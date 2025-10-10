@@ -2,6 +2,8 @@ use std::fmt;
 use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
+use p3_field::PrimeCharacteristicRing;
+
 pub trait TwinVMAlgebra:
     Add<Output = Self> + Sub<Output = Self> + Mul<Output = Self> + Neg<Output = Self> + Clone + Eq
 {
@@ -10,38 +12,50 @@ pub trait TwinVMAlgebra:
     fn one() -> Self;
 }
 
-/// Represents a single symbolic variable, like a column in the trace.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct TwinVMSymbolicCell {
-    pub is_curr: bool,
-    pub col_idx: usize,
+pub enum TwinVMSymbolicEntry {
+    Main { is_curr: bool },
+    Public,
 }
 
-impl fmt::Debug for TwinVMSymbolicCell {
+impl fmt::Debug for TwinVMSymbolicEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}[{}]",
-            if self.is_curr { "curr" } else { "next" },
-            self.col_idx
-        )
+        match self {
+            TwinVMSymbolicEntry::Main { is_curr } => {
+                write!(f, "{}", if *is_curr { "curr" } else { "next" })
+            }
+            TwinVMSymbolicEntry::Public => write!(f, "{}", "public"),
+        }
+    }
+}
+
+/// Represents a single symbolic variable, like a column in the trace.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct TwinVMSymbolicVal {
+    pub entry: TwinVMSymbolicEntry,
+    pub index: usize,
+}
+
+impl fmt::Debug for TwinVMSymbolicVal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}[{}]", self.entry, self.index)
     }
 }
 
 /// An enum representing a symbolic expression tree.
-pub enum TwinVMSymbolicExpr<F: TwinVMAlgebra> {
+pub enum TwinVMSymbolicExpr<F: PrimeCharacteristicRing> {
     IsFirstRow,
     IsTransition,
     IsLastRow,
     Constant(F),
-    Variable(TwinVMSymbolicCell),
+    Variable(TwinVMSymbolicVal),
     Add(Rc<Self>, Rc<Self>),
     Sub(Rc<Self>, Rc<Self>),
     Mul(Rc<Self>, Rc<Self>),
     Neg(Rc<Self>),
 }
 
-impl<F: fmt::Debug + TwinVMAlgebra> fmt::Debug for TwinVMSymbolicExpr<F> {
+impl<F: fmt::Debug + PrimeCharacteristicRing> fmt::Debug for TwinVMSymbolicExpr<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IsFirstRow => write!(f, "IsFirstRow"),
@@ -57,45 +71,46 @@ impl<F: fmt::Debug + TwinVMAlgebra> fmt::Debug for TwinVMSymbolicExpr<F> {
     }
 }
 
-impl<F: TwinVMAlgebra, T: Into<Self>> Add<T> for TwinVMSymbolicExpr<F> {
+impl<F: PrimeCharacteristicRing, T: Into<Self>> Add<T> for TwinVMSymbolicExpr<F> {
     type Output = Self;
     fn add(self, rhs: T) -> Self {
         Self::Add(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<F: TwinVMAlgebra, T: Into<Self>> Sub<T> for TwinVMSymbolicExpr<F> {
+impl<F: PrimeCharacteristicRing, T: Into<Self>> Sub<T> for TwinVMSymbolicExpr<F> {
     type Output = Self;
     fn sub(self, rhs: T) -> Self {
         Self::Sub(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<F: TwinVMAlgebra, T: Into<Self>> Mul<T> for TwinVMSymbolicExpr<F> {
+impl<F: PrimeCharacteristicRing, T: Into<Self>> Mul<T> for TwinVMSymbolicExpr<F> {
     type Output = Self;
     fn mul(self, rhs: T) -> Self {
         Self::Mul(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<F: TwinVMAlgebra> Neg for TwinVMSymbolicExpr<F> {
+impl<F: PrimeCharacteristicRing> Neg for TwinVMSymbolicExpr<F> {
     type Output = Self;
     fn neg(self) -> Self {
         Self::Neg(Rc::new(self))
     }
 }
 
-impl<F: TwinVMAlgebra> From<TwinVMSymbolicCell> for TwinVMSymbolicExpr<F> {
-    fn from(var: TwinVMSymbolicCell) -> Self {
+impl<F: PrimeCharacteristicRing> From<TwinVMSymbolicVal> for TwinVMSymbolicExpr<F> {
+    fn from(var: TwinVMSymbolicVal) -> Self {
         Self::Variable(var)
     }
 }
 
-impl<F: TwinVMAlgebra> TwinVMSymbolicExpr<F> {
+impl<F: PrimeCharacteristicRing> TwinVMSymbolicExpr<F> {
     pub fn eval(
         &self,
         curr_row: &[F],
         next_row: Option<&[F]>,
+        public_vals: Option<&[F]>,
         is_first_row: bool,
         is_transition: bool,
         is_last_row: bool,
@@ -103,61 +118,101 @@ impl<F: TwinVMAlgebra> TwinVMSymbolicExpr<F> {
         match self {
             Self::IsFirstRow => {
                 if is_first_row {
-                    F::one()
+                    F::ONE
                 } else {
-                    F::zero()
+                    F::ZERO
                 }
             }
             Self::IsTransition => {
                 if is_transition {
-                    F::one()
+                    F::ONE
                 } else {
-                    F::zero()
+                    F::ZERO
                 }
             }
             Self::IsLastRow => {
                 if is_last_row {
-                    F::one()
+                    F::ONE
                 } else {
-                    F::zero()
+                    F::ZERO
                 }
             }
             Self::Constant(c) => c.clone(),
-            Self::Variable(cell) => {
-                if cell.is_curr {
-                    curr_row[cell.col_idx].clone()
-                } else {
-                    match next_row {
-                        Some(nr) => nr[cell.col_idx].clone(),
-                        None => panic!("next_row not provided for next-row variable"),
+            Self::Variable(cell) => match cell.entry {
+                TwinVMSymbolicEntry::Main { is_curr } => {
+                    if is_curr {
+                        curr_row[cell.index].clone()
+                    } else {
+                        match next_row {
+                            Some(nr) => nr[cell.index].clone(),
+                            None => panic!("next_row not provided for next-row variable"),
+                        }
                     }
                 }
-            }
+                TwinVMSymbolicEntry::Public => match public_vals {
+                    Some(pv) => pv[cell.index].clone(),
+                    None => panic!("next_row not provided for next-row variable"),
+                },
+            },
             Self::Add(a, b) => {
-                a.eval(curr_row, next_row, is_first_row, is_transition, is_last_row)
-                    + b.eval(curr_row, next_row, is_first_row, is_transition, is_last_row)
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                ) + b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                )
             }
             Self::Sub(a, b) => {
-                a.eval(curr_row, next_row, is_first_row, is_transition, is_last_row)
-                    - b.eval(curr_row, next_row, is_first_row, is_transition, is_last_row)
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                ) - b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                )
             }
             Self::Mul(a, b) => {
-                a.eval(curr_row, next_row, is_first_row, is_transition, is_last_row)
-                    * b.eval(curr_row, next_row, is_first_row, is_transition, is_last_row)
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                ) * b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                )
             }
-            Self::Neg(a) => -a.eval(curr_row, next_row, is_first_row, is_transition, is_last_row),
+            Self::Neg(a) => -a.eval(
+                curr_row,
+                next_row,
+                public_vals,
+                is_first_row,
+                is_transition,
+                is_last_row,
+            ),
         }
-    }
-
-    pub fn eval_is_zero(
-        &self,
-        curr_row: &[F],
-        next_row: Option<&[F]>,
-        is_first_row: bool,
-        is_transition: bool,
-        is_last_row: bool,
-    ) -> bool {
-        self.eval(curr_row, next_row, is_first_row, is_transition, is_last_row)
-            .is_zero()
     }
 }
