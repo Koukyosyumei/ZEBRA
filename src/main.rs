@@ -19,7 +19,7 @@ use p3_uni_stark::{
     get_symbolic_constraints, prove, verify, StarkConfig, SymbolicAirBuilder, SymbolicExpression,
     SymbolicVariable,
 };
-use twinvm::{p3_to_tv::convert_p3_expr, symbolic::TwinVMAlgebra};
+use twinvm::{interval::AbstractInterval, p3_to_tv::convert_p3_expr};
 
 pub struct FibonacciAir {
     pub num_steps: usize,
@@ -78,7 +78,7 @@ fn main() -> Result<(), ()> {
     println!("#symbolic_constraints: {}", symbolic_constraints.len());
     for sc in symbolic_constraints {
         //println!("{:?}", sc);
-        println!("{:?}", convert_p3_expr(&sc));
+        println!("{:?}", convert_p3_expr::<Val>(&sc));
     }
 
     Ok(())

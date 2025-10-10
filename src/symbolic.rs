@@ -2,15 +2,8 @@ use std::fmt;
 use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
+use crate::interval::AbstractInterval;
 use p3_field::PrimeCharacteristicRing;
-
-pub trait TwinVMAlgebra:
-    Add<Output = Self> + Sub<Output = Self> + Mul<Output = Self> + Neg<Output = Self> + Clone + Eq
-{
-    fn is_zero(&self) -> bool;
-    fn zero() -> Self;
-    fn one() -> Self;
-}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TwinVMSymbolicEntry {
@@ -47,7 +40,7 @@ pub enum TwinVMSymbolicExpr<F: PrimeCharacteristicRing> {
     IsFirstRow,
     IsTransition,
     IsLastRow,
-    Constant(F),
+    Constant(AbstractInterval<F>),
     Variable(TwinVMSymbolicVal),
     Add(Rc<Self>, Rc<Self>),
     Sub(Rc<Self>, Rc<Self>),
@@ -108,33 +101,33 @@ impl<F: PrimeCharacteristicRing> From<TwinVMSymbolicVal> for TwinVMSymbolicExpr<
 impl<F: PrimeCharacteristicRing> TwinVMSymbolicExpr<F> {
     pub fn eval(
         &self,
-        curr_row: &[F],
-        next_row: Option<&[F]>,
-        public_vals: Option<&[F]>,
+        curr_row: &[AbstractInterval<F>],
+        next_row: Option<&[AbstractInterval<F>]>,
+        public_vals: Option<&[AbstractInterval<F>]>,
         is_first_row: bool,
         is_transition: bool,
         is_last_row: bool,
-    ) -> F {
+    ) -> AbstractInterval<F> {
         match self {
             Self::IsFirstRow => {
                 if is_first_row {
-                    F::ONE
+                    AbstractInterval::one()
                 } else {
-                    F::ZERO
+                    AbstractInterval::zero()
                 }
             }
             Self::IsTransition => {
                 if is_transition {
-                    F::ONE
+                    AbstractInterval::one()
                 } else {
-                    F::ZERO
+                    AbstractInterval::zero()
                 }
             }
             Self::IsLastRow => {
                 if is_last_row {
-                    F::ONE
+                    AbstractInterval::one()
                 } else {
-                    F::ZERO
+                    AbstractInterval::zero()
                 }
             }
             Self::Constant(c) => c.clone(),
