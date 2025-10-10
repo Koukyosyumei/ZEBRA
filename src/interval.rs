@@ -33,8 +33,8 @@ impl<F: PrimeCharacteristicRing> Sub<Self> for AbstractInterval<F> {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
         Self {
-            lo: self.lo + rhs.lo,
-            hi: self.hi + rhs.hi,
+            lo: self.lo - rhs.lo,
+            hi: self.hi - rhs.hi,
         }
     }
 }
@@ -43,8 +43,8 @@ impl<F: PrimeCharacteristicRing> Mul<Self> for AbstractInterval<F> {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self {
         Self {
-            lo: self.lo + rhs.lo,
-            hi: self.hi + rhs.hi,
+            lo: self.lo * rhs.lo,
+            hi: self.hi * rhs.hi,
         }
     }
 }
@@ -53,23 +53,25 @@ impl<F: PrimeCharacteristicRing> Neg for AbstractInterval<F> {
     type Output = Self;
     fn neg(self) -> Self {
         Self {
-            lo: self.lo,
-            hi: self.hi,
+            lo: -self.lo,
+            hi: -self.hi,
         }
     }
 }
 
 impl<F: PrimeCharacteristicRing> AbstractInterval<F> {
-    pub fn is_zero(&self) -> MayBeFlag {
-        todo!()
-    }
-
     pub fn zero() -> Self {
-        todo!()
+        Self {
+            lo: F::ZERO,
+            hi: F::ZERO,
+        }
     }
 
     pub fn one() -> Self {
-        todo!()
+        Self {
+            lo: F::ONE,
+            hi: F::ONE,
+        }
     }
 
     pub fn from_f(v: &F) -> Self {
