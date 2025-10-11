@@ -1,12 +1,9 @@
-
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::{Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
-
 use p3_mersenne_31::Mersenne31;
-use p3_uni_stark::{
-    get_symbolic_constraints, SymbolicExpression,
-};
+use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
+
 use twinvm::p3_to_tv::convert_p3_expr;
 
 pub struct FibonacciAir {

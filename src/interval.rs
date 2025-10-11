@@ -1,6 +1,6 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
-use p3_field::{PrimeCharacteristicRing, PrimeField32};
+use p3_field::PrimeField32;
 
 pub enum MayBeFlag {
     True,
@@ -55,6 +55,13 @@ impl<F: PrimeField32> Neg for AbstractInterval<F> {
 }
 
 impl<F: PrimeField32> AbstractInterval<F> {
+    pub fn top() -> Self {
+        Self {
+            lo: F::ZERO,
+            hi: -F::ONE,
+        }
+    }
+
     pub fn zero() -> Self {
         Self {
             lo: F::ZERO,

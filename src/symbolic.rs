@@ -2,8 +2,9 @@ use std::fmt;
 use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
-use crate::interval::AbstractInterval;
 use p3_field::PrimeField32;
+
+use crate::interval::AbstractInterval;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TwinVMSymbolicEntry {
