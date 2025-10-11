@@ -1,11 +1,6 @@
 use std::ops::{Add, Mul, Neg, Sub};
-use std::rc::Rc;
 
 use p3_field::{PrimeCharacteristicRing, PrimeField32};
-use p3_uni_stark::{
-    get_symbolic_constraints, prove, verify, Entry, StarkConfig, SymbolicAirBuilder,
-    SymbolicExpression, SymbolicVariable,
-};
 
 pub enum MayBeFlag {
     True,

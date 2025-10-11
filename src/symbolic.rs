@@ -3,7 +3,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
 use crate::interval::AbstractInterval;
-use p3_field::{PrimeCharacteristicRing, PrimeField32};
+use p3_field::PrimeField32;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TwinVMSymbolicEntry {
