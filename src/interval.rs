@@ -2,6 +2,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 
 use p3_field::PrimeField32;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MayBeFlag {
     True,
     False,

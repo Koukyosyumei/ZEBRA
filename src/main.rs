@@ -4,7 +4,11 @@ use p3_matrix::Matrix;
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
-use twinvm::p3_to_tv::convert_p3_expr;
+use twinvm::{
+    interval::{AbstractInterval, MayBeFlag},
+    p3_to_tv::convert_p3_expr,
+    symbolic,
+};
 
 pub struct FibonacciAir {
     pub num_steps: usize,
@@ -61,9 +65,35 @@ fn main() -> Result<(), ()> {
     };
     let symbolic_constraints: Vec<SymbolicExpression<Val>> = get_symbolic_constraints(&air, 0, 0);
     println!("#symbolic_constraints: {}", symbolic_constraints.len());
+
+    let mut tv_constraints = vec![];
     for sc in symbolic_constraints {
-        //println!("{:?}", sc);
         println!("{:?}", convert_p3_expr::<Val>(&sc));
+        tv_constraints.push(convert_p3_expr::<Val>(&sc));
+    }
+
+    let abs_main_trace = vec![vec![AbstractInterval::<Val>::top(); 2]; num_steps];
+    for i in 0..num_steps {
+        if i == 0 {
+            for tc in &tv_constraints {
+                if tc
+                    .eval(
+                        &abs_main_trace[i],
+                        if i + 1 < num_steps {
+                            Some(&abs_main_trace[i + 1])
+                        } else {
+                            None
+                        },
+                        None,
+                        true,
+                        i < num_steps - 1,
+                        i == num_steps - 1,
+                    )
+                    .is_zero()
+                    == MayBeFlag::True
+                {}
+            }
+        }
     }
 
     Ok(())
