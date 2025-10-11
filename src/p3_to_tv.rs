@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use p3_field::PrimeCharacteristicRing;
+use p3_field::{PrimeCharacteristicRing, PrimeField32};
 use p3_uni_stark::{
     get_symbolic_constraints, prove, verify, Entry, StarkConfig, SymbolicAirBuilder,
     SymbolicExpression, SymbolicVariable,
@@ -30,9 +30,7 @@ pub fn convert_p3_variable<F>(var: &SymbolicVariable<F>) -> TwinVMSymbolicVal {
     }
 }
 
-pub fn convert_p3_expr<F: PrimeCharacteristicRing>(
-    expr: &SymbolicExpression<F>,
-) -> TwinVMSymbolicExpr<F> {
+pub fn convert_p3_expr<F: PrimeField32>(expr: &SymbolicExpression<F>) -> TwinVMSymbolicExpr<F> {
     match expr {
         SymbolicExpression::Variable(symbolic_variable) => {
             TwinVMSymbolicExpr::Variable(convert_p3_variable(symbolic_variable))

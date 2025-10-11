@@ -3,7 +3,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
 use crate::interval::AbstractInterval;
-use p3_field::PrimeCharacteristicRing;
+use p3_field::{PrimeCharacteristicRing, PrimeField32};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TwinVMSymbolicEntry {
@@ -36,7 +36,7 @@ impl fmt::Debug for TwinVMSymbolicVal {
 }
 
 /// An enum representing a symbolic expression tree.
-pub enum TwinVMSymbolicExpr<F: PrimeCharacteristicRing> {
+pub enum TwinVMSymbolicExpr<F: PrimeField32> {
     IsFirstRow,
     IsTransition,
     IsLastRow,
@@ -48,7 +48,7 @@ pub enum TwinVMSymbolicExpr<F: PrimeCharacteristicRing> {
     Neg(Rc<Self>),
 }
 
-impl<F: fmt::Debug + PrimeCharacteristicRing> fmt::Debug for TwinVMSymbolicExpr<F> {
+impl<F: fmt::Debug + PrimeField32> fmt::Debug for TwinVMSymbolicExpr<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IsFirstRow => write!(f, "IsFirstRow"),
@@ -64,41 +64,41 @@ impl<F: fmt::Debug + PrimeCharacteristicRing> fmt::Debug for TwinVMSymbolicExpr<
     }
 }
 
-impl<F: PrimeCharacteristicRing, T: Into<Self>> Add<T> for TwinVMSymbolicExpr<F> {
+impl<F: PrimeField32, T: Into<Self>> Add<T> for TwinVMSymbolicExpr<F> {
     type Output = Self;
     fn add(self, rhs: T) -> Self {
         Self::Add(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<F: PrimeCharacteristicRing, T: Into<Self>> Sub<T> for TwinVMSymbolicExpr<F> {
+impl<F: PrimeField32, T: Into<Self>> Sub<T> for TwinVMSymbolicExpr<F> {
     type Output = Self;
     fn sub(self, rhs: T) -> Self {
         Self::Sub(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<F: PrimeCharacteristicRing, T: Into<Self>> Mul<T> for TwinVMSymbolicExpr<F> {
+impl<F: PrimeField32, T: Into<Self>> Mul<T> for TwinVMSymbolicExpr<F> {
     type Output = Self;
     fn mul(self, rhs: T) -> Self {
         Self::Mul(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<F: PrimeCharacteristicRing> Neg for TwinVMSymbolicExpr<F> {
+impl<F: PrimeField32> Neg for TwinVMSymbolicExpr<F> {
     type Output = Self;
     fn neg(self) -> Self {
         Self::Neg(Rc::new(self))
     }
 }
 
-impl<F: PrimeCharacteristicRing> From<TwinVMSymbolicVal> for TwinVMSymbolicExpr<F> {
+impl<F: PrimeField32> From<TwinVMSymbolicVal> for TwinVMSymbolicExpr<F> {
     fn from(var: TwinVMSymbolicVal) -> Self {
         Self::Variable(var)
     }
 }
 
-impl<F: PrimeCharacteristicRing> TwinVMSymbolicExpr<F> {
+impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
     pub fn eval(
         &self,
         curr_row: &[AbstractInterval<F>],
