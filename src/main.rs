@@ -1,25 +1,13 @@
-use std::fmt::Debug;
-use std::marker::PhantomData;
 
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::{Field, PrimeCharacteristicRing};
-use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::Matrix;
 
-use p3_challenger::{HashChallenger, SerializingChallenger32};
-use p3_circle::CirclePcs;
-use p3_commit::ExtensionMmcs;
-use p3_field::extension::BinomialExtensionField;
-use p3_fri::FriFoldingStrategy;
-use p3_keccak::Keccak256Hash;
-use p3_merkle_tree::MerkleTreeMmcs;
 use p3_mersenne_31::Mersenne31;
-use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher};
 use p3_uni_stark::{
-    get_symbolic_constraints, prove, verify, StarkConfig, SymbolicAirBuilder, SymbolicExpression,
-    SymbolicVariable,
+    get_symbolic_constraints, SymbolicExpression,
 };
-use twinvm::{interval::AbstractInterval, p3_to_tv::convert_p3_expr};
+use twinvm::p3_to_tv::convert_p3_expr;
 
 pub struct FibonacciAir {
     pub num_steps: usize,
