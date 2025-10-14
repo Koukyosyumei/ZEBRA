@@ -88,6 +88,19 @@ impl<F: PrimeField32> AbstractInterval<F> {
         }
     }
 
+    pub fn split(&self) -> (Self, Self) {
+        (
+            Self {
+                lo: self.lo,
+                hi: self.hi / F::from_i16(2),
+            },
+            Self {
+                lo: self.hi / F::from_i16(2),
+                hi: self.hi,
+            },
+        )
+    }
+
     pub fn from_f(v: &F) -> Self {
         Self {
             lo: v.clone(),
