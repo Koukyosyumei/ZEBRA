@@ -29,8 +29,8 @@ impl<F: PrimeField32> Sub<Self> for AbstractInterval<F> {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
         Self {
-            lo: self.lo - rhs.lo,
-            hi: self.hi - rhs.hi,
+            lo: self.lo - rhs.hi,
+            hi: self.hi - rhs.lo,
         }
     }
 }
@@ -110,12 +110,6 @@ impl<F: PrimeField32> AbstractInterval<F> {
     }
 
     pub fn split(&self) -> (Self, Self) {
-        println!(
-            "lo: {}, hi: {}, hi/2: {}",
-            self.lo,
-            self.hi,
-            self.hi.to_unique_u32() / 2
-        );
         (
             Self {
                 lo: self.lo,
