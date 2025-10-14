@@ -89,7 +89,6 @@ fn main() -> Result<(), ()> {
     ];
     println!("{:?}", eval_air_constraints(&true_trace, &tv_constraints));
 
-    // UNSAT: [[AbstractInterval { lo: 0, hi: 7 }, AbstractInterval { lo: 0, hi: 7 }], [AbstractInterval { lo: 1, hi: 1 }, AbstractInterval { lo: 0, hi: 15 }]]
     let trace_p = vec![
         vec![
             AbstractInterval {
@@ -125,9 +124,7 @@ fn main() -> Result<(), ()> {
             println!("Find SAT assignment");
             break;
         } else if flag == MayBeFlag::MayBe {
-            println!("MayBe: {:?}", trace);
             let children = refine_trace(&trace, 1, &mut rng);
-            println!("children: {:?}", children);
             deque.push_back(children.0);
             deque.push_back(children.1);
         } else {

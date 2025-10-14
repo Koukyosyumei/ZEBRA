@@ -228,23 +228,6 @@ pub fn eval_air_constraints<F: PrimeField32>(
     let mut is_all_true = true;
     for i in 0..num_steps {
         for tc in constraints {
-            println!("tc: {:?}", tc);
-            println!("trace[{}] = {:?}", i, trace[i]);
-            println!(
-                "tc.eval: {:?}",
-                tc.eval(
-                    &trace[i],
-                    if i + 1 < num_steps {
-                        Some(&trace[i + 1])
-                    } else {
-                        None
-                    },
-                    None,
-                    i == 0,
-                    i < num_steps - 1,
-                    i == num_steps - 1,
-                )
-            );
             let flag = tc
                 .eval(
                     &trace[i],
