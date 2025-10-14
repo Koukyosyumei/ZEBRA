@@ -110,13 +110,19 @@ impl<F: PrimeField32> AbstractInterval<F> {
     }
 
     pub fn split(&self) -> (Self, Self) {
+        println!(
+            "lo: {}, hi: {}, hi/2: {}",
+            self.lo,
+            self.hi,
+            self.hi.to_unique_u32() / 2
+        );
         (
             Self {
                 lo: self.lo,
                 hi: F::from_u32(self.hi.to_unique_u32() / 2),
             },
             Self {
-                lo: F::from_u32(self.hi.to_unique_u32() / 2),
+                lo: F::from_u32(self.hi.to_unique_u32() / 2 + 1),
                 hi: self.hi,
             },
         )

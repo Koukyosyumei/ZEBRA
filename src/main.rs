@@ -84,12 +84,14 @@ fn main() -> Result<(), ()> {
     while !deque.is_empty() {
         println!("{}", deque.len());
         let trace = deque.pop_front().unwrap();
+        println!("{:?}", trace);
         let flag = eval_air_constraints(&trace, &tv_constraints);
         if flag == MayBeFlag::True {
             println!("Find SAT assignment");
             break;
         } else if flag == MayBeFlag::MayBe {
             let children = refine_trace(&trace, 1, &mut rng);
+            println!("children: {:?}", children);
             deque.push_back(children.0);
             deque.push_back(children.1);
         } else {
