@@ -185,21 +185,26 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
                 )
             }
             Self::Mul(a, b) => {
-                a.eval(
+                let va = a.eval(
                     curr_row,
                     next_row,
                     public_vals,
                     is_first_row,
                     is_transition,
                     is_last_row,
-                ) * b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                )
+                );
+                if va.is_zero() == MayBeFlag::True {
+                    AbstractInterval::zero()
+                } else {
+                    b.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                    )
+                }
             }
             Self::Neg(a) => -a.eval(
                 curr_row,
@@ -222,27 +227,25 @@ pub fn eval_air_constraints<F: PrimeField32>(
     let num_steps = trace.len();
     let mut is_all_true = true;
     for i in 0..num_steps {
-        if i == 0 {
-            for tc in constraints {
-                let flag = tc
-                    .eval(
-                        &trace[i],
-                        if i + 1 < num_steps {
-                            Some(&trace[i + 1])
-                        } else {
-                            None
-                        },
-                        None,
-                        true,
-                        i < num_steps - 1,
-                        i == num_steps - 1,
-                    )
-                    .is_zero();
-                match flag {
-                    MayBeFlag::True => {}
-                    MayBeFlag::False => return MayBeFlag::False,
-                    MayBeFlag::MayBe => is_all_true = false,
-                }
+        for tc in constraints {
+            let flag = tc
+                .eval(
+                    &trace[i],
+                    if i + 1 < num_steps {
+                        Some(&trace[i + 1])
+                    } else {
+                        None
+                    },
+                    None,
+                    i == 0,
+                    i < num_steps - 1,
+                    i == num_steps - 1,
+                )
+                .is_zero();
+            match flag {
+                MayBeFlag::True => {}
+                MayBeFlag::False => return MayBeFlag::False,
+                MayBeFlag::MayBe => is_all_true = false,
             }
         }
     }
@@ -261,8 +264,8 @@ pub fn refine_trace<F: PrimeField32>(
     let mut trace_a = trace.clone();
     let mut trace_b = trace.clone();
     for _ in 0..num_refined_points {
-        let i = rng.random::<u32>() as usize;
-        let j = rng.random::<u32>() as usize;
+        let i = rng.random_range(0..trace.len()) as usize;
+        let j = rng.random_range(0..trace[i].len()) as usize;
         let v = trace[i][j].split();
         trace_a[i][j] = v.0;
         trace_b[i][j] = v.1;

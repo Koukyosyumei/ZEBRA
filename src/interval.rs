@@ -92,6 +92,9 @@ impl<F: PrimeField32> AbstractInterval<F> {
                 return MayBeFlag::MayBe;
             }
         }
+        if self.lo > self.hi {
+            return MayBeFlag::MayBe;
+        }
         return MayBeFlag::False;
     }
 
@@ -102,14 +105,18 @@ impl<F: PrimeField32> AbstractInterval<F> {
         }
     }
 
+    pub fn is_singleton(&self) -> bool {
+        self.lo == self.hi
+    }
+
     pub fn split(&self) -> (Self, Self) {
         (
             Self {
                 lo: self.lo,
-                hi: self.hi / F::from_u8(2),
+                hi: F::from_u32(self.hi.to_unique_u32() / 2),
             },
             Self {
-                lo: self.hi / F::from_u8(2),
+                lo: F::from_u32(self.hi.to_unique_u32() / 2),
                 hi: self.hi,
             },
         )

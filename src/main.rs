@@ -62,7 +62,7 @@ fn main() -> Result<(), ()> {
 
     let mut rng = StdRng::seed_from_u64(42);
 
-    let num_steps = 3; // Choose the number of Fibonacci steps
+    let num_steps = 2; // Choose the number of Fibonacci steps
     let final_value = 21; // Choose the final Fibonacci value
     let air = FibonacciAir {
         num_steps,
