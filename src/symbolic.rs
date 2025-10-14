@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use p3_field::PrimeField32;
 
-use crate::interval::AbstractInterval;
+use crate::interval::{AbstractInterval, MayBeFlag};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TwinVMSymbolicEntry {
@@ -208,5 +208,43 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
                 is_last_row,
             ),
         }
+    }
+}
+
+pub fn eval_air_constraints<F: PrimeField32>(
+    trace: &Vec<Vec<AbstractInterval<F>>>,
+    constraints: &Vec<TwinVMSymbolicExpr<F>>,
+) -> MayBeFlag {
+    let num_steps = trace.len();
+    let mut is_all_true = true;
+    for i in 0..num_steps {
+        if i == 0 {
+            for tc in constraints {
+                let flag = tc
+                    .eval(
+                        &trace[i],
+                        if i + 1 < num_steps {
+                            Some(&trace[i + 1])
+                        } else {
+                            None
+                        },
+                        None,
+                        true,
+                        i < num_steps - 1,
+                        i == num_steps - 1,
+                    )
+                    .is_zero();
+                match flag {
+                    MayBeFlag::True => {}
+                    MayBeFlag::False => return MayBeFlag::False,
+                    MayBeFlag::MayBe => is_all_true = false,
+                }
+            }
+        }
+    }
+    if is_all_true {
+        MayBeFlag::True
+    } else {
+        MayBeFlag::MayBe
     }
 }

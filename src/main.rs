@@ -7,7 +7,7 @@ use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 use twinvm::{
     interval::{AbstractInterval, MayBeFlag},
     p3_to_tv::convert_p3_expr,
-    symbolic,
+    symbolic::eval_air_constraints,
 };
 
 pub struct FibonacciAir {
@@ -73,28 +73,7 @@ fn main() -> Result<(), ()> {
     }
 
     let abs_main_trace = vec![vec![AbstractInterval::<Val>::top(); 2]; num_steps];
-    for i in 0..num_steps {
-        if i == 0 {
-            for tc in &tv_constraints {
-                if tc
-                    .eval(
-                        &abs_main_trace[i],
-                        if i + 1 < num_steps {
-                            Some(&abs_main_trace[i + 1])
-                        } else {
-                            None
-                        },
-                        None,
-                        true,
-                        i < num_steps - 1,
-                        i == num_steps - 1,
-                    )
-                    .is_zero()
-                    == MayBeFlag::True
-                {}
-            }
-        }
-    }
+    let flag = eval_air_constraints(&abs_main_trace, &tv_constraints);
 
     Ok(())
 }
