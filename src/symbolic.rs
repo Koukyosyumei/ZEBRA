@@ -3,6 +3,8 @@ use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
 use p3_field::PrimeField32;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 
@@ -211,8 +213,10 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
     }
 }
 
+type AbstTrace<F> = Vec<Vec<AbstractInterval<F>>>;
+
 pub fn eval_air_constraints<F: PrimeField32>(
-    trace: &Vec<Vec<AbstractInterval<F>>>,
+    trace: &AbstTrace<F>,
     constraints: &Vec<TwinVMSymbolicExpr<F>>,
 ) -> MayBeFlag {
     let num_steps = trace.len();
@@ -247,4 +251,21 @@ pub fn eval_air_constraints<F: PrimeField32>(
     } else {
         MayBeFlag::MayBe
     }
+}
+
+pub fn refine_trace<F: PrimeField32>(
+    trace: &AbstTrace<F>,
+    num_refined_points: usize,
+    rng: &mut StdRng,
+) -> (AbstTrace<F>, AbstTrace<F>) {
+    let mut trace_a = trace.clone();
+    let mut trace_b = trace.clone();
+    for _ in 0..num_refined_points {
+        let i = rng.random::<u32>() as usize;
+        let j = rng.random::<u32>() as usize;
+        let v = trace[i][j].split();
+        trace_a[i][j] = v.0;
+        trace_b[i][j] = v.1;
+    }
+    (trace_a, trace_b)
 }
