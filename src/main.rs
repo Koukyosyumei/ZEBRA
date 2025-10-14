@@ -1,13 +1,16 @@
+use std::collections::VecDeque;
+
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::{Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
+use rand::{rngs::StdRng, SeedableRng};
 use twinvm::{
     interval::{AbstractInterval, MayBeFlag},
     p3_to_tv::convert_p3_expr,
-    symbolic::eval_air_constraints,
+    symbolic::{eval_air_constraints, refine_trace, AbstractTrace},
 };
 
 pub struct FibonacciAir {
@@ -47,17 +50,19 @@ where
             .assert_eq(next[1].clone(), local[0].clone() + local[1].clone());
 
         // Constrain the final value
-        let final_value = AB::Expr::from_u32(self.final_value);
-        builder
-            .when_last_row()
-            .assert_eq(local[1].clone(), final_value);
+        //let final_value = AB::Expr::from_u32(self.final_value);
+        //builder
+        //    .when_last_row()
+        //    .assert_eq(local[1].clone(), final_value);
     }
 }
 
 fn main() -> Result<(), ()> {
     type Val = Mersenne31;
 
-    let num_steps = 8; // Choose the number of Fibonacci steps
+    let mut rng = StdRng::seed_from_u64(42);
+
+    let num_steps = 3; // Choose the number of Fibonacci steps
     let final_value = 21; // Choose the final Fibonacci value
     let air = FibonacciAir {
         num_steps,
@@ -72,8 +77,25 @@ fn main() -> Result<(), ()> {
         tv_constraints.push(convert_p3_expr::<Val>(&sc));
     }
 
-    let abs_main_trace = vec![vec![AbstractInterval::<Val>::top(); 2]; num_steps];
-    let flag = eval_air_constraints(&abs_main_trace, &tv_constraints);
+    let mut deque: VecDeque<AbstractTrace<Val>> = VecDeque::new();
+    let abs_main_trace = vec![vec![AbstractInterval::<Val>::u8(); 2]; num_steps];
+    deque.push_back(abs_main_trace);
+
+    while !deque.is_empty() {
+        println!("{}", deque.len());
+        let trace = deque.pop_front().unwrap();
+        let flag = eval_air_constraints(&trace, &tv_constraints);
+        if flag == MayBeFlag::True {
+            println!("Find SAT assignment");
+            break;
+        } else if flag == MayBeFlag::MayBe {
+            let children = refine_trace(&trace, 1, &mut rng);
+            deque.push_back(children.0);
+            deque.push_back(children.1);
+        } else {
+            println!("UNSAT");
+        }
+    }
 
     Ok(())
 }

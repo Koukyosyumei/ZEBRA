@@ -213,10 +213,10 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
     }
 }
 
-type AbstTrace<F> = Vec<Vec<AbstractInterval<F>>>;
+pub type AbstractTrace<F> = Vec<Vec<AbstractInterval<F>>>;
 
 pub fn eval_air_constraints<F: PrimeField32>(
-    trace: &AbstTrace<F>,
+    trace: &AbstractTrace<F>,
     constraints: &Vec<TwinVMSymbolicExpr<F>>,
 ) -> MayBeFlag {
     let num_steps = trace.len();
@@ -254,10 +254,10 @@ pub fn eval_air_constraints<F: PrimeField32>(
 }
 
 pub fn refine_trace<F: PrimeField32>(
-    trace: &AbstTrace<F>,
+    trace: &AbstractTrace<F>,
     num_refined_points: usize,
     rng: &mut StdRng,
-) -> (AbstTrace<F>, AbstTrace<F>) {
+) -> (AbstractTrace<F>, AbstractTrace<F>) {
     let mut trace_a = trace.clone();
     let mut trace_b = trace.clone();
     for _ in 0..num_refined_points {

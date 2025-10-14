@@ -63,6 +63,20 @@ impl<F: PrimeField32> AbstractInterval<F> {
         }
     }
 
+    pub fn bool() -> Self {
+        Self {
+            lo: F::ZERO,
+            hi: F::ONE,
+        }
+    }
+
+    pub fn u8() -> Self {
+        Self {
+            lo: F::ZERO,
+            hi: F::from_u8(255),
+        }
+    }
+
     pub fn zero() -> Self {
         Self {
             lo: F::ZERO,
@@ -92,10 +106,10 @@ impl<F: PrimeField32> AbstractInterval<F> {
         (
             Self {
                 lo: self.lo,
-                hi: self.hi / F::from_i16(2),
+                hi: self.hi / F::from_u8(2),
             },
             Self {
-                lo: self.hi / F::from_i16(2),
+                lo: self.hi / F::from_u8(2),
                 hi: self.hi,
             },
         )
