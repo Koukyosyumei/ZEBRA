@@ -10,49 +10,49 @@ use rand::{Rng, SeedableRng};
 use crate::interval::{AbstractInterval, MayBeFlag};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub enum TwinVMSymbolicEntry {
+pub enum LatticeVMSymbolicEntry {
     Main { is_curr: bool },
     Public,
 }
 
-impl fmt::Debug for TwinVMSymbolicEntry {
+impl fmt::Debug for LatticeVMSymbolicEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TwinVMSymbolicEntry::Main { is_curr } => {
+            LatticeVMSymbolicEntry::Main { is_curr } => {
                 write!(f, "{}", if *is_curr { "curr" } else { "next" })
             }
-            TwinVMSymbolicEntry::Public => write!(f, "{}", "public"),
+            LatticeVMSymbolicEntry::Public => write!(f, "{}", "public"),
         }
     }
 }
 
 /// Represents a single symbolic variable, like a column in the trace.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct TwinVMSymbolicVal {
-    pub entry: TwinVMSymbolicEntry,
+pub struct LatticeVMSymbolicVal {
+    pub entry: LatticeVMSymbolicEntry,
     pub index: usize,
 }
 
-impl fmt::Debug for TwinVMSymbolicVal {
+impl fmt::Debug for LatticeVMSymbolicVal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}[{}]", self.entry, self.index)
     }
 }
 
 /// An enum representing a symbolic expression tree.
-pub enum TwinVMSymbolicExpr {
+pub enum LatticeVMSymbolicExpr {
     IsFirstRow,
     IsTransition,
     IsLastRow,
     Constant(AbstractInterval),
-    Variable(TwinVMSymbolicVal),
+    Variable(LatticeVMSymbolicVal),
     Add(Rc<Self>, Rc<Self>),
     Sub(Rc<Self>, Rc<Self>),
     Mul(Rc<Self>, Rc<Self>),
     Neg(Rc<Self>),
 }
 
-impl fmt::Debug for TwinVMSymbolicExpr {
+impl fmt::Debug for LatticeVMSymbolicExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IsFirstRow => write!(f, "IsFirstRow"),
@@ -68,41 +68,41 @@ impl fmt::Debug for TwinVMSymbolicExpr {
     }
 }
 
-impl<T: Into<Self>> Add<T> for TwinVMSymbolicExpr {
+impl<T: Into<Self>> Add<T> for LatticeVMSymbolicExpr {
     type Output = Self;
     fn add(self, rhs: T) -> Self {
         Self::Add(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<T: Into<Self>> Sub<T> for TwinVMSymbolicExpr {
+impl<T: Into<Self>> Sub<T> for LatticeVMSymbolicExpr {
     type Output = Self;
     fn sub(self, rhs: T) -> Self {
         Self::Sub(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<T: Into<Self>> Mul<T> for TwinVMSymbolicExpr {
+impl<T: Into<Self>> Mul<T> for LatticeVMSymbolicExpr {
     type Output = Self;
     fn mul(self, rhs: T) -> Self {
         Self::Mul(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl Neg for TwinVMSymbolicExpr {
+impl Neg for LatticeVMSymbolicExpr {
     type Output = Self;
     fn neg(self) -> Self {
         Self::Neg(Rc::new(self))
     }
 }
 
-impl From<TwinVMSymbolicVal> for TwinVMSymbolicExpr {
-    fn from(var: TwinVMSymbolicVal) -> Self {
+impl From<LatticeVMSymbolicVal> for LatticeVMSymbolicExpr {
+    fn from(var: LatticeVMSymbolicVal) -> Self {
         Self::Variable(var)
     }
 }
 
-impl TwinVMSymbolicExpr {
+impl LatticeVMSymbolicExpr {
     pub fn eval(
         &self,
         curr_row: &[AbstractInterval],
@@ -137,7 +137,7 @@ impl TwinVMSymbolicExpr {
             }
             Self::Constant(c) => c.clone(),
             Self::Variable(cell) => match cell.entry {
-                TwinVMSymbolicEntry::Main { is_curr } => {
+                LatticeVMSymbolicEntry::Main { is_curr } => {
                     if is_curr {
                         curr_row[cell.index].clone()
                     } else {
@@ -147,7 +147,7 @@ impl TwinVMSymbolicExpr {
                         }
                     }
                 }
-                TwinVMSymbolicEntry::Public => match public_vals {
+                LatticeVMSymbolicEntry::Public => match public_vals {
                     Some(pv) => pv[cell.index].clone(),
                     None => panic!("next_row not provided for next-row variable"),
                 },
@@ -244,7 +244,7 @@ impl AbstractTrace {
 
 pub fn eval_air_constraints(
     trace: &AbstractTrace,
-    constraints: &Vec<TwinVMSymbolicExpr>,
+    constraints: &Vec<LatticeVMSymbolicExpr>,
     prime: u32,
 ) -> MayBeFlag {
     let num_steps = trace.data.len();

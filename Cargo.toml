@@ -1,5 +1,5 @@
 [package]
-name = "twinvm"
+name = "latticevm"
 version = "0.0.0"
 edition = "2021"
 authors = ["Koukyosyumei <koukyosyumei@hotmail.com>"]
@@ -9,7 +9,7 @@ repository = "https://github.com/Koukyosyumei/TwinVM"
 keywords = ["formal method", "security", "zero-knowledge-proof", "zkp"]
 
 [[bin]]
-name = "twinvm"
+name = "latticevm"
 path = "src/main.rs"
 
 [dependencies]

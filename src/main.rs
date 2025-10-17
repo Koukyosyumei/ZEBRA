@@ -6,12 +6,12 @@ use p3_matrix::Matrix;
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
-use rand::{rngs::StdRng, SeedableRng};
-use twinvm::{
+use latticevm::{
     interval::{AbstractInterval, MayBeFlag},
     p3_to_tv::convert_p3_expr,
     symbolic::{eval_air_constraints, refine_trace, AbstractTrace},
 };
+use rand::{rngs::StdRng, SeedableRng};
 
 pub struct FibonacciAir {
     pub num_steps: usize,

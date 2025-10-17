@@ -5,57 +5,57 @@ use p3_uni_stark::{Entry, SymbolicExpression, SymbolicVariable};
 
 use crate::{
     interval::AbstractInterval,
-    symbolic::{TwinVMSymbolicEntry, TwinVMSymbolicExpr, TwinVMSymbolicVal},
+    symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr, LatticeVMSymbolicVal},
 };
 
-pub fn convert_p3_entry(entry: &Entry) -> TwinVMSymbolicEntry {
+pub fn convert_p3_entry(entry: &Entry) -> LatticeVMSymbolicEntry {
     match entry {
         Entry::Preprocessed { offset: _offset } => todo!(),
-        Entry::Main { offset } => TwinVMSymbolicEntry::Main {
+        Entry::Main { offset } => LatticeVMSymbolicEntry::Main {
             is_curr: *offset == 0,
         },
         Entry::Permutation { offset: _offset } => todo!(),
-        Entry::Public => TwinVMSymbolicEntry::Public,
+        Entry::Public => LatticeVMSymbolicEntry::Public,
         Entry::Challenge => todo!(),
     }
 }
 
-pub fn convert_p3_variable<F>(var: &SymbolicVariable<F>) -> TwinVMSymbolicVal {
-    TwinVMSymbolicVal {
+pub fn convert_p3_variable<F>(var: &SymbolicVariable<F>) -> LatticeVMSymbolicVal {
+    LatticeVMSymbolicVal {
         entry: convert_p3_entry(&var.entry),
         index: var.index,
     }
 }
 
-pub fn convert_p3_expr<F: PrimeField32>(expr: &SymbolicExpression<F>) -> TwinVMSymbolicExpr {
+pub fn convert_p3_expr<F: PrimeField32>(expr: &SymbolicExpression<F>) -> LatticeVMSymbolicExpr {
     match expr {
         SymbolicExpression::Variable(symbolic_variable) => {
-            TwinVMSymbolicExpr::Variable(convert_p3_variable(symbolic_variable))
+            LatticeVMSymbolicExpr::Variable(convert_p3_variable(symbolic_variable))
         }
-        SymbolicExpression::IsFirstRow => TwinVMSymbolicExpr::IsFirstRow,
-        SymbolicExpression::IsLastRow => TwinVMSymbolicExpr::IsLastRow,
-        SymbolicExpression::IsTransition => TwinVMSymbolicExpr::IsTransition,
+        SymbolicExpression::IsFirstRow => LatticeVMSymbolicExpr::IsFirstRow,
+        SymbolicExpression::IsLastRow => LatticeVMSymbolicExpr::IsLastRow,
+        SymbolicExpression::IsTransition => LatticeVMSymbolicExpr::IsTransition,
         SymbolicExpression::Constant(v) => {
-            TwinVMSymbolicExpr::Constant(AbstractInterval::from_f(v))
+            LatticeVMSymbolicExpr::Constant(AbstractInterval::from_f(v))
         }
         SymbolicExpression::Add {
             x,
             y,
             degree_multiple: _degree_multiple,
-        } => TwinVMSymbolicExpr::Add(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
+        } => LatticeVMSymbolicExpr::Add(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
         SymbolicExpression::Sub {
             x,
             y,
             degree_multiple: _degree_multiple,
-        } => TwinVMSymbolicExpr::Sub(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
+        } => LatticeVMSymbolicExpr::Sub(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
         SymbolicExpression::Neg {
             x,
             degree_multiple: _degree_multiple,
-        } => TwinVMSymbolicExpr::Neg(Rc::new(convert_p3_expr(x))),
+        } => LatticeVMSymbolicExpr::Neg(Rc::new(convert_p3_expr(x))),
         SymbolicExpression::Mul {
             x,
             y,
             degree_multiple: _degree_multiple,
-        } => TwinVMSymbolicExpr::Mul(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
+        } => LatticeVMSymbolicExpr::Mul(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
     }
 }
