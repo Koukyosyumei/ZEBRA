@@ -3,9 +3,8 @@ use std::fmt;
 use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
-use p3_field::PrimeField32;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 
