@@ -93,8 +93,8 @@ impl AbstractInterval {
 
     pub fn from_f<F: PrimeField32>(v: &F) -> Self {
         Self {
-            lo: v.to_unique_u32() as i64,
-            hi: v.to_unique_u32() as i64,
+            lo: v.as_canonical_u32() as i64,
+            hi: v.as_canonical_u32() as i64,
         }
     }
 

@@ -1,5 +1,6 @@
 use p3_air::{Air, AirBuilder, BaseAir};
-use p3_field::{Field, PrimeCharacteristicRing};
+use p3_field::Field;
+use p3_field::FieldAlgebra;
 use p3_matrix::Matrix;
 
 pub struct FibonacciAir {
@@ -19,8 +20,8 @@ where
 {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let local = main.row_slice(0).unwrap();
-        let next = main.row_slice(1).unwrap();
+        let local = main.row_slice(0);
+        let next = main.row_slice(1);
 
         // Enforce starting values
         builder
