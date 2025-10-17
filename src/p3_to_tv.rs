@@ -1,10 +1,7 @@
 use std::rc::Rc;
 
 use p3_field::PrimeField32;
-use p3_uni_stark::{
-    Entry,
-    SymbolicExpression, SymbolicVariable,
-};
+use p3_uni_stark::{Entry, SymbolicExpression, SymbolicVariable};
 
 use crate::{
     interval::AbstractInterval,
@@ -30,35 +27,35 @@ pub fn convert_p3_variable<F>(var: &SymbolicVariable<F>) -> TwinVMSymbolicVal {
     }
 }
 
-pub fn convert_p3_expr<F: PrimeField32>(expr: &SymbolicExpression<F>) -> TwinVMSymbolicExpr<F> {
+pub fn convert_p3_expr<F: PrimeField32>(expr: &SymbolicExpression<F>) -> TwinVMSymbolicExpr {
     match expr {
         SymbolicExpression::Variable(symbolic_variable) => {
             TwinVMSymbolicExpr::Variable(convert_p3_variable(symbolic_variable))
         }
-        SymbolicExpression::IsFirstRow => TwinVMSymbolicExpr::<F>::IsFirstRow,
-        SymbolicExpression::IsLastRow => TwinVMSymbolicExpr::<F>::IsLastRow,
-        SymbolicExpression::IsTransition => TwinVMSymbolicExpr::<F>::IsTransition,
+        SymbolicExpression::IsFirstRow => TwinVMSymbolicExpr::IsFirstRow,
+        SymbolicExpression::IsLastRow => TwinVMSymbolicExpr::IsLastRow,
+        SymbolicExpression::IsTransition => TwinVMSymbolicExpr::IsTransition,
         SymbolicExpression::Constant(v) => {
-            TwinVMSymbolicExpr::<F>::Constant(AbstractInterval::from_f(v))
+            TwinVMSymbolicExpr::Constant(AbstractInterval::from_f(v))
         }
         SymbolicExpression::Add {
             x,
             y,
             degree_multiple: _degree_multiple,
-        } => TwinVMSymbolicExpr::<F>::Add(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
+        } => TwinVMSymbolicExpr::Add(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
         SymbolicExpression::Sub {
             x,
             y,
             degree_multiple: _degree_multiple,
-        } => TwinVMSymbolicExpr::<F>::Sub(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
+        } => TwinVMSymbolicExpr::Sub(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
         SymbolicExpression::Neg {
             x,
             degree_multiple: _degree_multiple,
-        } => TwinVMSymbolicExpr::<F>::Neg(Rc::new(convert_p3_expr(x))),
+        } => TwinVMSymbolicExpr::Neg(Rc::new(convert_p3_expr(x))),
         SymbolicExpression::Mul {
             x,
             y,
             degree_multiple: _degree_multiple,
-        } => TwinVMSymbolicExpr::<F>::Mul(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
+        } => TwinVMSymbolicExpr::Mul(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
     }
 }

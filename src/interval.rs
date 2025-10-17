@@ -10,12 +10,12 @@ pub enum MayBeFlag {
 }
 
 #[derive(Clone, Hash, Debug)]
-pub struct AbstractInterval<F: PrimeField32> {
-    pub lo: F,
-    pub hi: F,
+pub struct AbstractInterval {
+    pub lo: i64,
+    pub hi: i64,
 }
 
-impl<F: PrimeField32> Add<Self> for AbstractInterval<F> {
+impl Add<Self> for AbstractInterval {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
         Self {
@@ -25,7 +25,7 @@ impl<F: PrimeField32> Add<Self> for AbstractInterval<F> {
     }
 }
 
-impl<F: PrimeField32> Sub<Self> for AbstractInterval<F> {
+impl Sub<Self> for AbstractInterval {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
         Self {
@@ -35,7 +35,7 @@ impl<F: PrimeField32> Sub<Self> for AbstractInterval<F> {
     }
 }
 
-impl<F: PrimeField32> Mul<Self> for AbstractInterval<F> {
+impl Mul<Self> for AbstractInterval {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self {
         Self {
@@ -45,7 +45,7 @@ impl<F: PrimeField32> Mul<Self> for AbstractInterval<F> {
     }
 }
 
-impl<F: PrimeField32> Neg for AbstractInterval<F> {
+impl Neg for AbstractInterval {
     type Output = Self;
     fn neg(self) -> Self {
         Self {
@@ -55,53 +55,60 @@ impl<F: PrimeField32> Neg for AbstractInterval<F> {
     }
 }
 
-impl<F: PrimeField32> AbstractInterval<F> {
+impl AbstractInterval {
     pub fn top() -> Self {
         Self {
-            lo: F::ZERO,
-            hi: -F::ONE,
+            lo: 0_i64,
+            hi: 0_i64,
         }
     }
 
     pub fn bool() -> Self {
         Self {
-            lo: F::ZERO,
-            hi: F::ONE,
+            lo: 0_i64,
+            hi: 1_i64,
         }
     }
 
     pub fn u8() -> Self {
         Self {
-            lo: F::ZERO,
-            hi: F::from_u8(255),
+            lo: 0_i64,
+            hi: 255_i64,
         }
     }
 
     pub fn zero() -> Self {
         Self {
-            lo: F::ZERO,
-            hi: F::ZERO,
+            lo: 0_i64,
+            hi: 0_i64,
         }
-    }
-
-    pub fn is_zero(&self) -> MayBeFlag {
-        if self.lo.to_unique_u32() == 0 {
-            if self.hi.to_unique_u32() == 0 {
-                return MayBeFlag::True;
-            } else {
-                return MayBeFlag::MayBe;
-            }
-        }
-        if self.lo > self.hi {
-            return MayBeFlag::MayBe;
-        }
-        return MayBeFlag::False;
     }
 
     pub fn one() -> Self {
         Self {
-            lo: F::ONE,
-            hi: F::ONE,
+            lo: 1_i64,
+            hi: 1_i64,
+        }
+    }
+
+    pub fn from_f<F: PrimeField32>(v: &F) -> Self {
+        Self {
+            lo: v.to_unique_u32() as i64,
+            hi: v.to_unique_u32() as i64,
+        }
+    }
+
+    pub fn is_zero(&self, p: u32) -> MayBeFlag {
+        if self.is_singleton() {
+            if self.lo % (p as i64) == 0 {
+                return MayBeFlag::True;
+            }
+        }
+        let has_multiple_in_range = (self.hi / (p as i64)) - ((self.lo - 1) / (p as i64)) >= 1;
+        if has_multiple_in_range {
+            return MayBeFlag::MayBe;
+        } else {
+            return MayBeFlag::False;
         }
     }
 
@@ -113,19 +120,12 @@ impl<F: PrimeField32> AbstractInterval<F> {
         (
             Self {
                 lo: self.lo,
-                hi: F::from_u32(self.hi.to_unique_u32() / 2),
+                hi: self.hi / 2,
             },
             Self {
-                lo: F::from_u32(self.hi.to_unique_u32() / 2 + 1),
+                lo: self.hi / 2 + 1,
                 hi: self.hi,
             },
         )
-    }
-
-    pub fn from_f(v: &F) -> Self {
-        Self {
-            lo: v.clone(),
-            hi: v.clone(),
-        }
     }
 }

@@ -59,6 +59,7 @@ where
 
 fn main() -> Result<(), ()> {
     type Val = Mersenne31;
+    let prime = 2_u32.pow(31) - 1;
 
     let mut rng = StdRng::seed_from_u64(42);
 
@@ -87,39 +88,33 @@ fn main() -> Result<(), ()> {
             AbstractInterval::from_f(&Val::ONE),
         ],
     ];
-    println!("{:?}", eval_air_constraints(&true_trace, &tv_constraints));
+    println!(
+        "{:?}",
+        eval_air_constraints(&true_trace, &tv_constraints, prime)
+    );
 
     let trace_p = vec![
         vec![
-            AbstractInterval {
-                lo: Val::from_u16(0),
-                hi: Val::from_u16(7),
-            },
-            AbstractInterval {
-                lo: Val::from_u16(0),
-                hi: Val::from_u16(7),
-            },
+            AbstractInterval { lo: 0, hi: 7 },
+            AbstractInterval { lo: 0, hi: 7 },
         ],
         vec![
-            AbstractInterval {
-                lo: Val::from_u16(1),
-                hi: Val::from_u16(1),
-            },
-            AbstractInterval {
-                lo: Val::from_u16(0),
-                hi: Val::from_u16(15),
-            },
+            AbstractInterval { lo: 1, hi: 1 },
+            AbstractInterval { lo: 0, hi: 15 },
         ],
     ];
-    println!("{:?}", eval_air_constraints(&trace_p, &tv_constraints));
+    println!(
+        "{:?}",
+        eval_air_constraints(&trace_p, &tv_constraints, prime)
+    );
 
-    let mut deque: VecDeque<AbstractTrace<Val>> = VecDeque::new();
-    let abs_main_trace = vec![vec![AbstractInterval::<Val>::u8(); 2]; num_steps];
+    let mut deque: VecDeque<AbstractTrace> = VecDeque::new();
+    let abs_main_trace = vec![vec![AbstractInterval::u8(); 2]; num_steps];
     deque.push_back(abs_main_trace);
 
     while !deque.is_empty() {
         let trace = deque.pop_front().unwrap();
-        let flag = eval_air_constraints(&trace, &tv_constraints);
+        let flag = eval_air_constraints(&trace, &tv_constraints, prime);
         if flag == MayBeFlag::True {
             println!("Find SAT assignment");
             break;

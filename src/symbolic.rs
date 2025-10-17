@@ -39,11 +39,11 @@ impl fmt::Debug for TwinVMSymbolicVal {
 }
 
 /// An enum representing a symbolic expression tree.
-pub enum TwinVMSymbolicExpr<F: PrimeField32> {
+pub enum TwinVMSymbolicExpr {
     IsFirstRow,
     IsTransition,
     IsLastRow,
-    Constant(AbstractInterval<F>),
+    Constant(AbstractInterval),
     Variable(TwinVMSymbolicVal),
     Add(Rc<Self>, Rc<Self>),
     Sub(Rc<Self>, Rc<Self>),
@@ -51,7 +51,7 @@ pub enum TwinVMSymbolicExpr<F: PrimeField32> {
     Neg(Rc<Self>),
 }
 
-impl<F: fmt::Debug + PrimeField32> fmt::Debug for TwinVMSymbolicExpr<F> {
+impl fmt::Debug for TwinVMSymbolicExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IsFirstRow => write!(f, "IsFirstRow"),
@@ -67,50 +67,51 @@ impl<F: fmt::Debug + PrimeField32> fmt::Debug for TwinVMSymbolicExpr<F> {
     }
 }
 
-impl<F: PrimeField32, T: Into<Self>> Add<T> for TwinVMSymbolicExpr<F> {
+impl<T: Into<Self>> Add<T> for TwinVMSymbolicExpr {
     type Output = Self;
     fn add(self, rhs: T) -> Self {
         Self::Add(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<F: PrimeField32, T: Into<Self>> Sub<T> for TwinVMSymbolicExpr<F> {
+impl<T: Into<Self>> Sub<T> for TwinVMSymbolicExpr {
     type Output = Self;
     fn sub(self, rhs: T) -> Self {
         Self::Sub(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<F: PrimeField32, T: Into<Self>> Mul<T> for TwinVMSymbolicExpr<F> {
+impl<T: Into<Self>> Mul<T> for TwinVMSymbolicExpr {
     type Output = Self;
     fn mul(self, rhs: T) -> Self {
         Self::Mul(Rc::new(self), Rc::new(rhs.into()))
     }
 }
 
-impl<F: PrimeField32> Neg for TwinVMSymbolicExpr<F> {
+impl Neg for TwinVMSymbolicExpr {
     type Output = Self;
     fn neg(self) -> Self {
         Self::Neg(Rc::new(self))
     }
 }
 
-impl<F: PrimeField32> From<TwinVMSymbolicVal> for TwinVMSymbolicExpr<F> {
+impl From<TwinVMSymbolicVal> for TwinVMSymbolicExpr {
     fn from(var: TwinVMSymbolicVal) -> Self {
         Self::Variable(var)
     }
 }
 
-impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
+impl TwinVMSymbolicExpr {
     pub fn eval(
         &self,
-        curr_row: &[AbstractInterval<F>],
-        next_row: Option<&[AbstractInterval<F>]>,
-        public_vals: Option<&[AbstractInterval<F>]>,
+        curr_row: &[AbstractInterval],
+        next_row: Option<&[AbstractInterval]>,
+        public_vals: Option<&[AbstractInterval]>,
         is_first_row: bool,
         is_transition: bool,
         is_last_row: bool,
-    ) -> AbstractInterval<F> {
+        prime: u32,
+    ) -> AbstractInterval {
         match self {
             Self::IsFirstRow => {
                 if is_first_row {
@@ -158,6 +159,7 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
                     is_first_row,
                     is_transition,
                     is_last_row,
+                    prime,
                 ) + b.eval(
                     curr_row,
                     next_row,
@@ -165,6 +167,7 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
                     is_first_row,
                     is_transition,
                     is_last_row,
+                    prime,
                 )
             }
             Self::Sub(a, b) => {
@@ -175,6 +178,7 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
                     is_first_row,
                     is_transition,
                     is_last_row,
+                    prime,
                 ) - b.eval(
                     curr_row,
                     next_row,
@@ -182,6 +186,7 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
                     is_first_row,
                     is_transition,
                     is_last_row,
+                    prime,
                 )
             }
             Self::Mul(a, b) => {
@@ -192,8 +197,9 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
                     is_first_row,
                     is_transition,
                     is_last_row,
+                    prime,
                 );
-                if va.is_zero() == MayBeFlag::True {
+                if va.is_zero(prime) == MayBeFlag::True {
                     AbstractInterval::zero()
                 } else {
                     b.eval(
@@ -203,6 +209,7 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
                         is_first_row,
                         is_transition,
                         is_last_row,
+                        prime,
                     )
                 }
             }
@@ -213,16 +220,18 @@ impl<F: PrimeField32> TwinVMSymbolicExpr<F> {
                 is_first_row,
                 is_transition,
                 is_last_row,
+                prime,
             ),
         }
     }
 }
 
-pub type AbstractTrace<F> = Vec<Vec<AbstractInterval<F>>>;
+pub type AbstractTrace = Vec<Vec<AbstractInterval>>;
 
-pub fn eval_air_constraints<F: PrimeField32>(
-    trace: &AbstractTrace<F>,
-    constraints: &Vec<TwinVMSymbolicExpr<F>>,
+pub fn eval_air_constraints(
+    trace: &AbstractTrace,
+    constraints: &Vec<TwinVMSymbolicExpr>,
+    prime: u32,
 ) -> MayBeFlag {
     let num_steps = trace.len();
     let mut is_all_true = true;
@@ -240,8 +249,9 @@ pub fn eval_air_constraints<F: PrimeField32>(
                     i == 0,
                     i < num_steps - 1,
                     i == num_steps - 1,
+                    prime,
                 )
-                .is_zero();
+                .is_zero(prime);
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => return MayBeFlag::False,
@@ -256,11 +266,11 @@ pub fn eval_air_constraints<F: PrimeField32>(
     }
 }
 
-pub fn refine_trace<F: PrimeField32>(
-    trace: &AbstractTrace<F>,
+pub fn refine_trace(
+    trace: &AbstractTrace,
     num_refined_points: usize,
     rng: &mut StdRng,
-) -> (AbstractTrace<F>, AbstractTrace<F>) {
+) -> (AbstractTrace, AbstractTrace) {
     let mut trace_a = trace.clone();
     let mut trace_b = trace.clone();
     for _ in 0..num_refined_points {
