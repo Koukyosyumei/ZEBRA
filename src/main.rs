@@ -78,7 +78,7 @@ fn main() -> Result<(), ()> {
         tv_constraints.push(convert_p3_expr::<Val>(&sc));
     }
 
-    let true_trace = vec![
+    let true_trace_data = vec![
         vec![
             AbstractInterval::from_f(&Val::ZERO),
             AbstractInterval::from_f(&Val::ONE),
@@ -88,12 +88,13 @@ fn main() -> Result<(), ()> {
             AbstractInterval::from_f(&Val::ONE),
         ],
     ];
+    let true_trace = AbstractTrace::new(true_trace_data);
     println!(
         "{:?}",
         eval_air_constraints(&true_trace, &tv_constraints, prime)
     );
 
-    let trace_p = vec![
+    let false_trace_data = vec![
         vec![
             AbstractInterval { lo: 0, hi: 7 },
             AbstractInterval { lo: 0, hi: 7 },
@@ -103,13 +104,15 @@ fn main() -> Result<(), ()> {
             AbstractInterval { lo: 0, hi: 15 },
         ],
     ];
+    let false_trace = AbstractTrace::new(false_trace_data);
     println!(
         "{:?}",
-        eval_air_constraints(&trace_p, &tv_constraints, prime)
+        eval_air_constraints(&false_trace, &tv_constraints, prime)
     );
 
     let mut deque: VecDeque<AbstractTrace> = VecDeque::new();
-    let abs_main_trace = vec![vec![AbstractInterval::u8(); 2]; num_steps];
+    let abs_main_trace_data = vec![vec![AbstractInterval::u8(); 2]; num_steps];
+    let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
     deque.push_back(abs_main_trace);
 
     while !deque.is_empty() {
@@ -120,8 +123,10 @@ fn main() -> Result<(), ()> {
             break;
         } else if flag == MayBeFlag::MayBe {
             let children = refine_trace(&trace, 1, &mut rng);
-            deque.push_back(children.0);
-            deque.push_back(children.1);
+            if let Some(children) = children {
+                deque.push_back(children.0);
+                deque.push_back(children.1);
+            }
         } else {
             println!("UNSAT: {:?}", trace);
         }

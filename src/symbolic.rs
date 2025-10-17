@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt;
 use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
@@ -226,22 +227,35 @@ impl TwinVMSymbolicExpr {
     }
 }
 
-pub type AbstractTrace = Vec<Vec<AbstractInterval>>;
+#[derive(Clone, Debug)]
+pub struct AbstractTrace {
+    data: Vec<Vec<AbstractInterval>>,
+    singleton_positions: HashSet<(usize, usize)>,
+}
+
+impl AbstractTrace {
+    pub fn new(raw_trace: Vec<Vec<AbstractInterval>>) -> Self {
+        Self {
+            data: raw_trace,
+            singleton_positions: HashSet::new(),
+        }
+    }
+}
 
 pub fn eval_air_constraints(
     trace: &AbstractTrace,
     constraints: &Vec<TwinVMSymbolicExpr>,
     prime: u32,
 ) -> MayBeFlag {
-    let num_steps = trace.len();
+    let num_steps = trace.data.len();
     let mut is_all_true = true;
     for i in 0..num_steps {
         for tc in constraints {
             let flag = tc
                 .eval(
-                    &trace[i],
+                    &trace.data[i],
                     if i + 1 < num_steps {
-                        Some(&trace[i + 1])
+                        Some(&trace.data[i + 1])
                     } else {
                         None
                     },
@@ -270,17 +284,26 @@ pub fn refine_trace(
     trace: &AbstractTrace,
     num_refined_points: usize,
     rng: &mut StdRng,
-) -> (AbstractTrace, AbstractTrace) {
+) -> Option<(AbstractTrace, AbstractTrace)> {
+    if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
+        return None;
+    }
     let mut trace_a = trace.clone();
     let mut trace_b = trace.clone();
     for _ in 0..num_refined_points {
-        let i = rng.random_range(0..trace.len()) as usize;
-        let j = rng.random_range(0..trace[i].len()) as usize;
-        if !trace[i][j].is_singleton() {
-            let v = trace[i][j].split();
-            trace_a[i][j] = v.0;
-            trace_b[i][j] = v.1;
+        let i = rng.random_range(0..trace.data.len()) as usize;
+        let j = rng.random_range(0..trace.data[i].len()) as usize;
+        if !trace.data[i][j].is_singleton() {
+            let v = trace.data[i][j].split();
+            if v.0.is_singleton() {
+                trace_a.singleton_positions.insert((i, j));
+            }
+            if v.1.is_singleton() {
+                trace_b.singleton_positions.insert((i, j));
+            }
+            trace_a.data[i][j] = v.0;
+            trace_b.data[i][j] = v.1;
         }
     }
-    (trace_a, trace_b)
+    Some((trace_a, trace_b))
 }
