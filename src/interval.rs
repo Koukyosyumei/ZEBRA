@@ -127,10 +127,10 @@ impl AbstractInterval {
         (
             Self {
                 lo: self.lo,
-                hi: self.hi / 2,
+                hi: (self.lo + self.hi) / 2,
             },
             Self {
-                lo: self.hi / 2 + 1,
+                lo: (self.lo + self.hi) / 2 + 1,
                 hi: self.hi,
             },
         )

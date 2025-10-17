@@ -276,9 +276,11 @@ pub fn refine_trace(
     for _ in 0..num_refined_points {
         let i = rng.random_range(0..trace.len()) as usize;
         let j = rng.random_range(0..trace[i].len()) as usize;
-        let v = trace[i][j].split();
-        trace_a[i][j] = v.0;
-        trace_b[i][j] = v.1;
+        if !trace[i][j].is_singleton() {
+            let v = trace[i][j].split();
+            trace_a[i][j] = v.0;
+            trace_b[i][j] = v.1;
+        }
     }
     (trace_a, trace_b)
 }
