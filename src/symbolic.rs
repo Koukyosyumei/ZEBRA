@@ -244,7 +244,7 @@ impl AbstractTrace {
 
 pub fn eval_air_constraints(
     trace: &AbstractTrace,
-    constraints: &Vec<LatticeVMSymbolicExpr>,
+    constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
 ) -> MayBeFlag {
     let num_steps = trace.data.len();
