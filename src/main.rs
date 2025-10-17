@@ -116,7 +116,7 @@ fn main() -> Result<(), ()> {
         let trace = deque.pop_front().unwrap();
         let flag = eval_air_constraints(&trace, &tv_constraints, prime);
         if flag == MayBeFlag::True {
-            println!("Find SAT assignment");
+            println!("Find SAT assignment: {:?}", trace);
             break;
         } else if flag == MayBeFlag::MayBe {
             let children = refine_trace(&trace, 1, &mut rng);

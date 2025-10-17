@@ -98,14 +98,21 @@ impl AbstractInterval {
         }
     }
 
+    pub fn has_multiple_in_range(&self, k: i64) -> bool {
+        if self.lo <= 0 && 0 <= self.hi {
+            true
+        } else {
+            (self.hi / k) - ((self.lo - 1) / k) >= 1
+        }
+    }
+
     pub fn is_zero(&self, p: u32) -> MayBeFlag {
         if self.is_singleton() {
             if self.lo % (p as i64) == 0 {
                 return MayBeFlag::True;
             }
         }
-        let has_multiple_in_range = (self.hi / (p as i64)) - ((self.lo - 1) / (p as i64)) >= 1;
-        if has_multiple_in_range {
+        if self.has_multiple_in_range(p as i64) {
             return MayBeFlag::MayBe;
         } else {
             return MayBeFlag::False;
