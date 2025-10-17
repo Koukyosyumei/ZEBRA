@@ -128,7 +128,7 @@ fn main() -> Result<(), ()> {
                 deque.push_back(children.1);
             }
         } else {
-            println!("UNSAT: {:?}", trace);
+            //println!("UNSAT: {:?}", trace);
         }
     }
 
