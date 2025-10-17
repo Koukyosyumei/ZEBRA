@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 
-
 use rand::rngs::StdRng;
 
 use crate::{

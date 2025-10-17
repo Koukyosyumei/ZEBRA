@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_field::{Field, PrimeCharacteristicRing};
 use p3_matrix::Matrix;
