@@ -7,7 +7,7 @@ use zkm_core_machine::CpuChip;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 fn main() -> Result<(), ()> {
-    let prime = 2_u32.pow(31) - 1;
+    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
 
     let mut rng = StdRng::seed_from_u64(42);
 

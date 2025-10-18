@@ -20,7 +20,11 @@ pub struct AbstractInterval {
 
 impl fmt::Debug for AbstractInterval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}, {}]", self.lo, self.hi)
+        if self.is_singleton() {
+            write!(f, "{}", self.lo)
+        } else {
+            write!(f, "[{}, {}]", self.lo, self.hi)
+        }
     }
 }
 

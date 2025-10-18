@@ -265,6 +265,25 @@ pub fn eval_air_constraints(
                     prime,
                 )
                 .is_zero(prime);
+            if flag == MayBeFlag::False {
+                println!("{:?}", tc);
+                println!(
+                    "{:?}",
+                    tc.eval(
+                        &trace.data[i],
+                        if i + 1 < num_steps {
+                            Some(&trace.data[i + 1])
+                        } else {
+                            None
+                        },
+                        None,
+                        i == 0,
+                        i < num_steps - 1,
+                        i == num_steps - 1,
+                        prime,
+                    )
+                );
+            }
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => return MayBeFlag::False,
