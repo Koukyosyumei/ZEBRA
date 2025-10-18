@@ -34,6 +34,7 @@ fn main() -> Result<(), ()> {
         &tv_constraints,
         ZKM_PROOF_NUM_PV_ELTS,
         num_steps,
+        ZKM_PROOF_NUM_PV_ELTS,
         prime,
         &mut rng,
     );

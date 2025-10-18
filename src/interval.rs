@@ -69,10 +69,10 @@ impl Neg for AbstractInterval {
 }
 
 impl AbstractInterval {
-    pub fn top() -> Self {
+    pub fn top(prime: u32) -> Self {
         Self {
             lo: 0_i64,
-            hi: 0_i64,
+            hi: (prime as i64) - 1,
         }
     }
 

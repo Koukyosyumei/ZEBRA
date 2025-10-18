@@ -148,7 +148,7 @@ impl LatticeVMSymbolicExpr {
                 }
                 LatticeVMSymbolicEntry::Public => match public_vals {
                     Some(pv) => pv[cell.index].clone(),
-                    None => panic!("next_row not provided for next-row variable"),
+                    None => panic!("public_vals not provided"),
                 },
             },
             Self::Add(a, b) => {
@@ -243,6 +243,7 @@ impl AbstractTrace {
 
 pub fn eval_air_constraints(
     trace: &AbstractTrace,
+    public_vals: Option<&[AbstractInterval]>,
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
 ) -> MayBeFlag {
@@ -258,7 +259,7 @@ pub fn eval_air_constraints(
                     } else {
                         None
                     },
-                    None,
+                    public_vals,
                     i == 0,
                     i < num_steps - 1,
                     i == num_steps - 1,
@@ -276,7 +277,7 @@ pub fn eval_air_constraints(
                         } else {
                             None
                         },
-                        None,
+                        public_vals,
                         i == 0,
                         i < num_steps - 1,
                         i == num_steps - 1,
@@ -358,7 +359,7 @@ mod tests {
         ];
         let true_trace = AbstractTrace::new(true_trace_data);
         assert_eq!(
-            eval_air_constraints(&true_trace, &tv_constraints, prime),
+            eval_air_constraints(&true_trace, None, &tv_constraints, prime),
             MayBeFlag::True
         );
 
@@ -374,7 +375,7 @@ mod tests {
         ];
         let false_trace = AbstractTrace::new(false_trace_data);
         assert_eq!(
-            eval_air_constraints(&false_trace, &tv_constraints, prime),
+            eval_air_constraints(&false_trace, None, &tv_constraints, prime),
             MayBeFlag::MayBe
         );
     }
