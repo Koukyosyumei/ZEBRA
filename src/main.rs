@@ -11,7 +11,7 @@ fn main() -> Result<(), ()> {
 
     let mut rng = StdRng::seed_from_u64(42);
 
-    let num_steps = 2; // Choose the number of Fibonacci steps
+    let num_steps = 1; // Choose the number of Fibonacci steps
                        //let final_value = 21; // Choose the final Fibonacci value
                        /*
                        let air = FibonacciAir {
@@ -30,12 +30,17 @@ fn main() -> Result<(), ()> {
         tv_constraints.push(convert_p3_expr::<Mersenne31>(&sc));
     }
 
+    /*
+        [1, 0, 0, 0, 0, 0, 4, 8, 0, 29, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
+    CpuCols { shard: 1, clk_16bit_limb: 0, clk_8bit_limb: 0, shard_to_send: 0, clk_to_send: 0, pc: 0, next_pc: 4, next_next_pc: 8, instruction: InstructionCols { opcode: 0, op_a: 29, op_b: Word([0, 0, 0, 0]), op_c: Word([5, 0, 0, 0]), op_a_0: 0, imm_b: 0, imm_c: 1 }, num_extra_cycles: 0, is_memory: 0, is_rw_a: 0, is_write_hi: 0, is_halt: 0, is_sequential: 1, op_a_value: Word([5, 0, 0, 0]), hi_or_prev_a: Word([0, 0, 0, 0]), op_a_access: MemoryReadWriteCols { prev_value: Word([0, 0, 0, 0]), access: MemoryAccessCols { value: Word([5, 0, 0, 0]), prev_shard: 0, prev_clk: 0, compare_clk: 0, diff_16bit_limb: 0, diff_8bit_limb: 0 } }, op_b_access: MemoryReadCols { access: MemoryAccessCols { value: Word([0, 0, 0, 0]), prev_shard: 0, prev_clk: 0, compare_clk: 0, diff_16bit_limb: 0, diff_8bit_limb: 0 } }, op_c_access: MemoryReadCols { access: MemoryAccessCols { value: Word([5, 0, 0, 0]), prev_shard: 0, prev_clk: 0, compare_clk: 0, diff_16bit_limb: 0, diff_8bit_limb: 0 } }, is_real: 1, op_a_immutable: 0 }
+         */
+
     let result = solve(
         &tv_constraints,
         ZKM_PROOF_NUM_PV_ELTS,
         num_steps,
         ZKM_PROOF_NUM_PV_ELTS,
-        16,
+        1,
         prime,
         &mut rng,
     );

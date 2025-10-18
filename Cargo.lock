@@ -2535,7 +2535,7 @@ checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
 
 [[package]]
 name = "zkm-core-executor"
-version = "1.2.0"
+version = "1.1.4"
 dependencies = [
  "anyhow",
  "bincode",
@@ -2575,7 +2575,7 @@ dependencies = [
 
 [[package]]
 name = "zkm-core-machine"
-version = "1.2.0"
+version = "1.1.4"
 dependencies = [
  "bincode",
  "cfg-if",
@@ -2626,7 +2626,7 @@ dependencies = [
 
 [[package]]
 name = "zkm-curves"
-version = "1.2.0"
+version = "1.1.4"
 dependencies = [
  "cfg-if",
  "curve25519-dalek",
@@ -2647,7 +2647,7 @@ dependencies = [
 
 [[package]]
 name = "zkm-derive"
-version = "1.2.0"
+version = "1.1.4"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -2655,7 +2655,7 @@ dependencies = [
 
 [[package]]
 name = "zkm-lib"
-version = "1.2.0"
+version = "1.1.4"
 dependencies = [
  "bincode",
  "cfg-if",
@@ -2667,7 +2667,7 @@ dependencies = [
 
 [[package]]
 name = "zkm-primitives"
-version = "1.2.0"
+version = "1.1.4"
 dependencies = [
  "bincode",
  "hex",
@@ -2684,7 +2684,7 @@ dependencies = [
 
 [[package]]
 name = "zkm-stark"
-version = "1.2.0"
+version = "1.1.4"
 dependencies = [
  "arrayref",
  "hashbrown 0.14.5",
@@ -2725,7 +2725,7 @@ dependencies = [
 
 [[package]]
 name = "zkm-zkvm"
-version = "1.2.0"
+version = "1.1.4"
 dependencies = [
  "bincode",
  "cfg-if",

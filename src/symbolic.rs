@@ -237,8 +237,8 @@ impl LatticeVMSymbolicExpr {
 
 #[derive(Clone, Debug)]
 pub struct AbstractTrace {
-    data: Vec<Vec<AbstractInterval>>,
-    singleton_positions: HashSet<(usize, usize)>,
+    pub data: Vec<Vec<AbstractInterval>>,
+    pub singleton_positions: HashSet<(usize, usize)>,
 }
 
 impl fmt::Display for AbstractTrace {
