@@ -34,4 +34,8 @@ p3-poseidon = { git = "https://github.com/ProjectZKM/Plonky3" }
 p3-poseidon2 = { git = "https://github.com/ProjectZKM/Plonky3" }
 p3-symmetric = { git = "https://github.com/ProjectZKM/Plonky3" }
 p3-uni-stark = { git = "https://github.com/ProjectZKM/Plonky3" }
-valida-cpu = { path = "../valida-vm/cpu" }
+zkm-core-machine = { path = "../Ziren/crates/core/machine/" }
+zkm-core-executor = { path = "../Ziren/crates/core/executor/" }
+zkm-zkvm = { path = "../Ziren/crates/zkvm/entrypoint/" }
+zkm-stark = { path = "../Ziren/crates/stark" }
+zkm-derive = { path = "../Ziren/crates/derive" }

@@ -9,12 +9,13 @@ use crate::{
 
 pub fn solve(
     tv_constraints: &[LatticeVMSymbolicExpr],
+    num_columns: usize,
     num_steps: usize,
     prime: u32,
     rng: &mut StdRng,
 ) -> Option<AbstractTrace> {
     let mut deque: VecDeque<AbstractTrace> = VecDeque::new();
-    let abs_main_trace_data = vec![vec![AbstractInterval::u8(); 2]; num_steps];
+    let abs_main_trace_data = vec![vec![AbstractInterval::u8(); num_columns]; num_steps];
     let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
     deque.push_back(abs_main_trace);
 
