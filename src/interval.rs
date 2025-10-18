@@ -1,4 +1,7 @@
-use std::ops::{Add, Mul, Neg, Sub};
+use std::{
+    fmt,
+    ops::{Add, Mul, Neg, Sub},
+};
 
 use p3_field::PrimeField32;
 
@@ -9,10 +12,16 @@ pub enum MayBeFlag {
     MayBe,
 }
 
-#[derive(Clone, Hash, Debug)]
+#[derive(Clone, Hash)]
 pub struct AbstractInterval {
     pub lo: i64,
     pub hi: i64,
+}
+
+impl fmt::Debug for AbstractInterval {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}, {}]", self.lo, self.hi)
+    }
 }
 
 impl Add<Self> for AbstractInterval {
