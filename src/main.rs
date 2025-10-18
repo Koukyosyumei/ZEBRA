@@ -26,7 +26,7 @@ fn main() -> Result<(), ()> {
 
     let mut tv_constraints = vec![];
     for sc in symbolic_constraints {
-        println!("{:?}", convert_p3_expr::<Mersenne31>(&sc));
+        println!("{}", convert_p3_expr::<Mersenne31>(&sc));
         tv_constraints.push(convert_p3_expr::<Mersenne31>(&sc));
     }
 
@@ -39,7 +39,7 @@ fn main() -> Result<(), ()> {
         &mut rng,
     );
     if let Some(trace) = result {
-        println!("Find SAT assignment: {:?}", trace);
+        println!("Find SAT assignment: {}", trace);
     } else {
         println!("Couln't Find SAT assignment");
     }

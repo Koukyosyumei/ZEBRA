@@ -8,13 +8,13 @@ use rand::Rng;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum LatticeVMSymbolicEntry {
     Main { is_curr: bool },
     Public,
 }
 
-impl fmt::Debug for LatticeVMSymbolicEntry {
+impl fmt::Display for LatticeVMSymbolicEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LatticeVMSymbolicEntry::Main { is_curr } => {
@@ -26,19 +26,20 @@ impl fmt::Debug for LatticeVMSymbolicEntry {
 }
 
 /// Represents a single symbolic variable, like a column in the trace.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct LatticeVMSymbolicVal {
     pub entry: LatticeVMSymbolicEntry,
     pub index: usize,
 }
 
-impl fmt::Debug for LatticeVMSymbolicVal {
+impl fmt::Display for LatticeVMSymbolicVal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}[{}]", self.entry, self.index)
+        write!(f, "{}[{}]", self.entry, self.index)
     }
 }
 
 /// An enum representing a symbolic expression tree.
+#[derive(Clone, Debug)]
 pub enum LatticeVMSymbolicExpr {
     IsFirstRow,
     IsTransition,
@@ -51,18 +52,18 @@ pub enum LatticeVMSymbolicExpr {
     Neg(Rc<Self>),
 }
 
-impl fmt::Debug for LatticeVMSymbolicExpr {
+impl fmt::Display for LatticeVMSymbolicExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IsFirstRow => write!(f, "IsFirstRow"),
             Self::IsTransition => write!(f, "IsTransition"),
             Self::IsLastRow => write!(f, "IsLastRow"),
-            Self::Constant(c) => write!(f, "{:?}", c),
-            Self::Variable(v) => write!(f, "{:?}", v),
-            Self::Add(x, y) => write!(f, "({:?} + {:?})", x, y),
-            Self::Sub(x, y) => write!(f, "({:?} - {:?})", x, y),
-            Self::Mul(x, y) => write!(f, "({:?} * {:?})", x, y),
-            Self::Neg(x) => write!(f, "-{:?}", x),
+            Self::Constant(c) => write!(f, "{}", c),
+            Self::Variable(v) => write!(f, "{}", v),
+            Self::Add(x, y) => write!(f, "({} + {})", x, y),
+            Self::Sub(x, y) => write!(f, "({} - {})", x, y),
+            Self::Mul(x, y) => write!(f, "({} * {})", x, y),
+            Self::Neg(x) => write!(f, "-{}", x),
         }
     }
 }
@@ -202,7 +203,15 @@ impl LatticeVMSymbolicExpr {
                 if va.is_zero(prime) == MayBeFlag::True {
                     AbstractInterval::zero()
                 } else {
-                    b.eval(
+                    a.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    ) * b.eval(
                         curr_row,
                         next_row,
                         public_vals,
@@ -230,6 +239,12 @@ impl LatticeVMSymbolicExpr {
 pub struct AbstractTrace {
     data: Vec<Vec<AbstractInterval>>,
     singleton_positions: HashSet<(usize, usize)>,
+}
+
+impl fmt::Display for AbstractTrace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", "TBD")
+    }
 }
 
 impl AbstractTrace {
@@ -266,25 +281,6 @@ pub fn eval_air_constraints(
                     prime,
                 )
                 .is_zero(prime);
-            if flag == MayBeFlag::False {
-                println!("{:?}", tc);
-                println!(
-                    "{:?}",
-                    tc.eval(
-                        &trace.data[i],
-                        if i + 1 < num_steps {
-                            Some(&trace.data[i + 1])
-                        } else {
-                            None
-                        },
-                        public_vals,
-                        i == 0,
-                        i < num_steps - 1,
-                        i == num_steps - 1,
-                        prime,
-                    )
-                );
-            }
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => return MayBeFlag::False,
@@ -328,6 +324,75 @@ pub fn refine_trace(
 }
 
 mod tests {
+    use std::rc::Rc;
+
+    use crate::{
+        interval::AbstractInterval,
+        symbolic::{
+            AbstractTrace, LatticeVMSymbolicEntry, LatticeVMSymbolicExpr, LatticeVMSymbolicVal,
+        },
+    };
+
+    #[test]
+    fn test_eval_complex_constraints() {
+        let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
+
+        let a = LatticeVMSymbolicExpr::Mul(
+            Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
+                lo: 65536,
+                hi: 65536,
+            })),
+            Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                index: 2,
+            })),
+        );
+        let b = LatticeVMSymbolicExpr::Mul(
+            Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                index: 1,
+            })),
+            Rc::new(LatticeVMSymbolicExpr::Add(
+                Rc::new(LatticeVMSymbolicExpr::Add(
+                    Rc::new(LatticeVMSymbolicExpr::Mul(
+                        Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
+                            lo: 65536,
+                            hi: 65536,
+                        })),
+                        Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                            entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                            index: 2,
+                        })),
+                    )),
+                    Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                        entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                        index: 3,
+                    })),
+                )),
+                Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
+                    lo: 2,
+                    hi: 2,
+                })),
+            )),
+        );
+        let trace_data = vec![vec![
+            AbstractInterval::u8(),
+            AbstractInterval::u8(),
+            AbstractInterval::u8(),
+            AbstractInterval::u8(),
+        ]];
+        let trace = AbstractTrace::new(trace_data);
+        let a_eval = a.eval(&trace.data[0], None, None, false, false, false, prime);
+        println!("{}", a);
+        println!("{}", a_eval);
+
+        let b_eval = b.eval(&trace.data[0], None, None, false, false, false, prime);
+        println!("{}", b);
+        println!("{}", b_eval);
+
+        assert!(false);
+    }
+
     #[test]
     fn test_eval_fibonacci_air() {
         use crate::p3_to_tv::convert_p3_expr;

@@ -34,7 +34,7 @@ pub fn solve(
                 deque.push_back(children.1);
             }
         } else {
-            println!("UNSAT: {:?}", trace);
+            println!("UNSAT: {}", trace);
         }
     }
 

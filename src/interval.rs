@@ -12,13 +12,13 @@ pub enum MayBeFlag {
     MayBe,
 }
 
-#[derive(Clone, Hash)]
+#[derive(Clone, Hash, Debug)]
 pub struct AbstractInterval {
     pub lo: i64,
     pub hi: i64,
 }
 
-impl fmt::Debug for AbstractInterval {
+impl fmt::Display for AbstractInterval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_singleton() {
             write!(f, "{}", self.lo)
@@ -51,9 +51,15 @@ impl Sub<Self> for AbstractInterval {
 impl Mul<Self> for AbstractInterval {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self {
+        let products = [
+            self.lo * rhs.lo,
+            self.lo * rhs.hi,
+            self.hi * rhs.lo,
+            self.hi * rhs.hi,
+        ];
         Self {
-            lo: self.lo * rhs.lo,
-            hi: self.hi * rhs.hi,
+            lo: *products.iter().min().unwrap(),
+            hi: *products.iter().max().unwrap(),
         }
     }
 }
@@ -62,8 +68,8 @@ impl Neg for AbstractInterval {
     type Output = Self;
     fn neg(self) -> Self {
         Self {
-            lo: -self.lo,
-            hi: -self.hi,
+            lo: -self.hi,
+            hi: -self.lo,
         }
     }
 }
