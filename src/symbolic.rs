@@ -243,7 +243,17 @@ pub struct AbstractTrace {
 
 impl fmt::Display for AbstractTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", "TBD")
+        for (i, row) in self.data.iter().enumerate() {
+            for (j, val) in row.iter().enumerate() {
+                if val.is_singleton() {
+                    write!(f, "*{}* ", val)?;
+                } else {
+                    write!(f, "{} ", val)?;
+                }
+            }
+            writeln!(f)?;
+        }
+        Ok(())
     }
 }
 

@@ -16,7 +16,7 @@ pub fn solve(
     rng: &mut StdRng,
 ) -> Option<AbstractTrace> {
     let mut deque: VecDeque<AbstractTrace> = VecDeque::new();
-    let abs_main_trace_data = vec![vec![AbstractInterval::u8(); num_columns]; num_steps];
+    let abs_main_trace_data = vec![vec![AbstractInterval::bool(); num_columns]; num_steps];
     let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
     deque.push_back(abs_main_trace);
 
@@ -28,13 +28,13 @@ pub fn solve(
         if flag == MayBeFlag::True {
             return Some(trace);
         } else if flag == MayBeFlag::MayBe {
-            let children = refine_trace(&trace, 1, rng);
+            let children = refine_trace(&trace, 32, rng);
             if let Some(children) = children {
                 deque.push_back(children.0);
                 deque.push_back(children.1);
             }
         } else {
-            println!("UNSAT: {}", trace);
+            //println!("UNSAT: {}", trace);
         }
     }
 
