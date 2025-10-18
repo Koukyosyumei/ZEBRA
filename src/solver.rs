@@ -12,6 +12,7 @@ pub fn solve(
     num_columns: usize,
     num_steps: usize,
     num_public_vals: usize,
+    num_refined_points: usize,
     prime: u32,
     rng: &mut StdRng,
 ) -> Option<AbstractTrace> {
@@ -28,7 +29,7 @@ pub fn solve(
         if flag == MayBeFlag::True {
             return Some(trace);
         } else if flag == MayBeFlag::MayBe {
-            let children = refine_trace(&trace, 32, rng);
+            let children = refine_trace(&trace, num_refined_points, rng);
             if let Some(children) = children {
                 deque.push_back(children.0);
                 deque.push_back(children.1);
