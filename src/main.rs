@@ -11,10 +11,8 @@ use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 fn main() -> Result<(), ()> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
-
     let mut rng = StdRng::seed_from_u64(42);
 
-    let num_steps = 1;
     let air = CpuChip::default();
     let symbolic_constraints: Vec<SymbolicExpression<Mersenne31>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
@@ -26,25 +24,26 @@ fn main() -> Result<(), ()> {
         tv_constraints.push(convert_p3_expr::<Mersenne31>(&sc));
     }
 
-    let row = vec![
+    let rows = vec![vec![
         1, 0, 0, 0, 0, 0, 4, 8, 0, 29, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 5, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0,
         0, 0, 0, 0, 0, 0, 1, 0,
-    ];
-    let irow = row
+    ]];
+    let abs_main_trace_data = rows
         .into_iter()
-        .map(|v| AbstractInterval { lo: v, hi: v })
+        .map(|row| {
+            row.into_iter()
+                .map(|v| AbstractInterval { lo: v, hi: v })
+                .collect::<Vec<_>>()
+        })
         .collect::<Vec<_>>();
 
-    let mut abs_main_trace_data =
-        vec![vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS]; num_steps];
-    abs_main_trace_data[0] = irow;
+    //let mut abs_main_trace_data =
+    //    vec![vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS]; num_steps];
     let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
 
     let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    public_vals[40] = abs_main_trace.data[0][5].clone();
-    public_vals[41] = abs_main_trace.data[0][6].clone();
-    public_vals[44] = abs_main_trace.data[0][0].clone();
+    public_vals[44] = AbstractInterval::one();
 
     let result = solve(
         abs_main_trace,

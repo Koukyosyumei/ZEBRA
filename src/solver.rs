@@ -78,9 +78,20 @@ pub fn solve(
     let mut deque: VecDeque<AbstractTrace> = VecDeque::new();
     deque.push_back(initial_abs_main_trace);
 
+    let mut public_vals = initial_public_vals;
+
     while !deque.is_empty() {
-        let trace = deque.pop_front().unwrap();
-        let flag = eval_air_constraints(&trace, Some(&initial_public_vals), tv_constraints, prime);
+        let mut trace = deque.pop_front().unwrap();
+
+        {
+            public_vals[40] = trace.data[0][5].clone();
+            public_vals[41] = trace.data[trace.data.len() - 1][6].clone();
+            for i in 0..trace.data.len() {
+                trace.data[i][0] = public_vals[44].clone();
+            }
+        }
+
+        let flag = eval_air_constraints(&trace, Some(&public_vals), tv_constraints, prime);
         if flag == MayBeFlag::True {
             return Some(trace);
         } else if flag == MayBeFlag::MayBe {
