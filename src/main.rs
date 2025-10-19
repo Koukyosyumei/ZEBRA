@@ -3,7 +3,6 @@ use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
 use latticevm::{
     interval::AbstractInterval, p3_to_tv::convert_p3_expr, solver::solve, symbolic::AbstractTrace,
-    test_data::FibonacciAir,
 };
 use rand::{rngs::StdRng, SeedableRng};
 use zkm_core_machine::CpuChip;
@@ -29,7 +28,7 @@ fn main() -> Result<(), ()> {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0,
         0, 0, 0, 0, 0, 0, 1, 0,
     ]];
-    let abs_main_trace_data = rows
+    let mut abs_main_trace_data = rows
         .into_iter()
         .map(|row| {
             row.into_iter()
@@ -37,6 +36,7 @@ fn main() -> Result<(), ()> {
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
+    abs_main_trace_data[0][5] = AbstractInterval::u8();
 
     //let mut abs_main_trace_data =
     //    vec![vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS]; num_steps];
