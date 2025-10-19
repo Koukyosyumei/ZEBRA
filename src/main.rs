@@ -36,7 +36,11 @@ fn main() -> Result<(), ()> {
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
-    abs_main_trace_data[0][5] = AbstractInterval::u8();
+    for i in 0..abs_main_trace_data.len() {
+        abs_main_trace_data[i][5] = AbstractInterval::u8();
+        abs_main_trace_data[i][6] = AbstractInterval::u8();
+        abs_main_trace_data[i][7] = AbstractInterval::u8();
+    }
 
     //let mut abs_main_trace_data =
     //    vec![vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS]; num_steps];
