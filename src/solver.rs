@@ -85,7 +85,7 @@ pub fn solve(
 
         {
             public_vals[40] = trace.data[0][5].clone();
-            public_vals[41] = trace.data[trace.data.len() - 1][6].clone();
+            //public_vals[41] = trace.data[trace.data.len() - 1][6].clone();
             for i in 0..trace.data.len() {
                 trace.data[i][0] = public_vals[44].clone();
             }
