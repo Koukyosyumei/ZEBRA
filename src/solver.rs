@@ -68,40 +68,19 @@ use crate::{
 */
 
 pub fn solve(
+    initial_abs_main_trace: AbstractTrace,
+    initial_public_vals: Vec<AbstractInterval>,
     tv_constraints: &[LatticeVMSymbolicExpr],
-    num_columns: usize,
-    num_steps: usize,
-    num_public_vals: usize,
     num_refined_points: usize,
     prime: u32,
     rng: &mut StdRng,
 ) -> Option<AbstractTrace> {
     let mut deque: VecDeque<AbstractTrace> = VecDeque::new();
-
-    let row = vec![
-        1, 0, 0, 0, 0, 0, 4, 8, 0, 29, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 5, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0,
-        0, 0, 0, 0, 0, 0, 1, 0,
-    ];
-    let irow = row
-        .into_iter()
-        .map(|v| AbstractInterval { lo: v, hi: v })
-        .collect::<Vec<_>>();
-
-    let mut abs_main_trace_data = vec![vec![AbstractInterval::zero(); num_columns]; num_steps];
-    abs_main_trace_data[0] = irow;
-    let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
-
-    let mut public_vals = vec![AbstractInterval::zero(); num_public_vals];
-    public_vals[40] = abs_main_trace.data[0][5].clone();
-    public_vals[41] = abs_main_trace.data[0][6].clone();
-    public_vals[44] = abs_main_trace.data[0][0].clone();
-
-    deque.push_back(abs_main_trace);
+    deque.push_back(initial_abs_main_trace);
 
     while !deque.is_empty() {
         let trace = deque.pop_front().unwrap();
-        let flag = eval_air_constraints(&trace, Some(&public_vals), tv_constraints, prime);
+        let flag = eval_air_constraints(&trace, Some(&initial_public_vals), tv_constraints, prime);
         if flag == MayBeFlag::True {
             return Some(trace);
         } else if flag == MayBeFlag::MayBe {
