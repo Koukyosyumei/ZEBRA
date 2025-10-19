@@ -325,7 +325,7 @@ pub fn refine_trace(
     let mut trace_a = trace.clone();
     let mut trace_b = trace.clone();
     for _ in 0..num_refined_points {
-        let i = 0; //rng.random_range(0..trace.data.len()) as usize;
+        let i = rng.random_range(0..trace.data.len()) as usize;
         let j = rng.random_range(5..8); //rng.random_range(0..trace.data[i].len()) as usize;
         if !trace.data[i][j].is_singleton() {
             let v = trace.data[i][j].split();
