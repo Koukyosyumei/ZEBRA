@@ -37,9 +37,9 @@ fn main() -> Result<(), ()> {
         })
         .collect::<Vec<_>>();
     for i in 0..abs_main_trace_data.len() {
-        abs_main_trace_data[i][5] = AbstractInterval::u8();
-        abs_main_trace_data[i][6] = AbstractInterval::u8();
-        abs_main_trace_data[i][7] = AbstractInterval::u8();
+        abs_main_trace_data[i][5] = AbstractInterval::i8();
+        abs_main_trace_data[i][6] = AbstractInterval::i8();
+        abs_main_trace_data[i][7] = AbstractInterval::i8();
     }
 
     //let mut abs_main_trace_data =

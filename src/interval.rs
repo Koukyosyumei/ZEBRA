@@ -96,6 +96,13 @@ impl AbstractInterval {
         }
     }
 
+    pub fn i8() -> Self {
+        Self {
+            lo: -255_i64,
+            hi: 255_i64,
+        }
+    }
+
     pub fn zero() -> Self {
         Self {
             lo: 0_i64,
