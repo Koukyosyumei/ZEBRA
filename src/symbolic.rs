@@ -3,6 +3,7 @@ use std::fmt;
 use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
+use p3_symmetric::Hash;
 use rand::rngs::StdRng;
 use rand::Rng;
 
@@ -259,9 +260,17 @@ impl fmt::Display for AbstractTrace {
 
 impl AbstractTrace {
     pub fn new(raw_trace: Vec<Vec<AbstractInterval>>) -> Self {
+        let mut singleton_positions = HashSet::new();
+        for i in 0..raw_trace.len() {
+            for j in 0..raw_trace[0].len() {
+                if raw_trace[i][j].is_singleton() {
+                    singleton_positions.insert((i, j));
+                }
+            }
+        }
         Self {
             data: raw_trace,
-            singleton_positions: HashSet::new(),
+            singleton_positions,
         }
     }
 }
