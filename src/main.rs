@@ -1,14 +1,31 @@
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
+use rand::{rngs::StdRng, SeedableRng};
 
 use latticevm::{
     interval::AbstractInterval, p3_to_tv::convert_p3_expr, solver::solve, symbolic::AbstractTrace,
 };
-use rand::{rngs::StdRng, SeedableRng};
+
+use zkm_core_executor::{syscalls::SyscallCode, Executor, Instruction, Opcode, Program};
 use zkm_core_machine::CpuChip;
-use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
+use zkm_stark::{ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS};
+
+pub fn add_program() -> Program {
+    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 1, false, true)];
+    let mut instructions = vec![Instruction::new(Opcode::MUL, 1, 0, 1, false, true)];
+    instructions.extend(vec![
+        Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
+        Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
+        Instruction::new(Opcode::SYSCALL, 2, 4, 5, false, false),
+    ]);
+    Program::new(instructions, 0, 0)
+}
 
 fn main() -> Result<(), ()> {
+    let program = add_program();
+    let mut runtime = Executor::new(program, ZKMCoreOpts::default());
+    runtime.run().unwrap();
+
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
     let mut rng = StdRng::seed_from_u64(42);
 
