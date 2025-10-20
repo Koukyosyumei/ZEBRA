@@ -27,7 +27,7 @@ pub fn ziren_state_to_abstract_State(ziren_state: &ExecutionState) -> AbstractSt
     }
 }
 
-pub fn add_program() -> Program {
+pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 1, false, true)];
     let mut instructions = vec![Instruction::new(Opcode::MUL, 1, 0, 1, false, true)];
     instructions.extend(vec![
@@ -39,7 +39,7 @@ pub fn add_program() -> Program {
 }
 
 fn main() -> Result<(), ()> {
-    let program = add_program();
+    let program = add_program(0, 0);
     let mut runtime = Executor::new(program, ZKMCoreOpts::default());
     runtime.run().unwrap();
     println!("#history: {}", runtime.state_history.len());
