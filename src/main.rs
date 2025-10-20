@@ -25,6 +25,7 @@ fn main() -> Result<(), ()> {
     let program = add_program();
     let mut runtime = Executor::new(program, ZKMCoreOpts::default());
     runtime.run().unwrap();
+    println!("#history: {}", runtime.state_history.len());
 
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
     let mut rng = StdRng::seed_from_u64(42);
