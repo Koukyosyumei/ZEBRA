@@ -12,7 +12,7 @@ pub enum MayBeFlag {
     MayBe,
 }
 
-#[derive(Clone, Hash, Debug)]
+#[derive(Clone, Hash, Debug, PartialEq, Eq)]
 pub struct AbstractInterval {
     pub lo: i64,
     pub hi: i64,
@@ -115,6 +115,10 @@ impl AbstractInterval {
             lo: 1_i64,
             hi: 1_i64,
         }
+    }
+
+    pub fn from_i32(v: i64) -> Self {
+        Self { lo: v, hi: v }
     }
 
     pub fn from_f<F: PrimeField32>(v: &F) -> Self {

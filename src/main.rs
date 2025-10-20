@@ -6,9 +6,26 @@ use latticevm::{
     interval::AbstractInterval, p3_to_tv::convert_p3_expr, solver::solve, symbolic::AbstractTrace,
 };
 
-use zkm_core_executor::{syscalls::SyscallCode, Executor, Instruction, Opcode, Program};
+use zkm_core_executor::{
+    syscalls::SyscallCode, ExecutionState, Executor, Instruction, Opcode, Program,
+};
 use zkm_core_machine::CpuChip;
 use zkm_stark::{ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS};
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+struct AbstractState {
+    pub pc: AbstractInterval,
+    pub next_pc: AbstractInterval,
+    //pub clk: AbstractInterval,
+}
+
+pub fn ziren_state_to_abstract_State(ziren_state: &ExecutionState) -> AbstractState {
+    AbstractState {
+        pc: AbstractInterval::from_i32(ziren_state.pc as i64),
+        next_pc: AbstractInterval::from_i32(ziren_state.next_pc as i64),
+        //pc: AbstractInterval::from_u32(ziren_state.clk),
+    }
+}
 
 pub fn add_program() -> Program {
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 1, false, true)];
