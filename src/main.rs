@@ -3,7 +3,10 @@ use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 use rand::{rngs::StdRng, SeedableRng};
 
 use latticevm::{
-    interval::AbstractInterval, p3_to_tv::convert_p3_expr, solver::solve, symbolic::AbstractTrace,
+    interval::AbstractInterval,
+    p3_to_tv::convert_p3_expr,
+    solver::solve,
+    symbolic::{self, AbstractTrace},
 };
 
 use zkm_core_executor::{
@@ -50,12 +53,14 @@ fn main() -> Result<(), ()> {
     let air = CpuChip::default();
     let symbolic_constraints: Vec<SymbolicExpression<Mersenne31>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    println!("#symbolic_constraints: {}", symbolic_constraints.len());
+    let tv_constraints = symbolic_constraints
+        .iter()
+        .map(|sc| convert_p3_expr::<Mersenne31>(&sc))
+        .collect::<Vec<_>>();
 
-    let mut tv_constraints = vec![];
-    for sc in symbolic_constraints {
-        println!("{} = 0", convert_p3_expr::<Mersenne31>(&sc));
-        tv_constraints.push(convert_p3_expr::<Mersenne31>(&sc));
+    println!("#symbolic_constraints: {}", symbolic_constraints.len());
+    for tv in &tv_constraints {
+        println!("{} = 0", tv);
     }
 
     let rows = vec![vec![
