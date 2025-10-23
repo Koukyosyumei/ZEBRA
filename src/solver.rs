@@ -29,10 +29,7 @@ pub fn solve(
     while !deque.is_empty() {
         let head = deque.pop_front().unwrap();
         let trace = head.0;
-        let mut public_vals = head.1;
-
-        //public_vals.data[0][40] = trace.data[0][5].clone();
-        //public_vals.data[0][41] = trace.data[0][6].clone();
+        let public_vals = head.1;
 
         let flag = eval_constraints(&trace, Some(&public_vals.data[0]), constraints, prime);
         if flag == MayBeFlag::True {
@@ -67,7 +64,7 @@ pub fn solve(
                 deque.push_back((trace, pv_children.1));
             }
         } else {
-            println!("UNSAT: ({}, {}), {}", trace, public_vals, deque.len());
+            //println!("UNSAT: ({}, {}), {}", trace, public_vals, deque.len());
         }
     }
 
