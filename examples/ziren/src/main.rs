@@ -123,12 +123,12 @@ fn main() -> Result<(), ()> {
     let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
 
     let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    //public_vals[40] = AbstractInterval::zero();
+    public_vals[40] = AbstractInterval::i4();
     public_vals[41] = AbstractInterval::zero();
     public_vals[44] = AbstractInterval::one();
 
     let refinment_target_indicies_main: Vec<usize> = vec![5, 6, 7];
-    let refinment_target_indicies_pv: Vec<usize> = vec![];
+    let refinment_target_indicies_pv: Vec<usize> = vec![40];
 
     let result = solve(
         abs_main_trace,
