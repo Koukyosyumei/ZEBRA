@@ -90,11 +90,14 @@ fn main() -> Result<(), ()> {
     let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
     public_vals[44] = AbstractInterval::one();
 
+    let refinment_target_indicies: Vec<usize> = vec![5, 6, 7];
+
     let result = solve(
         abs_main_trace,
         public_vals,
         &tv_constraints,
         1,
+        &refinment_target_indicies,
         prime,
         &mut rng,
     );

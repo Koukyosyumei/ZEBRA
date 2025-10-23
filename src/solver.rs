@@ -12,6 +12,7 @@ pub fn solve(
     initial_public_vals: Vec<AbstractInterval>,
     tv_constraints: &[LatticeVMSymbolicExpr],
     num_refined_points: usize,
+    refinment_target_indicies: &Vec<usize>,
     prime: u32,
     rng: &mut StdRng,
 ) -> Option<AbstractTrace> {
@@ -35,7 +36,7 @@ pub fn solve(
         if flag == MayBeFlag::True {
             return Some(trace);
         } else if flag == MayBeFlag::MayBe {
-            let children = refine_trace(&trace, num_refined_points, rng);
+            let children = refine_trace(&trace, num_refined_points, refinment_target_indicies, rng);
             if let Some(children) = children {
                 deque.push_back(children.0);
                 deque.push_back(children.1);

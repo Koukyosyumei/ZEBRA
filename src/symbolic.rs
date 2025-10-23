@@ -4,6 +4,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
 use rand::rngs::StdRng;
+use rand::seq::{IndexedRandom, IteratorRandom};
 use rand::Rng;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
@@ -316,6 +317,7 @@ pub fn eval_air_constraints(
 pub fn refine_trace(
     trace: &AbstractTrace,
     num_refined_points: usize,
+    refinment_target_indicies: &Vec<usize>,
     rng: &mut StdRng,
 ) -> Option<(AbstractTrace, AbstractTrace)> {
     if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
@@ -325,7 +327,7 @@ pub fn refine_trace(
     let mut trace_b = trace.clone();
     for _ in 0..num_refined_points {
         let i = rng.random_range(0..trace.data.len()) as usize;
-        let j = rng.random_range(5..8); //rng.random_range(0..trace.data[i].len()) as usize;
+        let j = *refinment_target_indicies.choose(rng).unwrap();
         if !trace.data[i][j].is_singleton() {
             let v = trace.data[i][j].split();
             if v.0.is_singleton() {
