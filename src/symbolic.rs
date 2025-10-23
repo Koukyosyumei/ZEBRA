@@ -342,17 +342,17 @@ pub fn refine_trace(
 }
 
 mod tests {
-    use std::rc::Rc;
-
-    use crate::{
-        interval::AbstractInterval,
-        symbolic::{
-            AbstractTrace, LatticeVMSymbolicEntry, LatticeVMSymbolicExpr, LatticeVMSymbolicVal,
-        },
-    };
-
     #[test]
     fn test_eval_complex_constraints() {
+        use std::rc::Rc;
+
+        use crate::{
+            interval::AbstractInterval,
+            symbolic::{
+                AbstractTrace, LatticeVMSymbolicEntry, LatticeVMSymbolicExpr, LatticeVMSymbolicVal,
+            },
+        };
+
         let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
 
         let a = LatticeVMSymbolicExpr::Mul(
@@ -410,57 +410,4 @@ mod tests {
 
         assert!(false);
     }
-
-    /*
-    #[test]
-    fn test_eval_fibonacci_air() {
-        use crate::p3_to_tv::convert_p3_expr;
-        use crate::symbolic::{eval_air_constraints, AbstractInterval, AbstractTrace, MayBeFlag};
-        use crate::test_data::FibonacciAir;
-
-        use p3_mersenne_31::Mersenne31;
-        use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
-
-        let prime = 2_u32.pow(31) - 1;
-
-        let num_steps = 2; // Choose the number of Fibonacci steps
-        let final_value = 21; // Choose the final Fibonacci value
-        let air = FibonacciAir {
-            num_steps,
-            final_value,
-        };
-        let symbolic_constraints: Vec<SymbolicExpression<Mersenne31>> =
-            get_symbolic_constraints(&air, 0, 0);
-
-        let mut tv_constraints = vec![];
-        for sc in symbolic_constraints {
-            tv_constraints.push(convert_p3_expr::<Mersenne31>(&sc));
-        }
-
-        let true_trace_data = vec![
-            vec![AbstractInterval::zero(), AbstractInterval::one()],
-            vec![AbstractInterval::one(), AbstractInterval::one()],
-        ];
-        let true_trace = AbstractTrace::new(true_trace_data);
-        assert_eq!(
-            eval_air_constraints(&true_trace, None, &tv_constraints, prime),
-            MayBeFlag::True
-        );
-
-        let false_trace_data = vec![
-            vec![
-                AbstractInterval { lo: 0, hi: 7 },
-                AbstractInterval { lo: 0, hi: 7 },
-            ],
-            vec![
-                AbstractInterval { lo: 1, hi: 1 },
-                AbstractInterval { lo: 0, hi: 15 },
-            ],
-        ];
-        let false_trace = AbstractTrace::new(false_trace_data);
-        assert_eq!(
-            eval_air_constraints(&false_trace, None, &tv_constraints, prime),
-            MayBeFlag::MayBe
-        );
-    }*/
 }
