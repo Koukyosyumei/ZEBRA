@@ -141,9 +141,9 @@ fn main() -> Result<(), ()> {
         &mut rng,
     );
     if let Some(trace) = result {
-        println!("Find SAT assignment: {}", trace);
+        println!("\nFind SAT assignment: {}", trace);
     } else {
-        println!("Couln't Find SAT assignment");
+        println!("\nCouln't Find SAT assignment");
     }
 
     Ok(())

@@ -26,7 +26,12 @@ pub fn solve(
         AbstractTrace::new(vec![initial_public_vals]),
     ));
 
+    let mut num_trial = 0;
+    let mut num_unsat_trial = 0;
+
     while !deque.is_empty() {
+        num_trial += 1;
+
         let head = deque.pop_front().unwrap();
         let trace = head.0;
         let public_vals = head.1;
@@ -64,8 +69,15 @@ pub fn solve(
                 deque.push_back((trace, pv_children.1));
             }
         } else {
-            //println!("UNSAT: ({}, {}), {}", trace, public_vals, deque.len());
+            num_unsat_trial += 1;
         }
+
+        print!(
+            "\r #Trial: {}, #UNSAT Trial: {}, #Qued: {}",
+            num_trial,
+            num_unsat_trial,
+            deque.len()
+        );
     }
 
     None
