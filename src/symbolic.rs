@@ -4,7 +4,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
 use rand::rngs::StdRng;
-use rand::seq::{IndexedRandom, IteratorRandom};
+use rand::seq::{IndexedRandom, IteratorRandom, SliceRandom};
 use rand::Rng;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
@@ -302,11 +302,83 @@ pub fn eval_air_constraints(
                 .is_zero(prime);
             match flag {
                 MayBeFlag::True => {}
-                MayBeFlag::False => return MayBeFlag::False,
+                MayBeFlag::False => {
+                    return MayBeFlag::False;
+                }
                 MayBeFlag::MayBe => is_all_true = false,
             }
         }
     }
+    if is_all_true {
+        MayBeFlag::True
+    } else {
+        MayBeFlag::MayBe
+    }
+}
+
+pub struct LatticeVMConstraints {
+    pub air_constraints: Vec<LatticeVMSymbolicExpr>,
+    pub pv_pos_constraints: Vec<LatticeVMSymbolicExpr>,
+    pub pv_neg_constraints: Vec<LatticeVMSymbolicExpr>,
+}
+
+pub fn eval_constraints(
+    trace: &AbstractTrace,
+    public_vals: Option<&[AbstractInterval]>,
+    constraints: &LatticeVMConstraints,
+    prime: u32,
+) -> MayBeFlag {
+    let mut is_all_true = true;
+
+    let air_flag = eval_air_constraints(trace, public_vals, &constraints.air_constraints, prime);
+    match air_flag {
+        MayBeFlag::True => {}
+        MayBeFlag::False => return MayBeFlag::False,
+        MayBeFlag::MayBe => is_all_true = false,
+    }
+
+    for pp in &constraints.pv_pos_constraints {
+        let flag = pp
+            .eval(
+                &trace.data[0],
+                None,
+                public_vals,
+                false,
+                false,
+                false,
+                prime,
+            )
+            .is_zero(prime);
+        match flag {
+            MayBeFlag::True => {}
+            MayBeFlag::False => {
+                return MayBeFlag::False;
+            }
+            MayBeFlag::MayBe => is_all_true = false,
+        }
+    }
+
+    for pn in &constraints.pv_neg_constraints {
+        let flag = pn
+            .eval(
+                &trace.data[0],
+                None,
+                public_vals,
+                false,
+                false,
+                false,
+                prime,
+            )
+            .is_non_zero(prime);
+        match flag {
+            MayBeFlag::True => {}
+            MayBeFlag::False => {
+                return MayBeFlag::False;
+            }
+            MayBeFlag::MayBe => is_all_true = false,
+        }
+    }
+
     if is_all_true {
         MayBeFlag::True
     } else {
@@ -323,11 +395,19 @@ pub fn refine_trace(
     if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
         return None;
     }
+    if refinment_target_indicies.is_empty() {
+        return None;
+    }
+    let mut c_refinment_target_indicies = refinment_target_indicies.clone();
     let mut trace_a = trace.clone();
     let mut trace_b = trace.clone();
     for _ in 0..num_refined_points {
         let i = rng.random_range(0..trace.data.len()) as usize;
-        let j = *refinment_target_indicies.choose(rng).unwrap();
+        c_refinment_target_indicies.shuffle(rng);
+        let mut j = 0;
+        while trace.data[i][j].is_singleton() {
+            j += 1;
+        }
         if !trace.data[i][j].is_singleton() {
             let v = trace.data[i][j].split();
             if v.0.is_singleton() {

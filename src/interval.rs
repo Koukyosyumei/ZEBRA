@@ -94,6 +94,13 @@ impl AbstractInterval {
         }
     }
 
+    pub fn i4() -> Self {
+        Self {
+            lo: -8_i64,
+            hi: 8_i64,
+        }
+    }
+
     pub fn i8() -> Self {
         Self {
             lo: -255_i64,
@@ -131,12 +138,29 @@ impl AbstractInterval {
         if self.is_singleton() {
             if self.lo % (p as i64) == 0 {
                 return MayBeFlag::True;
+            } else {
+                return MayBeFlag::False;
             }
         }
         if self.has_multiple_in_range(p as i64) {
             return MayBeFlag::MayBe;
         } else {
             return MayBeFlag::False;
+        }
+    }
+
+    pub fn is_non_zero(&self, p: u32) -> MayBeFlag {
+        if self.is_singleton() {
+            if self.lo % (p as i64) != 0 {
+                return MayBeFlag::True;
+            } else {
+                return MayBeFlag::False;
+            }
+        }
+        if self.has_multiple_in_range(p as i64) {
+            return MayBeFlag::MayBe;
+        } else {
+            return MayBeFlag::True;
         }
     }
 
