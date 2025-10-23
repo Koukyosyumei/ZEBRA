@@ -113,9 +113,9 @@ fn main() -> Result<(), ()> {
         })
         .collect::<Vec<_>>();
     for i in 0..abs_main_trace_data.len() {
-        abs_main_trace_data[i][5] = AbstractInterval::i4();
-        abs_main_trace_data[i][6] = AbstractInterval::i4();
-        abs_main_trace_data[i][7] = AbstractInterval::i4();
+        abs_main_trace_data[i][5] = AbstractInterval::i8();
+        abs_main_trace_data[i][6] = AbstractInterval::i8();
+        abs_main_trace_data[i][7] = AbstractInterval::i8();
     }
 
     //let mut abs_main_trace_data =
@@ -123,8 +123,8 @@ fn main() -> Result<(), ()> {
     let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
 
     let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::i4();
-    public_vals[41] = AbstractInterval::i4();
+    public_vals[40] = AbstractInterval::i8();
+    public_vals[41] = AbstractInterval::i8();
     public_vals[44] = AbstractInterval::one();
 
     let refinment_target_indicies_main: Vec<usize> = vec![5, 6, 7];
