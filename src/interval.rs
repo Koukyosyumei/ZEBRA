@@ -3,8 +3,6 @@ use std::{
     ops::{Add, Mul, Neg, Sub},
 };
 
-use p3_field::PrimeField32;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MayBeFlag {
     True,
@@ -119,13 +117,6 @@ impl AbstractInterval {
 
     pub fn from_i64(v: i64) -> Self {
         Self { lo: v, hi: v }
-    }
-
-    pub fn from_f<F: PrimeField32>(v: &F) -> Self {
-        Self {
-            lo: v.as_canonical_u32() as i64,
-            hi: v.as_canonical_u32() as i64,
-        }
     }
 
     pub fn has_multiple_in_range(&self, k: i64) -> bool {

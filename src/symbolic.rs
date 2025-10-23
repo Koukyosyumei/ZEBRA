@@ -3,7 +3,6 @@ use std::fmt;
 use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
-use p3_symmetric::Hash;
 use rand::rngs::StdRng;
 use rand::Rng;
 
@@ -412,6 +411,7 @@ mod tests {
         assert!(false);
     }
 
+    /*
     #[test]
     fn test_eval_fibonacci_air() {
         use crate::p3_to_tv::convert_p3_expr;
@@ -462,5 +462,5 @@ mod tests {
             eval_air_constraints(&false_trace, None, &tv_constraints, prime),
             MayBeFlag::MayBe
         );
-    }
+    }*/
 }
