@@ -3,10 +3,7 @@ use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 use rand::{rngs::StdRng, SeedableRng};
 
 use latticevm::{
-    interval::AbstractInterval,
-    p3_to_tv::convert_p3_expr,
-    solver::solve,
-    symbolic::{self, AbstractTrace},
+    interval::AbstractInterval, p3_to_tv::convert_p3_expr, solver::solve, symbolic::AbstractTrace,
 };
 
 use zkm_core_executor::{
@@ -16,36 +13,42 @@ use zkm_core_machine::CpuChip;
 use zkm_stark::{ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-struct AbstractState {
+pub struct ZirenAbstractState {
+    pub clk: AbstractInterval,
     pub pc: AbstractInterval,
     pub next_pc: AbstractInterval,
     //pub clk: AbstractInterval,
 }
 
-pub fn ziren_state_to_abstract_State(ziren_state: &ExecutionState) -> AbstractState {
-    AbstractState {
-        pc: AbstractInterval::from_i32(ziren_state.pc as i64),
-        next_pc: AbstractInterval::from_i32(ziren_state.next_pc as i64),
-        //pc: AbstractInterval::from_u32(ziren_state.clk),
+pub fn ziren_state_to_abstract_State(ziren_state: &ExecutionState) -> ZirenAbstractState {
+    ZirenAbstractState {
+        clk: AbstractInterval::from_i64(ziren_state.clk as i64),
+        pc: AbstractInterval::from_i64(ziren_state.pc as i64),
+        next_pc: AbstractInterval::from_i64(ziren_state.next_pc as i64),
     }
 }
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 1, false, true)];
-    let mut instructions = vec![Instruction::new(Opcode::MUL, 1, 0, 1, false, true)];
+    instructions.extend(vec![Instruction::new(Opcode::MUL, 1, 0, 1, false, true)]);
     instructions.extend(vec![
         Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
         Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
         Instruction::new(Opcode::SYSCALL, 2, 4, 5, false, false),
     ]);
-    Program::new(instructions, 0, 0)
+    Program::new(instructions, pc_start, pc_base)
 }
 
 fn main() -> Result<(), ()> {
     let program = add_program(0, 0);
     let mut runtime = Executor::new(program, ZKMCoreOpts::default());
     runtime.run().unwrap();
-    println!("#history: {}", runtime.state_history.len());
+    let true_abstract_states = runtime
+        .state_history
+        .iter()
+        .map(|s| ziren_state_to_abstract_State(s))
+        .collect::<Vec<_>>();
+    println!("#history: {}", true_abstract_states.len());
 
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
     let mut rng = StdRng::seed_from_u64(42);

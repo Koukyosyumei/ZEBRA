@@ -117,7 +117,7 @@ impl AbstractInterval {
         }
     }
 
-    pub fn from_i32(v: i64) -> Self {
+    pub fn from_i64(v: i64) -> Self {
         Self { lo: v, hi: v }
     }
 
