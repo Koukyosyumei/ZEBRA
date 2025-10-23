@@ -31,8 +31,8 @@ pub fn solve(
         let trace = head.0;
         let mut public_vals = head.1;
 
-        public_vals.data[0][40] = trace.data[0][5].clone();
-        public_vals.data[0][41] = trace.data[0][6].clone();
+        //public_vals.data[0][40] = trace.data[0][5].clone();
+        //public_vals.data[0][41] = trace.data[0][6].clone();
 
         let flag = eval_constraints(&trace, Some(&public_vals.data[0]), constraints, prime);
         if flag == MayBeFlag::True {
