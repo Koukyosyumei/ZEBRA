@@ -73,7 +73,7 @@ fn test_smt_fibonacci_air() {
         tv_constraints.push(convert_p3_expr::<Mersenne31>(&sc));
     }
 
-    let smt = expr_to_smt_over_trace(&tv_constraints, 2, 2);
+    let smt = expr_to_smt_over_trace(&tv_constraints, 2, 2, prime);
     println!("{}", smt);
     assert!(false);
 }

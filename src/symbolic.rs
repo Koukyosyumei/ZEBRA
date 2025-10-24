@@ -58,6 +58,7 @@ pub fn expr_to_smt_over_trace(
     exprs: &[LatticeVMSymbolicExpr],
     n_rows: usize,
     n_cols: usize,
+    prime: u32,
 ) -> String {
     fn helper(
         expr: &LatticeVMSymbolicExpr,
@@ -144,11 +145,11 @@ pub fn expr_to_smt_over_trace(
         smt.push_str(&format!("(declare-fun {} () Int)\n", v));
     }
 
-    // For each row, expand the constraint with concrete row flags
+    // Add modular constraints for each row
     for expr in exprs {
         for i in 0..n_rows {
             let body = helper(expr, i, n_rows, &mut vars);
-            smt.push_str(&format!("(assert (= {} 0))\n", body));
+            smt.push_str(&format!("(assert (= (mod {} {}) 0))\n", body, prime));
         }
     }
 
