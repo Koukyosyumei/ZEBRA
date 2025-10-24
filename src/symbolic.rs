@@ -236,6 +236,39 @@ impl LatticeVMSymbolicExpr {
     }
 }
 
+pub fn gather_boolean_variables(constraints: &[LatticeVMSymbolicExpr]) -> Vec<usize> {
+    let mut result = HashSet::new();
+    for c in constraints {
+        if let LatticeVMSymbolicExpr::Mul(lhs, _) = c {
+            if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { entry: _, index }) =
+                &**lhs
+            {
+                result.insert(index.clone());
+            } else if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = &**lhs {
+                if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { entry: _, index }) =
+                    &**lhs
+                {
+                    if let LatticeVMSymbolicExpr::Constant(AbstractInterval { lo: 1, hi: 1 }) =
+                        &**rhs
+                    {
+                        result.insert(index.clone());
+                    }
+                }
+                if let LatticeVMSymbolicExpr::Constant(AbstractInterval { lo: 1, hi: 1 }) = &**lhs {
+                    if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                        entry: _,
+                        index,
+                    }) = &**rhs
+                    {
+                        result.insert(index.clone());
+                    }
+                }
+            }
+        }
+    }
+    result.iter().cloned().collect()
+}
+
 #[derive(Clone, Debug)]
 pub struct AbstractTrace {
     pub data: Vec<Vec<AbstractInterval>>,

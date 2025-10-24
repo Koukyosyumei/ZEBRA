@@ -14,8 +14,8 @@ use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
 use latticevm::{
-    interval::AbstractInterval, solver::solve, symbolic::AbstractTrace,
-    symbolic::LatticeVMConstraints,
+    interval::AbstractInterval, solver::solve, symbolic::gather_boolean_variables,
+    symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
 };
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
 
@@ -72,6 +72,9 @@ fn main() -> Result<(), ()> {
         println!("{} = 0", tv);
     }
 
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
+    println!("boolean vars: {:?}", potential_boolean_vars);
+
     let pv_pos_constraints = vec![LatticeVMSymbolicExpr::Sub(
         Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
             entry: LatticeVMSymbolicEntry::Public,
@@ -116,6 +119,7 @@ fn main() -> Result<(), ()> {
         abs_main_trace_data[i][5] = AbstractInterval::i8();
         abs_main_trace_data[i][6] = AbstractInterval::i8();
         abs_main_trace_data[i][7] = AbstractInterval::i8();
+        //abs_main_trace_data[i][18] = AbstractInterval::bool();
     }
 
     //let mut abs_main_trace_data =
