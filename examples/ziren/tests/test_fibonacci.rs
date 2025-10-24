@@ -48,6 +48,37 @@ where
 }
 
 #[test]
+fn test_smt_fibonacci_air() {
+    use latticevm::interval::{AbstractInterval, MayBeFlag};
+    use latticevm::symbolic::expr_to_smt_over_trace;
+    use latticevm::symbolic::{eval_air_constraints, AbstractTrace};
+    use latticevm_ziren::p3_to_tv::convert_p3_expr;
+
+    use p3_mersenne_31::Mersenne31;
+    use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
+
+    let prime = 2_u32.pow(31) - 1;
+
+    let num_steps = 2; // Choose the number of Fibonacci steps
+    let final_value = 21; // Choose the final Fibonacci value
+    let air = FibonacciAir {
+        num_steps,
+        final_value,
+    };
+    let symbolic_constraints: Vec<SymbolicExpression<Mersenne31>> =
+        get_symbolic_constraints(&air, 0, 0);
+
+    let mut tv_constraints = vec![];
+    for sc in symbolic_constraints {
+        tv_constraints.push(convert_p3_expr::<Mersenne31>(&sc));
+    }
+
+    let smt = expr_to_smt_over_trace(&tv_constraints, 2, 2);
+    println!("{}", smt);
+    assert!(false);
+}
+
+#[test]
 fn test_eval_fibonacci_air() {
     use latticevm::interval::{AbstractInterval, MayBeFlag};
     use latticevm::symbolic::{eval_air_constraints, AbstractTrace};
