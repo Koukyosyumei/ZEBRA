@@ -10,6 +10,7 @@ use zkm_core_executor::{
 use zkm_core_machine::CpuChip;
 use zkm_stark::{ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS};
 
+use latticevm::symbolic::expr_to_smt_over_trace;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
@@ -71,6 +72,10 @@ fn main() -> Result<(), ()> {
     for tv in &tv_constraints {
         println!("{} = 0", tv);
     }
+
+    //let smt = expr_to_smt_over_trace(&tv_constraints, 1, 68, prime);
+    //println!("{}", smt);
+    //println!("====");
 
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
     println!("boolean vars: {:?}", potential_boolean_vars);
