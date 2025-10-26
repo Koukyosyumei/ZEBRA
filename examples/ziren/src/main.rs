@@ -35,6 +35,17 @@ pub fn ziren_state_to_abstract_state(ziren_state: &ExecutionState) -> ZirenAbstr
     }
 }
 
+pub fn abstract_trace_to_abstract_state(
+    abstract_row: &Vec<AbstractInterval>,
+) -> ZirenAbstractState {
+    ZirenAbstractState {
+        clk: abstract_row[1].clone()
+            + abstract_row[2].clone() * AbstractInterval::from_i64(2_usize.pow(16) as i64),
+        pc: abstract_row[5].clone(),
+        next_pc: abstract_row[6].clone(),
+    }
+}
+
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 1, false, true)];
     instructions.extend(vec![Instruction::new(Opcode::MUL, 1, 0, 1, false, true)]);
@@ -121,10 +132,13 @@ fn main() -> Result<(), ()> {
         })
         .collect::<Vec<_>>();
     for i in 0..abs_main_trace_data.len() {
-        abs_main_trace_data[i][5] = AbstractInterval::i8();
-        abs_main_trace_data[i][6] = AbstractInterval::i8();
-        abs_main_trace_data[i][7] = AbstractInterval::i8();
-        //abs_main_trace_data[i][18] = AbstractInterval::bool();
+        abs_main_trace_data[i][5] = AbstractInterval::i4();
+        abs_main_trace_data[i][6] = AbstractInterval::i4();
+        //abs_main_trace_data[i][7] = AbstractInterval::i8();
+        abs_main_trace_data[i][18] = AbstractInterval::bool();
+        abs_main_trace_data[i][19] = AbstractInterval::bool();
+        abs_main_trace_data[i][20] = AbstractInterval::bool();
+        abs_main_trace_data[i][23] = AbstractInterval::bool();
     }
 
     //let mut abs_main_trace_data =
@@ -132,11 +146,11 @@ fn main() -> Result<(), ()> {
     let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
 
     let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::i8();
-    public_vals[41] = AbstractInterval::i8();
+    public_vals[40] = AbstractInterval::i4();
+    public_vals[41] = AbstractInterval::i4();
     public_vals[44] = AbstractInterval::one();
 
-    let refinment_target_indicies_main: Vec<usize> = vec![5, 6, 7];
+    let refinment_target_indicies_main: Vec<usize> = vec![5, 6, 19];
     let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
 
     let result = solve(
