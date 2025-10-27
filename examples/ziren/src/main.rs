@@ -16,8 +16,9 @@ use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
 use latticevm::{
     interval::AbstractInterval, solver::solve, symbolic::gather_boolean_variables,
-    symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
+    symbolic::AbstractTrace, symbolic::LatticeVMConstraints, utils::BitCombinationsDictOrder,
 };
+
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -134,39 +135,62 @@ fn main() -> Result<(), ()> {
     for i in 0..abs_main_trace_data.len() {
         abs_main_trace_data[i][5] = AbstractInterval::i4();
         abs_main_trace_data[i][6] = AbstractInterval::i4();
+
+        for j in &potential_boolean_vars {
+            abs_main_trace_data[i][*j] = AbstractInterval::one();
+        }
+
+        //abs_main_trace_data[i][2] = AbstractInterval::i4();
+        //abs_main_trace_data[i][1] = AbstractInterval::i4();
         //abs_main_trace_data[i][7] = AbstractInterval::i8();
-        abs_main_trace_data[i][18] = AbstractInterval::bool();
-        abs_main_trace_data[i][19] = AbstractInterval::bool();
-        abs_main_trace_data[i][20] = AbstractInterval::bool();
-        abs_main_trace_data[i][23] = AbstractInterval::bool();
+        //abs_main_trace_data[i][18] = AbstractInterval::bool();
+        //abs_main_trace_data[i][19] = AbstractInterval::bool();
+        //abs_main_trace_data[i][20] = AbstractInterval::bool();
+        //abs_main_trace_data[i][23] = AbstractInterval::bool();
     }
 
     //let mut abs_main_trace_data =
     //    vec![vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS]; num_steps];
-    let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
 
-    let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::i4();
-    public_vals[41] = AbstractInterval::i4();
-    public_vals[44] = AbstractInterval::one();
+    let comb =
+        BitCombinationsDictOrder::new(potential_boolean_vars.len() * abs_main_trace_data.len());
+    for c in comb {
+        let mut tmp = abs_main_trace_data.clone();
+        for (i, b) in c.iter().enumerate() {
+            tmp[0][potential_boolean_vars[i % potential_boolean_vars.len()]] = if *b == 1 {
+                AbstractInterval::one()
+            } else {
+                AbstractInterval::zero()
+            };
+        }
 
-    let refinment_target_indicies_main: Vec<usize> = vec![5, 6, 19];
-    let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
+        let abs_main_trace = AbstractTrace::new(tmp);
 
-    let result = solve(
-        abs_main_trace,
-        public_vals,
-        &constraints,
-        1,
-        &refinment_target_indicies_main,
-        &refinment_target_indicies_pv,
-        prime,
-        &mut rng,
-    );
-    if let Some(trace) = result {
-        println!("\nFind SAT assignment: {}", trace);
-    } else {
-        println!("\nCouln't Find SAT assignment");
+        let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
+        public_vals[40] = AbstractInterval::i4();
+        public_vals[41] = AbstractInterval::i4();
+        public_vals[44] = AbstractInterval::one();
+
+        let refinment_target_indicies_main: Vec<usize> = vec![5, 6];
+        let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
+
+        let result = solve(
+            abs_main_trace,
+            public_vals,
+            &constraints,
+            1,
+            &refinment_target_indicies_main,
+            &refinment_target_indicies_pv,
+            prime,
+            &mut rng,
+        );
+
+        if let Some(trace) = result {
+            println!("\nFind SAT assignment: {}", trace);
+            break;
+        } else {
+            println!("\nCouln't Find SAT assignment");
+        }
     }
 
     Ok(())
