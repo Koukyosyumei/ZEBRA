@@ -1,44 +1,30 @@
-use std::collections::HashMap;
-use std::io;
 use std::rc::Rc;
 
 use itertools::Itertools;
 use rand::{rngs::StdRng, SeedableRng};
 
-use p3_air::BaseAir;
-use p3_field::PrimeField32;
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
 use zkm_core_executor::{
-    syscalls::SyscallCode, ExecutionState, Executor, Instruction, Opcode, Program,
+    Instruction, Opcode, Program,
 };
-use zkm_core_machine::mips::MipsAir;
-use zkm_core_machine::utils::trace_checkpoint;
-use zkm_core_machine::utils::ZKMCoreProverError;
 use zkm_core_machine::CpuChip;
-use zkm_stark::{koala_bear_poseidon2::KoalaBearPoseidon2, StarkGenericConfig};
-use zkm_stark::{CpuProver, MachineProver};
-use zkm_stark::{ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS};
+use zkm_stark::MachineProver;
+use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
-use latticevm::interval::MayBeFlag;
-use latticevm::smt::expr_to_smt;
-use latticevm::symbolic::preprocess_row;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
 use latticevm::{
     interval::AbstractInterval, solver::solve, symbolic::gather_boolean_variables,
-    symbolic::AbstractTrace, symbolic::LatticeVMConstraints, utils::BitCombinationsDictOrder,
+    symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
 };
 
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
-use latticevm_ziren::state::{
-    ziren_abstract_trace_to_abstract_state, ziren_state_to_abstract_state,
-};
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 3, false, true)];
+    let instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 3, false, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -57,7 +43,7 @@ fn main() -> Result<(), ()> {
     // # Gather Constraints
     let symbolic_constraints: Vec<SymbolicExpression<Mersenne31>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    let mut tv_constraints = symbolic_constraints
+    let tv_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<Mersenne31>(&sc))
         .collect::<Vec<_>>();
