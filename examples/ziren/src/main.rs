@@ -73,8 +73,8 @@ pub fn abstract_trace_to_abstract_state(
 }
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 1, false, true)];
-    //instructions.extend(vec![Instruction::new(Opcode::MUL, 1, 0, 1, false, true)]);
+    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 3, false, true)];
+    //instructions.extend(vec![Instruction::new(Opcode::MUL, 1, 1, 5, false, true)]);
     //instructions.extend(vec![
     //    Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
     //    Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
@@ -89,7 +89,7 @@ fn main() -> Result<(), ()> {
     let mut rng = StdRng::seed_from_u64(42);
 
     // # Target Program
-    let program = add_program(0, 0);
+    let program = add_program(4, 4);
 
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
@@ -109,6 +109,7 @@ fn main() -> Result<(), ()> {
         .map(|s| ziren_state_to_abstract_state(s))
         .collect::<Vec<_>>();
     println!("#history: {}", true_abstract_states.len());
+    println!("#{:?}", true_abstract_states);
 
     type SC = KoalaBearPoseidon2;
 
