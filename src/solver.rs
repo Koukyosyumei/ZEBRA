@@ -19,6 +19,7 @@ pub fn solve(
     refinment_target_indicies_pv: &Vec<usize>,
     prime: u32,
     rng: &mut StdRng,
+    meta_info: &str,
 ) -> Option<AbstractTrace> {
     let mut deque: VecDeque<(AbstractTrace, AbstractTrace)> = VecDeque::new();
     deque.push_back((
@@ -73,7 +74,8 @@ pub fn solve(
         }
 
         print!(
-            "\r #Trial: {}, #UNSAT Trial: {}, #Qued: {}",
+            "\r{}, #Trial: {}, #UNSAT Trial: {}, #Qued: {}",
+            meta_info,
             num_trial,
             num_unsat_trial,
             deque.len()
