@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use itertools::Itertools;
@@ -10,9 +11,14 @@ use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 use zkm_core_executor::{
     syscalls::SyscallCode, ExecutionState, Executor, Instruction, Opcode, Program,
 };
+use zkm_core_machine::mips::MipsAir;
+use zkm_core_machine::utils::trace_checkpoint;
 use zkm_core_machine::CpuChip;
+use zkm_stark::{koala_bear_poseidon2::KoalaBearPoseidon2, StarkGenericConfig};
+use zkm_stark::{CpuProver, MachineProver};
 use zkm_stark::{ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS};
 
+use latticevm::interval::MayBeFlag;
 use latticevm::smt::expr_to_smt;
 use latticevm::symbolic::preprocess_row;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
@@ -25,18 +31,29 @@ use latticevm::{
 
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ZirenAbstractState {
     pub clk: AbstractInterval,
     pub pc: AbstractInterval,
     pub next_pc: AbstractInterval,
+    pub is_done: bool,
+    pub memory: HashMap<u32, u32>,
 }
 
 pub fn ziren_state_to_abstract_state(ziren_state: &ExecutionState) -> ZirenAbstractState {
+    let memory = ziren_state
+        .memory
+        .clone()
+        .into_iter()
+        .map(|(addr, record)| (addr, record.value))
+        .collect();
+
     ZirenAbstractState {
         clk: AbstractInterval::from_i64(ziren_state.clk as i64),
         pc: AbstractInterval::from_i64(ziren_state.pc as i64),
         next_pc: AbstractInterval::from_i64(ziren_state.next_pc as i64),
+        is_done: ziren_state.pc == 0, // TODO || ziren_state.exited,
+        memory: memory,
     }
 }
 
@@ -48,6 +65,8 @@ pub fn abstract_trace_to_abstract_state(
             + abstract_row[2].clone() * AbstractInterval::from_i64(2_usize.pow(16) as i64),
         pc: abstract_row[5].clone(),
         next_pc: abstract_row[6].clone(),
+        is_done: abstract_row[5].clone().is_zero(1) == MayBeFlag::True,
+        memory: HashMap::new(),
     }
 }
 
@@ -71,7 +90,7 @@ fn main() -> Result<(), ()> {
     let program = add_program(0, 0);
 
     // # Execute the Target Program
-    let mut runtime = Executor::new(program, ZKMCoreOpts::default());
+    let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
     runtime.run().unwrap();
     let true_abstract_states = runtime
         .state_history
@@ -79,6 +98,24 @@ fn main() -> Result<(), ()> {
         .map(|s| ziren_state_to_abstract_state(s))
         .collect::<Vec<_>>();
     println!("#history: {}", true_abstract_states.len());
+
+    type SC = KoalaBearPoseidon2;
+
+    // # Gather True Matrices
+    let config = KoalaBearPoseidon2::new();
+    let machine = MipsAir::machine(config);
+    let prover = CpuProver::new(machine);
+
+    let (records, report) = trace_checkpoint::<SC>(
+        program.clone(),
+        runtime.state.clone(),
+        ZKMCoreOpts::default(),
+        None,
+    );
+    let main_traces = records
+        .iter()
+        .map(|record| prover.generate_traces(record))
+        .collect::<Vec<_>>();
 
     // # Construct Cpu Chip
     let air = CpuChip::default();
