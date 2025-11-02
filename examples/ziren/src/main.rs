@@ -152,14 +152,14 @@ fn main() -> Result<(), ()> {
         .map(|sc| convert_p3_expr::<Mersenne31>(&sc))
         .collect::<Vec<_>>();
 
-    println!("#symbolic_constraints: {}", symbolic_constraints.len());
-    for tv in &tv_constraints {
-        println!("{} = 0", tv);
-    }
+    //println!("#symbolic_constraints: {}", symbolic_constraints.len());
+    //for tv in &tv_constraints {
+    //    println!("{} = 0", tv);
+    //}
 
     // # Gather Potential Boolean Variables
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
-    println!("boolean vars: {:?}", potential_boolean_vars);
+    // println!("boolean vars: {:?}", potential_boolean_vars);
 
     // # Additional Public Value Verification
     let pv_pos_constraints = vec![LatticeVMSymbolicExpr::Sub(
