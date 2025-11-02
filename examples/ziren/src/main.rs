@@ -13,7 +13,7 @@ use zkm_core_executor::{
 use zkm_core_machine::CpuChip;
 use zkm_stark::{ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS};
 
-use latticevm::symbolic::expr_to_smt_over_trace;
+use latticevm::smt::expr_to_smt;
 use latticevm::symbolic::preprocess_row;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
@@ -97,9 +97,6 @@ fn main() -> Result<(), ()> {
         println!("{} = 0", tv);
     }
 
-    // # Construct SMT formula
-    //let smt = expr_to_smt_over_trace(&tv_constraints, 1, 68, prime);
-
     // # Gather Potential Boolean Variables
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
     println!("boolean vars: {:?}", potential_boolean_vars);
@@ -141,11 +138,17 @@ fn main() -> Result<(), ()> {
     ]];
     // code location: 8 - 20
 
+    // # Construct SMT formula
+    //let smt = expr_to_smt(&constraints, 1, 68, prime);
+    //println!("{}", smt);
+
+    let mut found_solution_flag = false;
+
     let mut target_cols = (0..68).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
     for k in 1..(target_cols.len() + 1) {
         for combo in target_cols.iter().combinations(k) {
-            println!("{:?}", combo);
+            //println!("{:?}", combo);
             let mut abs_main_trace_data = real_rows
                 .clone()
                 .into_iter()
@@ -172,7 +175,7 @@ fn main() -> Result<(), ()> {
             public_vals[41] = AbstractInterval::i4();
             public_vals[44] = AbstractInterval::one();
 
-            let refinment_target_indicies_main = combo.into_iter().cloned().collect();
+            let refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
             let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
 
             let result = solve(
@@ -184,14 +187,20 @@ fn main() -> Result<(), ()> {
                 &refinment_target_indicies_pv,
                 prime,
                 &mut rng,
+                &format!("{:?}", combo),
             );
 
             if let Some(trace) = result {
                 println!("\nFind SAT assignment: {}", trace);
+                found_solution_flag = true;
                 break;
             } else {
-                println!("\nCouln't Find SAT assignment");
+                //println!("\nCouln't Find SAT assignment");
             }
+        }
+
+        if found_solution_flag {
+            break;
         }
     }
 
