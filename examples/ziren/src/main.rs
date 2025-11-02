@@ -6,6 +6,7 @@ use itertools::Itertools;
 use rand::{rngs::StdRng, SeedableRng};
 
 use p3_air::BaseAir;
+use p3_field::PrimeField32;
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
@@ -39,7 +40,7 @@ pub struct ZirenAbstractState {
     pub pc: AbstractInterval,
     pub next_pc: AbstractInterval,
     pub is_done: bool,
-    pub memory: HashMap<u32, u32>,
+    pub memory: HashMap<u32, AbstractInterval>,
 }
 
 pub fn ziren_state_to_abstract_state(ziren_state: &ExecutionState) -> ZirenAbstractState {
@@ -47,7 +48,7 @@ pub fn ziren_state_to_abstract_state(ziren_state: &ExecutionState) -> ZirenAbstr
         .memory
         .clone()
         .into_iter()
-        .map(|(addr, record)| (addr, record.value))
+        .map(|(addr, record)| (addr, AbstractInterval::from_i64(record.value as i64)))
         .collect();
 
     ZirenAbstractState {
@@ -83,18 +84,16 @@ pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     Program::new(instructions, pc_start, pc_base)
 }
 
-fn main() -> Result<(), ()> {
-    // # Setting
-    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
-    let mut rng = StdRng::seed_from_u64(42);
-
-    // # Target Program
-    let program = add_program(4, 4);
-
+pub fn run_ziren_program<KoalaBearParameters>(
+    program: &Program,
+) -> (
+    Vec<ZirenAbstractState>,
+    Vec<(String, Vec<Vec<AbstractInterval>>)>,
+) {
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
-    // runtime.run().unwrap();
     let (checkpoint, done) = runtime.execute_state(false).unwrap();
+
     let mut checkpoint_file = tempfile::tempfile()
         .map_err(ZKMCoreProverError::IoError)
         .unwrap();
@@ -108,12 +107,8 @@ fn main() -> Result<(), ()> {
         .iter()
         .map(|s| ziren_state_to_abstract_state(s))
         .collect::<Vec<_>>();
-    println!("#history: {}", true_abstract_states.len());
-    println!("#{:?}", true_abstract_states);
 
     type SC = KoalaBearPoseidon2;
-
-    // # Gather True Matrices
     let config = KoalaBearPoseidon2::new();
     let machine = MipsAir::machine(config);
     let prover = CpuProver::new(machine);
@@ -131,15 +126,27 @@ fn main() -> Result<(), ()> {
         .iter()
         .map(|record| prover.generate_traces(record))
         .collect::<Vec<_>>();
-    println!("#records: {:?}", records.len());
+
+    let mut abs_traces = vec![];
     for mt in &mut main_traces[0] {
         if mt.0 == "Cpu" {
             let nrows = mt.1.values.len() / mt.1.width;
             for i in 0..nrows {
-                println!("{:?}", mt.1.row_mut(i));
+                //println!("{:?}", mt.1.row_mut(i));
             }
         }
     }
+
+    (true_abstract_states, abs_traces)
+}
+
+fn main() -> Result<(), ()> {
+    // # Setting
+    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
+    let mut rng = StdRng::seed_from_u64(42);
+
+    // # Target Program
+    let program = add_program(4, 4);
 
     // # Construct Cpu Chip
     let air = CpuChip::default();
