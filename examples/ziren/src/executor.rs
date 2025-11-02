@@ -1,17 +1,14 @@
 use std::io;
 
-
 use p3_air::BaseAir;
 
-use zkm_core_executor::{
-    ExecutionState, Executor, Program,
-};
+use zkm_core_executor::{ExecutionState, Executor, Program};
 use zkm_core_machine::mips::MipsAir;
 use zkm_core_machine::utils::trace_checkpoint;
 use zkm_core_machine::utils::ZKMCoreProverError;
 use zkm_stark::koala_bear_poseidon2::KoalaBearPoseidon2;
-use zkm_stark::{CpuProver, MachineProver};
 use zkm_stark::ZKMCoreOpts;
+use zkm_stark::{CpuProver, MachineProver};
 
 use latticevm::interval::AbstractInterval;
 

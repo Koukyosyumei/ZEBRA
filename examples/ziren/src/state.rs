@@ -1,14 +1,11 @@
 use std::collections::HashMap;
 
-
-
 use zkm_core_executor::ExecutionState;
 use zkm_stark::MachineProver;
 
+use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
 use latticevm::state::AbstractState;
-use latticevm::interval::AbstractInterval;
-
 
 pub fn ziren_state_to_abstract_state(ziren_state: &ExecutionState) -> AbstractState {
     let memory = ziren_state
