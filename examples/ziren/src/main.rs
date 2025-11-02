@@ -1,8 +1,11 @@
 use std::rc::Rc;
 
+use itertools::Itertools;
+use rand::{rngs::StdRng, SeedableRng};
+
+use p3_air::BaseAir;
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
-use rand::{rngs::StdRng, SeedableRng};
 
 use zkm_core_executor::{
     syscalls::SyscallCode, ExecutionState, Executor, Instruction, Opcode, Program,
@@ -11,6 +14,7 @@ use zkm_core_machine::CpuChip;
 use zkm_stark::{ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS};
 
 use latticevm::symbolic::expr_to_smt_over_trace;
+use latticevm::symbolic::preprocess_row;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
@@ -59,7 +63,14 @@ pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
 }
 
 fn main() -> Result<(), ()> {
+    // # Setting
+    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
+    let mut rng = StdRng::seed_from_u64(42);
+
+    // # Target Program
     let program = add_program(0, 0);
+
+    // # Execute the Target Program
     let mut runtime = Executor::new(program, ZKMCoreOpts::default());
     runtime.run().unwrap();
     let true_abstract_states = runtime
@@ -69,10 +80,11 @@ fn main() -> Result<(), ()> {
         .collect::<Vec<_>>();
     println!("#history: {}", true_abstract_states.len());
 
-    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
-    let mut rng = StdRng::seed_from_u64(42);
-
+    // # Construct Cpu Chip
     let air = CpuChip::default();
+    let program_cols = (8..20).collect::<Vec<_>>();
+
+    // # Gather Constraints
     let symbolic_constraints: Vec<SymbolicExpression<Mersenne31>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
     let mut tv_constraints = symbolic_constraints
@@ -85,13 +97,14 @@ fn main() -> Result<(), ()> {
         println!("{} = 0", tv);
     }
 
+    // # Construct SMT formula
     //let smt = expr_to_smt_over_trace(&tv_constraints, 1, 68, prime);
-    //println!("{}", smt);
-    //println!("====");
 
+    // # Gather Potential Boolean Variables
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
     println!("boolean vars: {:?}", potential_boolean_vars);
 
+    // # Additional Public Value Verification
     let pv_pos_constraints = vec![LatticeVMSymbolicExpr::Sub(
         Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
             entry: LatticeVMSymbolicEntry::Public,
@@ -113,83 +126,72 @@ fn main() -> Result<(), ()> {
         })),
     )];
 
+    // # Gather Symbolic Constraints
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints,
         pv_pos_constraints,
         pv_neg_constraints,
     };
 
-    let rows = vec![vec![
+    // # Gather Real Trace
+    let real_rows = vec![vec![
         1, 0, 0, 0, 0, 0, 4, 8, 0, 29, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 5, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0,
         0, 0, 0, 0, 0, 0, 1, 0,
     ]];
-    let mut abs_main_trace_data = rows
-        .into_iter()
-        .map(|row| {
-            row.into_iter()
-                .map(|v| AbstractInterval { lo: v, hi: v })
-                .collect::<Vec<_>>()
-        })
-        .collect::<Vec<_>>();
-    for i in 0..abs_main_trace_data.len() {
-        abs_main_trace_data[i][5] = AbstractInterval::i4();
-        abs_main_trace_data[i][6] = AbstractInterval::i4();
+    // code location: 8 - 20
 
-        for j in &potential_boolean_vars {
-            abs_main_trace_data[i][*j] = AbstractInterval::one();
-        }
+    let mut target_cols = (0..68).collect::<Vec<_>>();
+    target_cols.retain(|x| !program_cols.contains(x));
+    for k in 1..(target_cols.len() + 1) {
+        for combo in target_cols.iter().combinations(k) {
+            println!("{:?}", combo);
+            let mut abs_main_trace_data = real_rows
+                .clone()
+                .into_iter()
+                .map(|row| {
+                    row.into_iter()
+                        .map(|v| AbstractInterval { lo: v, hi: v })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
 
-        //abs_main_trace_data[i][2] = AbstractInterval::i4();
-        //abs_main_trace_data[i][1] = AbstractInterval::i4();
-        //abs_main_trace_data[i][7] = AbstractInterval::i8();
-        //abs_main_trace_data[i][18] = AbstractInterval::bool();
-        //abs_main_trace_data[i][19] = AbstractInterval::bool();
-        //abs_main_trace_data[i][20] = AbstractInterval::bool();
-        //abs_main_trace_data[i][23] = AbstractInterval::bool();
-    }
+            for i in 0..abs_main_trace_data.len() {
+                for c in &combo {
+                    if potential_boolean_vars.contains(c) {
+                        abs_main_trace_data[i][**c] = AbstractInterval::bool();
+                    } else {
+                        abs_main_trace_data[i][**c] = AbstractInterval::i4();
+                    }
+                }
+            }
+            let abs_main_trace = AbstractTrace::new(abs_main_trace_data);
 
-    //let mut abs_main_trace_data =
-    //    vec![vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS]; num_steps];
+            let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
+            public_vals[40] = AbstractInterval::i4();
+            public_vals[41] = AbstractInterval::i4();
+            public_vals[44] = AbstractInterval::one();
 
-    let comb =
-        BitCombinationsDictOrder::new(potential_boolean_vars.len() * abs_main_trace_data.len());
-    for c in comb {
-        let mut tmp = abs_main_trace_data.clone();
-        for (i, b) in c.iter().enumerate() {
-            tmp[0][potential_boolean_vars[i % potential_boolean_vars.len()]] = if *b == 1 {
-                AbstractInterval::one()
+            let refinment_target_indicies_main = combo.into_iter().cloned().collect();
+            let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
+
+            let result = solve(
+                abs_main_trace,
+                public_vals.clone(),
+                &constraints,
+                1,
+                &refinment_target_indicies_main,
+                &refinment_target_indicies_pv,
+                prime,
+                &mut rng,
+            );
+
+            if let Some(trace) = result {
+                println!("\nFind SAT assignment: {}", trace);
+                break;
             } else {
-                AbstractInterval::zero()
-            };
-        }
-
-        let abs_main_trace = AbstractTrace::new(tmp);
-
-        let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-        public_vals[40] = AbstractInterval::i4();
-        public_vals[41] = AbstractInterval::i4();
-        public_vals[44] = AbstractInterval::one();
-
-        let refinment_target_indicies_main: Vec<usize> = vec![5, 6];
-        let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
-
-        let result = solve(
-            abs_main_trace,
-            public_vals,
-            &constraints,
-            1,
-            &refinment_target_indicies_main,
-            &refinment_target_indicies_pv,
-            prime,
-            &mut rng,
-        );
-
-        if let Some(trace) = result {
-            println!("\nFind SAT assignment: {}", trace);
-            break;
-        } else {
-            println!("\nCouln't Find SAT assignment");
+                println!("\nCouln't Find SAT assignment");
+            }
         }
     }
 

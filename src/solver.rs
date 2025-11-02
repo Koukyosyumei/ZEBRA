@@ -29,7 +29,7 @@ pub fn solve(
     let mut num_trial = 0;
     let mut num_unsat_trial = 0;
 
-    while !deque.is_empty() {
+    while !deque.is_empty() && deque.len() < 100000 {
         num_trial += 1;
 
         let head = deque.pop_front().unwrap();

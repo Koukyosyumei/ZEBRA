@@ -38,7 +38,6 @@ impl fmt::Display for LatticeVMSymbolicVal {
         write!(f, "{}[{}]", self.entry, self.index)
     }
 }
-
 /// An enum representing a symbolic expression tree.
 #[derive(Clone, Debug)]
 pub enum LatticeVMSymbolicExpr {
@@ -51,6 +50,58 @@ pub enum LatticeVMSymbolicExpr {
     Sub(Rc<Self>, Rc<Self>),
     Mul(Rc<Self>, Rc<Self>),
     Neg(Rc<Self>),
+}
+
+pub fn get_curr_i(expr: &LatticeVMSymbolicExpr) -> Option<usize> {
+    if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { entry, index }) = expr {
+        if let LatticeVMSymbolicEntry::Main { is_curr } = entry {
+            if *is_curr {
+                return Some(index.clone());
+            }
+        }
+    }
+    None
+}
+
+pub fn get_curr_i_sub_cur_j(expr: &LatticeVMSymbolicExpr) -> Option<(usize, usize)> {
+    if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = expr {
+        if let Some(lhs_i) = get_curr_i(lhs) {
+            if let Some(rhs_i) = get_curr_i(rhs) {
+                return Some((lhs_i, rhs_i));
+            }
+        }
+    }
+
+    None
+}
+
+pub fn preprocess_row(
+    air_constraints: &Vec<LatticeVMSymbolicExpr>,
+    row: &mut Vec<AbstractInterval>,
+    p: u32,
+) {
+    for c in air_constraints {
+        if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = c {
+            if let Some(lhs_i) = get_curr_i(lhs) {
+                if let Some(rhs_i) = get_curr_i(rhs) {
+                    if row[lhs_i].is_non_zero(p) == MayBeFlag::True
+                        && row[rhs_i].is_zero(p) != MayBeFlag::False
+                    {
+                        row[rhs_i] = AbstractInterval::zero();
+                    }
+                } else if let Some((r_lhs_i, r_rhs_i)) = get_curr_i_sub_cur_j(rhs) {
+                    if row[lhs_i].is_non_zero(p) == MayBeFlag::True {
+                        if row[r_lhs_i].is_singleton() && !row[r_rhs_i].is_singleton() {
+                            row[r_rhs_i] = row[r_lhs_i].clone();
+                        }
+                        if !row[r_lhs_i].is_singleton() && row[r_rhs_i].is_singleton() {
+                            row[r_lhs_i] = row[r_rhs_i].clone();
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Converts the given expression into SMT-LIB constraints over all rows.
