@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::rc::Rc;
 
 use itertools::Itertools;
@@ -13,6 +14,7 @@ use zkm_core_executor::{
 };
 use zkm_core_machine::mips::MipsAir;
 use zkm_core_machine::utils::trace_checkpoint;
+use zkm_core_machine::utils::ZKMCoreProverError;
 use zkm_core_machine::CpuChip;
 use zkm_stark::{koala_bear_poseidon2::KoalaBearPoseidon2, StarkGenericConfig};
 use zkm_stark::{CpuProver, MachineProver};
@@ -72,12 +74,12 @@ pub fn abstract_trace_to_abstract_state(
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 1, false, true)];
-    instructions.extend(vec![Instruction::new(Opcode::MUL, 1, 0, 1, false, true)]);
-    instructions.extend(vec![
-        Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
-        Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
-        Instruction::new(Opcode::SYSCALL, 2, 4, 5, false, false),
-    ]);
+    //instructions.extend(vec![Instruction::new(Opcode::MUL, 1, 0, 1, false, true)]);
+    //instructions.extend(vec![
+    //    Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
+    //    Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
+    //    Instruction::new(Opcode::SYSCALL, 2, 4, 5, false, false),
+    //]);
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -91,7 +93,16 @@ fn main() -> Result<(), ()> {
 
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
-    runtime.run().unwrap();
+    // runtime.run().unwrap();
+    let (checkpoint, done) = runtime.execute_state(false).unwrap();
+    let mut checkpoint_file = tempfile::tempfile()
+        .map_err(ZKMCoreProverError::IoError)
+        .unwrap();
+    checkpoint
+        .save(&mut checkpoint_file)
+        .map_err(ZKMCoreProverError::IoError)
+        .unwrap();
+
     let true_abstract_states = runtime
         .state_history
         .iter()
@@ -106,16 +117,28 @@ fn main() -> Result<(), ()> {
     let machine = MipsAir::machine(config);
     let prover = CpuProver::new(machine);
 
+    let mut reader = io::BufReader::new(checkpoint_file);
+    let execution_state: ExecutionState =
+        bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
     let (records, report) = trace_checkpoint::<SC>(
         program.clone(),
-        runtime.state.clone(),
+        execution_state,
         ZKMCoreOpts::default(),
         None,
     );
-    let main_traces = records
+    let mut main_traces = records
         .iter()
         .map(|record| prover.generate_traces(record))
         .collect::<Vec<_>>();
+    println!("#records: {:?}", records.len());
+    for mt in &mut main_traces[0] {
+        if mt.0 == "Cpu" {
+            let nrows = mt.1.values.len() / mt.1.width;
+            for i in 0..nrows {
+                println!("{:?}", mt.1.row_mut(i));
+            }
+        }
+    }
 
     // # Construct Cpu Chip
     let air = CpuChip::default();

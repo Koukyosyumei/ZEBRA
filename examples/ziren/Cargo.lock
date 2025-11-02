@@ -888,6 +888,7 @@ dependencies = [
 name = "latticevm_ziren"
 version = "0.0.0"
 dependencies = [
+ "bincode",
  "itertools 0.14.0",
  "latticevm",
  "p3-air",
@@ -911,6 +912,7 @@ dependencies = [
  "p3-uni-stark",
  "p3-util",
  "rand 0.9.2",
+ "tempfile",
  "zkm-core-executor",
  "zkm-core-machine",
  "zkm-derive",

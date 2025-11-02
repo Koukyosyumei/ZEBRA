@@ -41,3 +41,5 @@ zkm-core-executor = { path = "../../../Ziren/crates/core/executor/" }
 zkm-zkvm = { path = "../../../Ziren/crates/zkvm/entrypoint/" }
 zkm-stark = { path = "../../../Ziren/crates/stark" }
 zkm-derive = { path = "../../../Ziren/crates/derive" }
+bincode = "1.3.3"
+tempfile = "3.10.1"
