@@ -33,111 +33,13 @@ use latticevm::{
 };
 
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ZirenAbstractState {
-    pub clk: AbstractInterval,
-    pub pc: AbstractInterval,
-    pub next_pc: AbstractInterval,
-    pub is_done: bool,
-    pub memory: HashMap<u32, AbstractInterval>,
-}
-
-pub fn ziren_state_to_abstract_state(ziren_state: &ExecutionState) -> ZirenAbstractState {
-    let memory = ziren_state
-        .memory
-        .clone()
-        .into_iter()
-        .map(|(addr, record)| (addr, AbstractInterval::from_i64(record.value as i64)))
-        .collect();
-
-    ZirenAbstractState {
-        clk: AbstractInterval::from_i64(ziren_state.clk as i64),
-        pc: AbstractInterval::from_i64(ziren_state.pc as i64),
-        next_pc: AbstractInterval::from_i64(ziren_state.next_pc as i64),
-        is_done: ziren_state.pc == 0, // TODO || ziren_state.exited,
-        memory: memory,
-    }
-}
-
-pub fn abstract_trace_to_abstract_state(
-    abstract_row: &Vec<AbstractInterval>,
-) -> ZirenAbstractState {
-    ZirenAbstractState {
-        clk: abstract_row[1].clone()
-            + abstract_row[2].clone() * AbstractInterval::from_i64(2_usize.pow(16) as i64),
-        pc: abstract_row[5].clone(),
-        next_pc: abstract_row[6].clone(),
-        is_done: abstract_row[5].clone().is_zero(1) == MayBeFlag::True,
-        memory: HashMap::new(),
-    }
-}
+use latticevm_ziren::state::{
+    ziren_abstract_trace_to_abstract_state, ziren_state_to_abstract_state,
+};
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 3, false, true)];
-    //instructions.extend(vec![Instruction::new(Opcode::MUL, 1, 1, 5, false, true)]);
-    //instructions.extend(vec![
-    //    Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
-    //    Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
-    //    Instruction::new(Opcode::SYSCALL, 2, 4, 5, false, false),
-    //]);
     Program::new(instructions, pc_start, pc_base)
-}
-
-pub fn run_ziren_program<KoalaBearParameters>(
-    program: &Program,
-) -> (
-    Vec<ZirenAbstractState>,
-    Vec<(String, Vec<Vec<AbstractInterval>>)>,
-) {
-    // # Execute the Target Program
-    let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
-    let (checkpoint, done) = runtime.execute_state(false).unwrap();
-
-    let mut checkpoint_file = tempfile::tempfile()
-        .map_err(ZKMCoreProverError::IoError)
-        .unwrap();
-    checkpoint
-        .save(&mut checkpoint_file)
-        .map_err(ZKMCoreProverError::IoError)
-        .unwrap();
-
-    let true_abstract_states = runtime
-        .state_history
-        .iter()
-        .map(|s| ziren_state_to_abstract_state(s))
-        .collect::<Vec<_>>();
-
-    type SC = KoalaBearPoseidon2;
-    let config = KoalaBearPoseidon2::new();
-    let machine = MipsAir::machine(config);
-    let prover = CpuProver::new(machine);
-
-    let mut reader = io::BufReader::new(checkpoint_file);
-    let execution_state: ExecutionState =
-        bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
-    let (records, report) = trace_checkpoint::<SC>(
-        program.clone(),
-        execution_state,
-        ZKMCoreOpts::default(),
-        None,
-    );
-    let mut main_traces = records
-        .iter()
-        .map(|record| prover.generate_traces(record))
-        .collect::<Vec<_>>();
-
-    let mut abs_traces = vec![];
-    for mt in &mut main_traces[0] {
-        if mt.0 == "Cpu" {
-            let nrows = mt.1.values.len() / mt.1.width;
-            for i in 0..nrows {
-                //println!("{:?}", mt.1.row_mut(i));
-            }
-        }
-    }
-
-    (true_abstract_states, abs_traces)
 }
 
 fn main() -> Result<(), ()> {
