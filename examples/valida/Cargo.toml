@@ -1,0 +1,43 @@
+[package]
+name = "latticevm_valida"
+version = "0.0.0"
+edition = "2021"
+authors = ["Koukyosyumei <koukyosyumei@hotmail.com>"]
+description = "Abstract-Interpretation-based Verifier for zkVM"
+license = "GPL-3.0"
+repository = "https://github.com/Koukyosyumei/TwinVM"
+keywords = ["formal method", "security", "zero-knowledge-proof", "zkp"]
+
+[[bin]]
+name = "latticevm-ziren"
+path = "src/main.rs"
+
+[dependencies]
+rand = "0.8.5"
+rand_pcg = "0.3.1"
+rand_seeder = "0.2.3"
+latticevm = { path = "../../" }
+p3-mds = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-merkle-tree = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-poseidon = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-air = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-symmetric = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-uni-stark = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-baby-bear = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-commit = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-challenger = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-dft = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-field = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-fri = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-goldilocks = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-interpolation = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-keccak = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
+p3-matrix = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable", features = [
+    "serde",
+] }
+valida-cpu = { git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
+valida-machine = { git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
+valida-basic-api = { git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
+valida-opcodes = { git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
+valida-alu-u32 = {git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
+valida-program = {git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
