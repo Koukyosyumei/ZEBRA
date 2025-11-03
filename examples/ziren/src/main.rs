@@ -16,7 +16,7 @@ use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
 use latticevm::{
-    interval::AbstractInterval, solver::solve, symbolic::gather_boolean_variables,
+    interval::AbstractInterval, solver::run_solver, symbolic::gather_boolean_variables,
     symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
 };
 
@@ -28,67 +28,6 @@ use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 3, false, true)];
     Program::new(instructions, pc_start, pc_base)
-}
-
-pub fn run_solver<FinalCheckFn>(
-    constraints: &LatticeVMConstraints,
-    target_cols: &Vec<usize>,
-    potential_boolean_vars: &Vec<usize>,
-    refinment_target_indicies_pv: &Vec<usize>,
-    base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
-    public_vals: Vec<AbstractInterval>,
-    max_row_id: usize,
-    final_check: FinalCheckFn,
-    prime: u32,
-    seed: u64,
-) where
-    FinalCheckFn: Fn(&AbstractTrace, u32),
-{
-    let mut rng = StdRng::seed_from_u64(seed);
-    let mut found_solution_flag = false;
-
-    for k in 1..(target_cols.len() + 1) {
-        for combo in target_cols.iter().combinations(k) {
-            let mut abs_main_trace_data = base_abs_main_trace_data.clone();
-
-            for i in 0..(max_row_id + 1) {
-                for c in &combo {
-                    if potential_boolean_vars.contains(c) {
-                        abs_main_trace_data[i][**c] = AbstractInterval::bool();
-                    } else {
-                        abs_main_trace_data[i][**c] = AbstractInterval::i4();
-                    }
-                }
-            }
-            let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
-
-            let refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
-
-            let result = solve(
-                abs_main_trace,
-                public_vals.clone(),
-                &constraints,
-                1,
-                &refinment_target_indicies_main,
-                &refinment_target_indicies_pv,
-                max_row_id,
-                prime,
-                &mut rng,
-                &format!("{:?}", combo),
-            );
-
-            if let Some(trace) = result {
-                println!("\nFind SAT assignment: {}", trace);
-                final_check(&trace, prime);
-                found_solution_flag = true;
-                break;
-            }
-        }
-
-        if found_solution_flag {
-            break;
-        }
-    }
 }
 
 fn main() -> Result<(), ()> {
