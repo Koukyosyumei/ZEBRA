@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 use std::fmt;
 use std::ops::{Add, Mul, Neg, Sub};
-use std::rc::Rc;
+
+use serde::Serialize;
 
 use rand::rngs::StdRng;
 use rand::seq::{IndexedRandom, SliceRandom};
@@ -9,7 +10,7 @@ use rand::Rng;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum LatticeVMSymbolicEntry {
     Main { is_curr: bool },
     Public,
@@ -27,7 +28,7 @@ impl fmt::Display for LatticeVMSymbolicEntry {
 }
 
 /// Represents a single symbolic variable, like a column in the trace.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct LatticeVMSymbolicVal {
     pub entry: LatticeVMSymbolicEntry,
     pub index: usize,
@@ -39,17 +40,17 @@ impl fmt::Display for LatticeVMSymbolicVal {
     }
 }
 /// An enum representing a symbolic expression tree.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum LatticeVMSymbolicExpr {
     IsFirstRow,
     IsTransition,
     IsLastRow,
     Constant(AbstractInterval),
     Variable(LatticeVMSymbolicVal),
-    Add(Rc<Self>, Rc<Self>),
-    Sub(Rc<Self>, Rc<Self>),
-    Mul(Rc<Self>, Rc<Self>),
-    Neg(Rc<Self>),
+    Add(Box<Self>, Box<Self>),
+    Sub(Box<Self>, Box<Self>),
+    Mul(Box<Self>, Box<Self>),
+    Neg(Box<Self>),
 }
 
 pub fn get_curr_i(expr: &LatticeVMSymbolicExpr) -> Option<usize> {
@@ -123,28 +124,28 @@ impl fmt::Display for LatticeVMSymbolicExpr {
 impl<T: Into<Self>> Add<T> for LatticeVMSymbolicExpr {
     type Output = Self;
     fn add(self, rhs: T) -> Self {
-        Self::Add(Rc::new(self), Rc::new(rhs.into()))
+        Self::Add(Box::new(self), Box::new(rhs.into()))
     }
 }
 
 impl<T: Into<Self>> Sub<T> for LatticeVMSymbolicExpr {
     type Output = Self;
     fn sub(self, rhs: T) -> Self {
-        Self::Sub(Rc::new(self), Rc::new(rhs.into()))
+        Self::Sub(Box::new(self), Box::new(rhs.into()))
     }
 }
 
 impl<T: Into<Self>> Mul<T> for LatticeVMSymbolicExpr {
     type Output = Self;
     fn mul(self, rhs: T) -> Self {
-        Self::Mul(Rc::new(self), Rc::new(rhs.into()))
+        Self::Mul(Box::new(self), Box::new(rhs.into()))
     }
 }
 
 impl Neg for LatticeVMSymbolicExpr {
     type Output = Self;
     fn neg(self) -> Self {
-        Self::Neg(Rc::new(self))
+        Self::Neg(Box::new(self))
     }
 }
 
@@ -517,7 +518,7 @@ pub fn refine_trace(
 mod tests {
     #[test]
     fn test_eval_complex_constraints() {
-        use std::rc::Rc;
+        //use std::Box::Rc;
 
         use crate::{
             interval::AbstractInterval,
@@ -529,38 +530,38 @@ mod tests {
         let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
 
         let a = LatticeVMSymbolicExpr::Mul(
-            Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
+            Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
                 lo: 65536,
                 hi: 65536,
             })),
-            Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+            Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
                 entry: LatticeVMSymbolicEntry::Main { is_curr: true },
                 index: 2,
             })),
         );
         let b = LatticeVMSymbolicExpr::Mul(
-            Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+            Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
                 entry: LatticeVMSymbolicEntry::Main { is_curr: true },
                 index: 1,
             })),
-            Rc::new(LatticeVMSymbolicExpr::Add(
-                Rc::new(LatticeVMSymbolicExpr::Add(
-                    Rc::new(LatticeVMSymbolicExpr::Mul(
-                        Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
+            Box::new(LatticeVMSymbolicExpr::Add(
+                Box::new(LatticeVMSymbolicExpr::Add(
+                    Box::new(LatticeVMSymbolicExpr::Mul(
+                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
                             lo: 65536,
                             hi: 65536,
                         })),
-                        Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                        Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
                             entry: LatticeVMSymbolicEntry::Main { is_curr: true },
                             index: 2,
                         })),
                     )),
-                    Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                    Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
                         entry: LatticeVMSymbolicEntry::Main { is_curr: true },
                         index: 3,
                     })),
                 )),
-                Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
+                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
                     lo: 2,
                     hi: 2,
                 })),

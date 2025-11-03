@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use p3_field::PrimeField32;
 use p3_uni_stark::{Entry, SymbolicExpression, SymbolicVariable};
 
@@ -43,20 +41,20 @@ pub fn convert_p3_expr<F: PrimeField32>(expr: &SymbolicExpression<F>) -> Lattice
             x,
             y,
             degree_multiple: _degree_multiple,
-        } => LatticeVMSymbolicExpr::Add(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
+        } => LatticeVMSymbolicExpr::Add(Box::new(convert_p3_expr(x)), Box::new(convert_p3_expr(y))),
         SymbolicExpression::Sub {
             x,
             y,
             degree_multiple: _degree_multiple,
-        } => LatticeVMSymbolicExpr::Sub(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
+        } => LatticeVMSymbolicExpr::Sub(Box::new(convert_p3_expr(x)), Box::new(convert_p3_expr(y))),
         SymbolicExpression::Neg {
             x,
             degree_multiple: _degree_multiple,
-        } => LatticeVMSymbolicExpr::Neg(Rc::new(convert_p3_expr(x))),
+        } => LatticeVMSymbolicExpr::Neg(Box::new(convert_p3_expr(x))),
         SymbolicExpression::Mul {
             x,
             y,
             degree_multiple: _degree_multiple,
-        } => LatticeVMSymbolicExpr::Mul(Rc::new(convert_p3_expr(x)), Rc::new(convert_p3_expr(y))),
+        } => LatticeVMSymbolicExpr::Mul(Box::new(convert_p3_expr(x)), Box::new(convert_p3_expr(y))),
     }
 }

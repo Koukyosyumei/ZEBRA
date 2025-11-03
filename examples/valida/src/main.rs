@@ -112,7 +112,7 @@ pub fn prover_options() -> (ProverOptions, Vec<bool>, bool, Vec<bool>) {
     )
 }
 
-fn bne_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
+fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
 
     let mut program = vec![];
@@ -125,10 +125,12 @@ fn bne_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
             opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -8, 1, 0, 1]),
         },
+        /*
         InstructionWord {
             opcode: <BneInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([0 * bytes_per_instr, -8, -4, 0, 0]),
         },
+        */
         InstructionWord {
             opcode: <StopInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands::default(),
@@ -149,7 +151,7 @@ fn main() -> Result<(), ()> {
         .map(|sc| convert_p3_expr::<BabyBear>(&sc))
         .collect::<Vec<_>>();
 
-    let program = bne_program::<BabyBear>();
+    let program = add_program::<BabyBear>();
     let rom = ProgramROM::new(program);
 
     let mut machine = BasicMachine::<BabyBear>::default();
@@ -173,11 +175,19 @@ fn main() -> Result<(), ()> {
         prover_options();
 
     let mut traces = state.machine.generate_traces(&config, prover_opts);
-    if let Some(cpu_trace) = &mut traces.1[0] {
+    if let Some(traces) = &mut traces.1[0] {
         //println!("{:?}", cpu_trace);
-        let num_rows = cpu_trace.values.len() / cpu_trace.width();
+        let num_rows = traces.values.len() / traces.width();
         for i in 0..num_rows {
-            println!("{}: {:?}", i, cpu_trace.row_mut(i));
+            println!("{}: {:?}", i, traces.row_mut(i));
+        }
+    }
+
+    if let Some(traces) = &mut traces.1[3] {
+        //println!("{:?}", cpu_trace);
+        let num_rows = traces.values.len() / traces.width();
+        for i in 0..num_rows {
+            println!("{}: {:?}", i, traces.row_mut(i));
         }
     }
 

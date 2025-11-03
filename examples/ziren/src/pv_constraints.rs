@@ -21,21 +21,21 @@ use latticevm::{
 
 pub fn get_pv_constraints() -> (Vec<LatticeVMSymbolicExpr>, Vec<LatticeVMSymbolicExpr>) {
     let pv_pos_constraints = vec![LatticeVMSymbolicExpr::Sub(
-        Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+        Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
             entry: LatticeVMSymbolicEntry::Public,
             index: 41,
         })),
-        Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
+        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
             lo: 0,
             hi: 0,
         })),
     )];
     let pv_neg_constraints = vec![LatticeVMSymbolicExpr::Sub(
-        Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+        Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
             entry: LatticeVMSymbolicEntry::Public,
             index: 40,
         })),
-        Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
+        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
             lo: 0,
             hi: 0,
         })),
