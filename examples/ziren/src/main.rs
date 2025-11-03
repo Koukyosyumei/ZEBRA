@@ -23,6 +23,7 @@ use latticevm::{
 use latticevm_ziren::executor::run_ziren_program;
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
 use latticevm_ziren::pv_constraints::get_pv_constraints;
+use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 3, false, true)];
@@ -53,10 +54,6 @@ fn main() -> Result<(), ()> {
         pv_neg_constraints,
     };
 
-    // ############### Target Program ###################################
-    let program = add_program(4, 4);
-    let (true_abstract_states, true_abs_traces) = run_ziren_program(&program);
-
     // ############### Construct SMT formula ############################
     //let smt = expr_to_smt(&constraints, 1, 68, prime);
     //println!("{}", smt);
@@ -75,12 +72,16 @@ fn main() -> Result<(), ()> {
     public_vals[44] = AbstractInterval::one();
     let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
 
+    // ############### Target Program ###################################
+    let program = add_program(4, 4);
+    let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
+
     let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
     for k in 1..(target_cols.len() + 1) {
         for combo in target_cols.iter().combinations(k) {
             let mut abs_main_trace_data = vec![];
-            for st in &true_abs_traces {
+            for st in &true_abstract_traces {
                 if st.0 == "Cpu" {
                     abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
                 }
@@ -114,6 +115,26 @@ fn main() -> Result<(), ()> {
 
             if let Some(trace) = result {
                 println!("\nFind SAT assignment: {}", trace);
+
+                let recovered_states = trace
+                    .data
+                    .iter()
+                    .map(|row| ziren_abstract_trace_to_abstract_state(row, prime))
+                    .collect::<Vec<_>>();
+                for rs in &recovered_states {
+                    println!("{}", rs);
+                }
+                println!("========");
+
+                let program = add_program(
+                    recovered_states[0].pc.as_canonical_u32(prime),
+                    recovered_states[0].pc.as_canonical_u32(prime),
+                );
+                let (true_abstract_states, _true_abstract_traces) = run_ziren_program(&program);
+                for tas in &true_abstract_states {
+                    println!("{}", tas);
+                }
+
                 found_solution_flag = true;
                 break;
             }

@@ -126,6 +126,11 @@ impl AbstractInterval {
         Self { lo: v, hi: v }
     }
 
+    pub fn as_canonical_u32(&self, prime: u32) -> u32 {
+        let prime_i64 = prime as i64;
+        (((self.lo % prime_i64) + prime_i64) % prime_i64) as u32
+    }
+
     pub fn has_multiple_in_range(&self, k: i64) -> bool {
         if self.lo <= 0 && 0 <= self.hi {
             true
