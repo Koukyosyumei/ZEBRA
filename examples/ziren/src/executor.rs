@@ -16,7 +16,7 @@ use latticevm::interval::AbstractInterval;
 use crate::state::ziren_state_to_abstract_state;
 use latticevm::state::AbstractState;
 
-pub fn run_ziren_program<KoalaBearParameters>(
+pub fn run_ziren_program(
     program: &Program,
 ) -> (
     Vec<AbstractState>,
@@ -59,7 +59,7 @@ pub fn run_ziren_program<KoalaBearParameters>(
         .map(|record| prover.generate_traces(record))
         .collect::<Vec<_>>();
 
-    let mut abs_traces = vec![];
+    let mut true_abs_traces = vec![];
     for mt in &mut main_traces[0] {
         if mt.0 == "Cpu" {
             let nrows = mt.1.values.len() / mt.1.width;
@@ -71,11 +71,10 @@ pub fn run_ziren_program<KoalaBearParameters>(
                         .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
                         .collect(),
                 );
-                //println!("{:?}", mt.1.row_mut(i));
             }
-            abs_traces.push((mt.0.clone(), rows));
+            true_abs_traces.push((mt.0.clone(), rows));
         }
     }
 
-    (true_abstract_states, abs_traces)
+    (true_abstract_states, true_abs_traces)
 }

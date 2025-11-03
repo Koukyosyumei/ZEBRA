@@ -19,6 +19,7 @@ use latticevm::{
     symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
 };
 
+use latticevm_ziren::executor::run_ziren_program;
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 
@@ -53,6 +54,7 @@ fn main() -> Result<(), ()> {
 
     // # Target Program
     let program = add_program(4, 4);
+    let (true_abstract_states, true_abs_traces) = run_ziren_program(&program);
 
     // # Gather Real Trace
     let real_rows = vec![vec![
@@ -75,6 +77,7 @@ fn main() -> Result<(), ()> {
     for k in 1..(target_cols.len() + 1) {
         for combo in target_cols.iter().combinations(k) {
             //println!("{:?}", combo);
+
             let mut abs_main_trace_data = real_rows
                 .clone()
                 .into_iter()
@@ -84,6 +87,15 @@ fn main() -> Result<(), ()> {
                         .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
+
+            /*
+            let mut abs_main_trace_data = vec![];
+            for st in &true_abs_traces {
+                if st.0 == "Cpu" {
+                    abs_main_trace_data = st.1[..1].to_vec();
+                }
+            }*/
+            //println!("{:?}", abs_main_trace_data);
 
             for i in 0..abs_main_trace_data.len() {
                 for c in &combo {

@@ -490,19 +490,25 @@ pub fn refine_trace(
         let i = rng.random_range(0..(max_row_id + 1)) as usize;
         c_refinment_target_indicies.shuffle(rng);
         let mut j = 0;
-        while trace.data[i][j].is_singleton() {
+        while j < c_refinment_target_indicies.len() - 1
+            && trace.data[i][c_refinment_target_indicies[j]].is_singleton()
+        {
             j += 1;
         }
-        if !trace.data[i][j].is_singleton() {
-            let v = trace.data[i][j].split();
+        if !trace.data[i][c_refinment_target_indicies[j]].is_singleton() {
+            let v = trace.data[i][c_refinment_target_indicies[j]].split();
             if v.0.is_singleton() {
-                trace_a.singleton_positions.insert((i, j));
+                trace_a
+                    .singleton_positions
+                    .insert((i, c_refinment_target_indicies[j]));
             }
             if v.1.is_singleton() {
-                trace_b.singleton_positions.insert((i, j));
+                trace_b
+                    .singleton_positions
+                    .insert((i, c_refinment_target_indicies[j]));
             }
-            trace_a.data[i][j] = v.0;
-            trace_b.data[i][j] = v.1;
+            trace_a.data[i][c_refinment_target_indicies[j]] = v.0;
+            trace_b.data[i][c_refinment_target_indicies[j]] = v.1;
         }
     }
     Some((trace_a, trace_b))
