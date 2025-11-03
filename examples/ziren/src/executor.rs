@@ -1,6 +1,7 @@
 use std::io;
 
 use p3_air::BaseAir;
+use p3_field::PrimeField32;
 
 use zkm_core_executor::{ExecutionState, Executor, Program};
 use zkm_core_machine::mips::MipsAir;
@@ -58,13 +59,21 @@ pub fn run_ziren_program<KoalaBearParameters>(
         .map(|record| prover.generate_traces(record))
         .collect::<Vec<_>>();
 
-    let abs_traces = vec![];
+    let mut abs_traces = vec![];
     for mt in &mut main_traces[0] {
         if mt.0 == "Cpu" {
             let nrows = mt.1.values.len() / mt.1.width;
+            let mut rows = vec![];
             for i in 0..nrows {
+                let mut row = mt.1.row_mut(i);
+                rows.push(
+                    row.iter()
+                        .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                        .collect(),
+                );
                 //println!("{:?}", mt.1.row_mut(i));
             }
+            abs_traces.push((mt.0.clone(), rows));
         }
     }
 
