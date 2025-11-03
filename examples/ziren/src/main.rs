@@ -61,12 +61,14 @@ fn main() -> Result<(), ()> {
     //let smt = expr_to_smt(&constraints, 1, 68, prime);
     //println!("{}", smt);
 
+    // ############### Preparation of Solver ############################
     let mut rng = StdRng::seed_from_u64(42);
     let max_row_id = 0;
     let num_extracted_rows = 2;
     let mut found_solution_flag = false;
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
 
+    // ############### Prepare Public Values ############################
     let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
     public_vals[40] = AbstractInterval::i4();
     public_vals[41] = AbstractInterval::i4();
