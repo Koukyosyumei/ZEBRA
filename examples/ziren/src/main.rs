@@ -6,9 +6,7 @@ use rand::{rngs::StdRng, SeedableRng};
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
-use zkm_core_executor::{
-    Instruction, Opcode, Program,
-};
+use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::CpuChip;
 use zkm_stark::MachineProver;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
@@ -29,34 +27,10 @@ pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
 }
 
 fn main() -> Result<(), ()> {
-    // # Setting
+    // ############### Global Parameters ###############
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
     let mut rng = StdRng::seed_from_u64(42);
-
-    // # Target Program
-    let program = add_program(4, 4);
-
-    // # Construct Cpu Chip
-    let air = CpuChip::default();
     let program_cols = (8..20).collect::<Vec<_>>();
-
-    // # Gather Constraints
-    let symbolic_constraints: Vec<SymbolicExpression<Mersenne31>> =
-        get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    let tv_constraints = symbolic_constraints
-        .iter()
-        .map(|sc| convert_p3_expr::<Mersenne31>(&sc))
-        .collect::<Vec<_>>();
-
-    //println!("#symbolic_constraints: {}", symbolic_constraints.len());
-    //for tv in &tv_constraints {
-    //    println!("{} = 0", tv);
-    //}
-
-    // # Gather Potential Boolean Variables
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
-    // println!("boolean vars: {:?}", potential_boolean_vars);
-
     // # Additional Public Value Verification
     let pv_pos_constraints = vec![LatticeVMSymbolicExpr::Sub(
         Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
@@ -78,6 +52,20 @@ fn main() -> Result<(), ()> {
             hi: 0,
         })),
     )];
+    // ##################################################
+
+    // # Gather Constraints
+    let air = CpuChip::default();
+    let symbolic_constraints: Vec<SymbolicExpression<Mersenne31>> =
+        get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
+    let tv_constraints = symbolic_constraints
+        .iter()
+        .map(|sc| convert_p3_expr::<Mersenne31>(&sc))
+        .collect::<Vec<_>>();
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
+
+    // # Target Program
+    let program = add_program(4, 4);
 
     // # Gather Symbolic Constraints
     let constraints = LatticeVMConstraints {

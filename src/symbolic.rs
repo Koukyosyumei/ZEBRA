@@ -4,7 +4,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
 
 use rand::rngs::StdRng;
-use rand::seq::{IndexedRandom, IteratorRandom, SliceRandom};
+use rand::seq::{IndexedRandom, SliceRandom};
 use rand::Rng;
 
 use crate::interval::{AbstractInterval, MayBeFlag};

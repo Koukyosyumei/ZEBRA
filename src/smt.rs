@@ -1,9 +1,6 @@
 use std::collections::HashSet;
-use std::fmt;
-use std::ops::{Add, Mul, Neg, Sub};
-use std::rc::Rc;
 
-use crate::interval::{AbstractInterval, MayBeFlag};
+use crate::interval::AbstractInterval;
 use crate::symbolic::LatticeVMConstraints;
 use crate::symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr};
 

@@ -5,8 +5,7 @@ use rand::rngs::StdRng;
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
     symbolic::{
-        eval_air_constraints, eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints,
-        LatticeVMSymbolicExpr,
+        eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints,
     },
 };
 
