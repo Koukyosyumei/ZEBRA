@@ -474,6 +474,7 @@ pub fn refine_trace(
     trace: &AbstractTrace,
     num_refined_points: usize,
     refinment_target_indicies: &Vec<usize>,
+    max_row_id: usize,
     rng: &mut StdRng,
 ) -> Option<(AbstractTrace, AbstractTrace)> {
     if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
@@ -486,7 +487,7 @@ pub fn refine_trace(
     let mut trace_a = trace.clone();
     let mut trace_b = trace.clone();
     for _ in 0..num_refined_points {
-        let i = rng.random_range(0..trace.data.len()) as usize;
+        let i = rng.random_range(0..(max_row_id + 1)) as usize;
         c_refinment_target_indicies.shuffle(rng);
         let mut j = 0;
         while trace.data[i][j].is_singleton() {

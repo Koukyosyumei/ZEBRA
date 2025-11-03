@@ -20,6 +20,7 @@ use latticevm::{
 };
 
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
+use latticevm_ziren::pv_constraints::get_pv_constraints;
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 3, false, true)];
@@ -28,31 +29,8 @@ pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
 
 fn main() -> Result<(), ()> {
     // ############### Global Parameters ###############
-    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1; //2_u32.pow(31) - 1;
-    let mut rng = StdRng::seed_from_u64(42);
+    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
     let program_cols = (8..20).collect::<Vec<_>>();
-    // # Additional Public Value Verification
-    let pv_pos_constraints = vec![LatticeVMSymbolicExpr::Sub(
-        Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
-            entry: LatticeVMSymbolicEntry::Public,
-            index: 41,
-        })),
-        Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
-            lo: 0,
-            hi: 0,
-        })),
-    )];
-    let pv_neg_constraints = vec![LatticeVMSymbolicExpr::Sub(
-        Rc::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
-            entry: LatticeVMSymbolicEntry::Public,
-            index: 40,
-        })),
-        Rc::new(LatticeVMSymbolicExpr::Constant(AbstractInterval {
-            lo: 0,
-            hi: 0,
-        })),
-    )];
-    // ##################################################
 
     // # Gather Constraints
     let air = CpuChip::default();
@@ -62,17 +40,19 @@ fn main() -> Result<(), ()> {
         .iter()
         .map(|sc| convert_p3_expr::<Mersenne31>(&sc))
         .collect::<Vec<_>>();
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
 
-    // # Target Program
-    let program = add_program(4, 4);
+    // # Additional Public Value Verification
+    let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
 
     // # Gather Symbolic Constraints
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints,
+        air_constraints: tv_constraints.clone(),
         pv_pos_constraints,
         pv_neg_constraints,
     };
+
+    // # Target Program
+    let program = add_program(4, 4);
 
     // # Gather Real Trace
     let real_rows = vec![vec![
@@ -86,7 +66,9 @@ fn main() -> Result<(), ()> {
     //let smt = expr_to_smt(&constraints, 1, 68, prime);
     //println!("{}", smt);
 
+    let mut rng = StdRng::seed_from_u64(42);
     let mut found_solution_flag = false;
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
 
     let mut target_cols = (0..68).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
@@ -129,6 +111,7 @@ fn main() -> Result<(), ()> {
                 1,
                 &refinment_target_indicies_main,
                 &refinment_target_indicies_pv,
+                0,
                 prime,
                 &mut rng,
                 &format!("{:?}", combo),

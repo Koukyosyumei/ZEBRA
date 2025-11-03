@@ -4,9 +4,7 @@ use rand::rngs::StdRng;
 
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
-    symbolic::{
-        eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints,
-    },
+    symbolic::{eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints},
 };
 
 pub fn solve(
@@ -16,6 +14,7 @@ pub fn solve(
     num_refined_points: usize,
     refinment_target_indicies_main: &Vec<usize>,
     refinment_target_indicies_pv: &Vec<usize>,
+    max_row_id: usize,
     prime: u32,
     rng: &mut StdRng,
     meta_info: &str,
@@ -44,6 +43,7 @@ pub fn solve(
                 &trace,
                 num_refined_points,
                 refinment_target_indicies_main,
+                max_row_id,
                 rng,
             );
 
@@ -51,6 +51,7 @@ pub fn solve(
                 &public_vals,
                 num_refined_points,
                 refinment_target_indicies_pv,
+                max_row_id,
                 rng,
             );
 
