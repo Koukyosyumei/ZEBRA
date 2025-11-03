@@ -76,16 +76,18 @@ fn main() -> Result<(), ()> {
     let program = add_program(4, 4);
     let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
 
+    let mut base_abs_main_trace_data = vec![];
+    for st in &true_abstract_traces {
+        if st.0 == "Cpu" {
+            base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
+        }
+    }
+
     let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
     for k in 1..(target_cols.len() + 1) {
         for combo in target_cols.iter().combinations(k) {
-            let mut abs_main_trace_data = vec![];
-            for st in &true_abstract_traces {
-                if st.0 == "Cpu" {
-                    abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
-                }
-            }
+            let mut abs_main_trace_data = base_abs_main_trace_data.clone();
 
             for i in 0..(max_row_id + 1) {
                 for c in &combo {
