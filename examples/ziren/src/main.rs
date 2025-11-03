@@ -116,8 +116,6 @@ fn main() -> Result<(), ()> {
                 println!("\nFind SAT assignment: {}", trace);
                 found_solution_flag = true;
                 break;
-            } else {
-                //println!("\nCouln't Find SAT assignment");
             }
         }
 
