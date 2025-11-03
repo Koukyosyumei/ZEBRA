@@ -1,8 +1,5 @@
 use std::collections::HashSet;
 
-use serde::Serialize;
-use serde_json;
-
 use crate::interval::AbstractInterval;
 use crate::symbolic::LatticeVMConstraints;
 use crate::symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr};

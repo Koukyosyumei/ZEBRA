@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
+use rand::rngs::StdRng;
 use rand::thread_rng;
+use rand::SeedableRng;
 
 use p3_baby_bear::BabyBear;
 use p3_challenger::DuplexChallenger;
@@ -24,10 +26,13 @@ use valida_basic_api::BasicMachine;
 use valida_basic_api::BasicMachineMetrics;
 use valida_basic_api::ValidaRuntime;
 use valida_cpu::BneInstruction;
-use valida_cpu::CpuChip;
 use valida_cpu::Imm32Instruction;
 use valida_cpu::MachineWithRegisters;
 use valida_cpu::StopInstruction;
+use valida_cpu::{
+    columns::{CPU_COL_MAP, NUM_CPU_COLS},
+    CpuChip,
+};
 use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
 use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::StarkConfigImpl;
@@ -39,6 +44,14 @@ use valida_machine::{
 use valida_opcodes::BYTES_PER_INSTR;
 use valida_program::MachineWithProgramROM;
 use valida_program::ProgramTableType;
+
+use latticevm::interval::AbstractInterval;
+use latticevm::solver::run_solver;
+use latticevm::symbolic::eval_air_constraints;
+use latticevm::symbolic::eval_constraints;
+use latticevm::symbolic::gather_boolean_variables;
+use latticevm::symbolic::AbstractTrace;
+use latticevm::symbolic::LatticeVMConstraints;
 
 use latticevm_valida::p3_to_tv::convert_p3_expr;
 
@@ -141,6 +154,11 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
 }
 
 fn main() -> Result<(), ()> {
+    println!("{:?}", CPU_COL_MAP);
+    // 2^31 - 2^27 + 1
+    let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
+    let program_cols = (3..8).collect::<Vec<_>>();
+
     let air = CpuChip::default();
     let machine = BasicMachine::<BabyBear>::default();
     let symbolic_constraints =
@@ -150,6 +168,27 @@ fn main() -> Result<(), ()> {
         .iter()
         .map(|sc| convert_p3_expr::<BabyBear>(&sc))
         .collect::<Vec<_>>();
+    for tv in &tv_constraints {
+        println!("{}", tv);
+    }
+
+    let mut rng = StdRng::seed_from_u64(42);
+    let max_row_id = 0;
+    let num_extracted_rows = 2;
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
+
+    let constraints = LatticeVMConstraints {
+        air_constraints: tv_constraints.clone(),
+        pv_pos_constraints: vec![],
+        pv_neg_constraints: vec![],
+    };
+
+    // ############### Prepare Public Values ############################
+    let mut public_vals = vec![AbstractInterval::zero(); 3];
+    public_vals[0] = AbstractInterval::from_i64(0);
+    public_vals[1] = AbstractInterval::from_i64(4096);
+    public_vals[2] = AbstractInterval::from_i64(1);
+    let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
     let program = add_program::<BabyBear>();
     let rom = ProgramROM::new(program);
@@ -175,21 +214,41 @@ fn main() -> Result<(), ()> {
         prover_options();
 
     let mut traces = state.machine.generate_traces(&config, prover_opts);
-    if let Some(traces) = &mut traces.1[0] {
-        //println!("{:?}", cpu_trace);
-        let num_rows = traces.values.len() / traces.width();
-        for i in 0..num_rows {
-            println!("{}: {:?}", i, traces.row_mut(i));
-        }
-    }
 
-    if let Some(traces) = &mut traces.1[3] {
-        //println!("{:?}", cpu_trace);
-        let num_rows = traces.values.len() / traces.width();
-        for i in 0..num_rows {
+    let mut rows = vec![];
+    if let Some(traces) = &mut traces.1[0] {
+        let nrows = traces.values.len() / traces.width();
+        for i in 0..nrows {
             println!("{}: {:?}", i, traces.row_mut(i));
+            let mut row = traces.row_mut(i);
+            rows.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .collect(),
+            );
         }
     }
+    let base_abs_main_trace_data = rows.clone();
+
+    fn final_check(trace: &AbstractTrace, prime: u32) {}
+
+    let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
+    target_cols.retain(|x| !program_cols.contains(x));
+
+    let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
+
+    run_solver(
+        &constraints,
+        &target_cols,
+        &potential_boolean_vars,
+        &refinment_target_indicies_pv,
+        &base_abs_main_trace_data,
+        public_vals,
+        max_row_id,
+        final_check,
+        prime,
+        42,
+    );
 
     //let cpu = &state.machine.cpu;
 

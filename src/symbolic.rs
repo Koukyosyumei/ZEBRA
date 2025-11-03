@@ -196,7 +196,7 @@ impl LatticeVMSymbolicExpr {
                     } else {
                         match next_row {
                             Some(nr) => nr[cell.index].clone(),
-                            None => panic!("next_row not provided for next-row variable"),
+                            None => AbstractInterval::zero(), //panic!("next_row not provided for next-row variable"),
                         }
                     }
                 }

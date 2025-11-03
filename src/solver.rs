@@ -137,12 +137,12 @@ pub fn run_solver<FinalCheckFn>(
                 println!("\nFind SAT assignment: {}", trace);
                 final_check(&trace, prime);
                 found_solution_flag = true;
-                break;
+                //break;
             }
         }
 
         if found_solution_flag {
-            break;
+            //break;
         }
     }
 }
