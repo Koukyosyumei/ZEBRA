@@ -7,14 +7,17 @@ use crate::symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr};
 /// Converts the given expression into SMT-LIB constraints over all rows.
 pub fn expr_to_smt(
     constraints: &LatticeVMConstraints,
+    constants: &Vec<(usize, usize, AbstractInterval)>,
     n_rows: usize,
     n_cols: usize,
+    n_pvs: usize,
     prime: u32,
 ) -> String {
     fn helper(
         expr: &LatticeVMSymbolicExpr,
         row_id: usize,
         n_rows: usize,
+        n_pvs: usize,
         vars: &mut HashSet<String>,
     ) -> String {
         match expr {
@@ -44,42 +47,44 @@ pub fn expr_to_smt(
             }
             LatticeVMSymbolicExpr::Variable(v) => {
                 // "curr" -> a_row_index, "next" -> a_row+1_index
-                let base_row = match v.entry {
+                let (ty, base_row) = match v.entry {
                     LatticeVMSymbolicEntry::Main { is_curr } => {
                         if is_curr {
-                            row_id
+                            ("trace", row_id)
                         } else {
-                            row_id + 1
+                            ("trace", row_id + 1)
                         }
                     }
-                    LatticeVMSymbolicEntry::Public => 0,
+                    LatticeVMSymbolicEntry::Public => ("public", 0),
                 };
-                let name = format!("trace_{}_{}", base_row, v.index);
+                let name = format!("{}_{}_{}", ty, base_row, v.index);
                 vars.insert(name.clone());
                 name
             }
             LatticeVMSymbolicExpr::Add(a, b) => {
                 format!(
                     "(+ {} {})",
-                    helper(a, row_id, n_rows, vars),
-                    helper(b, row_id, n_rows, vars)
+                    helper(a, row_id, n_rows, n_pvs, vars),
+                    helper(b, row_id, n_rows, n_pvs, vars)
                 )
             }
             LatticeVMSymbolicExpr::Sub(a, b) => {
                 format!(
                     "(- {} {})",
-                    helper(a, row_id, n_rows, vars),
-                    helper(b, row_id, n_rows, vars)
+                    helper(a, row_id, n_rows, n_pvs, vars),
+                    helper(b, row_id, n_rows, n_pvs, vars)
                 )
             }
             LatticeVMSymbolicExpr::Mul(a, b) => {
                 format!(
                     "(* {} {})",
-                    helper(a, row_id, n_rows, vars),
-                    helper(b, row_id, n_rows, vars)
+                    helper(a, row_id, n_rows, n_pvs, vars),
+                    helper(b, row_id, n_rows, n_pvs, vars)
                 )
             }
-            LatticeVMSymbolicExpr::Neg(a) => format!("(- {})", helper(a, row_id, n_rows, vars)),
+            LatticeVMSymbolicExpr::Neg(a) => {
+                format!("(- {})", helper(a, row_id, n_rows, n_pvs, vars))
+            }
         }
     }
 
@@ -96,6 +101,10 @@ pub fn expr_to_smt(
             vars.insert(name.clone());
         }
     }
+    for i in 0..n_pvs {
+        let name = format!("public_0_{}", i);
+        vars.insert(name.clone());
+    }
     for v in &vars {
         smt.push_str(&format!("(declare-fun {} () Int)\n", v));
     }
@@ -103,23 +112,32 @@ pub fn expr_to_smt(
     // Add modular constraints for each row
     for expr in &constraints.air_constraints {
         for i in 0..n_rows {
-            let body = helper(expr, i, n_rows, &mut vars);
+            let body = helper(expr, i, n_rows, n_pvs, &mut vars);
             smt.push_str(&format!("(assert (= (mod {} {}) 0))\n", body, prime));
         }
     }
 
     for expr in &constraints.pv_pos_constraints {
         for i in 0..n_rows {
-            let body = helper(expr, i, n_rows, &mut vars);
+            let body = helper(expr, i, n_rows, n_pvs, &mut vars);
             smt.push_str(&format!("(assert (= (mod {} {}) 0))\n", body, prime));
         }
     }
 
     for expr in &constraints.pv_neg_constraints {
         for i in 0..n_rows {
-            let body = helper(expr, i, n_rows, &mut vars);
+            let body = helper(expr, i, n_rows, n_pvs, &mut vars);
             smt.push_str(&format!("(assert (not (= (mod {} {}) 0)))\n", body, prime));
         }
+    }
+
+    for (i, j, v) in constants {
+        smt.push_str(&format!(
+            "(assert (= trace_{}_{} {}))\n",
+            i,
+            j,
+            v.as_canonical_u32(prime)
+        ));
     }
 
     smt.push_str("(check-sat)\n(get-model)\n");
