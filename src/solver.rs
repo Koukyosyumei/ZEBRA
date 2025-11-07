@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use priority_queue::PriorityQueue;
 
 use itertools::Itertools;
 use rand::{rngs::StdRng, SeedableRng};
@@ -20,67 +20,79 @@ pub fn solve(
     rng: &mut StdRng,
     meta_info: &str,
 ) -> Option<AbstractTrace> {
-    let mut deque: VecDeque<(AbstractTrace, AbstractTrace)> = VecDeque::new();
-    deque.push_back((
-        initial_abs_main_trace,
-        AbstractTrace::new(vec![initial_public_vals]),
-    ));
+    let mut queue: PriorityQueue<(AbstractTrace, AbstractTrace), i32> = PriorityQueue::new();
+    queue.push(
+        (
+            initial_abs_main_trace,
+            AbstractTrace::new(vec![initial_public_vals]),
+        ),
+        1000,
+    );
 
     let mut num_trial = 0;
     let mut num_unsat_trial = 0;
 
-    while !deque.is_empty() && num_trial < 100000 {
+    while !queue.is_empty() && num_trial < 100000 {
         num_trial += 1;
 
-        let head = deque.pop_front().unwrap();
+        let (head, potential) = queue.pop().unwrap();
         let trace = head.0;
         let public_vals = head.1;
 
-        let flag = eval_constraints(&trace, Some(&public_vals.data[0]), constraints, prime);
-        if flag == MayBeFlag::True {
-            return Some(trace);
-        } else if flag == MayBeFlag::MayBe {
-            let trace_children = refine_trace(
-                &trace,
-                num_refined_points,
-                refinment_target_indicies_main,
-                max_row_id,
-                rng,
-            );
-
-            let pv_children = refine_trace(
-                &public_vals,
-                num_refined_points,
-                refinment_target_indicies_pv,
-                max_row_id,
-                rng,
-            );
-
-            if let Some(trace_children) = trace_children {
-                if let Some(pv_children) = pv_children {
-                    deque.push_back((trace_children.0.clone(), pv_children.0.clone()));
-                    deque.push_back((trace_children.1.clone(), pv_children.0));
-                    deque.push_back((trace_children.0, pv_children.1.clone()));
-                    deque.push_back((trace_children.1, pv_children.1));
-                } else {
-                    deque.push_back((trace_children.0, public_vals.clone()));
-                    deque.push_back((trace_children.1, public_vals));
-                }
-            } else if let Some(pv_children) = pv_children {
-                deque.push_back((trace.clone(), pv_children.0));
-                deque.push_back((trace, pv_children.1));
-            }
-        } else {
-            num_unsat_trial += 1;
-        }
-
         print!(
-            "\r{}, #Trial: {}, #UNSAT Trial: {}, #Qued: {}",
+            "\r{}, #Trial: {}, #UNSAT Trial: {}, #Qued: {}, Potential: {}   ",
             meta_info,
             num_trial,
             num_unsat_trial,
-            deque.len()
+            queue.len(),
+            potential
         );
+        let trace_children = refine_trace(
+            &trace,
+            num_refined_points,
+            refinment_target_indicies_main,
+            max_row_id,
+            rng,
+        );
+
+        let pv_children = refine_trace(
+            &public_vals,
+            num_refined_points,
+            refinment_target_indicies_pv,
+            max_row_id,
+            rng,
+        );
+
+        let mut chinldren = vec![];
+        if let Some(trace_children) = trace_children {
+            if let Some(pv_children) = pv_children {
+                chinldren.push((trace_children.0.clone(), pv_children.0.clone()));
+                chinldren.push((trace_children.1.clone(), pv_children.0));
+                chinldren.push((trace_children.0, pv_children.1.clone()));
+                chinldren.push((trace_children.1, pv_children.1));
+            } else {
+                chinldren.push((trace_children.0.clone(), public_vals.clone()));
+                chinldren.push((trace_children.1.clone(), public_vals));
+            }
+        } else if let Some(pv_children) = pv_children {
+            chinldren.push((trace.clone(), pv_children.0));
+            chinldren.push((trace, pv_children.1));
+        }
+        for kid in chinldren {
+            let (flag, potential) =
+                eval_constraints(&kid.0, Some(&kid.1.data[0]), constraints, prime);
+            match flag {
+                MayBeFlag::True => {
+                    return Some(kid.0);
+                }
+                MayBeFlag::False => {
+                    num_unsat_trial += 1;
+                }
+                MayBeFlag::MayBe => {
+                    queue.push(kid, potential);
+                }
+            }
+        }
     }
 
     None
