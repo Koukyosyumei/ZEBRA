@@ -7,7 +7,10 @@ use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
 use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::{cpu::columns::NUM_CPU_COLS, CpuChip};
+use zkm_core_machine::{
+    cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
+    CpuChip,
+};
 use zkm_stark::MachineProver;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
@@ -43,6 +46,12 @@ fn main() -> Result<(), ()> {
         .iter()
         .map(|sc| convert_p3_expr::<Mersenne31>(&sc))
         .collect::<Vec<_>>();
+    //let cmap = make_col_map();
+    println!("{:?}", CPU_COL_MAP);
+
+    for tv in &tv_constraints {
+        println!("{}", tv);
+    }
 
     // # Additional Public Value Verification
     let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
