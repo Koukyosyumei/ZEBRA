@@ -11,6 +11,7 @@ use zkm_core_machine::{cpu::columns::NUM_CPU_COLS, CpuChip};
 use zkm_stark::MachineProver;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
+use latticevm::smt::expr_to_smt;
 use latticevm::symbolic::eval_constraints;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
@@ -19,7 +20,6 @@ use latticevm::{
     interval::AbstractInterval, solver::run_solver, symbolic::gather_boolean_variables,
     symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
 };
-
 use latticevm_ziren::executor::run_ziren_program;
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
 use latticevm_ziren::pv_constraints::get_pv_constraints;
@@ -54,10 +54,6 @@ fn main() -> Result<(), ()> {
         pv_neg_constraints,
     };
 
-    // ############### Construct SMT formula ############################
-    //let smt = expr_to_smt(&constraints, 1, 68, prime);
-    //println!("{}", smt);
-
     // ############### Preparation of Solver ############################
     let mut rng = StdRng::seed_from_u64(42);
     let max_row_id = 0;
@@ -80,6 +76,25 @@ fn main() -> Result<(), ()> {
         if st.0 == "Cpu" {
             base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
         }
+    }
+
+    // ############### Construct SMT formula ############################
+    if false {
+        let mut positions = vec![];
+        for i in 0..base_abs_main_trace_data.len() {
+            for j in 0..base_abs_main_trace_data[0].len() {
+                positions.push((i, j, base_abs_main_trace_data[i][j].clone()));
+            }
+        }
+        let smt = expr_to_smt(
+            &constraints,
+            &positions,
+            num_extracted_rows,
+            68,
+            ZKM_PROOF_NUM_PV_ELTS,
+            prime,
+        );
+        println!("{}", smt);
     }
 
     // ############## Final Check Function ##############################

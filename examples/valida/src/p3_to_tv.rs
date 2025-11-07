@@ -1,27 +1,27 @@
+use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
+use valida_machine::symbolic::symbolic_variable::{SymbolicVariable, Trace};
+
 use p3_field::PrimeField32;
-use p3_uni_stark::{Entry, SymbolicExpression, SymbolicVariable};
 
 use latticevm::{
     interval::AbstractInterval,
     symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr, LatticeVMSymbolicVal},
 };
 
-pub fn convert_p3_entry(entry: &Entry) -> LatticeVMSymbolicEntry {
-    match entry {
-        Entry::Preprocessed { offset: _offset } => todo!(),
-        Entry::Main { offset } => LatticeVMSymbolicEntry::Main {
-            is_curr: *offset == 0,
+pub fn convert_p3_variable<F: PrimeField32>(var: &SymbolicVariable<F>) -> LatticeVMSymbolicVal {
+    match var.trace {
+        Trace::Preprocessed => todo!(),
+        Trace::Permutation => todo!(),
+        Trace::Main => LatticeVMSymbolicVal {
+            entry: LatticeVMSymbolicEntry::Main {
+                is_curr: !var.is_next,
+            },
+            index: var.column,
         },
-        Entry::Permutation { offset: _offset } => todo!(),
-        Entry::Public => LatticeVMSymbolicEntry::Public,
-        Entry::Challenge => todo!(),
-    }
-}
-
-pub fn convert_p3_variable<F>(var: &SymbolicVariable<F>) -> LatticeVMSymbolicVal {
-    LatticeVMSymbolicVal {
-        entry: convert_p3_entry(&var.entry),
-        index: var.index,
+        Trace::Public => LatticeVMSymbolicVal {
+            entry: LatticeVMSymbolicEntry::Public,
+            index: var.column,
+        },
     }
 }
 

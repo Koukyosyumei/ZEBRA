@@ -3,6 +3,8 @@ use std::{
     ops::{Add, Mul, Neg, Sub},
 };
 
+use serde::Serialize;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MayBeFlag {
     True,
@@ -10,7 +12,7 @@ pub enum MayBeFlag {
     MayBe,
 }
 
-#[derive(Clone, Hash, Debug, PartialEq, Eq)]
+#[derive(Clone, Hash, Debug, PartialEq, Eq, Serialize)]
 pub struct AbstractInterval {
     pub lo: i64,
     pub hi: i64,

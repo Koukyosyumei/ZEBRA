@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
-use rand::rngs::StdRng;
+use itertools::Itertools;
+use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
@@ -83,4 +84,65 @@ pub fn solve(
     }
 
     None
+}
+
+pub fn run_solver<FinalCheckFn>(
+    constraints: &LatticeVMConstraints,
+    target_cols: &Vec<usize>,
+    potential_boolean_vars: &Vec<usize>,
+    refinment_target_indicies_pv: &Vec<usize>,
+    base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
+    public_vals: Vec<AbstractInterval>,
+    max_row_id: usize,
+    final_check: FinalCheckFn,
+    prime: u32,
+    seed: u64,
+) where
+    FinalCheckFn: Fn(&AbstractTrace, u32),
+{
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut found_solution_flag = false;
+
+    for k in 1..(target_cols.len() + 1) {
+        for combo in target_cols.iter().combinations(k) {
+            let mut abs_main_trace_data = base_abs_main_trace_data.clone();
+
+            for i in 0..(max_row_id + 1) {
+                for c in &combo {
+                    if potential_boolean_vars.contains(c) {
+                        abs_main_trace_data[i][**c] = AbstractInterval::bool();
+                    } else {
+                        abs_main_trace_data[i][**c] = AbstractInterval::i4();
+                    }
+                }
+            }
+            let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
+
+            let refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
+
+            let result = solve(
+                abs_main_trace,
+                public_vals.clone(),
+                &constraints,
+                1,
+                &refinment_target_indicies_main,
+                &refinment_target_indicies_pv,
+                max_row_id,
+                prime,
+                &mut rng,
+                &format!("{:?}", combo),
+            );
+
+            if let Some(trace) = result {
+                println!("\nFind SAT assignment: {}", trace);
+                final_check(&trace, prime);
+                found_solution_flag = true;
+                break;
+            }
+        }
+
+        if found_solution_flag {
+            break;
+        }
+    }
 }
