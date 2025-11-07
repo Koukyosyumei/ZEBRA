@@ -16,6 +16,7 @@ pub fn solve(
     refinment_target_indicies_main: &Vec<usize>,
     refinment_target_indicies_pv: &Vec<usize>,
     max_row_id: usize,
+    maximum_num_trial: usize,
     prime: u32,
     rng: &mut StdRng,
     meta_info: &str,
@@ -32,7 +33,7 @@ pub fn solve(
     let mut num_trial = 0;
     let mut num_unsat_trial = 0;
 
-    while !queue.is_empty() && num_trial < 100000 {
+    while !queue.is_empty() && num_trial < maximum_num_trial {
         num_trial += 1;
 
         let (head, potential) = queue.pop().unwrap();
@@ -140,6 +141,7 @@ pub fn run_solver<FinalCheckFn>(
                 &refinment_target_indicies_main,
                 &refinment_target_indicies_pv,
                 max_row_id,
+                100000,
                 prime,
                 &mut rng,
                 &format!("{:?}", combo),
