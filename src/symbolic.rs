@@ -358,6 +358,20 @@ impl AbstractTrace {
             singleton_positions,
         }
     }
+
+    pub fn diff_positions(&self, other: &Self) -> Vec<(usize, usize)> {
+        let mut diffs = vec![];
+
+        for (i, (row_self, row_other)) in self.data.iter().zip(&other.data).enumerate() {
+            for (j, (cell_self, cell_other)) in row_self.iter().zip(row_other).enumerate() {
+                if cell_self != cell_other {
+                    diffs.push((i, j));
+                }
+            }
+        }
+
+        diffs
+    }
 }
 
 pub fn eval_air_constraints(

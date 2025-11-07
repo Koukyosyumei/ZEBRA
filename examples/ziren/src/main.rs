@@ -36,7 +36,7 @@ pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
 fn main() -> Result<(), ()> {
     // ############### Global Parameters #################################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
-    let program_cols = (8..20).collect::<Vec<_>>();
+    let program_cols = (8..35).collect::<Vec<_>>();
 
     // ############### Gather Constraints ################################
     let air = CpuChip::default();
@@ -72,7 +72,7 @@ fn main() -> Result<(), ()> {
     // ############### Prepare Public Values ############################
     let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
     public_vals[40] = AbstractInterval::i4();
-    public_vals[41] = AbstractInterval::i4();
+    public_vals[41] = AbstractInterval::bool();
     public_vals[44] = AbstractInterval::one();
     let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
 
@@ -122,7 +122,8 @@ fn main() -> Result<(), ()> {
             recovered_states[0].pc.as_canonical_u32(prime),
             recovered_states[0].pc.as_canonical_u32(prime),
         );
-        let (true_abstract_states, _true_abstract_traces) = run_ziren_program(&program);
+        let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
+
         for tas in &true_abstract_states {
             println!("{}", tas);
         }

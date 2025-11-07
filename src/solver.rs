@@ -1,3 +1,5 @@
+use std::i32;
+
 use priority_queue::PriorityQueue;
 
 use itertools::Itertools;
@@ -17,21 +19,23 @@ pub fn solve(
     refinment_target_indicies_pv: &Vec<usize>,
     max_row_id: usize,
     maximum_num_trial: usize,
+    cum_num_trial: usize,
     prime: u32,
     rng: &mut StdRng,
     meta_info: &str,
-) -> Option<AbstractTrace> {
+) -> (Option<AbstractTrace>, usize, i32) {
     let mut queue: PriorityQueue<(AbstractTrace, AbstractTrace), i32> = PriorityQueue::new();
     queue.push(
         (
             initial_abs_main_trace,
             AbstractTrace::new(vec![initial_public_vals]),
         ),
-        1000,
+        i32::MAX,
     );
 
     let mut num_trial = 0;
     let mut num_unsat_trial = 0;
+    let mut sum_potential = 0;
 
     while !queue.is_empty() && num_trial < maximum_num_trial {
         num_trial += 1;
@@ -41,13 +45,20 @@ pub fn solve(
         let public_vals = head.1;
 
         print!(
-            "\r{}, #Trial: {}, #UNSAT Trial: {}, #Qued: {}, Potential: {}   ",
+            "\r{}, #Total Trial: {}, #Trial {},  #UNSAT Trial: {}, #Qued: {}, Potential: {}, Sum-Potential: {}",
             meta_info,
+            num_trial + cum_num_trial,
             num_trial,
             num_unsat_trial,
             queue.len(),
-            potential
+            -potential,
+            sum_potential
         );
+
+        if num_trial > 1 {
+            sum_potential += potential;
+        }
+
         let trace_children = refine_trace(
             &trace,
             num_refined_points,
@@ -84,19 +95,19 @@ pub fn solve(
                 eval_constraints(&kid.0, Some(&kid.1.data[0]), constraints, prime);
             match flag {
                 MayBeFlag::True => {
-                    return Some(kid.0);
+                    return (Some(kid.0), num_trial, sum_potential);
                 }
                 MayBeFlag::False => {
                     num_unsat_trial += 1;
                 }
                 MayBeFlag::MayBe => {
-                    queue.push(kid, potential);
+                    queue.push(kid, -potential);
                 }
             }
         }
     }
 
-    None
+    (None, num_trial, sum_potential)
 }
 
 pub fn run_solver<FinalCheckFn>(
@@ -115,6 +126,7 @@ pub fn run_solver<FinalCheckFn>(
 {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut found_solution_flag = false;
+    let mut cum_num_trial = 0;
 
     for k in 1..(target_cols.len() + 1) {
         for combo in target_cols.iter().combinations(k) {
@@ -129,6 +141,7 @@ pub fn run_solver<FinalCheckFn>(
                     }
                 }
             }
+
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
 
             let refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
@@ -142,16 +155,19 @@ pub fn run_solver<FinalCheckFn>(
                 &refinment_target_indicies_pv,
                 max_row_id,
                 100000,
+                cum_num_trial,
                 prime,
                 &mut rng,
                 &format!("{:?}", combo),
             );
 
-            if let Some(trace) = result {
+            if let (Some(trace), _, _) = result {
                 println!("\nFind SAT assignment: {}", trace);
                 final_check(&trace, prime);
                 found_solution_flag = true;
                 break;
+            } else {
+                cum_num_trial += result.1;
             }
         }
 
