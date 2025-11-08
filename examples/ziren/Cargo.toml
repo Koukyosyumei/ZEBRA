@@ -22,6 +22,7 @@ p3-matrix = { git = "https://github.com/ProjectZKM/Plonky3" }
 p3-mersenne-31 = { git = "https://github.com/ProjectZKM/Plonky3" }
 p3-util = { git = "https://github.com/ProjectZKM/Plonky3" }
 p3-baby-bear = { git = "https://github.com/ProjectZKM/Plonky3" }
+p3-koala-bear = { git = "https://github.com/ProjectZKM/Plonky3" }
 p3-challenger = { git = "https://github.com/ProjectZKM/Plonky3" }
 p3-circle = { git = "https://github.com/ProjectZKM/Plonky3" }
 p3-commit = { git = "https://github.com/ProjectZKM/Plonky3" }

@@ -1,9 +1,13 @@
+use std::borrow::Borrow;
 use std::io;
 
 use p3_air::BaseAir;
 use p3_field::PrimeField32;
 
 use zkm_core_executor::{ExecutionState, Executor, Program};
+use zkm_core_machine::columns::CpuCols;
+use zkm_core_machine::memory::MemoryInitCols;
+use zkm_core_machine::memory::MemoryLocalCols;
 use zkm_core_machine::mips::MipsAir;
 use zkm_core_machine::utils::trace_checkpoint;
 use zkm_core_machine::utils::ZKMCoreProverError;
@@ -12,9 +16,9 @@ use zkm_stark::ZKMCoreOpts;
 use zkm_stark::{CpuProver, MachineProver};
 
 use latticevm::interval::AbstractInterval;
+use latticevm::state::AbstractState;
 
 use crate::state::ziren_state_to_abstract_state;
-use latticevm::state::AbstractState;
 
 pub fn run_ziren_program(
     program: &Program,
@@ -73,6 +77,26 @@ pub fn run_ziren_program(
                 );
             }
             true_abs_traces.push((mt.0.clone(), rows));
+        }
+        println!("{}, {} - {}", mt.0, mt.1.values.len(), mt.1.width);
+        if mt.0 == "MemoryLocal" {
+            for i in 0..4 {
+                let mut row = mt.1.row_mut(i);
+                let local: &MemoryLocalCols<_> = (*row).borrow();
+                println!("  row[{}]: {:?}", i, local);
+            }
+        } else if mt.0 == "MemoryGlobalInit" {
+            for i in 0..4 {
+                let mut row = mt.1.row_mut(i);
+                let local: &MemoryInitCols<_> = (*row).borrow();
+                println!("  row[{}]: {:?}", i, local);
+            }
+        } else if mt.0 == "Cpu" {
+            for i in 0..4 {
+                let mut row = mt.1.row_mut(i);
+                let local: &CpuCols<_> = (*row).borrow();
+                println!("  row[{}]: {:?}", i, local);
+            }
         }
     }
 

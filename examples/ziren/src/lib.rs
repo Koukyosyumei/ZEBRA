@@ -2,8 +2,25 @@ pub mod executor;
 pub mod p3_to_tv;
 pub mod pv_constraints;
 pub mod state;
+pub mod table_generator;
 
 /*
+CpuCols { shard: 1, clk_16bit_limb: 0, clk_8bit_limb: 0, shard_to_send: 0, clk_to_send: 0, pc: 4, next_pc: 8, next_next_pc: 12, instruction: InstructionCols { opcode: 0, op_a: 1, op_b: Word([5, 0, 0, 0]), op_c: Word([3, 0, 0, 0]), op_a_0: 0, imm_b: 0, imm_c: 1 }, num_extra_cycles: 0, is_memory: 0, is_rw_a: 0, is_write_hi: 0, is_halt: 0, is_sequential: 1, op_a_value: Word([3, 0, 0, 0]), hi_or_prev_a: Word([0, 0, 0, 0]), op_a_access: MemoryReadWriteCols { prev_value: Word([0, 0, 0, 0]), access: MemoryAccessCols { value: Word([3, 0, 0, 0]), prev_shard: 0, prev_clk: 0, compare_clk: 0, diff_16bit_limb: 0, diff_8bit_limb: 0 } }, op_b_access: MemoryReadCols { access: MemoryAccessCols { value: Word([0, 0, 0, 0]), prev_shard: 0, prev_clk: 0, compare_clk: 0, diff_16bit_limb: 0, diff_8bit_limb: 0 } }, op_c_access: MemoryReadCols { access: MemoryAccessCols { value: Word([3, 0, 0, 0]), prev_shard: 0, prev_clk: 0, compare_clk: 0, diff_16bit_limb: 0, diff_8bit_limb: 0 } }, is_real: 1, op_a_immutable: 0 }
+  row[1]: CpuCols { shard: 0, clk_16bit_limb: 0, clk_8bit_limb: 0, shard_to_send: 0, clk_to_send: 0, pc: 0, next_pc: 0, next_next_pc: 0, instruction: InstructionCols { opcode: 0, op_a: 0, op_b: Word([0, 0, 0, 0]), op_c: Word([0, 0, 0, 0]), op_a_0: 0, imm_b: 1, imm_c: 1 }, num_extra_cycles: 0, is_memory: 0, is_rw_a: 1, is_write_hi: 0, is_halt: 0, is_sequential: 0, op_a_value: Word([0, 0, 0, 0]), hi_or_prev_a: Word([0, 0, 0, 0]), op_a_access: MemoryReadWriteCols { prev_value: Word([0, 0, 0, 0]), access: MemoryAccessCols { value: Word([0, 0, 0, 0]), prev_shard: 0, prev_clk: 0, compare_clk: 0, diff_16bit_limb: 0, diff_8bit_limb: 0 } }, op_b_access: MemoryReadCols { access: MemoryAccessCols { value: Word([0, 0, 0, 0]), prev_shard: 0, prev_clk: 0, compare_clk: 0, diff_16bit_limb: 0, diff_8bit_limb: 0 } }, op_c_access: MemoryReadCols { access: MemoryAccessCols { value: Word([0, 0, 0, 0]), prev_shard: 0, prev_clk: 0, compare_clk: 0, diff_16bit_limb: 0, diff_8bit_limb: 0 } }, is_real: 0, op_a_immutable: 0 }
+
+CpuCols { shard: 0, clk_16bit_limb: 1, clk_8bit_limb: 2, shard_to_send: 3,
+clk_to_send: 4, pc: 5, next_pc: 6, next_next_pc: 7,
+instruction: InstructionCols { opcode: 8, op_a: 9, op_b: Word([10, 11, 12, 13]),
+op_c: Word([14, 15, 16, 17]), op_a_0: 18, imm_b: 19, imm_c: 20 },
+num_extra_cycles: 21, is_memory: 22, is_rw_a: 23, is_write_hi: 24, is_halt: 25,
+is_sequential: 26,
+op_a_value: Word([27, 28, 29, 30]),
+hi_or_prev_a: Word([31, 32, 33, 34]),
+op_a_access: MemoryReadWriteCols { prev_value: Word([35, 36, 37, 38]), access: MemoryAccessCols { value: Word([39, 40, 41, 42]), prev_shard: 43, prev_clk: 44, compare_clk: 45, diff_16bit_limb: 46, diff_8bit_limb: 47 } },
+op_b_access: MemoryReadCols { access: MemoryAccessCols { value: Word([48, 49, 50, 51]), prev_shard: 52, prev_clk: 53, compare_clk: 54, diff_16bit_limb: 55, diff_8bit_limb: 56 } },
+op_c_access: MemoryReadCols { access: MemoryAccessCols { value: Word([57, 58, 59, 60]), prev_shard: 61, prev_clk: 62, compare_clk: 63, diff_16bit_limb: 64, diff_8bit_limb: 65 } },
+is_real: 66, op_a_immutable: 67 }
+
 (curr[19] * (curr[48] - curr[10])) = 0
 (curr[19] * (curr[49] - curr[11])) = 0
 (curr[19] * (curr[50] - curr[12])) = 0

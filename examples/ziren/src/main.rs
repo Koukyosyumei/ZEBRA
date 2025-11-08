@@ -3,15 +3,24 @@ use std::rc::Rc;
 use itertools::Itertools;
 use rand::{rngs::StdRng, SeedableRng};
 
+use p3_koala_bear::KoalaBear;
+use p3_matrix::dense::RowMajorMatrix;
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
+use zkm_core_executor::ExecutionRecord;
+use zkm_core_executor::Executor;
+use zkm_core_executor::MipsAirId::MemoryLocal;
 use zkm_core_executor::{Instruction, Opcode, Program};
+use zkm_core_machine::memory::MemoryLocalChip;
+use zkm_core_machine::AddSubChip;
 use zkm_core_machine::{
     cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
     CpuChip,
 };
+use zkm_stark::MachineAir;
 use zkm_stark::MachineProver;
+use zkm_stark::ZKMCoreOpts;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 use latticevm::smt::expr_to_smt;
@@ -27,9 +36,10 @@ use latticevm_ziren::executor::run_ziren_program;
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
+use latticevm_ziren::table_generator::emit_events;
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::ADD, 1, 0, 3, false, true)];
+    let instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -85,7 +95,26 @@ fn main() -> Result<(), ()> {
         if st.0 == "Cpu" {
             base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
         }
+        println!("{}", st.0);
     }
+
+    let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
+    let mut u32_cpu_row: Vec<u32> = base_abs_main_trace_data[0]
+        .clone()
+        .into_iter()
+        .map(|v| v.as_canonical_u32(prime))
+        .collect();
+    emit_events(&mut runtime, &u32_cpu_row);
+
+    let chip = AddSubChip::default();
+    let mut trace: RowMajorMatrix<KoalaBear> =
+        chip.generate_trace(&runtime.record, &mut ExecutionRecord::default());
+    println!("AddSub: {:?}", trace.row_mut(0));
+
+    let chip = MemoryLocalChip::new();
+    let mut trace: RowMajorMatrix<KoalaBear> =
+        chip.generate_trace(&runtime.record, &mut ExecutionRecord::default());
+    println!("memLocal: {:?}", trace.row_mut(0));
 
     // ############### Construct SMT formula ############################
     if false {
@@ -133,6 +162,7 @@ fn main() -> Result<(), ()> {
     let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
 
+    /*
     run_solver(
         &constraints,
         &target_cols,
@@ -145,6 +175,7 @@ fn main() -> Result<(), ()> {
         prime,
         42,
     );
+    */
 
     Ok(())
 }

@@ -906,6 +906,7 @@ dependencies = [
  "p3-fri",
  "p3-goldilocks",
  "p3-keccak",
+ "p3-koala-bear",
  "p3-matrix",
  "p3-mds",
  "p3-merkle-tree",
