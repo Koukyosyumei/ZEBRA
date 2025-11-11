@@ -63,7 +63,7 @@ pub fn solve(
         let public_vals = head.1;
 
         ui.status = format!(
-                    "{}, #Total Trial: {}, #Trial {},  #UNSAT Trial: {}, #Qued: {}, Potential: {}, Sum-Potential: {}",
+                    "Target Columns: {}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
                     meta_info,
                     num_trial + cum_num_trial,
                     num_trial,
@@ -159,7 +159,7 @@ pub fn run_solver<FinalCheckFn>(
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
-    FinalCheckFn: Fn(&AbstractTrace, u32, &mut Terminal<CrosstermBackend<std::io::Stdout>>),
+    FinalCheckFn: Fn(&AbstractTrace, u32, &mut UiState),
 {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut found_solution_flag = false;
@@ -202,24 +202,16 @@ pub fn run_solver<FinalCheckFn>(
             );
 
             if let (Some(trace), _, _, _) = result {
-                ui.logs = format!(
-                    "#{}, Find SAT assignment: {}",
-                    cum_num_trial + result.1,
-                    trace
-                );
-                terminal
-                    .draw(|f| {
-                        ui.render::<CrosstermBackend<Stdout>>(f);
-                    })
-                    .unwrap();
-                terminal
-                    .draw(|f| {
-                        ui.render::<CrosstermBackend<Stdout>>(f);
-                    })
-                    .unwrap();
+                ui.logs = format!("#{}\n{}\n", cum_num_trial + result.1, trace);
 
-                final_check(&trace, prime, terminal);
+                final_check(&trace, prime, ui);
                 found_solution_flag = true;
+
+                terminal
+                    .draw(|f| {
+                        ui.render::<CrosstermBackend<Stdout>>(f);
+                    })
+                    .unwrap();
                 //break;
             } else {
                 cum_num_trial += result.1;

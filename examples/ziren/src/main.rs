@@ -151,20 +151,20 @@ fn main() -> Result<(), io::Error> {
     }
 
     // ############## Final Check Function ##############################
-    fn final_check(
-        trace: &AbstractTrace,
-        prime: u32,
-        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) {
+    fn final_check(trace: &AbstractTrace, prime: u32, ui: &mut UiState) {
+        let mut output = String::new();
+
         let recovered_states = trace
             .data
             .iter()
             .map(|row| ziren_abstract_trace_to_abstract_state(row, prime))
             .collect::<Vec<_>>();
-        //for rs in &recovered_states {
-        //    println!("{}", rs);
-        //}
-        //println!("========");
+
+        output.push_str("Malicious States:\n");
+        for rs in &recovered_states {
+            output.push_str(&format!("\t{}\n", rs));
+        }
+        output.push_str("-----------------\n");
 
         let program = add_program(
             recovered_states[0].pc.as_canonical_u32(prime),
@@ -172,9 +172,12 @@ fn main() -> Result<(), io::Error> {
         );
         let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
 
-        //for tas in &true_abstract_states {
-        //    println!("{}", tas);
-        //}
+        output.push_str("Original States:\n");
+        for tas in &true_abstract_states {
+            output.push_str(&format!("\t{}\n", tas));
+        }
+
+        ui.recovered = output;
     }
 
     // ############## Solve! ###########################################
@@ -187,7 +190,12 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut ui = UiState::new();
-    ui.program = format!("{:?}", program);
+
+    let mut program_str = String::new();
+    for inst in program.instructions {
+        program_str.push_str(&format!("{:?}\n", inst));
+    }
+    ui.program = program_str;
 
     run_solver(
         &constraints,

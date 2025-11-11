@@ -52,16 +52,23 @@ impl UiState {
             .wrap(wrap);
 
         let bottom_left = Paragraph::new(self.logs.clone())
-            .block(Block::default().borders(Borders::ALL).title("Logs"))
-            .style(Style::default().fg(Color::White))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("SAT Assignment"),
+            )
+            .style(Style::default().fg(Color::Cyan))
             .wrap(wrap);
 
-        let bottom_right = Paragraph::new(self.logs.clone())
-            .block(Block::default().borders(Borders::ALL).title("Debug"))
-            .style(Style::default().fg(Color::Blue))
+        let bottom_right = Paragraph::new(self.recovered.clone())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Recovered States"),
+            )
+            .style(Style::default().fg(Color::Magenta))
             .wrap(wrap);
 
-        // それぞれ描画
         f.render_widget(top_left, top_chunks[0]);
         f.render_widget(top_right, top_chunks[1]);
         f.render_widget(bottom_left, bottom_chunks[0]);
