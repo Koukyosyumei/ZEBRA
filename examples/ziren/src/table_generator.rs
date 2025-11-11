@@ -108,6 +108,7 @@ pub fn emit_events(executor: &mut Executor, row: &Vec<u32>) {
     let b = row[48] | (row[49] << 8) | (row[50] << 16) | (row[51] << 24);
     let c = row[57] | (row[58] << 8) | (row[59] << 16) | (row[60] << 24);
 
+    /*
     let op_a_access = MemoryWriteRecord {
         value: a,
         shard: row[0],
@@ -131,7 +132,7 @@ pub fn emit_events(executor: &mut Executor, row: &Vec<u32>) {
         timestamp: clk,
         prev_shard: row[61],
         prev_timestamp: row[62],
-    };
+    };*/
 
     match opcode {
         Opcode::SYSCALL => {
@@ -159,10 +160,6 @@ pub fn emit_events(executor: &mut Executor, row: &Vec<u32>) {
         | Opcode::MOD
         | Opcode::MODU => {
             if !instruction.imm_c {
-                //let (rs1, rs2) = (
-                //    (instruction.op_b as u8).into(),
-                //    (instruction.op_c as u8).into(),
-                //);
                 let c = executor.mr_cpu(op_b, MemoryAccessPosition::C);
                 let b = executor.mr_cpu(op_c, MemoryAccessPosition::B);
             } else if !instruction.imm_b && instruction.imm_c {
