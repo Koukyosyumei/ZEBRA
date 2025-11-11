@@ -321,10 +321,10 @@ pub fn gather_boolean_variables(constraints: &[LatticeVMSymbolicExpr]) -> Vec<us
     result.iter().cloned().collect()
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct AbstractTrace {
     pub data: Vec<Vec<AbstractInterval>>,
-    pub singleton_positions: HashSet<(usize, usize)>,
+    pub singleton_positions: Vec<(usize, usize)>,
 }
 
 impl fmt::Display for AbstractTrace {
@@ -345,11 +345,11 @@ impl fmt::Display for AbstractTrace {
 
 impl AbstractTrace {
     pub fn new(raw_trace: Vec<Vec<AbstractInterval>>) -> Self {
-        let mut singleton_positions = HashSet::new();
+        let mut singleton_positions = Vec::new();
         for i in 0..raw_trace.len() {
             for j in 0..raw_trace[0].len() {
                 if raw_trace[i][j].is_singleton() {
-                    singleton_positions.insert((i, j));
+                    singleton_positions.push((i, j));
                 }
             }
         }
@@ -358,6 +358,20 @@ impl AbstractTrace {
             singleton_positions,
         }
     }
+
+    pub fn diff_positions(&self, other: &Self) -> Vec<(usize, usize)> {
+        let mut diffs = vec![];
+
+        for (i, (row_self, row_other)) in self.data.iter().zip(&other.data).enumerate() {
+            for (j, (cell_self, cell_other)) in row_self.iter().zip(row_other).enumerate() {
+                if cell_self != cell_other {
+                    diffs.push((i, j));
+                }
+            }
+        }
+
+        diffs
+    }
 }
 
 pub fn eval_air_constraints(
@@ -365,9 +379,10 @@ pub fn eval_air_constraints(
     public_vals: Option<&[AbstractInterval]>,
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
-) -> MayBeFlag {
+) -> (MayBeFlag, i32) {
     let num_steps = trace.data.len();
     let mut is_all_true = true;
+    let mut potential = 0;
     for i in 0..num_steps {
         for tc in constraints {
             let flag = tc
@@ -388,16 +403,19 @@ pub fn eval_air_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    return MayBeFlag::False;
+                    return (MayBeFlag::False, 0);
                 }
-                MayBeFlag::MayBe => is_all_true = false,
+                MayBeFlag::MayBe => {
+                    is_all_true = false;
+                    potential += 1;
+                }
             }
         }
     }
     if is_all_true {
-        MayBeFlag::True
+        (MayBeFlag::True, 0)
     } else {
-        MayBeFlag::MayBe
+        (MayBeFlag::MayBe, potential)
     }
 }
 
@@ -412,13 +430,14 @@ pub fn eval_constraints(
     public_vals: Option<&[AbstractInterval]>,
     constraints: &LatticeVMConstraints,
     prime: u32,
-) -> MayBeFlag {
+) -> (MayBeFlag, i32) {
     let mut is_all_true = true;
 
-    let air_flag = eval_air_constraints(trace, public_vals, &constraints.air_constraints, prime);
+    let (air_flag, mut potential) =
+        eval_air_constraints(trace, public_vals, &constraints.air_constraints, prime);
     match air_flag {
         MayBeFlag::True => {}
-        MayBeFlag::False => return MayBeFlag::False,
+        MayBeFlag::False => return (MayBeFlag::False, 0),
         MayBeFlag::MayBe => is_all_true = false,
     }
 
@@ -437,9 +456,12 @@ pub fn eval_constraints(
         match flag {
             MayBeFlag::True => {}
             MayBeFlag::False => {
-                return MayBeFlag::False;
+                return (MayBeFlag::False, 0);
             }
-            MayBeFlag::MayBe => is_all_true = false,
+            MayBeFlag::MayBe => {
+                is_all_true = false;
+                potential += 1;
+            }
         }
     }
 
@@ -458,16 +480,19 @@ pub fn eval_constraints(
         match flag {
             MayBeFlag::True => {}
             MayBeFlag::False => {
-                return MayBeFlag::False;
+                return (MayBeFlag::False, 0);
             }
-            MayBeFlag::MayBe => is_all_true = false,
+            MayBeFlag::MayBe => {
+                is_all_true = false;
+                potential += 1;
+            }
         }
     }
 
     if is_all_true {
-        MayBeFlag::True
+        (MayBeFlag::True, 0)
     } else {
-        MayBeFlag::MayBe
+        (MayBeFlag::MayBe, potential)
     }
 }
 
@@ -501,12 +526,12 @@ pub fn refine_trace(
             if v.0.is_singleton() {
                 trace_a
                     .singleton_positions
-                    .insert((i, c_refinment_target_indicies[j]));
+                    .push((i, c_refinment_target_indicies[j]));
             }
             if v.1.is_singleton() {
                 trace_b
                     .singleton_positions
-                    .insert((i, c_refinment_target_indicies[j]));
+                    .push((i, c_refinment_target_indicies[j]));
             }
             trace_a.data[i][c_refinment_target_indicies[j]] = v.0;
             trace_b.data[i][c_refinment_target_indicies[j]] = v.1;

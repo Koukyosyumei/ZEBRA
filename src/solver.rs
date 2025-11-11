@@ -1,11 +1,29 @@
-use std::collections::VecDeque;
+use std::i32;
+use std::io::Stdout;
+use std::{io, thread, time::Duration};
 
+use crossterm::event::KeyModifiers;
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use itertools::Itertools;
 use rand::{rngs::StdRng, SeedableRng};
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
+    widgets::{Block, Borders, Paragraph},
+    Terminal,
+};
+
+use priority_queue::PriorityQueue;
 
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
     symbolic::{eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints},
+    ui::UiState,
 };
 
 pub fn solve(
@@ -16,74 +34,115 @@ pub fn solve(
     refinment_target_indicies_main: &Vec<usize>,
     refinment_target_indicies_pv: &Vec<usize>,
     max_row_id: usize,
+    maximum_num_trial: usize,
+    cum_num_trial: usize,
     prime: u32,
     rng: &mut StdRng,
     meta_info: &str,
-) -> Option<AbstractTrace> {
-    let mut deque: VecDeque<(AbstractTrace, AbstractTrace)> = VecDeque::new();
-    deque.push_back((
-        initial_abs_main_trace,
-        AbstractTrace::new(vec![initial_public_vals]),
-    ));
+    ui: &mut UiState,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+) -> (Option<AbstractTrace>, usize, i32, bool) {
+    let mut queue: PriorityQueue<(AbstractTrace, AbstractTrace), i32> = PriorityQueue::new();
+    queue.push(
+        (
+            initial_abs_main_trace,
+            AbstractTrace::new(vec![initial_public_vals]),
+        ),
+        i32::MAX,
+    );
 
     let mut num_trial = 0;
     let mut num_unsat_trial = 0;
+    let mut sum_potential = 0;
 
-    while !deque.is_empty() && num_trial < 100000 {
+    while !queue.is_empty() && num_trial < maximum_num_trial {
         num_trial += 1;
 
-        let head = deque.pop_front().unwrap();
+        let (head, potential) = queue.pop().unwrap();
         let trace = head.0;
         let public_vals = head.1;
 
-        let flag = eval_constraints(&trace, Some(&public_vals.data[0]), constraints, prime);
-        if flag == MayBeFlag::True {
-            return Some(trace);
-        } else if flag == MayBeFlag::MayBe {
-            let trace_children = refine_trace(
-                &trace,
-                num_refined_points,
-                refinment_target_indicies_main,
-                max_row_id,
-                rng,
-            );
+        ui.status = format!(
+                    "Target Columns: {}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
+                    meta_info,
+                    num_trial + cum_num_trial,
+                    num_trial,
+                    num_unsat_trial,
+                    queue.len(),
+                    -potential,
+                    sum_potential,
+                );
 
-            let pv_children = refine_trace(
-                &public_vals,
-                num_refined_points,
-                refinment_target_indicies_pv,
-                max_row_id,
-                rng,
-            );
+        terminal
+            .draw(|f| {
+                ui.render::<CrosstermBackend<Stdout>>(f);
+            })
+            .unwrap();
 
-            if let Some(trace_children) = trace_children {
-                if let Some(pv_children) = pv_children {
-                    deque.push_back((trace_children.0.clone(), pv_children.0.clone()));
-                    deque.push_back((trace_children.1.clone(), pv_children.0));
-                    deque.push_back((trace_children.0, pv_children.1.clone()));
-                    deque.push_back((trace_children.1, pv_children.1));
-                } else {
-                    deque.push_back((trace_children.0, public_vals.clone()));
-                    deque.push_back((trace_children.1, public_vals));
-                }
-            } else if let Some(pv_children) = pv_children {
-                deque.push_back((trace.clone(), pv_children.0));
-                deque.push_back((trace, pv_children.1));
-            }
-        } else {
-            num_unsat_trial += 1;
+        if num_trial > 1 {
+            sum_potential += potential;
         }
 
-        print!(
-            "\r{}, #Trial: {}, #UNSAT Trial: {}, #Qued: {}",
-            meta_info,
-            num_trial,
-            num_unsat_trial,
-            deque.len()
+        let trace_children = refine_trace(
+            &trace,
+            num_refined_points,
+            refinment_target_indicies_main,
+            max_row_id,
+            rng,
         );
+
+        let pv_children = refine_trace(
+            &public_vals,
+            num_refined_points,
+            refinment_target_indicies_pv,
+            max_row_id,
+            rng,
+        );
+
+        let mut chinldren = vec![];
+        if let Some(trace_children) = trace_children {
+            if let Some(pv_children) = pv_children {
+                chinldren.push((trace_children.0.clone(), pv_children.0.clone()));
+                chinldren.push((trace_children.1.clone(), pv_children.0));
+                chinldren.push((trace_children.0, pv_children.1.clone()));
+                chinldren.push((trace_children.1, pv_children.1));
+            } else {
+                chinldren.push((trace_children.0.clone(), public_vals.clone()));
+                chinldren.push((trace_children.1.clone(), public_vals));
+            }
+        } else if let Some(pv_children) = pv_children {
+            chinldren.push((trace.clone(), pv_children.0));
+            chinldren.push((trace, pv_children.1));
+        }
+        for kid in chinldren {
+            let (flag, potential) =
+                eval_constraints(&kid.0, Some(&kid.1.data[0]), constraints, prime);
+            match flag {
+                MayBeFlag::True => {
+                    return (Some(kid.0), num_trial, sum_potential, false);
+                }
+                MayBeFlag::False => {
+                    num_unsat_trial += 1;
+                }
+                MayBeFlag::MayBe => {
+                    queue.push(kid, -potential);
+                }
+            }
+        }
+
+        if event::poll(Duration::from_millis(1)).unwrap() {
+            if let Event::Key(key) = event::read().unwrap() {
+                if key.code == KeyCode::Char('q')
+                    || (key.code == KeyCode::Char('c')
+                        && key.modifiers.contains(KeyModifiers::CONTROL))
+                {
+                    return (None, num_trial, sum_potential, true);
+                }
+            }
+        }
     }
 
-    None
+    (None, num_trial, sum_potential, false)
 }
 
 pub fn run_solver<FinalCheckFn>(
@@ -97,11 +156,15 @@ pub fn run_solver<FinalCheckFn>(
     final_check: FinalCheckFn,
     prime: u32,
     seed: u64,
+    ui: &mut UiState,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
-    FinalCheckFn: Fn(&AbstractTrace, u32),
+    FinalCheckFn: Fn(&AbstractTrace, u32, &mut UiState),
 {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut found_solution_flag = false;
+    let mut cum_num_trial = 0;
+    let mut exit_flag = false;
 
     for k in 1..(target_cols.len() + 1) {
         for combo in target_cols.iter().combinations(k) {
@@ -116,6 +179,7 @@ pub fn run_solver<FinalCheckFn>(
                     }
                 }
             }
+
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
 
             let refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
@@ -128,20 +192,42 @@ pub fn run_solver<FinalCheckFn>(
                 &refinment_target_indicies_main,
                 &refinment_target_indicies_pv,
                 max_row_id,
+                1000000,
+                cum_num_trial,
                 prime,
                 &mut rng,
                 &format!("{:?}", combo),
+                ui,
+                terminal,
             );
 
-            if let Some(trace) = result {
-                println!("\nFind SAT assignment: {}", trace);
-                final_check(&trace, prime);
+            if let (Some(trace), _, _, _) = result {
+                ui.logs = format!("#{}\n{}\n", cum_num_trial + result.1, trace);
+
+                final_check(&trace, prime, ui);
                 found_solution_flag = true;
+
+                terminal
+                    .draw(|f| {
+                        ui.render::<CrosstermBackend<Stdout>>(f);
+                    })
+                    .unwrap();
+                //break;
+            } else {
+                cum_num_trial += result.1;
+            }
+
+            if result.3 {
+                exit_flag = true;
                 break;
             }
         }
 
         if found_solution_flag {
+            //break;
+        }
+
+        if exit_flag {
             break;
         }
     }
