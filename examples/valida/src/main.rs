@@ -1,8 +1,21 @@
 use std::rc::Rc;
+use std::{io, thread, time::Duration};
 
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use rand::rngs::StdRng;
 use rand::thread_rng;
 use rand::SeedableRng;
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
+    widgets::{Block, Borders, Paragraph},
+    Terminal,
+};
 
 use p3_baby_bear::BabyBear;
 use p3_challenger::DuplexChallenger;
@@ -52,6 +65,7 @@ use latticevm::symbolic::eval_constraints;
 use latticevm::symbolic::gather_boolean_variables;
 use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
+use latticevm::ui::UiState;
 
 use latticevm_valida::p3_to_tv::convert_p3_expr;
 
@@ -153,7 +167,7 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     program
 }
 
-fn main() -> Result<(), ()> {
+fn main() -> Result<(), io::Error> {
     println!("{:?}", CPU_COL_MAP);
     // 2^31 - 2^27 + 1
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
@@ -191,7 +205,7 @@ fn main() -> Result<(), ()> {
     let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
     let program = add_program::<BabyBear>();
-    let rom = ProgramROM::new(program);
+    let rom = ProgramROM::new(program.clone());
 
     let mut machine = BasicMachine::<BabyBear>::default();
     machine.set_segment_number(0);
@@ -230,12 +244,25 @@ fn main() -> Result<(), ()> {
     }
     let base_abs_main_trace_data = rows.clone();
 
-    fn final_check(trace: &AbstractTrace, prime: u32) {}
+    fn final_check(trace: &AbstractTrace, prime: u32, ui: &mut UiState) {}
 
     let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
 
     let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
+
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    let mut ui = UiState::new();
+
+    let mut program_str = String::new();
+    for inst in program {
+        program_str.push_str(&format!("{}\n", inst));
+    }
+    ui.program = program_str;
 
     run_solver(
         &constraints,
@@ -248,7 +275,17 @@ fn main() -> Result<(), ()> {
         final_check,
         prime,
         42,
+        &mut ui,
+        &mut terminal,
     );
+
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
 
     //let cpu = &state.machine.cpu;
 
