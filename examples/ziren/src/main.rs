@@ -187,6 +187,7 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut ui = UiState::new();
+    ui.program = format!("{:?}", program);
 
     run_solver(
         &constraints,
