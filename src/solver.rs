@@ -1,13 +1,29 @@
 use std::i32;
+use std::io::Stdout;
+use std::{io, thread, time::Duration};
 
-use priority_queue::PriorityQueue;
-
+use crossterm::event::KeyModifiers;
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use itertools::Itertools;
 use rand::{rngs::StdRng, SeedableRng};
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
+    widgets::{Block, Borders, Paragraph},
+    Terminal,
+};
+
+use priority_queue::PriorityQueue;
 
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
     symbolic::{eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints},
+    ui::UiState,
 };
 
 pub fn solve(
@@ -23,7 +39,9 @@ pub fn solve(
     prime: u32,
     rng: &mut StdRng,
     meta_info: &str,
-) -> (Option<AbstractTrace>, usize, i32) {
+    ui: &mut UiState,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+) -> (Option<AbstractTrace>, usize, i32, bool) {
     let mut queue: PriorityQueue<(AbstractTrace, AbstractTrace), i32> = PriorityQueue::new();
     queue.push(
         (
@@ -44,6 +62,24 @@ pub fn solve(
         let trace = head.0;
         let public_vals = head.1;
 
+        ui.status = format!(
+                    "{}, #Total Trial: {}, #Trial {},  #UNSAT Trial: {}, #Qued: {}, Potential: {}, Sum-Potential: {}",
+                    meta_info,
+                    num_trial + cum_num_trial,
+                    num_trial,
+                    num_unsat_trial,
+                    queue.len(),
+                    -potential,
+                    sum_potential,
+                );
+
+        terminal
+            .draw(|f| {
+                ui.render::<CrosstermBackend<Stdout>>(f);
+            })
+            .unwrap();
+
+        /*
         print!(
             "\r{}, #Total Trial: {}, #Trial {},  #UNSAT Trial: {}, #Qued: {}, Potential: {}, Sum-Potential: {}",
             meta_info,
@@ -54,6 +90,7 @@ pub fn solve(
             -potential,
             sum_potential
         );
+        */
 
         if num_trial > 1 {
             sum_potential += potential;
@@ -95,7 +132,7 @@ pub fn solve(
                 eval_constraints(&kid.0, Some(&kid.1.data[0]), constraints, prime);
             match flag {
                 MayBeFlag::True => {
-                    return (Some(kid.0), num_trial, sum_potential);
+                    return (Some(kid.0), num_trial, sum_potential, false);
                 }
                 MayBeFlag::False => {
                     num_unsat_trial += 1;
@@ -105,9 +142,20 @@ pub fn solve(
                 }
             }
         }
+
+        if event::poll(Duration::from_millis(1)).unwrap() {
+            if let Event::Key(key) = event::read().unwrap() {
+                if key.code == KeyCode::Char('q')
+                    || (key.code == KeyCode::Char('c')
+                        && key.modifiers.contains(KeyModifiers::CONTROL))
+                {
+                    return (None, num_trial, sum_potential, true);
+                }
+            }
+        }
     }
 
-    (None, num_trial, sum_potential)
+    (None, num_trial, sum_potential, false)
 }
 
 pub fn run_solver<FinalCheckFn>(
@@ -121,12 +169,15 @@ pub fn run_solver<FinalCheckFn>(
     final_check: FinalCheckFn,
     prime: u32,
     seed: u64,
+    ui: &mut UiState,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
-    FinalCheckFn: Fn(&AbstractTrace, u32),
+    FinalCheckFn: Fn(&AbstractTrace, u32, &mut Terminal<CrosstermBackend<std::io::Stdout>>),
 {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut found_solution_flag = false;
     let mut cum_num_trial = 0;
+    let mut exit_flag = false;
 
     for k in 1..(target_cols.len() + 1) {
         for combo in target_cols.iter().combinations(k) {
@@ -159,20 +210,50 @@ pub fn run_solver<FinalCheckFn>(
                 prime,
                 &mut rng,
                 &format!("{:?}", combo),
+                ui,
+                terminal,
             );
 
-            if let (Some(trace), _, _) = result {
-                println!("\nFind SAT assignment: {}", trace);
-                final_check(&trace, prime);
+            if let (Some(trace), _, _, _) = result {
+                ui.logs = format!("Find SAT assignment: {}", trace);
+                terminal
+                    .draw(|f| {
+                        ui.render::<CrosstermBackend<Stdout>>(f);
+                    })
+                    .unwrap();
+
+                //println!("\nFind SAT assignment: {}", trace);
+                final_check(&trace, prime, terminal);
                 found_solution_flag = true;
                 //break;
             } else {
                 cum_num_trial += result.1;
             }
+
+            if result.3 {
+                exit_flag = true;
+                break;
+            }
+
+            /*
+            if event::poll(Duration::from_millis(50)).unwrap() {
+                if let Event::Key(key) = event::read().unwrap() {
+                    if key.code == KeyCode::Char('q')
+                        || (key.code == KeyCode::Char('c')
+                            && key.modifiers.contains(KeyModifiers::CONTROL))
+                    {
+                        break;
+                    }
+                }
+            }*/
         }
 
         if found_solution_flag {
             //break;
+        }
+
+        if exit_flag {
+            break;
         }
     }
 }

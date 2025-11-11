@@ -1,7 +1,20 @@
 use std::rc::Rc;
+use std::{io, thread, time::Duration};
 
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use itertools::Itertools;
 use rand::{rngs::StdRng, SeedableRng};
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
+    widgets::{Block, Borders, Paragraph},
+    Terminal,
+};
 
 use p3_koala_bear::KoalaBear;
 use p3_matrix::dense::RowMajorMatrix;
@@ -28,6 +41,7 @@ use latticevm::symbolic::eval_constraints;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
+use latticevm::ui::UiState;
 use latticevm::{
     interval::AbstractInterval, solver::run_solver, symbolic::gather_boolean_variables,
     symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
@@ -43,7 +57,7 @@ pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     Program::new(instructions, pc_start, pc_base)
 }
 
-fn main() -> Result<(), ()> {
+fn main() -> Result<(), io::Error> {
     // ############### Global Parameters #################################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
     let program_cols = (8..35).collect::<Vec<_>>();
@@ -137,16 +151,20 @@ fn main() -> Result<(), ()> {
     }
 
     // ############## Final Check Function ##############################
-    fn final_check(trace: &AbstractTrace, prime: u32) {
+    fn final_check(
+        trace: &AbstractTrace,
+        prime: u32,
+        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    ) {
         let recovered_states = trace
             .data
             .iter()
             .map(|row| ziren_abstract_trace_to_abstract_state(row, prime))
             .collect::<Vec<_>>();
-        for rs in &recovered_states {
-            println!("{}", rs);
-        }
-        println!("========");
+        //for rs in &recovered_states {
+        //    println!("{}", rs);
+        //}
+        //println!("========");
 
         let program = add_program(
             recovered_states[0].pc.as_canonical_u32(prime),
@@ -154,14 +172,21 @@ fn main() -> Result<(), ()> {
         );
         let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
 
-        for tas in &true_abstract_states {
-            println!("{}", tas);
-        }
+        //for tas in &true_abstract_states {
+        //    println!("{}", tas);
+        //}
     }
 
     // ############## Solve! ###########################################
     let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
+
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    let mut ui = UiState::new();
 
     run_solver(
         &constraints,
@@ -174,7 +199,17 @@ fn main() -> Result<(), ()> {
         final_check,
         prime,
         42,
+        &mut ui,
+        &mut terminal,
     );
+
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
 
     Ok(())
 }
