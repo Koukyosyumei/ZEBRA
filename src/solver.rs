@@ -79,19 +79,6 @@ pub fn solve(
             })
             .unwrap();
 
-        /*
-        print!(
-            "\r{}, #Total Trial: {}, #Trial {},  #UNSAT Trial: {}, #Qued: {}, Potential: {}, Sum-Potential: {}",
-            meta_info,
-            num_trial + cum_num_trial,
-            num_trial,
-            num_unsat_trial,
-            queue.len(),
-            -potential,
-            sum_potential
-        );
-        */
-
         if num_trial > 1 {
             sum_potential += potential;
         }
@@ -215,14 +202,18 @@ pub fn run_solver<FinalCheckFn>(
             );
 
             if let (Some(trace), _, _, _) = result {
-                ui.logs = format!("Find SAT assignment: {}", trace);
+                ui.logs = format!("#{}, Find SAT assignment: {}", cum_num_trial, trace);
+                terminal
+                    .draw(|f| {
+                        ui.render::<CrosstermBackend<Stdout>>(f);
+                    })
+                    .unwrap();
                 terminal
                     .draw(|f| {
                         ui.render::<CrosstermBackend<Stdout>>(f);
                     })
                     .unwrap();
 
-                //println!("\nFind SAT assignment: {}", trace);
                 final_check(&trace, prime, terminal);
                 found_solution_flag = true;
                 //break;
@@ -234,18 +225,6 @@ pub fn run_solver<FinalCheckFn>(
                 exit_flag = true;
                 break;
             }
-
-            /*
-            if event::poll(Duration::from_millis(50)).unwrap() {
-                if let Event::Key(key) = event::read().unwrap() {
-                    if key.code == KeyCode::Char('q')
-                        || (key.code == KeyCode::Char('c')
-                            && key.modifiers.contains(KeyModifiers::CONTROL))
-                    {
-                        break;
-                    }
-                }
-            }*/
         }
 
         if found_solution_flag {
