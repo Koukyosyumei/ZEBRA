@@ -192,7 +192,7 @@ pub fn run_solver<FinalCheckFn>(
                 &refinment_target_indicies_main,
                 &refinment_target_indicies_pv,
                 max_row_id,
-                100000,
+                1000000,
                 cum_num_trial,
                 prime,
                 &mut rng,
@@ -202,7 +202,11 @@ pub fn run_solver<FinalCheckFn>(
             );
 
             if let (Some(trace), _, _, _) = result {
-                ui.logs = format!("#{}, Find SAT assignment: {}", cum_num_trial, trace);
+                ui.logs = format!(
+                    "#{}, Find SAT assignment: {}",
+                    cum_num_trial + result.1,
+                    trace
+                );
                 terminal
                     .draw(|f| {
                         ui.render::<CrosstermBackend<Stdout>>(f);
