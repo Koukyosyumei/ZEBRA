@@ -1,6 +1,18 @@
 pub mod p3_to_tv;
+pub mod state;
 
 /*
+CpuCols { clk: 0, pc: 1, fp: 2,
+instruction: InstructionCols { opcode: 3, operands: Operands([4, 5, 6, 7, 8]) },
+opcode_flags: OpcodeFlagCols { is_bus_op: 9, is_pointer_op: 10, is_imm_op: 11, is_left_imm_op: 12, is_load: 13,
+is_load_u8: 14, is_load_s8: 15, is_store: 16, is_store_u8: 17, is_beq: 18, is_bne: 19, is_jal: 20, is_jalv: 21,
+is_imm32: 22, is_advice: 23, is_stop: 24, is_loadfp: 25, is_write: 26 }, diff: 27, diff_inv: 28, not_equal: 29,
+mem_read_channels: [ReadChannelCols { used: 30, addr: 31, value: Word([32, 33, 34, 35]) },
+ReadChannelCols { used: 36, addr: 37, value: Word([38, 39, 40, 41]) }],
+mem_write_channels: [WriteChannelCols { used: 42, addr: 43, value:
+Word([44, 45, 46, 47]), old_value: Word([48, 49, 50, 51]) }],
+addr_offset_flags: Word([52, 53, 54, 55]), sign_bit: 56, is_last_segment: 57, is_real: 58 }
+
 (IsFirstRow * (curr[1] - public[0]))
 (IsTransition * (next[58] * ((1 - ((((curr[20] + curr[21]) + curr[19]) + curr[18]) + curr[24])) * (next[1] - (curr[1] + 1)))))
 (IsTransition * (curr[18] * ((24 * next[1]) - (((1 - curr[29]) * curr[4]) + ((24 * curr[29]) * (curr[1] + 1))))))

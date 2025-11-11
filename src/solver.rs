@@ -192,7 +192,7 @@ pub fn run_solver<FinalCheckFn>(
                 &refinment_target_indicies_main,
                 &refinment_target_indicies_pv,
                 max_row_id,
-                1000000,
+                1000,
                 cum_num_trial,
                 prime,
                 &mut rng,

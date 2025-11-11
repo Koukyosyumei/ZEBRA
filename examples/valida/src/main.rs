@@ -68,6 +68,7 @@ use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::UiState;
 
 use latticevm_valida::p3_to_tv::convert_p3_expr;
+use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
 
 pub type Val = BabyBear;
 pub type Challenge = BinomialExtensionField<Val, 5>;
@@ -187,7 +188,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     let mut rng = StdRng::seed_from_u64(42);
-    let max_row_id = 0;
+    let max_row_id = 2;
     let num_extracted_rows = 2;
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
 
@@ -244,7 +245,24 @@ fn main() -> Result<(), io::Error> {
     }
     let base_abs_main_trace_data = rows.clone();
 
-    fn final_check(trace: &AbstractTrace, prime: u32, ui: &mut UiState) {}
+    // ############## Final Check Function ##############################
+    fn final_check(trace: &AbstractTrace, prime: u32, ui: &mut UiState) {
+        let mut output = String::new();
+
+        let recovered_states = trace
+            .data
+            .iter()
+            .map(|row| valida_abstract_trace_to_abstract_state(row, prime))
+            .collect::<Vec<_>>();
+
+        output.push_str("Malicious States:\n");
+        for rs in &recovered_states {
+            output.push_str(&format!("\t{}\n", rs));
+        }
+        output.push_str("-----------------\n");
+
+        ui.recovered = output;
+    }
 
     let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
