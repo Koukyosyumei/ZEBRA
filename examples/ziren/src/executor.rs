@@ -78,6 +78,8 @@ pub fn run_ziren_program(
             }
             true_abs_traces.push((mt.0.clone(), rows));
         }
+
+        /*
         println!("{}, {} - {}", mt.0, mt.1.values.len(), mt.1.width);
         if mt.0 == "MemoryLocal" {
             for i in 0..4 {
@@ -98,6 +100,7 @@ pub fn run_ziren_program(
                 println!("  row[{}]: {:?}", i, local);
             }
         }
+        */
     }
 
     (true_abstract_states, true_abs_traces)

@@ -50,13 +50,13 @@ fn main() -> Result<(), ()> {
 
     // ############### Gather Constraints ################################
     let air = CpuChip::default();
-    let symbolic_constraints: Vec<SymbolicExpression<Mersenne31>> =
+
+    let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
     let tv_constraints = symbolic_constraints
         .iter()
-        .map(|sc| convert_p3_expr::<Mersenne31>(&sc))
+        .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
         .collect::<Vec<_>>();
-    //let cmap = make_col_map();
     println!("{:?}", CPU_COL_MAP);
 
     for tv in &tv_constraints {
@@ -95,9 +95,9 @@ fn main() -> Result<(), ()> {
         if st.0 == "Cpu" {
             base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
         }
-        println!("{}", st.0);
     }
 
+    /*
     let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
     let mut u32_cpu_row: Vec<u32> = base_abs_main_trace_data[0]
         .clone()
@@ -115,6 +115,7 @@ fn main() -> Result<(), ()> {
     let mut trace: RowMajorMatrix<KoalaBear> =
         chip.generate_trace(&runtime.record, &mut ExecutionRecord::default());
     println!("memLocal: {:?}", trace.row_mut(0));
+    */
 
     // ############### Construct SMT formula ############################
     if false {
@@ -162,7 +163,6 @@ fn main() -> Result<(), ()> {
     let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
 
-    /*
     run_solver(
         &constraints,
         &target_cols,
@@ -175,7 +175,6 @@ fn main() -> Result<(), ()> {
         prime,
         42,
     );
-    */
 
     Ok(())
 }
