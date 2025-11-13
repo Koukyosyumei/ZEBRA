@@ -46,8 +46,11 @@ use valida_cpu::{
     columns::{CPU_COL_MAP, NUM_CPU_COLS},
     CpuChip,
 };
-use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
+use valida_machine::symbolic::symbolic_builder::{
+    get_symbolic_constraints, get_symbolic_lookups, SymbolicAirBuilder,
+};
 use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
+use valida_machine::Chip;
 use valida_machine::StarkConfigImpl;
 use valida_machine::{
     Instruction, InstructionWord, Machine, MachineProof, MachineRuntime, MemoryBackendTrait,
@@ -179,6 +182,9 @@ fn main() -> Result<(), io::Error> {
     let symbolic_constraints =
         get_symbolic_constraints::<BasicMachine<BabyBear>, MyConfig, CpuChip>(&machine, &air);
 
+    //let lookup_constraints =
+    //    get_symbolic_lookups::<BasicMachine<BabyBear>, MyConfig, CpuChip>(&machine, &air);
+
     let mut tv_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<BabyBear>(&sc))
@@ -186,6 +192,20 @@ fn main() -> Result<(), io::Error> {
     for tv in &tv_constraints {
         println!("{}", tv);
     }
+    println!("=====================\n\n");
+
+    /*
+    let mut lv_constraints = lookup_constraints
+        .iter()
+        .map(|sc| convert_p3_expr::<BabyBear>(&sc))
+        .collect::<Vec<_>>();
+    for tv in &lv_constraints {
+        println!("{}", tv);
+    }
+    println!("=====================\n\n");
+    */
+
+    //println!("{:?}", air.ephemeral_interactions(&machine));
 
     let mut rng = StdRng::seed_from_u64(42);
     let max_row_id = 2;

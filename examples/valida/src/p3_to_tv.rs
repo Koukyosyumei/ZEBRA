@@ -10,8 +10,18 @@ use latticevm::{
 
 pub fn convert_p3_variable<F: PrimeField32>(var: &SymbolicVariable<F>) -> LatticeVMSymbolicVal {
     match var.trace {
-        Trace::Preprocessed => todo!(),
-        Trace::Permutation => todo!(),
+        Trace::Preprocessed => LatticeVMSymbolicVal {
+            entry: LatticeVMSymbolicEntry::Main {
+                is_curr: !var.is_next,
+            },
+            index: var.column,
+        },
+        Trace::Permutation => LatticeVMSymbolicVal {
+            entry: LatticeVMSymbolicEntry::Main {
+                is_curr: !var.is_next,
+            },
+            index: var.column,
+        },
         Trace::Main => LatticeVMSymbolicVal {
             entry: LatticeVMSymbolicEntry::Main {
                 is_curr: !var.is_next,
