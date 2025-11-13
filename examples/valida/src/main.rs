@@ -72,6 +72,7 @@ use latticevm::ui::UiState;
 
 use latticevm_valida::p3_to_tv::convert_p3_expr;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
+use latticevm_valida::state::valida_state_to_abstract_state;
 
 pub type Val = BabyBear;
 pub type Challenge = BinomialExtensionField<Val, 5>;
@@ -278,6 +279,37 @@ fn main() -> Result<(), io::Error> {
         output.push_str("Malicious States:\n");
         for rs in &recovered_states {
             output.push_str(&format!("\t{}\n", rs));
+        }
+        output.push_str("-----------------\n");
+
+        let program = add_program::<BabyBear>();
+        let rom = ProgramROM::new(program.clone());
+        let mut machine = BasicMachine::<BabyBear>::default();
+        machine.set_segment_number(0);
+        machine.set_max_trace_height(65536);
+        machine.set_program_rom(rom, ProgramTableType::Public);
+        machine.set_initial_register_values(valida_cpu::Registers { pc: 0, fp: 0x1000 });
+        let mut runtime = ValidaRuntime::default_for_field::<BabyBear>();
+        let mut state = machine.start(&mut runtime);
+        let mut metrics = BasicMachineMetrics::initialize();
+        let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
+
+        output.push_str("Original States:\n");
+        for i in 0..state.machine.state_history.len() {
+            if i < state.machine.state_history.len() - 1 {
+                output.push_str(&format!(
+                    "\t{}\n",
+                    valida_state_to_abstract_state(
+                        &state.machine.state_history[i],
+                        &Some(state.machine.state_history[i + 1].clone())
+                    )
+                ));
+            } else {
+                output.push_str(&format!(
+                    "\t{}\n",
+                    valida_state_to_abstract_state(&state.machine.state_history[i], &None)
+                ));
+            }
         }
         output.push_str("-----------------\n");
 

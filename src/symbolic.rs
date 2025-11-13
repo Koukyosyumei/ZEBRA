@@ -13,6 +13,8 @@ use crate::interval::{AbstractInterval, MayBeFlag};
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum LatticeVMSymbolicEntry {
     Main { is_curr: bool },
+    Permutation { is_curr: bool },
+    Preprocessed { is_curr: bool },
     Public,
 }
 
@@ -20,6 +22,12 @@ impl fmt::Display for LatticeVMSymbolicEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LatticeVMSymbolicEntry::Main { is_curr } => {
+                write!(f, "{}", if *is_curr { "curr" } else { "next" })
+            }
+            LatticeVMSymbolicEntry::Permutation { is_curr } => {
+                write!(f, "{}", if *is_curr { "curr" } else { "next" })
+            }
+            LatticeVMSymbolicEntry::Preprocessed { is_curr } => {
                 write!(f, "{}", if *is_curr { "curr" } else { "next" })
             }
             LatticeVMSymbolicEntry::Public => write!(f, "{}", "public"),
@@ -191,6 +199,26 @@ impl LatticeVMSymbolicExpr {
             Self::Constant(c) => c.clone(),
             Self::Variable(cell) => match cell.entry {
                 LatticeVMSymbolicEntry::Main { is_curr } => {
+                    if is_curr {
+                        curr_row[cell.index].clone()
+                    } else {
+                        match next_row {
+                            Some(nr) => nr[cell.index].clone(),
+                            None => AbstractInterval::zero(), //panic!("next_row not provided for next-row variable"),
+                        }
+                    }
+                }
+                LatticeVMSymbolicEntry::Preprocessed { is_curr } => {
+                    if is_curr {
+                        curr_row[cell.index].clone()
+                    } else {
+                        match next_row {
+                            Some(nr) => nr[cell.index].clone(),
+                            None => AbstractInterval::zero(), //panic!("next_row not provided for next-row variable"),
+                        }
+                    }
+                }
+                LatticeVMSymbolicEntry::Permutation { is_curr } => {
                     if is_curr {
                         curr_row[cell.index].clone()
                     } else {
