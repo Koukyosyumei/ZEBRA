@@ -294,6 +294,11 @@ fn main() -> Result<(), io::Error> {
         let mut metrics = BasicMachineMetrics::initialize();
         let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
 
+        let truth_abstrace_traces = state.machine.state_histor.into_iter().map(|s| valida_state_to_abstract_state(
+                        &state.machine.state_history[i],
+                        &Some(state.machine.state_history[i + 1].clone())
+                    );)
+
         output.push_str("Original States:\n");
         for i in 0..state.machine.state_history.len() {
             if i < state.machine.state_history.len() - 1 {

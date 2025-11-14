@@ -6,16 +6,32 @@ use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
 use latticevm::state::AbstractState;
 
-pub fn check_diff_valida(
-    state_x: &AbstractState,
-    state_y: &AbstractState,
-    prime: u32,
-) -> MayBeFlag {
+pub fn check_eq_valida(state_x: &AbstractState, state_y: &AbstractState, prime: u32) -> MayBeFlag {
     if (state_x.clk.clone() - state_y.clk.clone()).is_zero(prime) == MayBeFlag::False {
+        return MayBeFlag::False;
+    }
+    if (state_x.pc.clone() - state_y.pc.clone()).is_zero(prime) == MayBeFlag::False {
+        return MayBeFlag::False;
+    }
+    if (state_x.done != state_y.done) {
         return MayBeFlag::False;
     }
 
     MayBeFlag::True
+}
+
+pub fn check_eq_states(
+    states_x: &[AbstractState],
+    states_y: &[AbstractState],
+    prime: u32,
+) -> (MayBeFlag, usize) {
+    for i in 0..(states_x.len() - 1) {
+        if check_diff_valida(states_x[i], state_y[i]) == MayBeFlag::False {
+            return (MayBeFlag::False, i);
+        }
+    }
+
+    (MayBeFlag::True, 0)
 }
 
 pub fn valida_state_to_abstract_state(
