@@ -35,7 +35,9 @@ use p3_poseidon::Poseidon;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
 //use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
 
+use valida_alu_u32::add::Add32Chip;
 use valida_alu_u32::add::{Add32Instruction, MachineWithAdd32Chip};
+use valida_alu_u32::mul::Mul32Chip;
 use valida_basic_api::BasicMachine;
 use valida_basic_api::BasicMachineMetrics;
 use valida_basic_api::ValidaRuntime;
@@ -54,9 +56,9 @@ use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::Chip;
 use valida_machine::StarkConfigImpl;
 use valida_machine::{
-    Instruction, InstructionWord, Machine, MachineProof, MachineRuntime, MemoryBackendTrait,
-    MultiSegmentMachineProof, Operands, ProgramROM, ProverOptions, SegmentMachine, StarkField,
-    ValidaMemoryBackend, Word,
+    check_constraints::display_interaction, Instruction, InstructionWord, Machine, MachineProof,
+    MachineRuntime, MemoryBackendTrait, MultiSegmentMachineProof, Operands, ProgramROM,
+    ProverOptions, SegmentMachine, StarkField, ValidaMemoryBackend, Word,
 };
 use valida_opcodes::BYTES_PER_INSTR;
 use valida_program::MachineWithProgramROM;
@@ -176,51 +178,52 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
 }
 
 fn main() -> Result<(), io::Error> {
-    println!("{:?}", CPU_COL_MAP);
     // 2^31 - 2^27 + 1
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
     let program_cols = (3..8).collect::<Vec<_>>();
 
-    let air = CpuChip::default();
     let machine = BasicMachine::<BabyBear>::default();
-    let symbolic_constraints =
-        get_symbolic_constraints::<BasicMachine<BabyBear>, MyConfig, CpuChip>(&machine, &air);
 
-    //let lookup_constraints =
-    //    get_symbolic_lookups::<BasicMachine<BabyBear>, MyConfig, CpuChip>(&machine, &air);
-
-    let mut tv_constraints = symbolic_constraints
+    let cpu_air = CpuChip::default();
+    let cpu_symbolic_constraints =
+        get_symbolic_constraints::<BasicMachine<BabyBear>, MyConfig, CpuChip>(&machine, &cpu_air);
+    let mut cpu_tv_constraints = cpu_symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<BabyBear>(&sc))
         .collect::<Vec<_>>();
-    for tv in &tv_constraints {
-        println!("{}", tv);
+    let cpu_potential_boolean_vars = gather_boolean_variables(&cpu_tv_constraints);
+    let cpu_constraints = LatticeVMConstraints {
+        air_constraints: cpu_tv_constraints.clone(),
+        pv_pos_constraints: vec![],
+        pv_neg_constraints: vec![],
+    };
+    println!("CPU AIR constraints");
+    println!("{:?}", CPU_COL_MAP);
+    for tv in &cpu_tv_constraints {
+        println!("  {}", tv);
     }
-    println!("=====================\n\n");
 
-    /*
-    let mut lv_constraints = lookup_constraints
+    let add_air = Add32Chip::default();
+    let add_symbolic_constraints =
+        get_symbolic_constraints::<BasicMachine<BabyBear>, MyConfig, Add32Chip>(&machine, &add_air);
+    let mut add_tv_constraints = add_symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<BabyBear>(&sc))
         .collect::<Vec<_>>();
-    for tv in &lv_constraints {
-        println!("{}", tv);
+    let add_potential_boolean_vars = gather_boolean_variables(&add_tv_constraints);
+    let add_constraints = LatticeVMConstraints {
+        air_constraints: add_tv_constraints.clone(),
+        pv_pos_constraints: vec![],
+        pv_neg_constraints: vec![],
+    };
+    println!("ADD AIR constraints");
+    for tv in &add_tv_constraints {
+        println!("  {}", tv);
     }
-    println!("=====================\n\n");
-    */
-
-    //println!("{:?}", air.ephemeral_interactions(&machine));
 
     let mut rng = StdRng::seed_from_u64(42);
     let max_row_id = 2;
     let num_extracted_rows = 2;
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
-
-    let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
 
     // ############### Prepare Public Values ############################
     let mut public_vals = vec![AbstractInterval::zero(); 3];
@@ -251,7 +254,6 @@ fn main() -> Result<(), io::Error> {
     let config = get_machine_config();
     let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
         prover_options();
-
     let mut traces = state.machine.generate_traces(&config, prover_opts);
 
     let mut rows = vec![];
@@ -347,8 +349,8 @@ fn main() -> Result<(), io::Error> {
         };
     }
 
-    let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
-    target_cols.retain(|x| !program_cols.contains(x));
+    let mut cpu_target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
+    cpu_target_cols.retain(|x| !program_cols.contains(x));
 
     let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
 
@@ -366,9 +368,9 @@ fn main() -> Result<(), io::Error> {
     ui.program = program_str;
 
     run_solver(
-        &constraints,
-        &target_cols,
-        &potential_boolean_vars,
+        &cpu_constraints,
+        &cpu_target_cols,
+        &cpu_potential_boolean_vars,
         &refinment_target_indicies_pv,
         &base_abs_main_trace_data,
         public_vals,
