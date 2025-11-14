@@ -219,6 +219,8 @@ fn main() -> Result<(), io::Error> {
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
+    let mut cpu_target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
+    cpu_target_cols.retain(|x| !program_cols.contains(x));
     println!("CPU AIR constraints");
     println!("{:?}", CPU_COL_MAP);
     for tv in &cpu_tv_constraints {
@@ -238,6 +240,7 @@ fn main() -> Result<(), io::Error> {
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
+    let add_target_cols = vec![12, 13, 14];
     println!("ADD AIR constraints");
     for tv in &add_tv_constraints {
         println!("  {}", tv);
@@ -371,9 +374,6 @@ fn main() -> Result<(), io::Error> {
         };
     }
 
-    let mut cpu_target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
-    cpu_target_cols.retain(|x| !program_cols.contains(x));
-
     let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
 
     enable_raw_mode()?;
@@ -389,10 +389,35 @@ fn main() -> Result<(), io::Error> {
     }
     ui.program = program_str;
 
+    /*
+    pub fn run_solver<FinalCheckFn>(
+        constraints: &LatticeVMConstraints,
+        aux_constraints: &Vec<LatticeVMConstraints>,
+        target_cols: &Vec<usize>,
+        aux_target_cols: &Vec<Vec<usize>>,
+        potential_boolean_vars: &Vec<usize>,
+        aux_potential_boolean_vars: &Vec<Vec<usize>>,
+        refinment_target_indicies_pv: &Vec<usize>,
+        base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
+        public_vals: Vec<AbstractInterval>,
+        max_row_id: usize,
+        final_check: FinalCheckFn,
+        prime: u32,
+        seed: u64,
+        ui: &mut UiState,
+        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    */
+    let aux_constraints = vec![add_constraints];
+    let aux_target_cols = vec![add_target_cols];
+    let aux_potential_boolean_vars = vec![add_potential_boolean_vars];
+
     run_solver(
         &cpu_constraints,
+        &aux_constraints,
         &cpu_target_cols,
+        &aux_target_cols,
         &cpu_potential_boolean_vars,
+        &aux_potential_boolean_vars,
         &refinment_target_indicies_pv,
         &base_abs_main_trace_data,
         public_vals,

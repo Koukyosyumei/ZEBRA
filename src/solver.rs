@@ -145,10 +145,39 @@ pub fn solve(
     (None, num_trial, sum_potential, false)
 }
 
+fn derive_add_table(
+    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    potential_boolean_vars: &Vec<usize>,
+    prime: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let mut out = vec![];
+    for row in cpu_main_trace {
+        if row[3].as_canonical_u32(prime) == 100 {
+            let mut r: Vec<_> = (0..16).map(|_| AbstractInterval::top(prime)).collect();
+            for i in potential_boolean_vars {
+                r[*i] = AbstractInterval::bool();
+            }
+
+            let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
+            let add_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+            for i in 0..(cpu_columns.len()) {
+                r[add_columns[i]] = row[cpu_columns[i]].clone();
+            }
+            r[15] = AbstractInterval::one();
+            out.push(r);
+        }
+    }
+
+    out
+}
+
 pub fn run_solver<FinalCheckFn>(
     constraints: &LatticeVMConstraints,
+    aux_constraints: &Vec<LatticeVMConstraints>,
     target_cols: &Vec<usize>,
+    aux_target_cols: &Vec<Vec<usize>>,
     potential_boolean_vars: &Vec<usize>,
+    aux_potential_boolean_vars: &Vec<Vec<usize>>,
     refinment_target_indicies_pv: &Vec<usize>,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
@@ -202,17 +231,38 @@ pub fn run_solver<FinalCheckFn>(
             );
 
             if let (Some(trace), _, _, _) = result {
-                ui.logs = format!("#{}\n{}\n", cum_num_trial + result.1, trace);
+                let add_table =
+                    derive_add_table(&trace.data, &aux_potential_boolean_vars[0], prime);
+                let abs_add_trace = AbstractTrace::new(add_table);
+                let add_result = solve(
+                    abs_add_trace,
+                    public_vals.clone(),
+                    &aux_constraints[0],
+                    1,
+                    &aux_target_cols[0],
+                    &refinment_target_indicies_pv,
+                    0,
+                    1000,
+                    cum_num_trial,
+                    prime,
+                    &mut rng,
+                    &format!("{:?}", combo),
+                    ui,
+                    terminal,
+                );
+                if let Some(_) = add_result.0 {
+                    ui.logs = format!("#{}\n{}\n", cum_num_trial + result.1, trace);
 
-                final_check(&trace, prime, ui);
-                found_solution_flag = true;
+                    final_check(&trace, prime, ui);
+                    found_solution_flag = true;
 
-                terminal
-                    .draw(|f| {
-                        ui.render::<CrosstermBackend<Stdout>>(f);
-                    })
-                    .unwrap();
-                //break;
+                    terminal
+                        .draw(|f| {
+                            ui.render::<CrosstermBackend<Stdout>>(f);
+                        })
+                        .unwrap();
+                    //break;
+                }
             } else {
                 cum_num_trial += result.1;
             }
