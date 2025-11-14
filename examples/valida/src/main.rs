@@ -209,7 +209,7 @@ fn main() -> Result<(), io::Error> {
     //println!("{:?}", air.ephemeral_interactions(&machine));
 
     let mut rng = StdRng::seed_from_u64(42);
-    let max_row_id = 0;
+    let max_row_id = 2;
     let num_extracted_rows = 2;
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
 
