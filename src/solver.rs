@@ -9,6 +9,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use itertools::Itertools;
+use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{
     backend::CrosstermBackend,
@@ -196,7 +197,9 @@ pub fn run_solver<FinalCheckFn>(
     let mut exit_flag = false;
 
     for k in 1..(target_cols.len() + 1) {
-        for combo in target_cols.iter().combinations(k) {
+        let mut combos: Vec<_> = target_cols.iter().combinations(k).collect();
+        combos.shuffle(&mut rng);
+        for combo in combos {
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
 
             for i in 0..(max_row_id + 1) {
@@ -235,7 +238,7 @@ pub fn run_solver<FinalCheckFn>(
                     derive_add_table(&trace.data, &aux_potential_boolean_vars[0], prime);
                 let abs_add_trace = AbstractTrace::new(add_table);
                 let add_result = solve(
-                    abs_add_trace,
+                    abs_add_trace.clone(),
                     public_vals.clone(),
                     &aux_constraints[0],
                     1,
@@ -250,8 +253,8 @@ pub fn run_solver<FinalCheckFn>(
                     ui,
                     terminal,
                 );
-                if let Some(_) = add_result.0 {
-                    ui.logs = format!("#{}\n{}\n", cum_num_trial + result.1, trace);
+                if let Some(add_trace) = add_result.0 {
+                    ui.logs = format!("#{}\n{}\n{}", cum_num_trial + result.1, trace, add_trace);
 
                     final_check(&trace, prime, ui);
                     found_solution_flag = true;

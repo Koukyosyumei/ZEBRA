@@ -160,7 +160,7 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
         },
         InstructionWord {
             opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-8, -8, 1, 0, 1]),
+            operands: Operands([-8, -4, 1, 0, 1]),
         },
         /*
         InstructionWord {
