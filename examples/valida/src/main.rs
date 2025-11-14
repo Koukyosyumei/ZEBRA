@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::{io, thread, time::Duration};
 
@@ -270,11 +271,30 @@ fn main() -> Result<(), io::Error> {
     fn final_check(trace: &AbstractTrace, prime: u32, ui: &mut UiState) {
         let mut output = String::new();
 
+        let mut memory = HashMap::new();
+        let mut recovered_states = vec![];
+        for row in &trace.data {
+            recovered_states.push(valida_abstract_trace_to_abstract_state(row, &memory, prime));
+            memory = recovered_states.last().unwrap().memory.clone();
+        }
+
+        let rs_len = recovered_states.len();
+        for i in 0..rs_len {
+            if i == rs_len - 1 {
+                recovered_states[rs_len - 1 - i].memory = HashMap::new();
+            } else {
+                recovered_states[rs_len - 1 - i].memory =
+                    recovered_states[rs_len - 2 - i].memory.clone();
+            }
+        }
+
+        /*
         let recovered_states = trace
             .data
             .iter()
-            .map(|row| valida_abstract_trace_to_abstract_state(row, prime))
+            .map(|row| valida_abstract_trace_to_abstract_state(row, &memory, prime))
             .collect::<Vec<_>>();
+        */
 
         output.push_str("Malicious States:\n");
         for rs in &recovered_states {

@@ -13,10 +13,18 @@ pub struct AbstractState {
 
 impl fmt::Display for AbstractState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut vec: Vec<(u32, AbstractInterval)> = self.memory.clone().into_iter().collect();
+        vec.sort_by_key(|(k, _)| *k);
+        let memory_str = vec
+            .iter()
+            .map(|(k, v)| format!("{:?}: {}", k, v))
+            .collect::<Vec<_>>()
+            .join(", ");
+
         write!(
             f,
-            "(clk: {}, pc: {}, next_pc: {}, is_done: {:?})",
-            self.clk, self.pc, self.next_pc, self.is_done
+            "(clk: {}, pc: {}, next_pc: {}, is_done: {:?}, memory: [{:?}])",
+            self.clk, self.pc, self.next_pc, self.is_done, memory_str
         )
     }
 }
