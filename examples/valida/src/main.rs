@@ -36,7 +36,7 @@ use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
 //use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
 
 use valida_alu_u32::add::Add32Chip;
-use valida_alu_u32::add::{Add32Instruction, MachineWithAdd32Chip};
+use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction, MachineWithAdd32Chip};
 use valida_alu_u32::mul::Mul32Chip;
 use valida_basic_api::BasicMachine;
 use valida_basic_api::BasicMachineMetrics;
@@ -175,6 +175,28 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     ]);
 
     program
+}
+
+fn derive_add_table(
+    cpu_main_trace: Vec<Vec<AbstractInterval>>,
+    prime: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let mut out = vec![];
+    for row in &cpu_main_trace {
+        if row[3].as_canonical_u32(prime) == 100 {
+            let mut r: Vec<_> = (0..NUM_ADD_COLS)
+                .map(|_| AbstractInterval::top(prime))
+                .collect();
+            let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
+            let add_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+            for i in 0..(cpu_columns.len()) {
+                r[add_columns[i]] = row[cpu_columns[i]].clone();
+            }
+            out.push(r);
+        }
+    }
+
+    out
 }
 
 fn main() -> Result<(), io::Error> {
