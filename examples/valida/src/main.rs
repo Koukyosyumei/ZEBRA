@@ -71,7 +71,9 @@ use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::UiState;
 
+use latticevm::interval::MayBeFlag;
 use latticevm_valida::p3_to_tv::convert_p3_expr;
+use latticevm_valida::state::check_eq_states;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
 use latticevm_valida::state::valida_state_to_abstract_state;
 
@@ -319,26 +321,30 @@ fn main() -> Result<(), io::Error> {
         //                &Some(state.machine.state_history[i + 1].clone())
         //            );)
 
-        output.push_str("Original States:\n");
+        let mut groundtruth_states = vec![];
         for i in 0..state.machine.state_history.len() {
             if i < state.machine.state_history.len() - 1 {
-                output.push_str(&format!(
-                    "\t{}\n",
-                    valida_state_to_abstract_state(
-                        &state.machine.state_history[i],
-                        &Some(state.machine.state_history[i + 1].clone())
-                    )
+                groundtruth_states.push(valida_state_to_abstract_state(
+                    &state.machine.state_history[i],
+                    &Some(state.machine.state_history[i + 1].clone()),
                 ));
             } else {
-                output.push_str(&format!(
-                    "\t{}\n",
-                    valida_state_to_abstract_state(&state.machine.state_history[i], &None)
-                ));
+                groundtruth_states.push(valida_state_to_abstract_state(
+                    &state.machine.state_history[i],
+                    &None,
+                ))
             }
+        }
+
+        output.push_str("Original States:\n");
+        for rs in &groundtruth_states {
+            output.push_str(&format!("\t{}\n", rs));
         }
         output.push_str("-----------------\n");
 
-        ui.recovered = output;
+        if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
+            ui.recovered = output;
+        };
     }
 
     let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();

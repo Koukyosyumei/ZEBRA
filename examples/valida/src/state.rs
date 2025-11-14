@@ -17,6 +17,18 @@ pub fn check_eq_valida(state_x: &AbstractState, state_y: &AbstractState, prime: 
         return MayBeFlag::False;
     }
 
+    if state_x.memory.len() != state_y.memory.len() {
+        return MayBeFlag::False;
+    }
+
+    for (k, vx) in &state_x.memory {
+        if let Some(vy) = state_y.memory.get(&k) {
+            if (vx.clone() - vy.clone()).is_zero(prime) != MayBeFlag::True {
+                return MayBeFlag::False;
+            }
+        }
+    }
+
     MayBeFlag::True
 }
 
