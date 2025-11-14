@@ -13,7 +13,7 @@ pub fn check_eq_valida(state_x: &AbstractState, state_y: &AbstractState, prime: 
     if (state_x.pc.clone() - state_y.pc.clone()).is_zero(prime) == MayBeFlag::False {
         return MayBeFlag::False;
     }
-    if (state_x.done != state_y.done) {
+    if state_x.is_done != state_y.is_done {
         return MayBeFlag::False;
     }
 
@@ -26,7 +26,7 @@ pub fn check_eq_states(
     prime: u32,
 ) -> (MayBeFlag, usize) {
     for i in 0..(states_x.len() - 1) {
-        if check_diff_valida(states_x[i], state_y[i]) == MayBeFlag::False {
+        if check_eq_valida(&states_x[i], &states_y[i], prime) == MayBeFlag::False {
             return (MayBeFlag::False, i);
         }
     }
