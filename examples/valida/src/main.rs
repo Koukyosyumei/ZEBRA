@@ -211,6 +211,13 @@ fn main() -> Result<(), io::Error> {
     // 2^31 - 2^27 + 1
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
     let program_cols = (3..8).collect::<Vec<_>>();
+
+    // ############### Config #########################################
+    let config = get_machine_config();
+    let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
+        prover_options();
+
+    // ############### Extract Constraints ############################
     let machine = BasicMachine::<BabyBear>::default();
 
     let cpu_air = CpuChip::default();
@@ -242,6 +249,7 @@ fn main() -> Result<(), io::Error> {
     public_vals[2] = AbstractInterval::from_i64(1);
     let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
+    // ############### Dry-Run Machine ##################################
     let program = add_program::<BabyBear>();
     let rom = ProgramROM::new(program.clone());
 
@@ -256,11 +264,9 @@ fn main() -> Result<(), io::Error> {
     let mut metrics = BasicMachineMetrics::initialize();
     let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
 
-    let config = get_machine_config();
-    let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
-        prover_options();
     let mut traces = state.machine.generate_traces(&config, prover_opts);
 
+    // ############# Obtain the inital solution ############################
     let mut rows = vec![];
     if let Some(traces) = &mut traces.1[0] {
         let nrows = traces.values.len() / traces.width();
