@@ -74,6 +74,7 @@ use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::UiState;
 
 use latticevm::interval::MayBeFlag;
+use latticevm::solver::AbsConstraintObj;
 use latticevm_valida::p3_to_tv::convert_p3_expr;
 use latticevm_valida::state::check_eq_states;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
@@ -178,20 +179,24 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
 }
 
 fn derive_add_table(
-    cpu_main_trace: Vec<Vec<AbstractInterval>>,
+    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    potential_boolean_vars: &Vec<usize>,
     prime: u32,
 ) -> Vec<Vec<AbstractInterval>> {
     let mut out = vec![];
-    for row in &cpu_main_trace {
+    for row in cpu_main_trace {
         if row[3].as_canonical_u32(prime) == 100 {
-            let mut r: Vec<_> = (0..NUM_ADD_COLS)
-                .map(|_| AbstractInterval::top(prime))
-                .collect();
+            let mut r: Vec<_> = (0..16).map(|_| AbstractInterval::top(prime)).collect();
+            for i in potential_boolean_vars {
+                r[*i] = AbstractInterval::bool();
+            }
+
             let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
             let add_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
             for i in 0..(cpu_columns.len()) {
                 r[add_columns[i]] = row[cpu_columns[i]].clone();
             }
+            r[15] = AbstractInterval::one();
             out.push(r);
         }
     }
@@ -407,17 +412,25 @@ fn main() -> Result<(), io::Error> {
         ui: &mut UiState,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     */
-    let aux_constraints = vec![add_constraints];
-    let aux_target_cols = vec![add_target_cols];
-    let aux_potential_boolean_vars = vec![add_potential_boolean_vars];
+    //let aux_constraints = vec![add_constraints];
+    //let aux_target_cols = vec![add_target_cols];
+    //let aux_potential_boolean_vars = vec![add_potential_boolean_vars];
+
+    let aux_add_obj = AbsConstraintObj {
+        name: "Add".to_string(),
+        aux_constraints: add_constraints,
+        aux_target_cols: add_target_cols,
+        aux_potential_boolean_vars: add_potential_boolean_vars,
+    };
+    let aux_objs = vec![aux_add_obj];
+    let aux_tg_fns = vec![derive_add_table];
 
     run_solver(
         &cpu_constraints,
-        &aux_constraints,
         &cpu_target_cols,
-        &aux_target_cols,
         &cpu_potential_boolean_vars,
-        &aux_potential_boolean_vars,
+        &aux_objs,
+        &aux_tg_fns,
         &refinment_target_indicies_pv,
         &base_abs_main_trace_data,
         public_vals,

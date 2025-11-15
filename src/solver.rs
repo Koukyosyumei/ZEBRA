@@ -172,13 +172,19 @@ fn derive_add_table(
     out
 }
 
-pub fn run_solver<FinalCheckFn>(
+pub struct AbsConstraintObj {
+    pub name: String,
+    pub aux_constraints: LatticeVMConstraints,
+    pub aux_target_cols: Vec<usize>,
+    pub aux_potential_boolean_vars: Vec<usize>,
+}
+
+pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
     constraints: &LatticeVMConstraints,
-    aux_constraints: &Vec<LatticeVMConstraints>,
     target_cols: &Vec<usize>,
-    aux_target_cols: &Vec<Vec<usize>>,
     potential_boolean_vars: &Vec<usize>,
-    aux_potential_boolean_vars: &Vec<Vec<usize>>,
+    aux_constraints_objs: &Vec<AbsConstraintObj>,
+    aux_table_gen_fns: &Vec<AuxTableGenFn>,
     refinment_target_indicies_pv: &Vec<usize>,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
@@ -190,6 +196,7 @@ pub fn run_solver<FinalCheckFn>(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
     FinalCheckFn: Fn(&AbstractTrace, u32, &mut UiState),
+    AuxTableGenFn: Fn(&Vec<Vec<AbstractInterval>>, &Vec<usize>, u32) -> Vec<Vec<AbstractInterval>>,
 {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut found_solution_flag = false;
@@ -234,28 +241,41 @@ pub fn run_solver<FinalCheckFn>(
             );
 
             if let (Some(trace), _, _, _) = result {
-                let add_table =
-                    derive_add_table(&trace.data, &aux_potential_boolean_vars[0], prime);
-                let abs_add_trace = AbstractTrace::new(add_table);
-                let add_result = solve(
-                    abs_add_trace.clone(),
-                    public_vals.clone(),
-                    &aux_constraints[0],
-                    1,
-                    &aux_target_cols[0],
-                    &refinment_target_indicies_pv,
-                    0,
-                    1000,
-                    cum_num_trial,
-                    prime,
-                    &mut rng,
-                    &format!("{:?}", combo),
-                    ui,
-                    terminal,
-                );
-                if let Some(add_trace) = add_result.0 {
-                    ui.logs = format!("#{}\n{}\n{}", cum_num_trial + result.1, trace, add_trace);
+                let mut output = String::new();
+                output.push_str(&format!("#{}\n{}", cum_num_trial + result.1, trace));
 
+                let mut pass_all_aux = true;
+                for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
+                    let aux_table = gfn(&trace.data, &co.aux_potential_boolean_vars, prime);
+                    let abs_aux_trace = AbstractTrace::new(aux_table);
+                    let abs_result = solve(
+                        abs_aux_trace,
+                        public_vals.clone(),
+                        &co.aux_constraints,
+                        1,
+                        &co.aux_target_cols,
+                        &refinment_target_indicies_pv,
+                        0,
+                        1000,
+                        cum_num_trial,
+                        prime,
+                        &mut rng,
+                        &format!("{:?}", combo),
+                        ui,
+                        terminal,
+                    );
+
+                    if let Some(abs_trace) = abs_result.0 {
+                        output.push_str(&format!("\n#{}\n{}", co.name, abs_trace));
+                        //break;
+                    } else {
+                        pass_all_aux = false;
+                        break;
+                    }
+                }
+
+                if pass_all_aux {
+                    ui.logs = output;
                     final_check(&trace, prime, ui);
                     found_solution_flag = true;
 
@@ -264,7 +284,6 @@ pub fn run_solver<FinalCheckFn>(
                             ui.render::<CrosstermBackend<Stdout>>(f);
                         })
                         .unwrap();
-                    //break;
                 }
             } else {
                 cum_num_trial += result.1;
