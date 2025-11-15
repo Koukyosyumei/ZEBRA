@@ -1,8 +1,22 @@
+use valida_machine::symbolic::symbolic_builder::{
+    get_symbolic_constraints, get_symbolic_lookups, SymbolicAirBuilder,
+};
 use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::symbolic::symbolic_variable::{SymbolicVariable, Trace};
+use valida_machine::Chip;
+use valida_machine::ChipWithPersistence;
+use valida_machine::StarkConfig;
+use valida_machine::StarkConfigImpl;
+use valida_machine::{
+    check_constraints::display_interaction, Instruction, InstructionWord, Machine, MachineProof,
+    MachineRuntime, MemoryBackendTrait, MultiSegmentMachineProof, Operands, ProgramROM,
+    ProverOptions, SegmentMachine, StarkField, ValidaMemoryBackend, Word,
+};
 
 use p3_field::PrimeField32;
 
+use latticevm::symbolic::gather_boolean_variables;
+use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::{
     interval::AbstractInterval,
     symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr, LatticeVMSymbolicVal},
@@ -67,4 +81,28 @@ pub fn convert_p3_expr<F: PrimeField32>(expr: &SymbolicExpression<F>) -> Lattice
             degree_multiple: _degree_multiple,
         } => LatticeVMSymbolicExpr::Mul(Box::new(convert_p3_expr(x)), Box::new(convert_p3_expr(y))),
     }
+}
+
+pub fn get_converted_symbolicconstraints<M, SC, C>(
+    machine: &M,
+    chip: &C,
+) -> (LatticeVMConstraints, Vec<usize>)
+where
+    M: Machine<SC::Val>,
+    SC: StarkConfig,
+    C: ChipWithPersistence<M, SC>,
+{
+    let symbolic_constraints = get_symbolic_constraints::<M, SC, C>(&machine, &chip);
+    let mut tv_constraints = symbolic_constraints
+        .iter()
+        .map(|sc| convert_p3_expr::<SC::Val>(&sc))
+        .collect::<Vec<_>>();
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
+    let constraints = LatticeVMConstraints {
+        air_constraints: tv_constraints.clone(),
+        pv_pos_constraints: vec![],
+        pv_neg_constraints: vec![],
+    };
+
+    (constraints, potential_boolean_vars)
 }

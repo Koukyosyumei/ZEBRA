@@ -54,6 +54,8 @@ use valida_machine::symbolic::symbolic_builder::{
 };
 use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::Chip;
+use valida_machine::ChipWithPersistence;
+use valida_machine::StarkConfig;
 use valida_machine::StarkConfigImpl;
 use valida_machine::{
     check_constraints::display_interaction, Instruction, InstructionWord, Machine, MachineProof,
@@ -76,6 +78,7 @@ use latticevm::ui::UiState;
 use latticevm::interval::MayBeFlag;
 use latticevm::solver::AbsConstraintObj;
 use latticevm_valida::p3_to_tv::convert_p3_expr;
+use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
 use latticevm_valida::state::check_eq_states;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
 use latticevm_valida::state::valida_state_to_abstract_state;
@@ -150,6 +153,32 @@ pub fn prover_options() -> (ProverOptions, Vec<bool>, bool, Vec<bool>) {
     )
 }
 
+fn derive_add_table(
+    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    potential_boolean_vars: &Vec<usize>,
+    prime: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let mut out = vec![];
+    for row in cpu_main_trace {
+        if row[3].as_canonical_u32(prime) == 100 {
+            let mut r: Vec<_> = (0..16).map(|_| AbstractInterval::top(prime)).collect();
+            for i in potential_boolean_vars {
+                r[*i] = AbstractInterval::bool();
+            }
+
+            let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
+            let add_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+            for i in 0..(cpu_columns.len()) {
+                r[add_columns[i]] = row[cpu_columns[i]].clone();
+            }
+            r[15] = AbstractInterval::one();
+            out.push(r);
+        }
+    }
+
+    out
+}
+
 fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
 
@@ -178,78 +207,29 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     program
 }
 
-fn derive_add_table(
-    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
-    potential_boolean_vars: &Vec<usize>,
-    prime: u32,
-) -> Vec<Vec<AbstractInterval>> {
-    let mut out = vec![];
-    for row in cpu_main_trace {
-        if row[3].as_canonical_u32(prime) == 100 {
-            let mut r: Vec<_> = (0..16).map(|_| AbstractInterval::top(prime)).collect();
-            for i in potential_boolean_vars {
-                r[*i] = AbstractInterval::bool();
-            }
-
-            let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
-            let add_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-            for i in 0..(cpu_columns.len()) {
-                r[add_columns[i]] = row[cpu_columns[i]].clone();
-            }
-            r[15] = AbstractInterval::one();
-            out.push(r);
-        }
-    }
-
-    out
-}
-
 fn main() -> Result<(), io::Error> {
     // 2^31 - 2^27 + 1
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
     let program_cols = (3..8).collect::<Vec<_>>();
-
     let machine = BasicMachine::<BabyBear>::default();
 
     let cpu_air = CpuChip::default();
-    let cpu_symbolic_constraints =
-        get_symbolic_constraints::<BasicMachine<BabyBear>, MyConfig, CpuChip>(&machine, &cpu_air);
-    let mut cpu_tv_constraints = cpu_symbolic_constraints
-        .iter()
-        .map(|sc| convert_p3_expr::<BabyBear>(&sc))
-        .collect::<Vec<_>>();
-    let cpu_potential_boolean_vars = gather_boolean_variables(&cpu_tv_constraints);
-    let cpu_constraints = LatticeVMConstraints {
-        air_constraints: cpu_tv_constraints.clone(),
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
+    let (cpu_constraints, cpu_potential_boolean_vars) =
+        get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
+            &machine, &cpu_air,
+        );
     let mut cpu_target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     cpu_target_cols.retain(|x| !program_cols.contains(x));
     println!("CPU AIR constraints");
     println!("{:?}", CPU_COL_MAP);
-    for tv in &cpu_tv_constraints {
-        println!("  {}", tv);
-    }
 
     let add_air = Add32Chip::default();
-    let add_symbolic_constraints =
-        get_symbolic_constraints::<BasicMachine<BabyBear>, MyConfig, Add32Chip>(&machine, &add_air);
-    let mut add_tv_constraints = add_symbolic_constraints
-        .iter()
-        .map(|sc| convert_p3_expr::<BabyBear>(&sc))
-        .collect::<Vec<_>>();
-    let add_potential_boolean_vars = gather_boolean_variables(&add_tv_constraints);
-    let add_constraints = LatticeVMConstraints {
-        air_constraints: add_tv_constraints.clone(),
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
+    let (add_constraints, add_potential_boolean_vars) =
+        get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
+            &machine, &add_air,
+        );
     let add_target_cols = vec![12, 13, 14];
     println!("ADD AIR constraints");
-    for tv in &add_tv_constraints {
-        println!("  {}", tv);
-    }
 
     let mut rng = StdRng::seed_from_u64(42);
     let max_row_id = 2;
@@ -274,12 +254,7 @@ fn main() -> Result<(), io::Error> {
     let mut runtime = ValidaRuntime::default_for_field::<BabyBear>();
     let mut state = machine.start(&mut runtime);
     let mut metrics = BasicMachineMetrics::initialize();
-
     let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
-
-    for s in &state.machine.state_history {
-        println!("{:?}", s);
-    }
 
     let config = get_machine_config();
     let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
@@ -322,14 +297,6 @@ fn main() -> Result<(), io::Error> {
             }
         }
 
-        /*
-        let recovered_states = trace
-            .data
-            .iter()
-            .map(|row| valida_abstract_trace_to_abstract_state(row, &memory, prime))
-            .collect::<Vec<_>>();
-        */
-
         output.push_str("Malicious States:\n");
         for rs in &recovered_states {
             output.push_str(&format!("\t{}\n", rs));
@@ -347,11 +314,6 @@ fn main() -> Result<(), io::Error> {
         let mut state = machine.start(&mut runtime);
         let mut metrics = BasicMachineMetrics::initialize();
         let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
-
-        //let truth_abstrace_traces = state.machine.state_histor.into_iter().map(|s| valida_state_to_abstract_state(
-        //                &state.machine.state_history[i],
-        //                &Some(state.machine.state_history[i + 1].clone())
-        //            );)
 
         let mut groundtruth_states = vec![];
         for i in 0..state.machine.state_history.len() {
@@ -394,28 +356,6 @@ fn main() -> Result<(), io::Error> {
     }
     ui.program = program_str;
 
-    /*
-    pub fn run_solver<FinalCheckFn>(
-        constraints: &LatticeVMConstraints,
-        aux_constraints: &Vec<LatticeVMConstraints>,
-        target_cols: &Vec<usize>,
-        aux_target_cols: &Vec<Vec<usize>>,
-        potential_boolean_vars: &Vec<usize>,
-        aux_potential_boolean_vars: &Vec<Vec<usize>>,
-        refinment_target_indicies_pv: &Vec<usize>,
-        base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
-        public_vals: Vec<AbstractInterval>,
-        max_row_id: usize,
-        final_check: FinalCheckFn,
-        prime: u32,
-        seed: u64,
-        ui: &mut UiState,
-        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    */
-    //let aux_constraints = vec![add_constraints];
-    //let aux_target_cols = vec![add_target_cols];
-    //let aux_potential_boolean_vars = vec![add_potential_boolean_vars];
-
     let aux_add_obj = AbsConstraintObj {
         name: "Add".to_string(),
         aux_constraints: add_constraints,
@@ -449,13 +389,6 @@ fn main() -> Result<(), io::Error> {
         DisableMouseCapture
     )?;
     terminal.show_cursor()?;
-
-    //let cpu = &state.machine.cpu;
-
-    //let dot = exprs_to_dependency_dot(&tv_constraints);
-    //println!("{}", dot);
-    //let symbolic_constraints: Vec<SymbolicExpression<BabyBear>> =
-    //    get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
 
     Ok(())
 }
