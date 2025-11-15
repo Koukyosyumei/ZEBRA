@@ -64,7 +64,7 @@ impl UiState {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title("Recovered States"),
+                    .title("Canonical Representation"),
             )
             .style(Style::default().fg(Color::Magenta))
             .wrap(wrap);

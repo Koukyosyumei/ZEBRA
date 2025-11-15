@@ -146,32 +146,6 @@ pub fn solve(
     (None, num_trial, sum_potential, false)
 }
 
-fn derive_add_table(
-    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
-    potential_boolean_vars: &Vec<usize>,
-    prime: u32,
-) -> Vec<Vec<AbstractInterval>> {
-    let mut out = vec![];
-    for row in cpu_main_trace {
-        if row[3].as_canonical_u32(prime) == 100 {
-            let mut r: Vec<_> = (0..16).map(|_| AbstractInterval::top(prime)).collect();
-            for i in potential_boolean_vars {
-                r[*i] = AbstractInterval::bool();
-            }
-
-            let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
-            let add_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-            for i in 0..(cpu_columns.len()) {
-                r[add_columns[i]] = row[cpu_columns[i]].clone();
-            }
-            r[15] = AbstractInterval::one();
-            out.push(r);
-        }
-    }
-
-    out
-}
-
 pub struct AbsConstraintObj {
     pub name: String,
     pub aux_constraints: LatticeVMConstraints,
@@ -195,7 +169,7 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
-    FinalCheckFn: Fn(&AbstractTrace, u32, &mut UiState),
+    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut UiState),
     AuxTableGenFn: Fn(&Vec<Vec<AbstractInterval>>, &Vec<usize>, u32) -> Vec<Vec<AbstractInterval>>,
 {
     let mut rng = StdRng::seed_from_u64(seed);
@@ -242,7 +216,11 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
 
             if let (Some(trace), _, _, _) = result {
                 let mut output = String::new();
-                output.push_str(&format!("#{}\n{}", cum_num_trial + result.1, trace));
+                output.push_str(&format!(
+                    "Trial ID: {}\n\n#CPU\n{}",
+                    cum_num_trial + result.1,
+                    trace
+                ));
 
                 let mut pass_all_aux = true;
                 for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
@@ -276,7 +254,7 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
 
                 if pass_all_aux {
                     ui.logs = output;
-                    final_check(&trace, prime, ui);
+                    final_check(&trace, cum_num_trial + result.1, prime, ui);
                     found_solution_flag = true;
 
                     terminal
