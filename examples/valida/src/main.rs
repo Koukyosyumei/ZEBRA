@@ -283,7 +283,7 @@ fn main() -> Result<(), io::Error> {
     let base_abs_main_trace_data = rows.clone();
 
     // ############## Final Check Function ##############################
-    fn final_check(trace: &AbstractTrace, prime: u32, ui: &mut UiState) {
+    fn final_check(trace: &AbstractTrace, num_trial: usize, prime: u32, ui: &mut UiState) {
         let mut output = String::new();
 
         let mut memory = HashMap::new();
@@ -303,11 +303,12 @@ fn main() -> Result<(), io::Error> {
             }
         }
 
+        output.push_str(&format!("Trial ID: {}\n\n", num_trial));
         output.push_str("Malicious States:\n");
         for rs in &recovered_states {
             output.push_str(&format!("\t{}\n", rs));
         }
-        output.push_str("-----------------\n");
+        output.push_str("-----------------\n\n");
 
         let program = add_program::<BabyBear>();
         let rom = ProgramROM::new(program.clone());
