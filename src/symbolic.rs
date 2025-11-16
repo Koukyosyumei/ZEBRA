@@ -539,34 +539,32 @@ pub fn refine_trace(
         return None;
     }
     let mut c_refinment_target_indicies = refinment_target_indicies.clone();
-    let mut trace_a = trace.clone();
-    let mut trace_b = trace.clone();
-    for _ in 0..num_refined_points {
-        let i = rng.random_range(2..(max_row_id + 1)) as usize;
-        c_refinment_target_indicies.shuffle(rng);
-        let mut j = 0;
-        while j < c_refinment_target_indicies.len() - 1
-            && trace.data[i][c_refinment_target_indicies[j]].is_singleton()
-        {
-            j += 1;
-        }
-        if !trace.data[i][c_refinment_target_indicies[j]].is_singleton() {
-            let v = trace.data[i][c_refinment_target_indicies[j]].split();
-            if v.0.is_singleton() {
-                trace_a
-                    .singleton_positions
-                    .push((i, c_refinment_target_indicies[j]));
-            }
-            if v.1.is_singleton() {
-                trace_b
-                    .singleton_positions
-                    .push((i, c_refinment_target_indicies[j]));
-            }
-            trace_a.data[i][c_refinment_target_indicies[j]] = v.0;
-            trace_b.data[i][c_refinment_target_indicies[j]] = v.1;
-        }
+    let i = rng.random_range(2..(max_row_id + 1)) as usize;
+    c_refinment_target_indicies.shuffle(rng);
+    let mut j = 0;
+    while j < c_refinment_target_indicies.len() - 1
+        && trace.data[i][c_refinment_target_indicies[j]].is_singleton()
+    {
+        j += 1;
     }
-    Some(vec![trace_a, trace_b])
+    if !trace.data[i][c_refinment_target_indicies[j]].is_singleton() {
+        let vs = trace.data[i][c_refinment_target_indicies[j]].split();
+        let mut results = vec![];
+        for v in vs {
+            let mut new_trace = trace.clone();
+            if v.is_singleton() {
+                new_trace
+                    .singleton_positions
+                    .push((i, c_refinment_target_indicies[j]));
+            }
+            new_trace.data[i][c_refinment_target_indicies[j]] = v.clone();
+            results.push(new_trace);
+        }
+        Some(results)
+    } else {
+        Some(vec![trace.clone(), trace.clone()])
+    }
+    //}
 }
 
 mod tests {

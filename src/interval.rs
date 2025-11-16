@@ -175,9 +175,9 @@ impl AbstractInterval {
         self.lo == self.hi
     }
 
-    pub fn split(&self) -> (Self, Self) {
+    pub fn split(&self) -> Vec<Self> {
         if self.hi == self.lo || self.hi == self.lo + 1 {
-            (
+            vec![
                 Self {
                     lo: self.lo,
                     hi: self.lo,
@@ -186,9 +186,9 @@ impl AbstractInterval {
                     lo: self.hi,
                     hi: self.hi,
                 },
-            )
+            ]
         } else {
-            (
+            vec![
                 Self {
                     lo: self.lo,
                     hi: (self.lo + self.hi) / 2,
@@ -197,7 +197,7 @@ impl AbstractInterval {
                     lo: (self.lo + self.hi) / 2 + 1,
                     hi: self.hi,
                 },
-            )
+            ]
         }
     }
 }
