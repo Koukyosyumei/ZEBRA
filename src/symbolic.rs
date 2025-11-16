@@ -542,7 +542,7 @@ pub fn refine_trace(
     let mut trace_a = trace.clone();
     let mut trace_b = trace.clone();
     for _ in 0..num_refined_points {
-        let i = rng.random_range(0..(max_row_id + 1)) as usize;
+        let i = rng.random_range(2..(max_row_id + 1)) as usize;
         c_refinment_target_indicies.shuffle(rng);
         let mut j = 0;
         while j < c_refinment_target_indicies.len() - 1

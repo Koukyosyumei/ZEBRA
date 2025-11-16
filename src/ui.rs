@@ -10,6 +10,11 @@ pub struct UiState {
     pub logs: String,
     pub program: String,
     pub recovered: String,
+
+    pub scroll_status: u16,
+    pub scroll_logs: u16,
+    pub scroll_program: u16,
+    pub scroll_recovered: u16,
 }
 
 impl UiState {
@@ -19,6 +24,11 @@ impl UiState {
             logs: String::new(),
             program: String::new(),
             recovered: String::new(),
+
+            scroll_status: 0,
+            scroll_logs: 0,
+            scroll_program: 0,
+            scroll_recovered: 0,
         }
     }
 
@@ -44,12 +54,14 @@ impl UiState {
         let top_left = Paragraph::new(self.status.clone())
             .block(Block::default().borders(Borders::ALL).title("Status"))
             .style(Style::default().fg(Color::Green))
-            .wrap(wrap);
+            .wrap(wrap)
+            .scroll((self.scroll_status, 0));
 
         let top_right = Paragraph::new(self.program.clone())
             .block(Block::default().borders(Borders::ALL).title("Program"))
             .style(Style::default().fg(Color::Yellow))
-            .wrap(wrap);
+            .wrap(wrap)
+            .scroll((self.scroll_program, 0));
 
         let bottom_left = Paragraph::new(self.logs.clone())
             .block(
@@ -58,7 +70,8 @@ impl UiState {
                     .title("SAT Assignment"),
             )
             .style(Style::default().fg(Color::Cyan))
-            .wrap(wrap);
+            .wrap(wrap)
+            .scroll((self.scroll_logs, 0));
 
         let bottom_right = Paragraph::new(self.recovered.clone())
             .block(
@@ -67,7 +80,8 @@ impl UiState {
                     .title("Canonical Representation"),
             )
             .style(Style::default().fg(Color::Magenta))
-            .wrap(wrap);
+            .wrap(wrap)
+            .scroll((self.scroll_recovered, 0));
 
         f.render_widget(top_left, top_chunks[0]);
         f.render_widget(top_right, top_chunks[1]);

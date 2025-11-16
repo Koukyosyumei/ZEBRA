@@ -41,6 +41,9 @@ pub fn check_eq_states(
         if check_eq_valida(&states_x[i], &states_y[i], prime) == MayBeFlag::False {
             return (MayBeFlag::False, i);
         }
+        if states_x[i].is_done != MayBeFlag::False {
+            break;
+        }
     }
 
     (MayBeFlag::True, 0)

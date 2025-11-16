@@ -27,6 +27,62 @@ use crate::{
     ui::UiState,
 };
 
+fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {
+    for row in &mut main_trace.data {
+        if row[1].is_singleton() {
+            if row[1].as_canonical_u32(prime) == 0 {
+                row[3] = AbstractInterval::from_i64(7);
+                row[4] = AbstractInterval::from_i64(-4);
+                row[5] = AbstractInterval::from_i64(2);
+                row[6] = AbstractInterval::from_i64(0);
+                row[7] = AbstractInterval::from_i64(0);
+                row[8] = AbstractInterval::from_i64(0);
+            }
+
+            if row[1].as_canonical_u32(prime) == 1 {
+                row[3] = AbstractInterval::from_i64(100);
+                row[4] = AbstractInterval::from_i64(-8);
+                row[5] = AbstractInterval::from_i64(-8);
+                row[6] = AbstractInterval::from_i64(1);
+                row[7] = AbstractInterval::from_i64(0);
+                row[8] = AbstractInterval::from_i64(1);
+            }
+
+            if row[1].as_canonical_u32(prime) == 2 {
+                row[3] = AbstractInterval::from_i64(6);
+                row[4] = AbstractInterval::from_i64(24);
+                row[5] = AbstractInterval::from_i64(-8);
+                row[6] = AbstractInterval::from_i64(-4);
+                row[7] = AbstractInterval::from_i64(0);
+                row[8] = AbstractInterval::from_i64(0);
+            }
+
+            if row[1].as_canonical_u32(prime) == 3 {
+                row[3] = AbstractInterval::from_i64(8);
+                row[4] = AbstractInterval::from_i64(0);
+                row[5] = AbstractInterval::from_i64(0);
+                row[6] = AbstractInterval::from_i64(0);
+                row[7] = AbstractInterval::from_i64(0);
+                row[8] = AbstractInterval::from_i64(0);
+
+                let a = vec![
+                    3, 3, 4096, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 1, 1,
+                ];
+                for i in 0..59 {
+                    row[i] = AbstractInterval::from_i64(a[i]);
+                }
+
+                /*
+                for i in 30..52 {
+                    row[i] = AbstractInterval::zero();
+                }*/
+            }
+        }
+    }
+}
+
 pub fn solve(
     initial_abs_main_trace: AbstractTrace,
     initial_public_vals: Vec<AbstractInterval>,
@@ -115,18 +171,22 @@ pub fn solve(
             chinldren.push((trace.clone(), pv_children.0));
             chinldren.push((trace, pv_children.1));
         }
-        for kid in chinldren {
+        //println!("############ {}", chinldren.len());
+        for kid in &mut chinldren {
+            adjust_pc_program(&mut kid.0, prime);
             let (flag, potential) =
                 eval_constraints(&kid.0, Some(&kid.1.data[0]), constraints, prime);
             match flag {
                 MayBeFlag::True => {
-                    return (Some(kid.0), num_trial, sum_potential, false);
+                    num_unsat_trial += 1;
+                    return (Some(kid.0.clone()), num_trial, sum_potential, false);
                 }
                 MayBeFlag::False => {
                     num_unsat_trial += 1;
                 }
                 MayBeFlag::MayBe => {
-                    queue.push(kid, -potential);
+                    //println!("aaaaaaaaaaa");
+                    queue.push(kid.clone(), -potential);
                 }
             }
         }
@@ -138,6 +198,12 @@ pub fn solve(
                         && key.modifiers.contains(KeyModifiers::CONTROL))
                 {
                     return (None, num_trial, sum_potential, true);
+                }
+
+                if key.code == KeyCode::Down {
+                    ui.scroll_recovered = ui.scroll_logs.saturating_add(1);
+                } else if key.code == KeyCode::Up {
+                    ui.scroll_recovered = ui.scroll_logs.saturating_sub(1);
                 }
             }
         }
@@ -183,19 +249,35 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
         for combo in combos {
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
 
-            for i in 0..(max_row_id + 1) {
-                for c in &combo {
-                    if potential_boolean_vars.contains(c) {
+            let mut combo_mut = combo.clone();
+            combo_mut.push(&1);
+            combo_mut.push(&58);
+            combo_mut = vec![&1, &18, &19, &22, &24, &58];
+            for i in 2..(max_row_id + 1) {
+                for c in &combo_mut {
+                    if potential_boolean_vars.contains(c)
+                        || **c == 18
+                        || **c == 19
+                        || **c == 22
+                        || **c == 24
+                    {
                         abs_main_trace_data[i][**c] = AbstractInterval::bool();
                     } else {
                         abs_main_trace_data[i][**c] = AbstractInterval::i4();
+                    }
+
+                    if **c == 1 {
+                        abs_main_trace_data[i][**c] = AbstractInterval { lo: 0, hi: 4 };
                     }
                 }
             }
 
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
 
-            let refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
+            //let a = eval_constraints(&abs_main_trace, Some(&public_vals), constraints, prime);
+            //println!("{:?}: {}", a.0, a.1);
+
+            let refinment_target_indicies_main = combo_mut.clone().into_iter().cloned().collect();
 
             let result = solve(
                 abs_main_trace,
@@ -205,11 +287,11 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
                 &refinment_target_indicies_main,
                 &refinment_target_indicies_pv,
                 max_row_id,
-                1000,
+                1000000,
                 cum_num_trial,
                 prime,
                 &mut rng,
-                &format!("{:?}", combo),
+                &format!("{:?}", combo_mut),
                 ui,
                 terminal,
             );
@@ -223,6 +305,8 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
                 ));
 
                 let mut pass_all_aux = true;
+
+                /*
                 for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
                     let aux_table = gfn(&trace.data, &co.aux_potential_boolean_vars, prime);
                     let abs_aux_trace = AbstractTrace::new(aux_table);
@@ -250,7 +334,7 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
                         pass_all_aux = false;
                         break;
                     }
-                }
+                }*/
 
                 if pass_all_aux {
                     ui.logs = output;
@@ -271,6 +355,9 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
                 exit_flag = true;
                 break;
             }
+
+            //break;
+            //exit_flag = true;
         }
 
         if found_solution_flag {

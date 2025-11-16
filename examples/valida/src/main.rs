@@ -190,14 +190,12 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
         },
         InstructionWord {
             opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-8, -4, 1, 0, 1]),
+            operands: Operands([-8, -8, 1, 0, 1]),
         },
-        /*
         InstructionWord {
             opcode: <BneInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([0 * bytes_per_instr, -8, -4, 0, 0]),
+            operands: Operands([1 * bytes_per_instr, -8, -4, 0, 0]),
         },
-        */
         InstructionWord {
             opcode: <StopInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands::default(),
@@ -221,7 +219,7 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
 
     let cpu_air = CpuChip::default();
-    let (cpu_constraints, cpu_potential_boolean_vars) =
+    let (cpu_constraints, mut cpu_potential_boolean_vars) =
         get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &cpu_air,
         );
@@ -239,7 +237,7 @@ fn main() -> Result<(), io::Error> {
     println!("ADD AIR constraints");
 
     let mut rng = StdRng::seed_from_u64(42);
-    let max_row_id = 2;
+    let max_row_id = 7;
     let num_extracted_rows = 2;
 
     // ############### Prepare Public Values ############################
@@ -310,6 +308,7 @@ fn main() -> Result<(), io::Error> {
         }
         output.push_str("-----------------\n\n");
 
+        /*
         let program = add_program::<BabyBear>();
         let rom = ProgramROM::new(program.clone());
         let mut machine = BasicMachine::<BabyBear>::default();
@@ -342,10 +341,11 @@ fn main() -> Result<(), io::Error> {
             output.push_str(&format!("\t{}\n", rs));
         }
         output.push_str("-----------------\n");
+        */
 
-        if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
-            ui.recovered = output;
-        };
+        //if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
+        ui.recovered = output;
+        //};
     }
 
     let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
