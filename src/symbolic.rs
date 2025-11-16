@@ -530,6 +530,7 @@ pub fn refine_trace(
     num_refined_points: usize,
     refinment_target_indicies: &Vec<usize>,
     max_row_id: usize,
+    prime: u32,
     rng: &mut StdRng,
 ) -> Option<Vec<AbstractTrace>> {
     if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
@@ -548,7 +549,7 @@ pub fn refine_trace(
         j += 1;
     }
     if !trace.data[i][c_refinment_target_indicies[j]].is_singleton() {
-        let vs = trace.data[i][c_refinment_target_indicies[j]].split();
+        let vs = trace.data[i][c_refinment_target_indicies[j]].split(prime);
         let mut results = vec![];
         for v in vs {
             let mut new_trace = trace.clone();

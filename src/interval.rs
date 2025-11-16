@@ -175,7 +175,7 @@ impl AbstractInterval {
         self.lo == self.hi
     }
 
-    pub fn split(&self) -> Vec<Self> {
+    pub fn split(&self, _p: u32) -> Vec<Self> {
         if self.hi == self.lo || self.hi == self.lo + 1 {
             vec![
                 Self {

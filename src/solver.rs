@@ -145,6 +145,7 @@ pub fn solve(
             num_refined_points,
             refinment_target_indicies_main,
             max_row_id,
+            prime,
             rng,
         );
 
@@ -153,6 +154,7 @@ pub fn solve(
             num_refined_points,
             refinment_target_indicies_pv,
             max_row_id,
+            prime,
             rng,
         );
 
@@ -164,31 +166,16 @@ pub fn solve(
                         chinldren.push((tc.clone(), pc.clone()));
                     }
                 }
-                /*
-                chinldren.push((trace_children.0.clone(), pv_children.0.clone()));
-                chinldren.push((trace_children.1.clone(), pv_children.0));
-                chinldren.push((trace_children.0, pv_children.1.clone()));
-                chinldren.push((trace_children.1, pv_children.1));
-                */
             } else {
                 for tc in trace_children {
                     chinldren.push((tc.clone(), public_vals.clone()));
                 }
-                /*
-                    chinldren.push((trace_children.0.clone(), public_vals.clone()));
-                    chinldren.push((trace_children.1.clone(), public_vals));
-                */
             }
         } else if let Some(pv_children) = pv_children {
             for pc in pv_children {
                 chinldren.push((trace.clone(), pc.clone()));
             }
-            /*
-                chinldren.push((trace.clone(), pv_children.0));
-                chinldren.push((trace, pv_children.1));
-            */
         }
-        //println!("############ {}", chinldren.len());
         for kid in &mut chinldren {
             adjust_pc_program(&mut kid.0, prime);
             let (flag, potential) =
@@ -202,7 +189,6 @@ pub fn solve(
                     num_unsat_trial += 1;
                 }
                 MayBeFlag::MayBe => {
-                    //println!("aaaaaaaaaaa");
                     queue.push(kid.clone(), -potential);
                 }
             }
@@ -267,17 +253,10 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
 
             let mut combo_mut = combo.clone();
-            combo_mut.push(&1);
-            combo_mut.push(&58);
             combo_mut = vec![&1, &18, &19, &22, &24, &58];
             for i in 2..(max_row_id + 1) {
                 for c in &combo_mut {
-                    if potential_boolean_vars.contains(c)
-                        || **c == 18
-                        || **c == 19
-                        || **c == 22
-                        || **c == 24
-                    {
+                    if potential_boolean_vars.contains(c) {
                         abs_main_trace_data[i][**c] = AbstractInterval::bool();
                     } else {
                         abs_main_trace_data[i][**c] = AbstractInterval::i4();
@@ -290,9 +269,6 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
             }
 
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
-
-            //let a = eval_constraints(&abs_main_trace, Some(&public_vals), constraints, prime);
-            //println!("{:?}: {}", a.0, a.1);
 
             let refinment_target_indicies_main = combo_mut.clone().into_iter().cloned().collect();
 

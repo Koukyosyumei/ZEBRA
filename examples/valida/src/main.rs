@@ -160,7 +160,7 @@ fn derive_add_table(
 ) -> Vec<Vec<AbstractInterval>> {
     let mut out = vec![];
     for row in cpu_main_trace {
-        if row[3].as_canonical_u32(prime) == 100 {
+        if row[58].as_canonical_u32(prime) != 0 && row[3].as_canonical_u32(prime) == 100 {
             let mut r: Vec<_> = (0..16).map(|_| AbstractInterval::top(prime)).collect();
             for i in potential_boolean_vars {
                 r[*i] = AbstractInterval::bool();
@@ -223,6 +223,10 @@ fn main() -> Result<(), io::Error> {
         get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &cpu_air,
         );
+    cpu_potential_boolean_vars.push(18);
+    cpu_potential_boolean_vars.push(19);
+    cpu_potential_boolean_vars.push(22);
+    cpu_potential_boolean_vars.push(24);
     let mut cpu_target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     cpu_target_cols.retain(|x| !program_cols.contains(x));
     println!("CPU AIR constraints");
