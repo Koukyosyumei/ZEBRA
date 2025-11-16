@@ -531,7 +531,7 @@ pub fn refine_trace(
     refinment_target_indicies: &Vec<usize>,
     max_row_id: usize,
     rng: &mut StdRng,
-) -> Option<(AbstractTrace, AbstractTrace)> {
+) -> Option<Vec<AbstractTrace>> {
     if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
         return None;
     }
@@ -566,7 +566,7 @@ pub fn refine_trace(
             trace_b.data[i][c_refinment_target_indicies[j]] = v.1;
         }
     }
-    Some((trace_a, trace_b))
+    Some(vec![trace_a, trace_b])
 }
 
 mod tests {

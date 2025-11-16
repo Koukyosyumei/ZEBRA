@@ -159,17 +159,34 @@ pub fn solve(
         let mut chinldren = vec![];
         if let Some(trace_children) = trace_children {
             if let Some(pv_children) = pv_children {
+                for pc in pv_children {
+                    for tc in &trace_children {
+                        chinldren.push((tc.clone(), pc.clone()));
+                    }
+                }
+                /*
                 chinldren.push((trace_children.0.clone(), pv_children.0.clone()));
                 chinldren.push((trace_children.1.clone(), pv_children.0));
                 chinldren.push((trace_children.0, pv_children.1.clone()));
                 chinldren.push((trace_children.1, pv_children.1));
+                */
             } else {
-                chinldren.push((trace_children.0.clone(), public_vals.clone()));
-                chinldren.push((trace_children.1.clone(), public_vals));
+                for tc in trace_children {
+                    chinldren.push((tc.clone(), public_vals.clone()));
+                }
+                /*
+                    chinldren.push((trace_children.0.clone(), public_vals.clone()));
+                    chinldren.push((trace_children.1.clone(), public_vals));
+                */
             }
         } else if let Some(pv_children) = pv_children {
-            chinldren.push((trace.clone(), pv_children.0));
-            chinldren.push((trace, pv_children.1));
+            for pc in pv_children {
+                chinldren.push((trace.clone(), pc.clone()));
+            }
+            /*
+                chinldren.push((trace.clone(), pv_children.0));
+                chinldren.push((trace, pv_children.1));
+            */
         }
         //println!("############ {}", chinldren.len());
         for kid in &mut chinldren {
