@@ -166,6 +166,11 @@ fn derive_add_table(
                 r[*i] = AbstractInterval::bool();
             }
 
+            /*
+            //let mut combo_mut = combo.clone();
+            //combo_mut = vec![&1, &18, &19, &22, &24, &58];
+             */
+
             let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
             let add_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
             for i in 0..(cpu_columns.len()) {
@@ -241,6 +246,7 @@ fn main() -> Result<(), io::Error> {
     println!("ADD AIR constraints");
 
     let mut rng = StdRng::seed_from_u64(42);
+    let min_row_id = 2;
     let max_row_id = 7;
     let num_extracted_rows = 2;
 
@@ -283,6 +289,19 @@ fn main() -> Result<(), io::Error> {
         }
     }
     let base_abs_main_trace_data = rows.clone();
+
+    fn program_counter_refine_fn(
+        abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
+        i: usize,
+        j: usize,
+    ) {
+        if j == 1 {
+            abs_main_trace_data[i][j] = AbstractInterval {
+                lo: 0,
+                hi: add_program::<BabyBear>().len() as i64,
+            };
+        }
+    }
 
     // ############## Final Check Function ##############################
     fn final_check(trace: &AbstractTrace, num_trial: usize, prime: u32, ui: &mut UiState) {
@@ -385,7 +404,9 @@ fn main() -> Result<(), io::Error> {
         &refinment_target_indicies_pv,
         &base_abs_main_trace_data,
         public_vals,
+        min_row_id,
         max_row_id,
+        program_counter_refine_fn,
         final_check,
         prime,
         42,

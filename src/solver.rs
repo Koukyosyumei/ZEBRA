@@ -222,7 +222,7 @@ pub struct AbsConstraintObj {
     pub aux_potential_boolean_vars: Vec<usize>,
 }
 
-pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
+pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
     constraints: &LatticeVMConstraints,
     target_cols: &Vec<usize>,
     potential_boolean_vars: &Vec<usize>,
@@ -231,13 +231,16 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
     refinment_target_indicies_pv: &Vec<usize>,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
+    min_row_id: usize,
     max_row_id: usize,
+    program_counter_refine_fn: ProgramCounterRefinFn,
     final_check: FinalCheckFn,
     prime: u32,
     seed: u64,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
+    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut UiState),
     AuxTableGenFn: Fn(&Vec<Vec<AbstractInterval>>, &Vec<usize>, u32) -> Vec<Vec<AbstractInterval>>,
 {
@@ -252,25 +255,24 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
         for combo in combos {
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
 
-            let mut combo_mut = combo.clone();
-            combo_mut = vec![&1, &18, &19, &22, &24, &58];
-            for i in 2..(max_row_id + 1) {
-                for c in &combo_mut {
+            for i in min_row_id..(max_row_id + 1) {
+                for c in &combo {
                     if potential_boolean_vars.contains(c) {
                         abs_main_trace_data[i][**c] = AbstractInterval::bool();
                     } else {
                         abs_main_trace_data[i][**c] = AbstractInterval::i4();
                     }
 
+                    program_counter_refine_fn(&mut abs_main_trace_data, i, **c);
+                    /*
                     if **c == 1 {
                         abs_main_trace_data[i][**c] = AbstractInterval { lo: 0, hi: 4 };
-                    }
+                    }*/
                 }
             }
 
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
-
-            let refinment_target_indicies_main = combo_mut.clone().into_iter().cloned().collect();
+            let refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
 
             let result = solve(
                 abs_main_trace,
@@ -280,11 +282,11 @@ pub fn run_solver<FinalCheckFn, AuxTableGenFn>(
                 &refinment_target_indicies_main,
                 &refinment_target_indicies_pv,
                 max_row_id,
-                1000000,
+                1000,
                 cum_num_trial,
                 prime,
                 &mut rng,
-                &format!("{:?}", combo_mut),
+                &format!("{:?}", combo),
                 ui,
                 terminal,
             );
