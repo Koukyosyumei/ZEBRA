@@ -331,7 +331,6 @@ fn main() -> Result<(), io::Error> {
         }
         output.push_str("-----------------\n\n");
 
-        /*
         let program = add_program::<BabyBear>();
         let rom = ProgramROM::new(program.clone());
         let mut machine = BasicMachine::<BabyBear>::default();
@@ -364,7 +363,6 @@ fn main() -> Result<(), io::Error> {
             output.push_str(&format!("\t{}\n", rs));
         }
         output.push_str("-----------------\n");
-        */
 
         //if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
         ui.recovered = output;

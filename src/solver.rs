@@ -73,11 +73,6 @@ fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {
                 for i in 0..59 {
                     row[i] = AbstractInterval::from_i64(a[i]);
                 }
-
-                /*
-                for i in 30..52 {
-                    row[i] = AbstractInterval::zero();
-                }*/
             }
         }
     }
@@ -264,10 +259,6 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
                     }
 
                     program_counter_refine_fn(&mut abs_main_trace_data, i, **c);
-                    /*
-                    if **c == 1 {
-                        abs_main_trace_data[i][**c] = AbstractInterval { lo: 0, hi: 4 };
-                    }*/
                 }
             }
 
