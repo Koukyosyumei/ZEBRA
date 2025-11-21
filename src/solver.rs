@@ -79,7 +79,7 @@ fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {
     }
 }
 
-pub fn solve<ProgramCounterRefinFn>(
+pub fn solve<AdjustPcProgramFn>(
     initial_abs_main_trace: AbstractTrace,
     initial_public_vals: Vec<AbstractInterval>,
     constraints: &LatticeVMConstraints,
@@ -89,7 +89,7 @@ pub fn solve<ProgramCounterRefinFn>(
     refinment_target_indicies_pv: &Vec<usize>,
     min_row_id: usize,
     max_row_id: usize,
-    program_counter_refine_fn: &ProgramCounterRefinFn,
+    adjust_pc_program: &AdjustPcProgramFn,
     maximum_num_trial: usize,
     cum_num_trial: usize,
     prime: u32,
@@ -99,7 +99,7 @@ pub fn solve<ProgramCounterRefinFn>(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) -> (Option<AbstractTrace>, usize, i32, bool, HashSet<usize>)
 where
-    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize),
+    AdjustPcProgramFn: Fn(&mut AbstractTrace, u32),
 {
     let mut queue: PriorityQueue<(AbstractTrace, AbstractTrace, usize), (i32, i32)> =
         PriorityQueue::new();
@@ -301,7 +301,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
                 &refinment_target_indicies_pv,
                 min_row_id,
                 max_row_id,
-                &program_counter_refine_fn,
+                &adjust_pc_program,
                 1000,
                 cum_num_trial,
                 prime,
@@ -361,6 +361,8 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
 
                 let mut pass_all_aux = true;
 
+                fn dummy_adjust_pc_program(_at: &mut AbstractTrace, _prime: u32) {}
+
                 for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
                     let aux_table = gfn(&trace.data, &co.aux_potential_boolean_vars, prime);
                     let abs_aux_trace = AbstractTrace::new(aux_table.clone());
@@ -374,7 +376,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
                         &refinment_target_indicies_pv,
                         0,
                         aux_table.len() - 1,
-                        &program_counter_refine_fn,
+                        &dummy_adjust_pc_program,
                         1000,
                         cum_num_trial,
                         prime,
@@ -388,7 +390,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
                         output.push_str(&format!("\n#{}\n{}", co.name, abs_trace));
                         //break;
                     } else {
-                        //pass_all_aux = false;
+                        pass_all_aux = false;
                         break;
                     }
                 }
