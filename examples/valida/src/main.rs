@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs;
 use std::rc::Rc;
 use std::{io, thread, time::Duration};
 
@@ -416,6 +417,8 @@ fn main() -> Result<(), io::Error> {
 
         if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
             ui.recovered = output;
+            fs::write("states.txt", ui.recovered.clone()).unwrap();
+            fs::write("assignments.txt", ui.logs.clone()).unwrap();
         };
     }
 
