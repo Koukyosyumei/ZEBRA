@@ -414,9 +414,9 @@ fn main() -> Result<(), io::Error> {
         }
         output.push_str("-----------------\n");
 
-        //if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
-        ui.recovered = output;
-        //};
+        if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
+            ui.recovered = output;
+        };
     }
 
     let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
