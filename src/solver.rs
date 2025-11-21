@@ -32,7 +32,7 @@ pub fn solve<AdjustPcProgramFn>(
     initial_abs_main_trace: AbstractTrace,
     initial_public_vals: Vec<AbstractInterval>,
     constraints: &LatticeVMConstraints,
-    num_refined_points: usize,
+    _num_refined_points: usize,
     base_refinment_target_indicies_main: &Vec<usize>,
     refinment_target_indicies_pv: &Vec<usize>,
     min_row_id: usize,
