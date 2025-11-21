@@ -245,7 +245,6 @@ fn main() -> Result<(), io::Error> {
     let add_target_cols = vec![12, 13, 14];
     println!("ADD AIR constraints");
 
-    let mut rng = StdRng::seed_from_u64(42);
     let min_row_id = 2;
     let max_row_id = 7;
     let num_extracted_rows = 2;
@@ -407,7 +406,7 @@ fn main() -> Result<(), io::Error> {
         program_counter_refine_fn,
         final_check,
         prime,
-        42,
+        41,
         &mut ui,
         &mut terminal,
     );
@@ -422,3 +421,17 @@ fn main() -> Result<(), io::Error> {
 
     Ok(())
 }
+
+/* constant                     (-potential, -(head.2 as i32))  (-potential, (head.2 as i32))
+42 18193                        28806 (137084)                  27672 (192644)
+40 51102                        13619 (29734)                   6961 (19520)
+41 51695                        51441 (40774)                        (5250)
+43 228240                       6140  (103235)                  23494 (51691)
+44 129052                       49319 (72830)                   43973 (30496)
+
+45 147155                       39695 (49101)                                (119136) <-- interesting
+46 72458                        5194
+47
+48
+49
+*/

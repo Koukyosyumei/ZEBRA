@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fmt;
+use std::hash::Hash;
 use std::ops::{Add, Mul, Neg, Sub};
 
 use serde::Serialize;
@@ -59,6 +60,30 @@ pub enum LatticeVMSymbolicExpr {
     Sub(Box<Self>, Box<Self>),
     Mul(Box<Self>, Box<Self>),
     Neg(Box<Self>),
+}
+
+pub fn gather_vars(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize>) {
+    match expr {
+        LatticeVMSymbolicExpr::Variable(lattice_vmsymbolic_val) => {
+            memo.insert(lattice_vmsymbolic_val.index);
+        }
+        LatticeVMSymbolicExpr::Add(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(&lattice_vmsymbolic_expr, memo);
+            gather_vars(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Sub(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(&lattice_vmsymbolic_expr, memo);
+            gather_vars(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Mul(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(&lattice_vmsymbolic_expr, memo);
+            gather_vars(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
+            gather_vars(&lattice_vmsymbolic_expr, memo);
+        }
+        _ => {}
+    }
 }
 
 pub fn get_curr_i(expr: &LatticeVMSymbolicExpr) -> Option<usize> {
@@ -408,10 +433,11 @@ pub fn eval_air_constraints(
     public_vals: Option<&[AbstractInterval]>,
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
-) -> (MayBeFlag, i32) {
+) -> (MayBeFlag, i32, HashSet<usize>) {
     let num_steps = trace.data.len();
     let mut is_all_true = true;
     let mut potential = 0;
+    let mut memo = HashSet::<usize>::new();
     for i in 0..num_steps {
         for tc in constraints {
             let flag = tc
@@ -432,9 +458,10 @@ pub fn eval_air_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    return (MayBeFlag::False, 0);
+                    return (MayBeFlag::False, 0, memo);
                 }
                 MayBeFlag::MayBe => {
+                    gather_vars(tc, &mut memo);
                     is_all_true = false;
                     potential += 1;
                 }
@@ -442,9 +469,9 @@ pub fn eval_air_constraints(
         }
     }
     if is_all_true {
-        (MayBeFlag::True, 0)
+        (MayBeFlag::True, 0, memo)
     } else {
-        (MayBeFlag::MayBe, potential)
+        (MayBeFlag::MayBe, potential, memo)
     }
 }
 
@@ -459,14 +486,14 @@ pub fn eval_constraints(
     public_vals: Option<&[AbstractInterval]>,
     constraints: &LatticeVMConstraints,
     prime: u32,
-) -> (MayBeFlag, i32) {
+) -> (MayBeFlag, i32, HashSet<usize>) {
     let mut is_all_true = true;
 
-    let (air_flag, mut potential) =
+    let (air_flag, mut potential, memo) =
         eval_air_constraints(trace, public_vals, &constraints.air_constraints, prime);
     match air_flag {
         MayBeFlag::True => {}
-        MayBeFlag::False => return (MayBeFlag::False, 0),
+        MayBeFlag::False => return (MayBeFlag::False, 0, memo),
         MayBeFlag::MayBe => is_all_true = false,
     }
 
@@ -485,7 +512,7 @@ pub fn eval_constraints(
         match flag {
             MayBeFlag::True => {}
             MayBeFlag::False => {
-                return (MayBeFlag::False, 0);
+                return (MayBeFlag::False, 0, memo);
             }
             MayBeFlag::MayBe => {
                 is_all_true = false;
@@ -509,7 +536,7 @@ pub fn eval_constraints(
         match flag {
             MayBeFlag::True => {}
             MayBeFlag::False => {
-                return (MayBeFlag::False, 0);
+                return (MayBeFlag::False, 0, memo);
             }
             MayBeFlag::MayBe => {
                 is_all_true = false;
@@ -519,9 +546,9 @@ pub fn eval_constraints(
     }
 
     if is_all_true {
-        (MayBeFlag::True, 0)
+        (MayBeFlag::True, 0, memo)
     } else {
-        (MayBeFlag::MayBe, potential)
+        (MayBeFlag::MayBe, potential, memo)
     }
 }
 
@@ -529,6 +556,7 @@ pub fn refine_trace(
     trace: &AbstractTrace,
     num_refined_points: usize,
     refinment_target_indicies: &Vec<usize>,
+    min_row_id: usize,
     max_row_id: usize,
     prime: u32,
     rng: &mut StdRng,
@@ -540,7 +568,7 @@ pub fn refine_trace(
         return None;
     }
     let mut c_refinment_target_indicies = refinment_target_indicies.clone();
-    let i = rng.random_range(2..(max_row_id + 1)) as usize;
+    let i = rng.random_range(min_row_id..(max_row_id + 1)) as usize;
     c_refinment_target_indicies.shuffle(rng);
     let mut j = 0;
     while j < c_refinment_target_indicies.len() - 1
