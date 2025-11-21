@@ -554,7 +554,6 @@ pub fn eval_constraints(
 
 pub fn refine_trace(
     trace: &AbstractTrace,
-    num_refined_points: usize,
     refinment_target_indicies: &Vec<usize>,
     min_row_id: usize,
     max_row_id: usize,

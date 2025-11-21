@@ -96,7 +96,6 @@ where
 
         let trace_children = refine_trace(
             &trace,
-            num_refined_points,
             &refinment_target_indicies_main,
             min_row_id,
             max_row_id,
@@ -106,7 +105,6 @@ where
 
         let pv_children = refine_trace(
             &public_vals,
-            num_refined_points,
             refinment_target_indicies_pv,
             min_row_id,
             max_row_id,
