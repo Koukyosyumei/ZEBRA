@@ -62,25 +62,29 @@ pub enum LatticeVMSymbolicExpr {
     Neg(Box<Self>),
 }
 
-pub fn gather_vars(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize>) {
+pub fn gather_vars(
+    row_index: usize,
+    expr: &LatticeVMSymbolicExpr,
+    memo: &mut HashSet<(usize, usize)>,
+) {
     match expr {
         LatticeVMSymbolicExpr::Variable(lattice_vmsymbolic_val) => {
-            memo.insert(lattice_vmsymbolic_val.index);
+            memo.insert((row_index, lattice_vmsymbolic_val.index));
         }
         LatticeVMSymbolicExpr::Add(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
-            gather_vars(&lattice_vmsymbolic_expr, memo);
-            gather_vars(&lattice_vmsymbolic_expr1, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
         LatticeVMSymbolicExpr::Sub(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
-            gather_vars(&lattice_vmsymbolic_expr, memo);
-            gather_vars(&lattice_vmsymbolic_expr1, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
         LatticeVMSymbolicExpr::Mul(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
-            gather_vars(&lattice_vmsymbolic_expr, memo);
-            gather_vars(&lattice_vmsymbolic_expr1, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
         LatticeVMSymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
-            gather_vars(&lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
         }
         _ => {}
     }
@@ -433,11 +437,11 @@ pub fn eval_air_constraints(
     public_vals: Option<&[AbstractInterval]>,
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
-) -> (MayBeFlag, i32, HashSet<usize>) {
+) -> (MayBeFlag, i32, HashSet<(usize, usize)>) {
     let num_steps = trace.data.len();
     let mut is_all_true = true;
     let mut potential = 0;
-    let mut memo = HashSet::<usize>::new();
+    let mut memo = HashSet::<(usize, usize)>::new();
     for i in 0..num_steps {
         for tc in constraints {
             let flag = tc
@@ -461,7 +465,7 @@ pub fn eval_air_constraints(
                     return (MayBeFlag::False, 0, memo);
                 }
                 MayBeFlag::MayBe => {
-                    gather_vars(tc, &mut memo);
+                    gather_vars(i, tc, &mut memo);
                     is_all_true = false;
                     potential += 1;
                 }
@@ -486,7 +490,7 @@ pub fn eval_constraints(
     public_vals: Option<&[AbstractInterval]>,
     constraints: &LatticeVMConstraints,
     prime: u32,
-) -> (MayBeFlag, i32, HashSet<usize>) {
+) -> (MayBeFlag, i32, HashSet<(usize, usize)>) {
     let mut is_all_true = true;
 
     let (air_flag, mut potential, memo) =

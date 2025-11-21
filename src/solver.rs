@@ -45,7 +45,13 @@ pub fn solve<AdjustPcProgramFn>(
     _meta_info: &str,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-) -> (Option<AbstractTrace>, usize, i32, bool, HashSet<usize>)
+) -> (
+    Option<AbstractTrace>,
+    usize,
+    i32,
+    bool,
+    HashSet<(usize, usize)>,
+)
 where
     AdjustPcProgramFn: Fn(&mut AbstractTrace, u32),
 {
@@ -237,9 +243,9 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
             }
 
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
-            let refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
+            let mut refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
 
-            let result = solve(
+            let mut result = solve(
                 abs_main_trace,
                 public_vals.clone(),
                 &constraints,
@@ -260,18 +266,18 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
 
             /*
             if let (None, _, _, _, final_memo) = result {
-                if final_memo.len() <= 2 {
+                if final_memo.len() <= 0 {
                     for v in final_memo {
-                        if !refinment_target_indicies_main.contains(&v) {
-                            for i in min_row_id..(max_row_id + 1) {
-                                if potential_boolean_vars.contains(&v) {
-                                    abs_main_trace_data[i][v] = AbstractInterval::bool();
-                                } else {
-                                    abs_main_trace_data[i][v] = AbstractInterval::i4();
-                                }
-                                program_counter_refine_fn(&mut abs_main_trace_data, i, v);
+                        if !refinment_target_indicies_main.contains(&v.1) {
+                            //for i in min_row_id..(max_row_id + 1) {
+                            if potential_boolean_vars.contains(&v.1) {
+                                abs_main_trace_data[v.0][v.1] = AbstractInterval::bool();
+                            } else {
+                                abs_main_trace_data[v.0][v.1] = AbstractInterval::i4();
                             }
-                            refinment_target_indicies_main.push(v);
+                            program_counter_refine_fn(&mut abs_main_trace_data, v.0, v.1);
+                            //}
+                            refinment_target_indicies_main.push(v.1);
                         }
                     }
 
@@ -282,11 +288,10 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                         &constraints,
                         1,
                         &refinment_target_indicies_main,
-                        &potential_boolean_vars,
                         &refinment_target_indicies_pv,
                         min_row_id,
                         max_row_id,
-                        &program_counter_refine_fn,
+                        &adjust_pc_program,
                         1000,
                         cum_num_trial,
                         prime,
