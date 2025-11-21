@@ -28,64 +28,12 @@ use crate::{
     ui::UiState,
 };
 
-fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {
-    for row in &mut main_trace.data {
-        if row[1].is_singleton() {
-            if row[1].as_canonical_u32(prime) == 0 {
-                row[3] = AbstractInterval::from_i64(7);
-                row[4] = AbstractInterval::from_i64(-4);
-                row[5] = AbstractInterval::from_i64(2);
-                row[6] = AbstractInterval::from_i64(0);
-                row[7] = AbstractInterval::from_i64(0);
-                row[8] = AbstractInterval::from_i64(0);
-            }
-
-            if row[1].as_canonical_u32(prime) == 1 {
-                row[3] = AbstractInterval::from_i64(100);
-                row[4] = AbstractInterval::from_i64(-8);
-                row[5] = AbstractInterval::from_i64(-8);
-                row[6] = AbstractInterval::from_i64(1);
-                row[7] = AbstractInterval::from_i64(0);
-                row[8] = AbstractInterval::from_i64(1);
-            }
-
-            if row[1].as_canonical_u32(prime) == 2 {
-                row[3] = AbstractInterval::from_i64(6);
-                row[4] = AbstractInterval::from_i64(24);
-                row[5] = AbstractInterval::from_i64(-8);
-                row[6] = AbstractInterval::from_i64(-4);
-                row[7] = AbstractInterval::from_i64(0);
-                row[8] = AbstractInterval::from_i64(0);
-            }
-
-            if row[1].as_canonical_u32(prime) == 3 {
-                row[3] = AbstractInterval::from_i64(8);
-                row[4] = AbstractInterval::from_i64(0);
-                row[5] = AbstractInterval::from_i64(0);
-                row[6] = AbstractInterval::from_i64(0);
-                row[7] = AbstractInterval::from_i64(0);
-                row[8] = AbstractInterval::from_i64(0);
-
-                let a = vec![
-                    3, 3, 4096, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 1, 1,
-                ];
-                for i in 0..59 {
-                    row[i] = AbstractInterval::from_i64(a[i]);
-                }
-            }
-        }
-    }
-}
-
 pub fn solve<AdjustPcProgramFn>(
     initial_abs_main_trace: AbstractTrace,
     initial_public_vals: Vec<AbstractInterval>,
     constraints: &LatticeVMConstraints,
     num_refined_points: usize,
     base_refinment_target_indicies_main: &Vec<usize>,
-    potential_boolean_vars: &Vec<usize>,
     refinment_target_indicies_pv: &Vec<usize>,
     min_row_id: usize,
     max_row_id: usize,
@@ -94,7 +42,7 @@ pub fn solve<AdjustPcProgramFn>(
     cum_num_trial: usize,
     prime: u32,
     rng: &mut StdRng,
-    meta_info: &str,
+    _meta_info: &str,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) -> (Option<AbstractTrace>, usize, i32, bool, HashSet<usize>)
@@ -115,7 +63,7 @@ where
     let mut num_trial = 0;
     let mut num_unsat_trial = 0;
     let mut sum_potential = 0;
-    let mut refinment_target_indicies_main = base_refinment_target_indicies_main.clone();
+    let refinment_target_indicies_main = base_refinment_target_indicies_main.clone();
     let mut final_memo = HashSet::new();
 
     while !queue.is_empty() && num_trial < maximum_num_trial {
@@ -243,7 +191,7 @@ pub struct AbsConstraintObj {
     pub aux_potential_boolean_vars: Vec<usize>,
 }
 
-pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
+pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcProgramFn>(
     constraints: &LatticeVMConstraints,
     target_cols: &Vec<usize>,
     potential_boolean_vars: &Vec<usize>,
@@ -255,6 +203,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
     min_row_id: usize,
     max_row_id: usize,
     program_counter_refine_fn: ProgramCounterRefinFn,
+    adjust_pc_program: AdjustPcProgramFn,
     final_check: FinalCheckFn,
     prime: u32,
     seed: u64,
@@ -264,6 +213,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut UiState),
     AuxTableGenFn: Fn(&Vec<Vec<AbstractInterval>>, &Vec<usize>, u32) -> Vec<Vec<AbstractInterval>>,
+    AdjustPcProgramFn: Fn(&mut AbstractTrace, u32),
 {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut found_solution_flag = false;
@@ -289,15 +239,14 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
             }
 
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
-            let mut refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
+            let refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
 
-            let mut result = solve(
+            let result = solve(
                 abs_main_trace,
                 public_vals.clone(),
                 &constraints,
                 1,
                 &refinment_target_indicies_main,
-                &potential_boolean_vars,
                 &refinment_target_indicies_pv,
                 min_row_id,
                 max_row_id,
@@ -372,7 +321,6 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
                         &co.aux_constraints,
                         1,
                         &co.aux_target_cols,
-                        &potential_boolean_vars,
                         &refinment_target_indicies_pv,
                         0,
                         aux_table.len() - 1,
@@ -414,9 +362,6 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn>(
                 exit_flag = true;
                 break;
             }
-
-            //break;
-            //exit_flag = true;
         }
 
         if found_solution_flag {

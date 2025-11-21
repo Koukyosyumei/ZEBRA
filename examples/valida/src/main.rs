@@ -153,6 +153,57 @@ pub fn prover_options() -> (ProverOptions, Vec<bool>, bool, Vec<bool>) {
     )
 }
 
+fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {
+    for row in &mut main_trace.data {
+        if row[1].is_singleton() {
+            if row[1].as_canonical_u32(prime) == 0 {
+                row[3] = AbstractInterval::from_i64(7);
+                row[4] = AbstractInterval::from_i64(-4);
+                row[5] = AbstractInterval::from_i64(2);
+                row[6] = AbstractInterval::from_i64(0);
+                row[7] = AbstractInterval::from_i64(0);
+                row[8] = AbstractInterval::from_i64(0);
+            }
+
+            if row[1].as_canonical_u32(prime) == 1 {
+                row[3] = AbstractInterval::from_i64(100);
+                row[4] = AbstractInterval::from_i64(-8);
+                row[5] = AbstractInterval::from_i64(-8);
+                row[6] = AbstractInterval::from_i64(1);
+                row[7] = AbstractInterval::from_i64(0);
+                row[8] = AbstractInterval::from_i64(1);
+            }
+
+            if row[1].as_canonical_u32(prime) == 2 {
+                row[3] = AbstractInterval::from_i64(6);
+                row[4] = AbstractInterval::from_i64(24);
+                row[5] = AbstractInterval::from_i64(-8);
+                row[6] = AbstractInterval::from_i64(-4);
+                row[7] = AbstractInterval::from_i64(0);
+                row[8] = AbstractInterval::from_i64(0);
+            }
+
+            if row[1].as_canonical_u32(prime) == 3 {
+                row[3] = AbstractInterval::from_i64(8);
+                row[4] = AbstractInterval::from_i64(0);
+                row[5] = AbstractInterval::from_i64(0);
+                row[6] = AbstractInterval::from_i64(0);
+                row[7] = AbstractInterval::from_i64(0);
+                row[8] = AbstractInterval::from_i64(0);
+
+                let a = vec![
+                    3, 3, 4096, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 1, 1,
+                ];
+                for i in 0..59 {
+                    row[i] = AbstractInterval::from_i64(a[i]);
+                }
+            }
+        }
+    }
+}
+
 fn derive_add_table(
     cpu_main_trace: &Vec<Vec<AbstractInterval>>,
     potential_boolean_vars: &Vec<usize>,
@@ -404,6 +455,7 @@ fn main() -> Result<(), io::Error> {
         min_row_id,
         max_row_id,
         program_counter_refine_fn,
+        adjust_pc_program,
         final_check,
         prime,
         41,
