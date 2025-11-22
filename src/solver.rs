@@ -229,21 +229,23 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
         combos.shuffle(&mut rng);
         for combo in combos {
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
+            let mut refinment_target_indicies_main: Vec<usize> =
+                combo.clone().into_iter().cloned().collect();
 
             for i in min_row_id..(max_row_id + 1) {
-                for c in &combo {
+                for c in &refinment_target_indicies_main {
                     if potential_boolean_vars.contains(c) {
-                        abs_main_trace_data[i][**c] = AbstractInterval::bool();
+                        abs_main_trace_data[i][*c] = AbstractInterval::bool();
                     } else {
-                        abs_main_trace_data[i][**c] = AbstractInterval::i4();
+                        abs_main_trace_data[i][*c] = AbstractInterval::i4();
                     }
 
-                    program_counter_refine_fn(&mut abs_main_trace_data, i, **c);
+                    program_counter_refine_fn(&mut abs_main_trace_data, i, *c);
                 }
             }
+            //abs_main_trace_data[3][1] = AbstractInterval::from_i64(3);
 
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
-            let mut refinment_target_indicies_main = combo.clone().into_iter().cloned().collect();
 
             let mut result = solve(
                 abs_main_trace,
@@ -317,32 +319,34 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
 
                 for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
                     let aux_table = gfn(&trace.data, &co.aux_potential_boolean_vars, prime);
-                    let abs_aux_trace = AbstractTrace::new(aux_table.clone());
-                    let abs_result = solve(
-                        abs_aux_trace,
-                        public_vals.clone(),
-                        &co.aux_constraints,
-                        1,
-                        &co.aux_target_cols,
-                        &refinment_target_indicies_pv,
-                        0,
-                        aux_table.len() - 1,
-                        &dummy_adjust_pc_program,
-                        1000,
-                        cum_num_trial,
-                        prime,
-                        &mut rng,
-                        &format!("{:?}", combo),
-                        ui,
-                        terminal,
-                    );
+                    if !aux_table.is_empty() {
+                        let abs_aux_trace = AbstractTrace::new(aux_table.clone());
+                        let abs_result = solve(
+                            abs_aux_trace,
+                            public_vals.clone(),
+                            &co.aux_constraints,
+                            1,
+                            &co.aux_target_cols,
+                            &refinment_target_indicies_pv,
+                            0,
+                            aux_table.len() - 1,
+                            &dummy_adjust_pc_program,
+                            1000,
+                            cum_num_trial,
+                            prime,
+                            &mut rng,
+                            &format!("{:?}", combo),
+                            ui,
+                            terminal,
+                        );
 
-                    if let Some(abs_trace) = abs_result.0 {
-                        output.push_str(&format!("\n#{}\n{}", co.name, abs_trace));
-                        //break;
-                    } else {
-                        pass_all_aux = false;
-                        break;
+                        if let Some(abs_trace) = abs_result.0 {
+                            output.push_str(&format!("\n#{}\n{}", co.name, abs_trace));
+                            //break;
+                        } else {
+                            //pass_all_aux = false;
+                            break;
+                        }
                     }
                 }
 

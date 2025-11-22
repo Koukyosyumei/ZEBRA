@@ -39,6 +39,7 @@ use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
 use valida_alu_u32::add::Add32Chip;
 use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction, MachineWithAdd32Chip};
 use valida_alu_u32::mul::Mul32Chip;
+use valida_alu_u32::sub::Sub32Instruction;
 use valida_basic_api::BasicMachine;
 use valida_basic_api::BasicMachineMetrics;
 use valida_basic_api::ValidaRuntime;
@@ -154,57 +155,6 @@ pub fn prover_options() -> (ProverOptions, Vec<bool>, bool, Vec<bool>) {
     )
 }
 
-fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {
-    for row in &mut main_trace.data {
-        if row[1].is_singleton() {
-            if row[1].as_canonical_u32(prime) == 0 {
-                row[3] = AbstractInterval::from_i64(7);
-                row[4] = AbstractInterval::from_i64(-4);
-                row[5] = AbstractInterval::from_i64(2);
-                row[6] = AbstractInterval::from_i64(0);
-                row[7] = AbstractInterval::from_i64(0);
-                row[8] = AbstractInterval::from_i64(0);
-            }
-
-            if row[1].as_canonical_u32(prime) == 1 {
-                row[3] = AbstractInterval::from_i64(100);
-                row[4] = AbstractInterval::from_i64(-8);
-                row[5] = AbstractInterval::from_i64(-8);
-                row[6] = AbstractInterval::from_i64(1);
-                row[7] = AbstractInterval::from_i64(0);
-                row[8] = AbstractInterval::from_i64(1);
-            }
-
-            if row[1].as_canonical_u32(prime) == 2 {
-                row[3] = AbstractInterval::from_i64(6);
-                row[4] = AbstractInterval::from_i64(24);
-                row[5] = AbstractInterval::from_i64(-8);
-                row[6] = AbstractInterval::from_i64(-4);
-                row[7] = AbstractInterval::from_i64(0);
-                row[8] = AbstractInterval::from_i64(0);
-            }
-
-            if row[1].as_canonical_u32(prime) == 3 {
-                row[3] = AbstractInterval::from_i64(8);
-                row[4] = AbstractInterval::from_i64(0);
-                row[5] = AbstractInterval::from_i64(0);
-                row[6] = AbstractInterval::from_i64(0);
-                row[7] = AbstractInterval::from_i64(0);
-                row[8] = AbstractInterval::from_i64(0);
-
-                let a = vec![
-                    3, 3, 4096, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 1, 1,
-                ];
-                for i in 0..59 {
-                    row[i] = AbstractInterval::from_i64(a[i]);
-                }
-            }
-        }
-    }
-}
-
 fn derive_add_table(
     cpu_main_trace: &Vec<Vec<AbstractInterval>>,
     potential_boolean_vars: &Vec<usize>,
@@ -297,9 +247,8 @@ fn main() -> Result<(), io::Error> {
     let add_target_cols = vec![12, 13, 14];
     println!("ADD AIR constraints");
 
-    let min_row_id = 2;
+    let min_row_id = 1;
     let max_row_id = 7;
-    let num_extracted_rows = 2;
 
     // ############### Prepare Public Values ############################
     let mut public_vals = vec![AbstractInterval::zero(); 3];
@@ -349,8 +298,34 @@ fn main() -> Result<(), io::Error> {
         if j == 1 {
             abs_main_trace_data[i][j] = AbstractInterval {
                 lo: 0,
-                hi: add_program::<BabyBear>().len() as i64,
+                hi: (add_program::<BabyBear>().len() - 1) as i64,
             };
+        }
+    }
+
+    fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {
+        let program = add_program::<BabyBear>();
+
+        for row in &mut main_trace.data {
+            if row[1].is_singleton() {
+                let pc = row[1].as_canonical_u32(prime) as usize;
+                if pc < program.len() {
+                    let instr = program[pc];
+                    row[3] = AbstractInterval::from_i64(instr.opcode.into());
+                    row[4] = AbstractInterval::from_i64(instr.operands.0[0].into());
+                    row[5] = AbstractInterval::from_i64(instr.operands.0[1].into());
+                    row[6] = AbstractInterval::from_i64(instr.operands.0[2].into());
+                    row[7] = AbstractInterval::from_i64(instr.operands.0[3].into());
+                    row[8] = AbstractInterval::from_i64(instr.operands.0[4].into());
+
+                    if row[3].as_canonical_u32(prime) == 8 {
+                        for i in 4..57 {
+                            row[i] = AbstractInterval::zero();
+                        }
+                        row[24] = AbstractInterval::from_i64(1);
+                    }
+                }
+            }
         }
     }
 
