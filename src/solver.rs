@@ -29,8 +29,8 @@ use crate::{
 };
 
 pub fn solve<AdjustPcProgramFn>(
-    initial_abs_main_trace: AbstractTrace,
-    initial_public_vals: Vec<AbstractInterval>,
+    queue: &mut PriorityQueue<(AbstractTrace, AbstractTrace, usize), (i32, i32)>,
+    num_trial: &mut usize,
     constraints: &LatticeVMConstraints,
     _num_refined_points: usize,
     base_refinment_target_indicies_main: &Vec<usize>,
@@ -55,25 +55,13 @@ pub fn solve<AdjustPcProgramFn>(
 where
     AdjustPcProgramFn: Fn(&mut AbstractTrace, u32),
 {
-    let mut queue: PriorityQueue<(AbstractTrace, AbstractTrace, usize), (i32, i32)> =
-        PriorityQueue::new();
-    queue.push(
-        (
-            initial_abs_main_trace,
-            AbstractTrace::new(vec![initial_public_vals]),
-            0,
-        ),
-        (0, i32::MAX),
-    );
-
-    let mut num_trial = 0;
     let mut num_unsat_trial = 0;
     let mut sum_potential = 0;
     let refinment_target_indicies_main = base_refinment_target_indicies_main.clone();
     let mut final_memo = HashSet::new();
 
-    while !queue.is_empty() && num_trial < maximum_num_trial {
-        num_trial += 1;
+    while !queue.is_empty() && *num_trial < maximum_num_trial {
+        *num_trial += &1;
 
         let (head, potential) = queue.pop().unwrap();
         let trace = head.0;
@@ -82,7 +70,7 @@ where
         ui.status = format!(
                     "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
                     refinment_target_indicies_main,
-                    num_trial + cum_num_trial,
+                    *num_trial + cum_num_trial,
                     num_trial,
                     num_unsat_trial,
                     queue.len(),
@@ -96,7 +84,7 @@ where
             })
             .unwrap();
 
-        if num_trial > 1 {
+        if *num_trial > 1 {
             sum_potential += potential.1;
         }
 
@@ -149,7 +137,7 @@ where
                     num_unsat_trial += 1;
                     return (
                         Some(kid.0.clone()),
-                        num_trial,
+                        *num_trial,
                         sum_potential,
                         false,
                         final_memo,
@@ -173,7 +161,7 @@ where
                     || (key.code == KeyCode::Char('c')
                         && key.modifiers.contains(KeyModifiers::CONTROL))
                 {
-                    return (None, num_trial, sum_potential, true, final_memo);
+                    return (None, *num_trial, sum_potential, true, final_memo);
                 }
 
                 if key.code == KeyCode::Down {
@@ -185,7 +173,7 @@ where
         }
     }
 
-    (None, num_trial, sum_potential, false, final_memo)
+    (None, *num_trial, sum_potential, false, final_memo)
 }
 
 pub struct AbsConstraintObj {
@@ -231,6 +219,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
             let mut refinment_target_indicies_main: Vec<usize> =
                 combo.clone().into_iter().cloned().collect();
+            //refinment_target_indicies_main.push(1);
 
             for i in min_row_id..(max_row_id + 1) {
                 for c in &refinment_target_indicies_main {
@@ -243,94 +232,69 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                     program_counter_refine_fn(&mut abs_main_trace_data, i, *c);
                 }
             }
-            //abs_main_trace_data[3][1] = AbstractInterval::from_i64(3);
+            abs_main_trace_data[3][1] = AbstractInterval::from_i64(3);
 
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
 
-            let mut result = solve(
-                abs_main_trace,
-                public_vals.clone(),
-                &constraints,
-                1,
-                &refinment_target_indicies_main,
-                &refinment_target_indicies_pv,
-                min_row_id,
-                max_row_id,
-                &adjust_pc_program,
-                1000,
-                cum_num_trial,
-                prime,
-                &mut rng,
-                &format!("{:?}", combo),
-                ui,
-                terminal,
+            let mut queue: PriorityQueue<(AbstractTrace, AbstractTrace, usize), (i32, i32)> =
+                PriorityQueue::new();
+            queue.push(
+                (
+                    abs_main_trace,
+                    AbstractTrace::new(vec![public_vals.clone()]),
+                    0,
+                ),
+                (0, i32::MAX),
             );
+            let mut num_trial = 0;
+            while !queue.is_empty() && num_trial < 1000 {
+                let mut result = solve(
+                    &mut queue,
+                    &mut num_trial,
+                    &constraints,
+                    1,
+                    &refinment_target_indicies_main,
+                    &refinment_target_indicies_pv,
+                    min_row_id,
+                    max_row_id,
+                    &adjust_pc_program,
+                    1000,
+                    cum_num_trial,
+                    prime,
+                    &mut rng,
+                    &format!("{:?}", combo),
+                    ui,
+                    terminal,
+                );
 
-            /*
-            if let (None, _, _, _, final_memo) = result {
-                if final_memo.len() <= 0 {
-                    for v in final_memo {
-                        if !refinment_target_indicies_main.contains(&v.1) {
-                            //for i in min_row_id..(max_row_id + 1) {
-                            if potential_boolean_vars.contains(&v.1) {
-                                abs_main_trace_data[v.0][v.1] = AbstractInterval::bool();
-                            } else {
-                                abs_main_trace_data[v.0][v.1] = AbstractInterval::i4();
+                /*
+                if let (None, _, _, _, final_memo) = result {
+                    if final_memo.len() <= 0 {
+                        for v in final_memo {
+                            if !refinment_target_indicies_main.contains(&v.1) {
+                                //for i in min_row_id..(max_row_id + 1) {
+                                if potential_boolean_vars.contains(&v.1) {
+                                    abs_main_trace_data[v.0][v.1] = AbstractInterval::bool();
+                                } else {
+                                    abs_main_trace_data[v.0][v.1] = AbstractInterval::i4();
+                                }
+                                program_counter_refine_fn(&mut abs_main_trace_data, v.0, v.1);
+                                //}
+                                refinment_target_indicies_main.push(v.1);
                             }
-                            program_counter_refine_fn(&mut abs_main_trace_data, v.0, v.1);
-                            //}
-                            refinment_target_indicies_main.push(v.1);
                         }
-                    }
 
-                    let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
-                    result = solve(
-                        abs_main_trace,
-                        public_vals.clone(),
-                        &constraints,
-                        1,
-                        &refinment_target_indicies_main,
-                        &refinment_target_indicies_pv,
-                        min_row_id,
-                        max_row_id,
-                        &adjust_pc_program,
-                        1000,
-                        cum_num_trial,
-                        prime,
-                        &mut rng,
-                        &format!("{:?}", combo),
-                        ui,
-                        terminal,
-                    );
-                }
-            }*/
-
-            if let (Some(trace), _, _, _, _) = result {
-                let mut output = String::new();
-                output.push_str(&format!(
-                    "Trial ID: {}\n\n#CPU\n{}",
-                    cum_num_trial + result.1,
-                    trace
-                ));
-
-                let mut pass_all_aux = true;
-
-                fn dummy_adjust_pc_program(_at: &mut AbstractTrace, _prime: u32) {}
-
-                for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
-                    let aux_table = gfn(&trace.data, &co.aux_potential_boolean_vars, prime);
-                    if !aux_table.is_empty() {
-                        let abs_aux_trace = AbstractTrace::new(aux_table.clone());
-                        let abs_result = solve(
-                            abs_aux_trace,
+                        let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
+                        result = solve(
+                            abs_main_trace,
                             public_vals.clone(),
-                            &co.aux_constraints,
+                            &constraints,
                             1,
-                            &co.aux_target_cols,
+                            &refinment_target_indicies_main,
                             &refinment_target_indicies_pv,
-                            0,
-                            aux_table.len() - 1,
-                            &dummy_adjust_pc_program,
+                            min_row_id,
+                            max_row_id,
+                            &adjust_pc_program,
                             1000,
                             cum_num_trial,
                             prime,
@@ -339,34 +303,91 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                             ui,
                             terminal,
                         );
+                    }
+                }*/
 
-                        if let Some(abs_trace) = abs_result.0 {
-                            output.push_str(&format!("\n#{}\n{}", co.name, abs_trace));
-                            //break;
-                        } else {
-                            //pass_all_aux = false;
-                            break;
+                if let (Some(trace), _, _, _, _) = result {
+                    let mut output = String::new();
+                    output.push_str(&format!(
+                        "Trial ID: {}\n\n#CPU\n{}",
+                        cum_num_trial + result.1,
+                        trace
+                    ));
+
+                    let mut pass_all_aux = true;
+
+                    fn dummy_adjust_pc_program(_at: &mut AbstractTrace, _prime: u32) {}
+
+                    for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
+                        let aux_table = gfn(&trace.data, &co.aux_potential_boolean_vars, prime);
+                        if !aux_table.is_empty() {
+                            let abs_aux_trace = AbstractTrace::new(aux_table.clone());
+
+                            let mut aux_queue: PriorityQueue<
+                                (AbstractTrace, AbstractTrace, usize),
+                                (i32, i32),
+                            > = PriorityQueue::new();
+                            aux_queue.push(
+                                (
+                                    abs_aux_trace,
+                                    AbstractTrace::new(vec![public_vals.clone()]),
+                                    0,
+                                ),
+                                (0, i32::MAX),
+                            );
+                            let mut aux_num_trial = 0;
+
+                            let abs_result = solve(
+                                &mut aux_queue,
+                                &mut aux_num_trial,
+                                &co.aux_constraints,
+                                1,
+                                &co.aux_target_cols,
+                                &refinment_target_indicies_pv,
+                                0,
+                                aux_table.len() - 1,
+                                &dummy_adjust_pc_program,
+                                1000,
+                                cum_num_trial,
+                                prime,
+                                &mut rng,
+                                &format!("{:?}", combo),
+                                ui,
+                                terminal,
+                            );
+
+                            if let Some(abs_trace) = abs_result.0 {
+                                output.push_str(&format!("\n#{}\n{}", co.name, abs_trace));
+                                //break;
+                            } else {
+                                pass_all_aux = false;
+                                break;
+                            }
                         }
                     }
+
+                    if pass_all_aux {
+                        ui.logs = output;
+                        final_check(&trace, cum_num_trial + result.1, prime, ui);
+                        found_solution_flag = true;
+
+                        terminal
+                            .draw(|f| {
+                                ui.render::<CrosstermBackend<Stdout>>(f);
+                            })
+                            .unwrap();
+                    }
+                } else {
+                    cum_num_trial += result.1;
                 }
 
-                if pass_all_aux {
-                    ui.logs = output;
-                    final_check(&trace, cum_num_trial + result.1, prime, ui);
-                    found_solution_flag = true;
-
-                    terminal
-                        .draw(|f| {
-                            ui.render::<CrosstermBackend<Stdout>>(f);
-                        })
-                        .unwrap();
+                if result.3 {
+                    exit_flag = true;
+                    break;
                 }
-            } else {
-                cum_num_trial += result.1;
             }
 
-            if result.3 {
-                exit_flag = true;
+            if exit_flag {
                 break;
             }
         }

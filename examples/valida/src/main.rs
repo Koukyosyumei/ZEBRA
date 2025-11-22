@@ -247,7 +247,7 @@ fn main() -> Result<(), io::Error> {
     let add_target_cols = vec![12, 13, 14];
     println!("ADD AIR constraints");
 
-    let min_row_id = 1;
+    let min_row_id = 2;
     let max_row_id = 7;
 
     // ############### Prepare Public Values ############################
