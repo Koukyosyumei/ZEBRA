@@ -134,7 +134,6 @@ where
             final_memo = memo;
             match flag {
                 MayBeFlag::True => {
-                    num_unsat_trial += 1;
                     return (
                         Some(kid.0.clone()),
                         *num_trial,
@@ -219,7 +218,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
             let mut refinment_target_indicies_main: Vec<usize> =
                 combo.clone().into_iter().cloned().collect();
-            //refinment_target_indicies_main.push(1);
+            refinment_target_indicies_main.push(1);
 
             for i in min_row_id..(max_row_id + 1) {
                 for c in &refinment_target_indicies_main {
@@ -232,7 +231,6 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                     program_counter_refine_fn(&mut abs_main_trace_data, i, *c);
                 }
             }
-            abs_main_trace_data[3][1] = AbstractInterval::from_i64(3);
 
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
 

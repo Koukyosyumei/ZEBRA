@@ -279,7 +279,6 @@ fn main() -> Result<(), io::Error> {
     if let Some(traces) = &mut traces.1[0] {
         let nrows = traces.values.len() / traces.width();
         for i in 0..nrows {
-            println!("{}: {:?}", i, traces.row_mut(i));
             let mut row = traces.row_mut(i);
             rows.push(
                 row.iter()
@@ -325,6 +324,13 @@ fn main() -> Result<(), io::Error> {
                         row[24] = AbstractInterval::from_i64(1);
                     }
                 }
+            } else {
+                row[3] = AbstractInterval::i4();
+                row[4] = AbstractInterval::i4();
+                row[5] = AbstractInterval::i4();
+                row[6] = AbstractInterval::i4();
+                row[7] = AbstractInterval::i4();
+                row[8] = AbstractInterval::i4();
             }
         }
     }
