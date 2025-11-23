@@ -91,9 +91,9 @@ use latticevm::interval::MayBeFlag;
 use latticevm::solver::AbsConstraintObj;
 use latticevm_valida::p3_to_tv::convert_p3_expr;
 use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
-use latticevm_valida::state::check_eq_states;
+//use latticevm_valida::state::check_eq_states;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
-use latticevm_valida::state::valida_state_to_abstract_state;
+//use latticevm_valida::state::valida_state_to_abstract_state;
 
 pub type Val = BabyBear;
 pub type Challenge = BinomialExtensionField<Val, 5>;
@@ -359,8 +359,8 @@ fn main() -> Result<(), io::Error> {
     println!("COM AIR MAP");
     println!("  {:?}", COM_COL_MAP);
 
-    let aux_objs = vec![aux_sub_obj, aux_com_obj];
-    let aux_tg_fns = vec![derive_sub_table, derive_com_table];
+    let aux_objs = vec![aux_add_obj, aux_sub_obj, aux_com_obj];
+    let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
 
     let min_row_id = 0;
     let max_row_id = 2;
@@ -403,6 +403,7 @@ fn main() -> Result<(), io::Error> {
         }
     }
     let base_abs_main_trace_data = rows.clone();
+    let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
 
     fn program_counter_refine_fn(
         abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
@@ -494,58 +495,11 @@ fn main() -> Result<(), io::Error> {
             output.push_str("-----------------\n\n");
 
             ui.recovered = output;
+
+            fs::write("states.txt", ui.recovered.clone()).unwrap();
+            fs::write("assignments.txt", ui.logs.clone()).unwrap();
         }
-
-        /*
-        output.push_str(&format!("Trial ID: {}\n\n", num_trial));
-        output.push_str("Malicious States:\n");
-        for rs in &recovered_states {
-            output.push_str(&format!("\t{}\n", rs));
-        }
-        output.push_str("-----------------\n\n");
-
-        let program = add_program::<BabyBear>();
-        let rom = ProgramROM::new(program.clone());
-        let mut machine = BasicMachine::<BabyBear>::default();
-        machine.set_segment_number(0);
-        machine.set_max_trace_height(65536);
-        machine.set_program_rom(rom, ProgramTableType::Public);
-        machine.set_initial_register_values(valida_cpu::Registers { pc: 0, fp: 0x1000 });
-        let mut runtime = ValidaRuntime::default_for_field::<BabyBear>();
-        let mut state = machine.start(&mut runtime);
-        let mut metrics = BasicMachineMetrics::initialize();
-        let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
-
-        let mut groundtruth_states = vec![];
-        for i in 0..state.machine.state_history.len() {
-            if i < state.machine.state_history.len() - 1 {
-                groundtruth_states.push(valida_state_to_abstract_state(
-                    &state.machine.state_history[i],
-                    &Some(state.machine.state_history[i + 1].clone()),
-                ));
-            } else {
-                groundtruth_states.push(valida_state_to_abstract_state(
-                    &state.machine.state_history[i],
-                    &None,
-                ))
-            }
-        }
-
-        output.push_str("Original States:\n");
-        for rs in &groundtruth_states {
-            output.push_str(&format!("\t{}\n", rs));
-        }
-        output.push_str("-----------------\n");
-
-        //if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
-        ui.recovered = output;
-        fs::write("states.txt", ui.recovered.clone()).unwrap();
-        fs::write("assignments.txt", ui.logs.clone()).unwrap();
-        //};
-        */
     }
-
-    let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -590,17 +544,3 @@ fn main() -> Result<(), io::Error> {
 
     Ok(())
 }
-
-/* constant                     (-potential, -(head.2 as i32))  (-potential, (head.2 as i32))
-42 18193                        28806 (137084)                  27672 (192644)
-40 51102                        13619 (29734)                   6961 (19520)
-41 51695                        51441 (40774)                        (5250)
-43 228240                       6140  (103235)                  23494 (51691)
-44 129052                       49319 (72830)                   43973 (30496)
-
-45 147155                       39695 (49101)                                (119136) <-- interesting
-46 72458                        5194
-47
-48
-49
-*/

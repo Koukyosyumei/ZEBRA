@@ -1,15 +1,8 @@
-Trial ID: 2039
+Trial ID: 24374
 
 Malicious States:
-	(clk: 0, pc: 0, next_pc: 0, is_done: False, memory: [""])
-	(clk: 1, pc: 1, next_pc: 1, is_done: False, memory: ["4092: 2"])
-	(clk: 2, pc: 2, next_pc: 2, is_done: True, memory: ["4088: 1, 4092: 2"])
-	(clk: 0, pc: 0, next_pc: 0, is_done: False, memory: ["4088: 1, 4092: 2"])
+(clk: 0, pc: 0, is_done: False, memory: [""])
+(clk: 1, pc: 1, is_done: False, memory: ["4092: 2"])
+(clk: 2, pc: 2, is_done: True, memory: ["4088: [11, 12], 4092: 2"])
 -----------------
 
-Original States:
-	(clk: 0, pc: 0, next_pc: 0, is_done: False, memory: [""])
-	(clk: 1, pc: 1, next_pc: 1, is_done: False, memory: ["4092: 2"])
-	(clk: 2, pc: 2, next_pc: 2, is_done: True, memory: ["4088: 1, 4092: 2"])
-	(clk: 3, pc: 2, next_pc: 2, is_done: False, memory: ["4088: 1, 4092: 2"])
------------------
