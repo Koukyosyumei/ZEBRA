@@ -1,22 +1,15 @@
-Trial ID: 38786
+Trial ID: 10419
 
 Malicious States:
 	(clk: 0, pc: 0, next_pc: 0, is_done: False, memory: [""])
 	(clk: 1, pc: 1, next_pc: 1, is_done: False, memory: ["4092: 2"])
-	(clk: 2, pc: 2, next_pc: 2, is_done: False, memory: ["4088: 1, 4092: 2"])
-	(clk: 3, pc: 3, next_pc: 3, is_done: True, memory: ["4088: 1, 4092: 2"])
-	(clk: 4, pc: 0, next_pc: 0, is_done: False, memory: ["4088: 1, 4092: 2"])
-	(clk: 5, pc: 1, next_pc: 1, is_done: True, memory: ["4088: 1, 4092: 2"])
-	(clk: 0, pc: 0, next_pc: 0, is_done: False, memory: ["4088: 1, 4092: 2"])
-	(clk: 0, pc: 0, next_pc: 0, is_done: False, memory: ["4088: 1, 4092: 2"])
+	(clk: 2, pc: 2, next_pc: 2, is_done: True, memory: ["4088: 1020, 4092: 2"])
+	(clk: 0, pc: 0, next_pc: 0, is_done: False, memory: ["4088: 1020, 4092: 2"])
 -----------------
 
 Original States:
 	(clk: 0, pc: 0, next_pc: 0, is_done: False, memory: [""])
 	(clk: 1, pc: 1, next_pc: 1, is_done: False, memory: ["4092: 2"])
-	(clk: 2, pc: 2, next_pc: 2, is_done: False, memory: ["4088: 1, 4092: 2"])
-	(clk: 3, pc: 1, next_pc: 1, is_done: False, memory: ["4088: 1, 4092: 2"])
-	(clk: 4, pc: 2, next_pc: 2, is_done: False, memory: ["4088: 2, 4092: 2"])
-	(clk: 5, pc: 3, next_pc: 3, is_done: True, memory: ["4088: 2, 4092: 2"])
-	(clk: 6, pc: 3, next_pc: 3, is_done: False, memory: ["4088: 2, 4092: 2"])
+	(clk: 2, pc: 2, next_pc: 2, is_done: True, memory: ["4088: 4294967295, 4092: 2"])
+	(clk: 3, pc: 2, next_pc: 2, is_done: False, memory: ["4088: 4294967295, 4092: 2"])
 -----------------

@@ -218,7 +218,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
             let mut refinment_target_indicies_main: Vec<usize> =
                 combo.clone().into_iter().cloned().collect();
-            refinment_target_indicies_main.push(1);
+            //refinment_target_indicies_main.push(1);
 
             for i in min_row_id..(max_row_id + 1) {
                 for c in &refinment_target_indicies_main {

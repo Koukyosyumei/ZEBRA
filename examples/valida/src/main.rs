@@ -36,9 +36,16 @@ use p3_poseidon::Poseidon;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
 //use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
 
+use valida_alu_u32::add::columns::ADD_COL_MAP;
 use valida_alu_u32::add::Add32Chip;
 use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction, MachineWithAdd32Chip};
+use valida_alu_u32::bitwise::columns::COL_MAP;
+use valida_alu_u32::bitwise::Bitwise32Chip;
+use valida_alu_u32::com::columns::COM_COL_MAP;
+use valida_alu_u32::com::Com32Chip;
 use valida_alu_u32::mul::Mul32Chip;
+use valida_alu_u32::sub::columns::SUB_COL_MAP;
+use valida_alu_u32::sub::Sub32Chip;
 use valida_alu_u32::sub::Sub32Instruction;
 use valida_basic_api::BasicMachine;
 use valida_basic_api::BasicMachineMetrics;
@@ -168,17 +175,38 @@ fn derive_add_table(
                 r[*i] = AbstractInterval::bool();
             }
 
-            /*
-            //let mut combo_mut = combo.clone();
-            //combo_mut = vec![&1, &18, &19, &22, &24, &58];
-             */
-
             let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
             let add_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
             for i in 0..(cpu_columns.len()) {
                 r[add_columns[i]] = row[cpu_columns[i]].clone();
             }
             r[15] = AbstractInterval::one();
+            out.push(r);
+        }
+    }
+
+    out
+}
+
+fn derive_sub_table(
+    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    potential_boolean_vars: &Vec<usize>,
+    prime: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let mut out = vec![];
+    for row in cpu_main_trace {
+        if row[58].as_canonical_u32(prime) != 0 && row[3].as_canonical_u32(prime) == 101 {
+            let mut r: Vec<_> = (0..17).map(|_| AbstractInterval::top(prime)).collect();
+            for i in potential_boolean_vars {
+                r[*i] = AbstractInterval::bool();
+            }
+
+            let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
+            let sub_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15];
+            for i in 0..(cpu_columns.len()) {
+                r[sub_columns[i]] = row[cpu_columns[i]].clone();
+            }
+            r[16] = AbstractInterval::one();
             out.push(r);
         }
     }
@@ -196,13 +224,13 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
             operands: Operands([-4, 2, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Sub32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -8, 1, 0, 1]),
         },
-        InstructionWord {
-            opcode: <BneInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([1 * bytes_per_instr, -8, -4, 0, 0]),
-        },
+        //InstructionWord {
+        //    opcode: <BneInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+        //    operands: Operands([1 * bytes_per_instr, -8, -4, 0, 0]),
+        //},
         InstructionWord {
             opcode: <StopInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands::default(),
@@ -236,8 +264,8 @@ fn main() -> Result<(), io::Error> {
     cpu_potential_boolean_vars.push(24);
     let mut cpu_target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     cpu_target_cols.retain(|x| !program_cols.contains(x));
-    println!("CPU AIR constraints");
-    println!("{:?}", CPU_COL_MAP);
+    println!("CPU AIR MAP");
+    println!("  {:?}", CPU_COL_MAP);
 
     let add_air = Add32Chip::default();
     let (add_constraints, add_potential_boolean_vars) =
@@ -245,10 +273,54 @@ fn main() -> Result<(), io::Error> {
             &machine, &add_air,
         );
     let add_target_cols = vec![12, 13, 14];
-    println!("ADD AIR constraints");
+    let aux_add_obj = AbsConstraintObj {
+        name: "Add".to_string(),
+        aux_constraints: add_constraints,
+        aux_target_cols: add_target_cols,
+        aux_potential_boolean_vars: add_potential_boolean_vars,
+    };
+    println!("ADD AIR MAP");
+    println!("  {:?}", ADD_COL_MAP);
 
-    let min_row_id = 2;
-    let max_row_id = 7;
+    let sub_air = Sub32Chip::default();
+    let (sub_constraints, sub_potential_boolean_vars) =
+        get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
+            &machine, &sub_air,
+        );
+    let sub_target_cols = vec![8, 9, 10, 11];
+    let aux_sub_obj = AbsConstraintObj {
+        name: "Sub".to_string(),
+        aux_constraints: sub_constraints,
+        aux_target_cols: sub_target_cols,
+        aux_potential_boolean_vars: sub_potential_boolean_vars,
+    };
+    println!("SUB AIR MAP");
+    println!("  {:?}", SUB_COL_MAP);
+
+    let bitwise_air = Bitwise32Chip::default();
+    let (bitsise_constraints, bitsise_potential_boolean_vars) = get_converted_symbolicconstraints::<
+        BasicMachine<BabyBear>,
+        MyConfig,
+        _,
+    >(&machine, &bitwise_air);
+    let bitsise_target_cols = (0..64).collect::<Vec<usize>>();
+    println!("BITWISE AIR MAP");
+    println!("  {:?}", COL_MAP);
+
+    let com_air = Com32Chip::default();
+    let (com_constraints, com_potential_boolean_vars) =
+        get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
+            &machine, &com_air,
+        );
+    let com_target_cols = vec![8, 9, 10];
+    println!("COM AIR MAP");
+    println!("  {:?}", COM_COL_MAP);
+
+    let aux_objs = vec![aux_add_obj, aux_sub_obj];
+    let aux_tg_fns = vec![derive_add_table, derive_sub_table];
+
+    let min_row_id = 1;
+    let max_row_id = 3;
 
     // ############### Prepare Public Values ############################
     let mut public_vals = vec![AbstractInterval::zero(); 3];
@@ -396,11 +468,11 @@ fn main() -> Result<(), io::Error> {
         }
         output.push_str("-----------------\n");
 
-        if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
-            ui.recovered = output;
-            fs::write("states.txt", ui.recovered.clone()).unwrap();
-            fs::write("assignments.txt", ui.logs.clone()).unwrap();
-        };
+        //if check_eq_states(&recovered_states, &groundtruth_states, prime).0 == MayBeFlag::False {
+        ui.recovered = output;
+        fs::write("states.txt", ui.recovered.clone()).unwrap();
+        fs::write("assignments.txt", ui.logs.clone()).unwrap();
+        //};
     }
 
     let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
@@ -417,15 +489,6 @@ fn main() -> Result<(), io::Error> {
         program_str.push_str(&format!("{}\n", inst));
     }
     ui.program = program_str;
-
-    let aux_add_obj = AbsConstraintObj {
-        name: "Add".to_string(),
-        aux_constraints: add_constraints,
-        aux_target_cols: add_target_cols,
-        aux_potential_boolean_vars: add_potential_boolean_vars,
-    };
-    let aux_objs = vec![aux_add_obj];
-    let aux_tg_fns = vec![derive_add_table];
 
     run_solver(
         &cpu_constraints,
