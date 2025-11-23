@@ -43,6 +43,7 @@ use valida_alu_u32::bitwise::columns::COL_MAP;
 use valida_alu_u32::bitwise::Bitwise32Chip;
 use valida_alu_u32::com::columns::COM_COL_MAP;
 use valida_alu_u32::com::Com32Chip;
+use valida_alu_u32::com::Eq32Instruction;
 use valida_alu_u32::mul::Mul32Chip;
 use valida_alu_u32::sub::columns::SUB_COL_MAP;
 use valida_alu_u32::sub::Sub32Chip;
@@ -214,6 +215,40 @@ fn derive_sub_table(
     out
 }
 
+fn derive_com_table(
+    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    potential_boolean_vars: &Vec<usize>,
+    prime: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let mut out = vec![];
+    for row in cpu_main_trace {
+        if row[58].as_canonical_u32(prime) != 0
+            && (row[3].as_canonical_u32(prime) == 116 || row[3].as_canonical_u32(prime) == 111)
+        {
+            let mut r: Vec<_> = (0..14).map(|_| AbstractInterval::i4()).collect();
+            for i in potential_boolean_vars {
+                r[*i] = AbstractInterval::bool();
+            }
+
+            let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44];
+            let com_columns = vec![0, 1, 2, 3, 4, 5, 6, 7, 11];
+            for i in 0..(cpu_columns.len()) {
+                r[com_columns[i]] = row[cpu_columns[i]].clone();
+            }
+            if row[3].as_canonical_u32(prime) == 116 {
+                r[13] = AbstractInterval::one();
+                r[12] = AbstractInterval::zero();
+            } else {
+                r[13] = AbstractInterval::zero();
+                r[12] = AbstractInterval::one();
+            }
+            out.push(r);
+        }
+    }
+
+    out
+}
+
 fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
 
@@ -224,7 +259,7 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
             operands: Operands([-4, 2, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Sub32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Eq32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -8, 1, 0, 1]),
         },
         //InstructionWord {
@@ -313,11 +348,17 @@ fn main() -> Result<(), io::Error> {
             &machine, &com_air,
         );
     let com_target_cols = vec![8, 9, 10];
+    let aux_com_obj = AbsConstraintObj {
+        name: "Com".to_string(),
+        aux_constraints: com_constraints,
+        aux_target_cols: com_target_cols,
+        aux_potential_boolean_vars: com_potential_boolean_vars,
+    };
     println!("COM AIR MAP");
     println!("  {:?}", COM_COL_MAP);
 
-    let aux_objs = vec![aux_add_obj, aux_sub_obj];
-    let aux_tg_fns = vec![derive_add_table, derive_sub_table];
+    let aux_objs = vec![aux_add_obj, aux_sub_obj, aux_com_obj];
+    let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
 
     let min_row_id = 1;
     let max_row_id = 3;
