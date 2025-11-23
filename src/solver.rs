@@ -45,6 +45,7 @@ pub fn solve<AdjustPcProgramFn>(
     _meta_info: &str,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    ui_update: bool,
 ) -> (
     Option<AbstractTrace>,
     usize,
@@ -67,7 +68,8 @@ where
         let trace = head.0;
         let public_vals = head.1;
 
-        ui.status = format!(
+        if ui_update {
+            ui.status = format!(
                     "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
                     refinment_target_indicies_main,
                     *num_trial + cum_num_trial,
@@ -77,6 +79,7 @@ where
                     -potential.0,
                     sum_potential,
                 );
+        }
 
         terminal
             .draw(|f| {
@@ -220,7 +223,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
             let mut refinment_target_indicies_main: Vec<usize> =
                 combo.clone().into_iter().cloned().collect();
-            //refinment_target_indicies_main.push(1);
+            //refinment_target_indicies_main.push(24);
 
             for i in min_row_id..(max_row_id + 1) {
                 for c in &refinment_target_indicies_main {
@@ -229,6 +232,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                     } else {
                         abs_main_trace_data[i][*c] = AbstractInterval::i4();
                     }
+                    //abs_main_trace_data[i][24] = AbstractInterval::from_i64(2);
 
                     program_counter_refine_fn(&mut abs_main_trace_data, i, *c);
                 }
@@ -265,6 +269,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                     &format!("{:?}", combo),
                     ui,
                     terminal,
+                    true,
                 );
 
                 /*
@@ -336,6 +341,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                                 (0, i32::MAX),
                             );
                             let mut aux_num_trial = 0;
+                            let aux_cum_num_trial = 0;
 
                             let abs_result = solve(
                                 &mut aux_queue,
@@ -348,12 +354,13 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                                 aux_table.len() - 1,
                                 &dummy_adjust_pc_program,
                                 max_iteration,
-                                cum_num_trial,
+                                aux_cum_num_trial,
                                 prime,
                                 &mut rng,
                                 &format!("{:?}", combo),
                                 ui,
                                 terminal,
+                                false,
                             );
 
                             if let Some(abs_trace) = abs_result.0 {
@@ -383,9 +390,8 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                             })
                             .unwrap();
                     }
-                } else {
-                    cum_num_trial += result.1;
                 }
+                cum_num_trial += result.1;
 
                 if result.3 {
                     exit_flag = true;

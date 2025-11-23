@@ -261,7 +261,7 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
             operands: Operands([-4, 2, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Ne32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -8, 1, 0, 1]),
         },
         //InstructionWord {
@@ -309,7 +309,7 @@ fn main() -> Result<(), io::Error> {
         get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &add_air,
         );
-    let add_target_cols = vec![12, 13, 14];
+    let add_target_cols = vec![8, 9, 10, 11, 12, 13, 14];
     let aux_add_obj = AbsConstraintObj {
         name: "Add".to_string(),
         aux_constraints: add_constraints,
