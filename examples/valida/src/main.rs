@@ -44,6 +44,7 @@ use valida_alu_u32::bitwise::Bitwise32Chip;
 use valida_alu_u32::com::columns::COM_COL_MAP;
 use valida_alu_u32::com::Com32Chip;
 use valida_alu_u32::com::Eq32Instruction;
+use valida_alu_u32::com::Ne32Instruction;
 use valida_alu_u32::mul::Mul32Chip;
 use valida_alu_u32::sub::columns::SUB_COL_MAP;
 use valida_alu_u32::sub::Sub32Chip;
@@ -259,7 +260,7 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
             operands: Operands([-4, 2, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Eq32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Ne32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -8, 1, 0, 1]),
         },
         //InstructionWord {
