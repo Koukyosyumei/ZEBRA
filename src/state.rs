@@ -6,7 +6,6 @@ use crate::interval::{AbstractInterval, MayBeFlag};
 pub struct AbstractState {
     pub clk: AbstractInterval,
     pub pc: AbstractInterval,
-    pub next_pc: AbstractInterval,
     pub memory: HashMap<u32, AbstractInterval>,
     pub is_done: MayBeFlag,
 }
@@ -23,8 +22,8 @@ impl fmt::Display for AbstractState {
 
         write!(
             f,
-            "(clk: {}, pc: {}, next_pc: {}, is_done: {:?}, memory: [{:?}])",
-            self.clk, self.pc, self.next_pc, self.is_done, memory_str
+            "(clk: {}, pc: {}, is_done: {:?}, memory: [{:?}])",
+            self.clk, self.pc, self.is_done, memory_str
         )
     }
 }

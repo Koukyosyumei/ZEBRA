@@ -202,7 +202,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize),
-    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut UiState),
+    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
     AuxTableGenFn: Fn(&Vec<Vec<AbstractInterval>>, &Vec<usize>, u32) -> Vec<Vec<AbstractInterval>>,
     AdjustPcProgramFn: Fn(&mut AbstractTrace, u32),
 {
@@ -210,6 +210,8 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
     let mut found_solution_flag = false;
     let mut cum_num_trial = 0;
     let mut exit_flag = false;
+    let mut known_solution = HashSet::<String>::new();
+    let max_iteration = 1000;
 
     for k in 1..(target_cols.len() + 1) {
         let mut combos: Vec<_> = target_cols.iter().combinations(k).collect();
@@ -245,7 +247,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                 (0, i32::MAX),
             );
             let mut num_trial = 0;
-            while !queue.is_empty() && num_trial < 1000 {
+            while !queue.is_empty() && num_trial < max_iteration {
                 let mut result = solve(
                     &mut queue,
                     &mut num_trial,
@@ -256,7 +258,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                     min_row_id,
                     max_row_id,
                     &adjust_pc_program,
-                    1000,
+                    max_iteration,
                     cum_num_trial,
                     prime,
                     &mut rng,
@@ -345,7 +347,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                                 0,
                                 aux_table.len() - 1,
                                 &dummy_adjust_pc_program,
-                                1000,
+                                max_iteration,
                                 cum_num_trial,
                                 prime,
                                 &mut rng,
@@ -366,7 +368,13 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
 
                     if pass_all_aux {
                         ui.logs = output;
-                        final_check(&trace, cum_num_trial + result.1, prime, ui);
+                        final_check(
+                            &trace,
+                            cum_num_trial + result.1,
+                            prime,
+                            &mut known_solution,
+                            ui,
+                        );
                         found_solution_flag = true;
 
                         terminal

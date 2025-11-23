@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
 use std::rc::Rc;
 use std::{io, thread, time::Duration};
@@ -260,7 +261,7 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
             operands: Operands([-4, 2, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Ne32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -8, 1, 0, 1]),
         },
         //InstructionWord {
@@ -358,11 +359,11 @@ fn main() -> Result<(), io::Error> {
     println!("COM AIR MAP");
     println!("  {:?}", COM_COL_MAP);
 
-    let aux_objs = vec![aux_add_obj, aux_sub_obj, aux_com_obj];
-    let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
+    let aux_objs = vec![aux_sub_obj, aux_com_obj];
+    let aux_tg_fns = vec![derive_sub_table, derive_com_table];
 
-    let min_row_id = 1;
-    let max_row_id = 3;
+    let min_row_id = 0;
+    let max_row_id = 2;
 
     // ############### Prepare Public Values ############################
     let mut public_vals = vec![AbstractInterval::zero(); 3];
@@ -450,7 +451,13 @@ fn main() -> Result<(), io::Error> {
     }
 
     // ############## Final Check Function ##############################
-    fn final_check(trace: &AbstractTrace, num_trial: usize, prime: u32, ui: &mut UiState) {
+    fn final_check(
+        trace: &AbstractTrace,
+        num_trial: usize,
+        prime: u32,
+        known_reprt: &mut HashSet<String>,
+        ui: &mut UiState,
+    ) {
         let mut output = String::new();
 
         let mut memory = HashMap::new();
@@ -470,6 +477,26 @@ fn main() -> Result<(), io::Error> {
             }
         }
 
+        let mut string_representation = String::new();
+        for state in &recovered_states {
+            string_representation.push_str(&format!("{}\n", state));
+            if state.is_done != MayBeFlag::False {
+                break;
+            }
+        }
+
+        if !known_reprt.contains(&string_representation) {
+            known_reprt.insert(string_representation.clone());
+
+            output.push_str(&format!("Trial ID: {}\n\n", num_trial));
+            output.push_str("Malicious States:\n");
+            output.push_str(&string_representation);
+            output.push_str("-----------------\n\n");
+
+            ui.recovered = output;
+        }
+
+        /*
         output.push_str(&format!("Trial ID: {}\n\n", num_trial));
         output.push_str("Malicious States:\n");
         for rs in &recovered_states {
@@ -515,6 +542,7 @@ fn main() -> Result<(), io::Error> {
         fs::write("states.txt", ui.recovered.clone()).unwrap();
         fs::write("assignments.txt", ui.logs.clone()).unwrap();
         //};
+        */
     }
 
     let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
