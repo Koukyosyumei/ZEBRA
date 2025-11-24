@@ -214,7 +214,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
     let mut cum_num_trial = 0;
     let mut exit_flag = false;
     let mut known_solution = HashSet::<String>::new();
-    let max_iteration = 1000;
+    let max_iteration = 100000;
 
     for k in 1..(target_cols.len() + 1) {
         let mut combos: Vec<_> = target_cols.iter().combinations(k).collect();

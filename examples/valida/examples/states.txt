@@ -1,0 +1,8 @@
+Trial ID: 4466
+
+Malicious States:
+(clk: 0, pc: 0, is_done: False, memory: [""])
+(clk: 1, pc: 1, is_done: False, memory: ["4092: 2"])
+(clk: 2, pc: 2, is_done: True, memory: ["4088: [8, 9], 4092: 2"])
+-----------------
+

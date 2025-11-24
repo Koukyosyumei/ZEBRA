@@ -479,6 +479,7 @@ pub fn eval_air_constraints(
     }
 }
 
+#[derive(Clone)]
 pub struct LatticeVMConstraints {
     pub air_constraints: Vec<LatticeVMSymbolicExpr>,
     pub pv_pos_constraints: Vec<LatticeVMSymbolicExpr>,
