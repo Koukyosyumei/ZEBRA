@@ -1,26 +1,15 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::i32;
 use std::io::Stdout;
-use std::{io, thread, time::Duration};
+use std::time::Duration;
 
 use crossterm::event::KeyModifiers;
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
+use crossterm::event::{self, Event, KeyCode};
 use itertools::Itertools;
+use priority_queue::PriorityQueue;
 use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
-use ratatui::{
-    backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
-    widgets::{Block, Borders, Paragraph},
-    Terminal,
-};
-
-use priority_queue::PriorityQueue;
+use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
@@ -194,6 +183,8 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
     refinment_target_indicies_pv: &Vec<usize>,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
+    max_iteration: usize,
+    minimum_num_taregt_cols: usize,
     min_row_id: usize,
     max_row_id: usize,
     program_counter_refine_fn: ProgramCounterRefinFn,
@@ -214,16 +205,15 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
     let mut cum_num_trial = 0;
     let mut exit_flag = false;
     let mut known_solution = HashSet::<String>::new();
-    let max_iteration = 100000;
 
-    for k in 1..(target_cols.len() + 1) {
+    for k in minimum_num_taregt_cols..(target_cols.len() + 1) {
         let mut combos: Vec<_> = target_cols.iter().combinations(k).collect();
         combos.shuffle(&mut rng);
         for combo in combos {
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
-            let mut refinment_target_indicies_main: Vec<usize> =
+            let refinment_target_indicies_main: Vec<usize> =
                 combo.clone().into_iter().cloned().collect();
-            //refinment_target_indicies_main.push(24);
+            //refinment_target_indicies_main.push(1);
 
             for i in min_row_id..(max_row_id + 1) {
                 for c in &refinment_target_indicies_main {
@@ -232,7 +222,6 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                     } else {
                         abs_main_trace_data[i][*c] = AbstractInterval::i4();
                     }
-                    //abs_main_trace_data[i][24] = AbstractInterval::from_i64(2);
 
                     program_counter_refine_fn(&mut abs_main_trace_data, i, *c);
                 }
@@ -252,7 +241,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
             );
             let mut num_trial = 0;
             while !queue.is_empty() && num_trial < max_iteration {
-                let mut result = solve(
+                let result = solve(
                     &mut queue,
                     &mut num_trial,
                     &constraints,
@@ -272,49 +261,10 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                     true,
                 );
 
-                /*
-                if let (None, _, _, _, final_memo) = result {
-                    if final_memo.len() <= 0 {
-                        for v in final_memo {
-                            if !refinment_target_indicies_main.contains(&v.1) {
-                                //for i in min_row_id..(max_row_id + 1) {
-                                if potential_boolean_vars.contains(&v.1) {
-                                    abs_main_trace_data[v.0][v.1] = AbstractInterval::bool();
-                                } else {
-                                    abs_main_trace_data[v.0][v.1] = AbstractInterval::i4();
-                                }
-                                program_counter_refine_fn(&mut abs_main_trace_data, v.0, v.1);
-                                //}
-                                refinment_target_indicies_main.push(v.1);
-                            }
-                        }
-
-                        let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
-                        result = solve(
-                            abs_main_trace,
-                            public_vals.clone(),
-                            &constraints,
-                            1,
-                            &refinment_target_indicies_main,
-                            &refinment_target_indicies_pv,
-                            min_row_id,
-                            max_row_id,
-                            &adjust_pc_program,
-                            1000,
-                            cum_num_trial,
-                            prime,
-                            &mut rng,
-                            &format!("{:?}", combo),
-                            ui,
-                            terminal,
-                        );
-                    }
-                }*/
-
                 if let (Some(trace), _, _, _, _) = result {
                     let mut output = String::new();
                     output.push_str(&format!(
-                        "Trial ID: {}\n\n#CPU\n{}",
+                        "Trial ID: {}\n\n#Main\n{}",
                         cum_num_trial + result.1,
                         trace
                     ));

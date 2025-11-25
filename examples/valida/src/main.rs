@@ -261,13 +261,13 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
             operands: Operands([-4, 2, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Ne32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -8, 1, 0, 1]),
         },
-        //InstructionWord {
-        //    opcode: <BneInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-        //    operands: Operands([1 * bytes_per_instr, -8, -4, 0, 0]),
-        //},
+        InstructionWord {
+            opcode: <BneInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            operands: Operands([1 * bytes_per_instr, -8, -4, 0, 0]),
+        },
         InstructionWord {
             opcode: <StopInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands::default(),
@@ -362,8 +362,10 @@ fn main() -> Result<(), io::Error> {
     let aux_objs = vec![aux_add_obj, aux_sub_obj, aux_com_obj];
     let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
 
-    let min_row_id = 0;
-    let max_row_id = 2;
+    let max_iteration = 1000;
+    let minimum_num_taregt_cols = 1;
+    let min_row_id = 2;
+    let max_row_id = 7;
 
     // ############### Prepare Public Values ############################
     let mut public_vals = vec![AbstractInterval::zero(); 3];
@@ -523,6 +525,8 @@ fn main() -> Result<(), io::Error> {
         &refinment_target_indicies_pv,
         &base_abs_main_trace_data,
         public_vals,
+        max_iteration,
+        minimum_num_taregt_cols,
         min_row_id,
         max_row_id,
         program_counter_refine_fn,

@@ -41,6 +41,7 @@ use valida_alu_u32::add::columns::ADD_COL_MAP;
 use valida_alu_u32::add::Add32Chip;
 use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction, MachineWithAdd32Chip};
 use valida_alu_u32::bitwise::columns::COL_MAP;
+use valida_alu_u32::bitwise::And32Instruction;
 use valida_alu_u32::bitwise::Bitwise32Chip;
 use valida_alu_u32::com::columns::COM_COL_MAP;
 use valida_alu_u32::com::Com32Chip;
@@ -217,6 +218,48 @@ fn derive_sub_table(
     out
 }
 
+fn derive_bitwise_table(
+    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    potential_boolean_vars: &Vec<usize>,
+    prime: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let mut out = vec![];
+    for row in cpu_main_trace {
+        if row[58].as_canonical_u32(prime) != 0
+            && (row[3].as_canonical_u32(prime) == 107
+                || row[3].as_canonical_u32(prime) == 108
+                || row[3].as_canonical_u32(prime) == 109)
+        {
+            let mut r: Vec<_> = (0..79).map(|_| AbstractInterval::top(prime)).collect();
+            for i in potential_boolean_vars {
+                r[*i] = AbstractInterval::bool();
+            }
+
+            let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
+            let bws_columns = vec![64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75];
+            for i in 0..(cpu_columns.len()) {
+                r[bws_columns[i]] = row[cpu_columns[i]].clone();
+            }
+            if row[3].as_canonical_u32(prime) == 107 {
+                r[76] = AbstractInterval::one();
+                r[77] = AbstractInterval::zero();
+                r[78] = AbstractInterval::zero();
+            } else if row[3].as_canonical_u32(prime) == 108 {
+                r[76] = AbstractInterval::zero();
+                r[77] = AbstractInterval::one();
+                r[78] = AbstractInterval::zero();
+            } else if row[3].as_canonical_u32(prime) == 109 {
+                r[76] = AbstractInterval::zero();
+                r[77] = AbstractInterval::zero();
+                r[78] = AbstractInterval::one();
+            }
+            out.push(r);
+        }
+    }
+
+    out
+}
+
 fn derive_com_table(
     cpu_main_trace: &Vec<Vec<AbstractInterval>>,
     potential_boolean_vars: &Vec<usize>,
@@ -261,7 +304,7 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
             operands: Operands([-4, 2, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <And32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -8, 1, 0, 1]),
         },
         //InstructionWord {
@@ -324,7 +367,7 @@ fn main() -> Result<(), io::Error> {
         get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &sub_air,
         );
-    let sub_target_cols = vec![8, 9, 10, 11];
+    let sub_target_cols = vec![8, 9, 10, 11, 12, 13, 14, 15];
     let aux_sub_obj = AbsConstraintObj {
         name: "Sub".to_string(),
         aux_constraints: sub_constraints,
@@ -335,12 +378,12 @@ fn main() -> Result<(), io::Error> {
     println!("  {:?}", SUB_COL_MAP);
 
     let bitwise_air = Bitwise32Chip::default();
-    let (bitsise_constraints, bitsise_potential_boolean_vars) = get_converted_symbolicconstraints::<
+    let (bitwise_constraints, bitwise_potential_boolean_vars) = get_converted_symbolicconstraints::<
         BasicMachine<BabyBear>,
         MyConfig,
         _,
     >(&machine, &bitwise_air);
-    let bitsise_target_cols = (0..64).collect::<Vec<usize>>();
+    let bitwise_target_cols = (0..64).collect::<Vec<usize>>();
     println!("BITWISE AIR MAP");
     println!("  {:?}", COL_MAP);
 
@@ -362,8 +405,6 @@ fn main() -> Result<(), io::Error> {
     let aux_objs = vec![];
     let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
 
-    let max_iteration = 1000;
-    let minimum_num_taregt_cols = 1;
     let min_row_id = 0;
     let max_row_id = 0;
 
@@ -393,7 +434,7 @@ fn main() -> Result<(), io::Error> {
 
     // ############# Obtain the inital solution ############################
     let mut rows = vec![];
-    if let Some(traces) = &mut traces.1[3] {
+    if let Some(traces) = &mut traces.1[10] {
         let nrows = traces.values.len() / traces.width();
         for i in 0..nrows {
             let mut row = traces.row_mut(i);
@@ -424,37 +465,7 @@ fn main() -> Result<(), io::Error> {
         known_reprt: &mut HashSet<String>,
         ui: &mut UiState,
     ) {
-        let string_representation = format!(
-            "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-            trace.data[0][0],
-            trace.data[0][1],
-            trace.data[0][2],
-            trace.data[0][3],
-            trace.data[0][4],
-            trace.data[0][5],
-            trace.data[0][6],
-            trace.data[0][7],
-            trace.data[0][8],
-            trace.data[0][9],
-            trace.data[0][10],
-            trace.data[0][11],
-        );
-
-        if !known_reprt.contains(&string_representation) {
-            known_reprt.insert(string_representation.clone());
-            ui.recovered = string_representation;
-
-            fs::write(
-                format!("{}_states.txt", known_reprt.len()),
-                ui.recovered.clone(),
-            )
-            .unwrap();
-            fs::write(
-                format!("{}_assignments.txt", known_reprt.len()),
-                ui.logs.clone(),
-            )
-            .unwrap();
-        }
+        let mut output = String::new();
     }
 
     enable_raw_mode()?;
@@ -471,16 +482,14 @@ fn main() -> Result<(), io::Error> {
     ui.program = program_str;
 
     run_solver(
-        &add_constraints,
-        &add_target_cols,
-        &add_potential_boolean_vars,
+        &bitwise_constraints,
+        &bitwise_target_cols,
+        &bitwise_potential_boolean_vars,
         &aux_objs,
         &aux_tg_fns,
         &refinment_target_indicies_pv,
         &base_abs_main_trace_data,
         public_vals,
-        max_iteration,
-        minimum_num_taregt_cols,
         min_row_id,
         max_row_id,
         program_counter_refine_fn,
