@@ -29,7 +29,7 @@ pub struct SearchNode {
     depth: usize,
 }
 
-pub fn solve<AdjustPcProgramFn>(
+pub fn solve<AlignPcToProgramFn>(
     queue: &mut PriorityQueue<SearchNode, Potential>,
     num_trial: &mut usize,
     constraints: &LatticeVMConstraints,
@@ -38,15 +38,15 @@ pub fn solve<AdjustPcProgramFn>(
     refinment_target_indicies_pv: &Vec<usize>,
     min_row_id: usize,
     max_row_id: usize,
-    adjust_pc_program: &AdjustPcProgramFn,
-    maximum_num_trial: usize,
-    cum_num_trial: usize,
+    align_pc_to_program: &AlignPcToProgramFn,
+    max_expansions: usize,
+    global_expansion_count: usize,
     prime: u32,
     rng: &mut StdRng,
-    _meta_info: &str,
+    _solver_context_info: &str,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ui_update: bool,
+    should_update_ui: bool,
 ) -> (
     Option<AbstractTrace>,
     usize,
@@ -55,14 +55,14 @@ pub fn solve<AdjustPcProgramFn>(
     HashSet<(usize, usize)>,
 )
 where
-    AdjustPcProgramFn: Fn(&mut AbstractTrace, u32),
+    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32),
 {
-    let mut num_unsat_trial = 0;
+    let mut num_unsatisfied_trial = 0;
     let mut cumulative_priority = 0;
     let refinment_target_indicies_main = base_refinment_target_indicies_main.clone();
     let mut final_memo = HashSet::new();
 
-    while !queue.is_empty() && *num_trial < maximum_num_trial {
+    while !queue.is_empty() && *num_trial < max_expansions {
         *num_trial += &1;
 
         // -----------------------------
@@ -72,13 +72,13 @@ where
         let main_trace = head.main_trace;
         let public_trace = head.public_trace;
 
-        if ui_update {
+        if should_update_ui {
             ui.status = format!(
                     "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
                     refinment_target_indicies_main,
-                    *num_trial + cum_num_trial,
+                    *num_trial + global_expansion_count,
                     num_trial,
-                    num_unsat_trial,
+                    num_unsatisfied_trial,
                     queue.len(),
                     -potential.0,
                     cumulative_priority,
@@ -140,7 +140,7 @@ where
         for kid in &mut children {
             // Synchronize opcode + operand intervals based on PC column
             // This enforces program semantics at the abstract level.
-            adjust_pc_program(&mut kid.0, prime);
+            align_pc_to_program(&mut kid.0, prime);
 
             // Evaluate constraints on the refined trace.
             // - True  → fully satisfies constraints → solution
@@ -160,7 +160,7 @@ where
                     );
                 }
                 MayBeFlag::False => {
-                    num_unsat_trial += 1;
+                    num_unsatisfied_trial += 1;
                 }
                 MayBeFlag::MayBe => {
                     queue.push(
@@ -201,26 +201,26 @@ where
 pub struct AbsConstraintObj {
     pub name: String,
     pub aux_constraints: LatticeVMConstraints,
-    pub aux_target_cols: Vec<usize>,
+    pub aux_refinement_plan: Vec<usize>,
     pub aux_potential_boolean_vars: Vec<usize>,
 }
 
-pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcProgramFn>(
+pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
-    target_cols: &Vec<usize>,
+    refinement_plan: &Vec<usize>,
     potential_boolean_vars: &Vec<usize>,
     aux_constraints_objs: &Vec<AbsConstraintObj>,
     aux_table_gen_fns: &Vec<AuxTableGenFn>,
     refinment_target_indicies_pv: &Vec<usize>,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
-    max_iteration: usize,
+    max_expansions: usize,
     minimum_num_taregt_cols: usize,
     min_row_id: usize,
     max_row_id: usize,
     program_len: usize,
     program_counter_refine_fn: ProgramCounterRefinFn,
-    adjust_pc_program: AdjustPcProgramFn,
+    align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     prime: u32,
     seed: u64,
@@ -230,21 +230,21 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
     AuxTableGenFn: Fn(&Vec<Vec<AbstractInterval>>, &Vec<usize>, u32) -> Vec<Vec<AbstractInterval>>,
-    AdjustPcProgramFn: Fn(&mut AbstractTrace, u32),
+    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32),
 {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut found_solution_flag = false;
-    let mut cum_num_trial = 0;
+    let mut global_expansion_count = 0;
     let mut exit_flag = false;
     let mut known_solution = HashSet::<String>::new();
 
-    for k in minimum_num_taregt_cols..(target_cols.len() + 1) {
-        let mut combos: Vec<_> = target_cols.iter().combinations(k).collect();
-        combos.shuffle(&mut rng);
-        for combo in combos {
+    for k in minimum_num_taregt_cols..(refinement_plan.len() + 1) {
+        let mut column_subsets: Vec<_> = refinement_plan.iter().combinations(k).collect();
+        column_subsets.shuffle(&mut rng);
+        for column_subset in column_subsets {
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
             let refinment_target_indicies_main: Vec<usize> =
-                combo.clone().into_iter().cloned().collect();
+                column_subset.clone().into_iter().cloned().collect();
             //refinment_target_indicies_main.push(1);
 
             for i in min_row_id..(max_row_id + 1) {
@@ -271,7 +271,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                 (0, i32::MAX),
             );
             let mut num_trial = 0;
-            while !queue.is_empty() && num_trial < max_iteration {
+            while !queue.is_empty() && num_trial < max_expansions {
                 let result = solve(
                     &mut queue,
                     &mut num_trial,
@@ -281,12 +281,12 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                     &refinment_target_indicies_pv,
                     min_row_id,
                     max_row_id,
-                    &adjust_pc_program,
-                    max_iteration,
-                    cum_num_trial,
+                    &align_pc_to_program,
+                    max_expansions,
+                    global_expansion_count,
                     prime,
                     &mut rng,
-                    &format!("{:?}", combo),
+                    &format!("{:?}", column_subset),
                     ui,
                     terminal,
                     true,
@@ -296,13 +296,13 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                     let mut output = String::new();
                     output.push_str(&format!(
                         "Trial ID: {}\n\n#Main\n{}",
-                        cum_num_trial + result.1,
+                        global_expansion_count + result.1,
                         trace
                     ));
 
                     let mut pass_all_aux = true;
 
-                    fn dummy_adjust_pc_program(_at: &mut AbstractTrace, _prime: u32) {}
+                    fn dummy_align_pc_to_program(_at: &mut AbstractTrace, _prime: u32) {}
 
                     for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
                         let aux_table = gfn(&trace.data, &co.aux_potential_boolean_vars, prime);
@@ -320,23 +320,23 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                                 (0, i32::MAX),
                             );
                             let mut aux_num_trial = 0;
-                            let aux_cum_num_trial = 0;
+                            let aux_global_expansion_count = 0;
 
                             let abs_result = solve(
                                 &mut aux_queue,
                                 &mut aux_num_trial,
                                 &co.aux_constraints,
                                 1,
-                                &co.aux_target_cols,
+                                &co.aux_refinement_plan,
                                 &refinment_target_indicies_pv,
                                 0,
                                 aux_table.len() - 1,
-                                &dummy_adjust_pc_program,
-                                max_iteration,
-                                aux_cum_num_trial,
+                                &dummy_align_pc_to_program,
+                                max_expansions,
+                                aux_global_expansion_count,
                                 prime,
                                 &mut rng,
-                                &format!("{:?}", combo),
+                                &format!("{:?}", column_subset),
                                 ui,
                                 terminal,
                                 false,
@@ -356,7 +356,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                         ui.logs = output;
                         final_check(
                             &trace,
-                            cum_num_trial + result.1,
+                            global_expansion_count + result.1,
                             prime,
                             &mut known_solution,
                             ui,
@@ -370,7 +370,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                             .unwrap();
                     }
                 }
-                cum_num_trial += result.1;
+                global_expansion_count += result.1;
 
                 if result.3 {
                     exit_flag = true;
