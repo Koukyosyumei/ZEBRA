@@ -8,10 +8,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{
-    backend::CrosstermBackend,
-    Terminal,
-};
+use ratatui::{backend::CrosstermBackend, Terminal};
 
 use p3_baby_bear::BabyBear;
 use p3_field::{AbstractField, PrimeField32};
@@ -47,6 +44,7 @@ use latticevm_valida::alu_tables::{derive_add_table, derive_com_table, derive_su
 use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
 use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
+use latticevm_valida::utils::{get_adjust_pc_clausuer, program_counter_refine_fn};
 
 fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
@@ -124,8 +122,13 @@ fn main() -> Result<(), io::Error> {
 
     // ############### Dry-Run Machine ##################################
     let program = add_program::<BabyBear>();
-    let rom = ProgramROM::new(program.clone());
+    let program_len = program.len();
+    let mut program_str = String::new();
+    for inst in &program {
+        program_str.push_str(&format!("{}\n", inst));
+    }
 
+    let rom = ProgramROM::new(program.clone());
     let mut machine = BasicMachine::<BabyBear>::default();
     machine.set_segment_number(0);
     machine.set_max_trace_height(65536);
@@ -155,51 +158,7 @@ fn main() -> Result<(), io::Error> {
     let base_abs_main_trace_data = rows.clone();
     let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
 
-    fn program_counter_refine_fn(
-        abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
-        i: usize,
-        j: usize,
-    ) {
-        if j == 1 {
-            abs_main_trace_data[i][j] = AbstractInterval {
-                lo: 0,
-                hi: (add_program::<BabyBear>().len() - 1) as i64,
-            };
-        }
-    }
-
-    fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {
-        let program = add_program::<BabyBear>();
-
-        for row in &mut main_trace.data {
-            if row[1].is_singleton() {
-                let pc = row[1].as_canonical_u32(prime) as usize;
-                if pc < program.len() {
-                    let instr = program[pc];
-                    row[3] = AbstractInterval::from_i64(instr.opcode.into());
-                    row[4] = AbstractInterval::from_i64(instr.operands.0[0].into());
-                    row[5] = AbstractInterval::from_i64(instr.operands.0[1].into());
-                    row[6] = AbstractInterval::from_i64(instr.operands.0[2].into());
-                    row[7] = AbstractInterval::from_i64(instr.operands.0[3].into());
-                    row[8] = AbstractInterval::from_i64(instr.operands.0[4].into());
-
-                    if row[3].as_canonical_u32(prime) == 8 {
-                        for i in 4..57 {
-                            row[i] = AbstractInterval::zero();
-                        }
-                        row[24] = AbstractInterval::from_i64(1);
-                    }
-                }
-            } else {
-                row[3] = AbstractInterval::i4();
-                row[4] = AbstractInterval::i4();
-                row[5] = AbstractInterval::i4();
-                row[6] = AbstractInterval::i4();
-                row[7] = AbstractInterval::i4();
-                row[8] = AbstractInterval::i4();
-            }
-        }
-    }
+    let adjust_pc_program = get_adjust_pc_clausuer(program.clone());
 
     // ############## Final Check Function ##############################
     fn final_check(
@@ -258,10 +217,6 @@ fn main() -> Result<(), io::Error> {
     let mut terminal = Terminal::new(backend)?;
     let mut ui = UiState::new();
 
-    let mut program_str = String::new();
-    for inst in program {
-        program_str.push_str(&format!("{}\n", inst));
-    }
     ui.program = program_str;
 
     run_solver(
@@ -277,6 +232,7 @@ fn main() -> Result<(), io::Error> {
         minimum_num_taregt_cols,
         min_row_id,
         max_row_id,
+        program_len,
         program_counter_refine_fn,
         adjust_pc_program,
         final_check,
