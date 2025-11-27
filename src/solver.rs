@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crossterm::event::KeyModifiers;
 use crossterm::event::{self, Event, KeyCode};
-use itertools::{Itertools, Powerset};
+use itertools::Itertools;
 use priority_queue::PriorityQueue;
 use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
@@ -29,6 +29,49 @@ pub struct SearchNode {
     depth: usize,
 }
 
+/// Performs a prioritized, iterative refinement search over abstract execution traces.
+///
+/// This function implements the main refinement loop for symbolic execution or
+/// abstract interpretation. It repeatedly selects the most promising trace from
+/// the priority queue, applies program semantics constraints via `align_pc_to_program`,
+/// and evaluates the trace against user-defined constraints. Based on the evaluation:
+/// - If the trace satisfies all constraints (`MayBeFlag::True`), it is returned as a solution.
+/// - If the trace violates constraints (`MayBeFlag::False`), it is discarded and counted as an unsatisfied trial.
+/// - If the trace is partially satisfying (`MayBeFlag::MayBe`), it is further refined and pushed back into the queue.
+///
+/// During execution, the function optionally updates a UI showing progress, trial counts,
+/// queue status, and potentials.
+///
+/// # Type Parameters
+/// * `AlignPcToProgramFn` - A closure or function that synchronizes the PC column with the program
+///   instructions in an abstract trace. Signature: `Fn(&mut AbstractTrace, u32)`.
+///
+/// # Arguments
+/// * `queue` - A priority queue containing candidate search nodes `(main_trace, public_trace, depth)`
+///   prioritized by potential and depth.
+/// * `num_trial` - Mutable reference to the cumulative number of trials performed.
+/// * `constraints` - The `LatticeVMConstraints` against which traces are evaluated.
+/// * `_num_refined_points` - Placeholder for number of points to refine (currently unused).
+/// * `base_refinment_target_indicies_main` - Indices of main trace columns to target for refinement.
+/// * `refinment_target_indicies_pv` - Indices of public-value columns to target for refinement.
+/// * `min_row_id` / `max_row_id` - Row bounds within which refinement occurs.
+/// * `align_pc_to_program` - Function or closure that updates opcode and operand intervals based on the PC column.
+/// * `max_expansions` - Maximum number of iterations / expansions allowed.
+/// * `global_expansion_count` - Number of expansions already performed globally (for UI tracking / logging).
+/// * `prime` - Field prime for interval arithmetic and canonical conversion.
+/// * `rng` - Random number generator for stochastic refinement ordering.
+/// * `_solver_context_info` - Optional context string for logging (currently unused).
+/// * `ui` - Mutable reference to the UI state to update progress.
+/// * `terminal` - Terminal backend used for drawing the UI.
+/// * `should_update_ui` - Whether to refresh the UI after each iteration.
+///
+/// # Returns
+/// Tuple `(solution, num_trial, cumulative_potential, exit_flag, final_memo)`:
+/// * `solution` - `Some(AbstractTrace)` if a trace satisfying all constraints is found; otherwise `None`.
+/// * `num_trial` - Total number of trials performed during this function call.
+/// * `cumulative_potential` - Sum of evaluated potentials over all explored nodes.
+/// * `exit_flag` - `true` if the user requested an early exit via keyboard input; otherwise `false`.
+/// * `final_memo` - A set of `(row_index, col_index)` pairs that were refined during the last evaluation.
 pub fn solve<AlignPcToProgramFn>(
     queue: &mut PriorityQueue<SearchNode, Potential>,
     num_trial: &mut usize,
@@ -236,13 +279,45 @@ pub struct AbsConstraintObj {
     pub aux_potential_boolean_vars: Vec<usize>,
 }
 
-/// Top-level orchestration function.
-/// Responsibilities split into:
-///  - iterate over column subset sizes
-///  - build initial abstract traces for each subset
-///  - run main solve() (refinement search)
-///  - validate auxiliary constraints if a candidate is found
-///  - perform final_check if everything passes
+/// Orchestrates a full symbolic refinement search over abstract traces, including auxiliary constraints.
+///
+/// `run_solver` performs a staged, prioritized search for an abstract trace that satisfies a given set
+/// of constraints (`constraints`) and optionally a collection of auxiliary constraints (`aux_constraints_objs`).
+/// It iterates over combinations of target columns (refinement_plan), initializes abstract traces,
+/// applies program counter refinement, and pushes initial candidates into a priority queue.
+///
+/// Each candidate trace is refined iteratively using `solve`, which performs depth-prioritized refinement
+/// and evaluates constraints. If a candidate satisfies all constraints, auxiliary tables are generated
+/// and validated against their respective auxiliary constraints. If all checks pass, `final_check`
+/// is invoked to finalize the solution (e.g., logging, UI update, or storing known solutions).
+///
+/// # Type Parameters
+/// * `ProgramCounterRefinFn` - Closure to refine the program counter column at a specific row and column index.
+/// * `FinalCheckFn` - Closure invoked after a candidate trace satisfies all constraints. Typically used
+///   to update UI or store solutions.
+/// * `AuxTableGenFn` - Closure generating auxiliary traces from the main trace and a set of boolean variable indices.
+/// * `AlignPcToProgramFn` - Closure that enforces program semantics by synchronizing the PC column with opcode/operand intervals.
+///
+/// # Arguments
+/// * `constraints` - Main lattice VM constraints for the primary abstract trace.
+/// * `refinement_plan` - List of main trace columns to consider for refinement combinations.
+/// * `potential_boolean_vars` - Column indices of boolean variables that may require special refinement.
+/// * `aux_constraints_objs` - Auxiliary constraints to check on derived traces.
+/// * `aux_table_gen_fns` - Functions to generate auxiliary tables for each auxiliary constraint object.
+/// * `refinment_target_indicies_pv` - Column indices for refining public-value traces.
+/// * `base_abs_main_trace_data` - Initial abstract trace table for main execution.
+/// * `public_vals` - Abstract intervals for public trace values.
+/// * `max_expansions` - Maximum number of search expansions allowed per refinement attempt.
+/// * `minimum_num_taregt_cols` - Minimum number of columns to include in refinement combinations.
+/// * `min_row_id` / `max_row_id` - Row bounds to apply refinement.
+/// * `program_len` - Length of the program for program counter constraints.
+/// * `program_counter_refine_fn` - Function to refine the PC column in the trace.
+/// * `align_pc_to_program` - Function to align PC column to program semantics (opcode/operands).
+/// * `final_check` - Function invoked when a candidate trace satisfies all constraints and auxiliary checks.
+/// * `prime` - Field prime for interval arithmetic and canonical conversion.
+/// * `seed` - Seed for deterministic random number generation used in shuffling refinement combinations.
+/// * `ui` - Mutable reference to UI state for displaying search progress.
+/// * `terminal` - Terminal backend used to render the UI.
 pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
     refinement_plan: &Vec<usize>,

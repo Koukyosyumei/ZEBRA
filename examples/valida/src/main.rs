@@ -165,14 +165,12 @@ fn main() -> Result<(), io::Error> {
     let min_row_id = 2;
     let max_row_id = 7;
 
-    // ############### Prepare Public Values ############################
     let mut public_vals = vec![AbstractInterval::zero(); 3];
     public_vals[0] = AbstractInterval::from_i64(0);
     public_vals[1] = AbstractInterval::from_i64(4096);
     public_vals[2] = AbstractInterval::from_i64(1);
     let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
-    // ############### Dry-Run Machine ##################################
     let program = add_program::<BabyBear>();
     let program_len = program.len();
     let mut program_str = String::new();
