@@ -90,7 +90,7 @@ fn final_check(
     }
 }
 
-fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
+fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
 
     let mut program = vec![];
@@ -166,7 +166,7 @@ fn main() -> Result<(), io::Error> {
     let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
     // ######################## Program Initialization ###########################
-    let program = add_program::<BabyBear>();
+    let program = get_target_program::<BabyBear>();
     let program_len = program.len();
 
     // Convert program to string for UI display
