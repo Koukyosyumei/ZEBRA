@@ -9,7 +9,7 @@ repository = "https://github.com/Koukyosyumei/TwinVM"
 keywords = ["formal method", "security", "zero-knowledge-proof", "zkp"]
 
 [[bin]]
-name = "latticevm-ziren"
+name = "latticevm-valida"
 path = "src/main.rs"
 
 [dependencies]
