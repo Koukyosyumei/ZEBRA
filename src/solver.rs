@@ -167,6 +167,7 @@ where
     (None, *num_trial, sum_potential, false, final_memo)
 }
 
+#[derive(Clone)]
 pub struct AbsConstraintObj {
     pub name: String,
     pub aux_constraints: LatticeVMConstraints,

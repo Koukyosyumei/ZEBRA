@@ -1,3 +1,6 @@
+pub mod alu_constraints;
+pub mod alu_tables;
+pub mod config;
 pub mod p3_to_tv;
 pub mod state;
 
