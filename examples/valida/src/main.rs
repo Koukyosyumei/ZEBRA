@@ -45,7 +45,7 @@ use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
 use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
 use latticevm_valida::utils::{
-    get_adjust_pc_clausuer, get_initial_satisfying_trace, program_counter_refine_fn,
+    generate_bootstrap_trace_from_program, make_pc_adjuster, refine_pc_interval,
 };
 
 // ############## Final Check Function ##############################
@@ -180,8 +180,8 @@ fn main() -> Result<(), io::Error> {
         program_str.push_str(&format!("{}\n", inst));
     }
 
-    let base_abs_main_trace_data = get_initial_satisfying_trace(&program, 0, 0, 0x1000);
-    let adjust_pc_program = get_adjust_pc_clausuer(program.clone());
+    let base_abs_main_trace_data = generate_bootstrap_trace_from_program(&program, 0, 0, 0x1000);
+    let adjust_pc_program = make_pc_adjuster(program.clone());
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -206,7 +206,7 @@ fn main() -> Result<(), io::Error> {
         min_row_id,
         max_row_id,
         program_len,
-        program_counter_refine_fn,
+        refine_pc_interval,
         adjust_pc_program,
         final_check,
         prime,

@@ -40,9 +40,7 @@ use latticevm::ui::UiState;
 
 use crate::config::{get_machine_config, prover_options};
 
-pub fn get_adjust_pc_clausuer(
-    program: Vec<InstructionWord<i32>>,
-) -> impl Fn(&mut AbstractTrace, u32) {
+pub fn make_pc_adjuster(program: Vec<InstructionWord<i32>>) -> impl Fn(&mut AbstractTrace, u32) {
     move |main_trace: &mut AbstractTrace, prime: u32| {
         for row in &mut main_trace.data {
             if row[1].is_singleton() {
@@ -75,7 +73,7 @@ pub fn get_adjust_pc_clausuer(
     }
 }
 
-pub fn program_counter_refine_fn(
+pub fn refine_pc_interval(
     abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
     program_len: usize,
     i: usize,
@@ -89,7 +87,7 @@ pub fn program_counter_refine_fn(
     }
 }
 
-pub fn get_initial_satisfying_trace(
+pub fn generate_bootstrap_trace_from_program(
     program: &Vec<InstructionWord<i32>>,
     i: usize,
     pc: u32,
