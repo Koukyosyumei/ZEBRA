@@ -156,6 +156,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = 1;
     let min_row_id = 2;
     let max_row_id = 7;
+    let seed = 41;
 
     // Public trace values (example: program start, memory base, initial step)
     let mut public_vals = vec![AbstractInterval::zero(); 3];
@@ -208,7 +209,7 @@ fn main() -> Result<(), io::Error> {
         adjust_pc_program,
         final_check,
         prime,
-        41,
+        seed,
         &mut ui,
         &mut terminal,
     );
