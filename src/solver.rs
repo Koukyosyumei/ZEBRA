@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crossterm::event::KeyModifiers;
 use crossterm::event::{self, Event, KeyCode};
-use itertools::Itertools;
+use itertools::{Itertools, Powerset};
 use priority_queue::PriorityQueue;
 use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
@@ -17,8 +17,20 @@ use crate::{
     ui::UiState,
 };
 
+/// Result of constraint checking on a node.
+pub type Potential = (i32, i32);
+
+/// Node inside the search queue.
+/// depth: number of refinement steps so far.
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+pub struct SearchNode {
+    main_trace: AbstractTrace,
+    public_trace: AbstractTrace,
+    depth: usize,
+}
+
 pub fn solve<AdjustPcProgramFn>(
-    queue: &mut PriorityQueue<(AbstractTrace, AbstractTrace, usize), (i32, i32)>,
+    queue: &mut PriorityQueue<SearchNode, Potential>,
     num_trial: &mut usize,
     constraints: &LatticeVMConstraints,
     _num_refined_points: usize,
@@ -46,16 +58,19 @@ where
     AdjustPcProgramFn: Fn(&mut AbstractTrace, u32),
 {
     let mut num_unsat_trial = 0;
-    let mut sum_potential = 0;
+    let mut cumulative_priority = 0;
     let refinment_target_indicies_main = base_refinment_target_indicies_main.clone();
     let mut final_memo = HashSet::new();
 
     while !queue.is_empty() && *num_trial < maximum_num_trial {
         *num_trial += &1;
 
+        // -----------------------------
+        // POP best candidate from queue
+        // -----------------------------
         let (head, potential) = queue.pop().unwrap();
-        let trace = head.0;
-        let public_vals = head.1;
+        let main_trace = head.main_trace;
+        let public_trace = head.public_trace;
 
         if ui_update {
             ui.status = format!(
@@ -66,7 +81,7 @@ where
                     num_unsat_trial,
                     queue.len(),
                     -potential.0,
-                    sum_potential,
+                    cumulative_priority,
                 );
         }
 
@@ -77,11 +92,14 @@ where
             .unwrap();
 
         if *num_trial > 1 {
-            sum_potential += potential.1;
+            cumulative_priority += potential.1;
         }
 
-        let trace_children = refine_trace(
-            &trace,
+        // 1. Try refining the main trace columns
+        // 2. Try refining the public-value trace
+        // 3. Combine both refinements to produce child search nodes
+        let refined_trace_candidates = refine_trace(
+            &main_trace,
             &refinment_target_indicies_main,
             min_row_id,
             max_row_id,
@@ -89,8 +107,8 @@ where
             rng,
         );
 
-        let pv_children = refine_trace(
-            &public_vals,
+        let refined_public_candidates = refine_trace(
+            &public_trace,
             refinment_target_indicies_pv,
             min_row_id,
             max_row_id,
@@ -98,38 +116,45 @@ where
             rng,
         );
 
-        let mut chinldren = vec![];
-        if let Some(trace_children) = trace_children {
-            if let Some(pv_children) = pv_children {
-                for pc in pv_children {
-                    for tc in &trace_children {
-                        chinldren.push((tc.clone(), pc.clone()));
+        let mut children = vec![];
+        if let Some(refined_trace_candidates) = refined_trace_candidates {
+            if let Some(refined_public_candidates) = refined_public_candidates {
+                for pc in refined_public_candidates {
+                    for tc in &refined_trace_candidates {
+                        children.push((tc.clone(), pc.clone()));
                     }
                 }
             } else {
-                for tc in trace_children {
-                    chinldren.push((tc.clone(), public_vals.clone()));
+                for tc in refined_trace_candidates {
+                    children.push((tc.clone(), public_trace.clone()));
                 }
             }
-        } else if let Some(pv_children) = pv_children {
-            for pc in pv_children {
-                chinldren.push((trace.clone(), pc.clone()));
+        } else if let Some(refined_public_candidates) = refined_public_candidates {
+            for pc in refined_public_candidates {
+                children.push((main_trace.clone(), pc.clone()));
             }
         }
 
-        chinldren.shuffle(rng);
+        children.shuffle(rng);
 
-        for kid in &mut chinldren {
+        for kid in &mut children {
+            // Synchronize opcode + operand intervals based on PC column
+            // This enforces program semantics at the abstract level.
             adjust_pc_program(&mut kid.0, prime);
-            let (flag, potential, memo) =
+
+            // Evaluate constraints on the refined trace.
+            // - True  → fully satisfies constraints → solution
+            // - False → violates constraints → prune
+            // - MayBe → push back into queue for further refinement
+            let (constraint_result, potential, memo) =
                 eval_constraints(&kid.0, Some(&kid.1.data[0]), constraints, prime);
             final_memo = memo;
-            match flag {
+            match constraint_result {
                 MayBeFlag::True => {
                     return (
                         Some(kid.0.clone()),
                         *num_trial,
-                        sum_potential,
+                        cumulative_priority,
                         false,
                         final_memo,
                     );
@@ -139,20 +164,25 @@ where
                 }
                 MayBeFlag::MayBe => {
                     queue.push(
-                        (kid.0.clone(), kid.1.clone(), head.2 + 1),
-                        (-potential, (head.2 as i32)),
+                        SearchNode {
+                            main_trace: kid.0.clone(),
+                            public_trace: kid.1.clone(),
+                            depth: head.depth + 1,
+                        },
+                        (-potential, (head.depth as i32)),
                     );
                 }
             }
         }
 
+        // Non-blocking keyboard interaction (quit or scroll)
         if event::poll(Duration::from_millis(1)).unwrap() {
             if let Event::Key(key) = event::read().unwrap() {
                 if key.code == KeyCode::Char('q')
                     || (key.code == KeyCode::Char('c')
                         && key.modifiers.contains(KeyModifiers::CONTROL))
                 {
-                    return (None, *num_trial, sum_potential, true, final_memo);
+                    return (None, *num_trial, cumulative_priority, true, final_memo);
                 }
 
                 if key.code == KeyCode::Down {
@@ -164,7 +194,7 @@ where
         }
     }
 
-    (None, *num_trial, sum_potential, false, final_memo)
+    (None, *num_trial, cumulative_priority, false, final_memo)
 }
 
 #[derive(Clone)]
@@ -231,14 +261,13 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
 
             let abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
 
-            let mut queue: PriorityQueue<(AbstractTrace, AbstractTrace, usize), (i32, i32)> =
-                PriorityQueue::new();
+            let mut queue: PriorityQueue<SearchNode, Potential> = PriorityQueue::new();
             queue.push(
-                (
-                    abs_main_trace,
-                    AbstractTrace::new(vec![public_vals.clone()]),
-                    0,
-                ),
+                SearchNode {
+                    main_trace: abs_main_trace,
+                    public_trace: AbstractTrace::new(vec![public_vals.clone()]),
+                    depth: 0,
+                },
                 (0, i32::MAX),
             );
             let mut num_trial = 0;
@@ -280,16 +309,14 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                         if !aux_table.is_empty() {
                             let abs_aux_trace = AbstractTrace::new(aux_table.clone());
 
-                            let mut aux_queue: PriorityQueue<
-                                (AbstractTrace, AbstractTrace, usize),
-                                (i32, i32),
-                            > = PriorityQueue::new();
+                            let mut aux_queue: PriorityQueue<SearchNode, Potential> =
+                                PriorityQueue::new();
                             aux_queue.push(
-                                (
-                                    abs_aux_trace,
-                                    AbstractTrace::new(vec![public_vals.clone()]),
-                                    0,
-                                ),
+                                SearchNode {
+                                    main_trace: abs_aux_trace,
+                                    public_trace: AbstractTrace::new(vec![public_vals.clone()]),
+                                    depth: 0,
+                                },
                                 (0, i32::MAX),
                             );
                             let mut aux_num_trial = 0;
