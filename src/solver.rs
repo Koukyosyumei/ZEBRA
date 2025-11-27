@@ -188,6 +188,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
     minimum_num_taregt_cols: usize,
     min_row_id: usize,
     max_row_id: usize,
+    program_len: usize,
     program_counter_refine_fn: ProgramCounterRefinFn,
     adjust_pc_program: AdjustPcProgramFn,
     final_check: FinalCheckFn,
@@ -196,7 +197,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
-    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize),
+    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
     AuxTableGenFn: Fn(&Vec<Vec<AbstractInterval>>, &Vec<usize>, u32) -> Vec<Vec<AbstractInterval>>,
     AdjustPcProgramFn: Fn(&mut AbstractTrace, u32),
@@ -224,7 +225,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AdjustPcPr
                         abs_main_trace_data[i][*c] = AbstractInterval::i4();
                     }
 
-                    program_counter_refine_fn(&mut abs_main_trace_data, i, *c);
+                    program_counter_refine_fn(&mut abs_main_trace_data, program_len, i, *c);
                 }
             }
 

@@ -86,3 +86,43 @@ pub fn program_counter_refine_fn(
         };
     }
 }
+
+pub fn get_initial_satisfying_trace(
+    program: &Vec<InstructionWord<i32>>,
+    i: usize,
+    pc: u32,
+    fp: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let config = get_machine_config();
+    let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
+        prover_options();
+
+    let rom = ProgramROM::new(program.clone());
+    let mut machine = BasicMachine::<BabyBear>::default();
+    machine.set_segment_number(0);
+    machine.set_max_trace_height(65536);
+    machine.set_program_rom(rom, ProgramTableType::Public);
+    machine.set_initial_register_values(valida_cpu::Registers { pc: pc, fp: fp });
+
+    let mut runtime = ValidaRuntime::default_for_field::<BabyBear>();
+    let mut state = machine.start(&mut runtime);
+    let mut metrics = BasicMachineMetrics::initialize();
+    let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
+
+    let mut traces = state.machine.generate_traces(&config, prover_opts);
+
+    // ############# Obtain the inital solution ############################
+    let mut rows = vec![];
+    if let Some(traces) = &mut traces.1[i] {
+        let nrows = traces.values.len() / traces.width();
+        for i in 0..nrows {
+            let row = traces.row_mut(i);
+            rows.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .collect(),
+            );
+        }
+    }
+    rows
+}

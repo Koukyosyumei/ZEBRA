@@ -44,7 +44,59 @@ use latticevm_valida::alu_tables::{derive_add_table, derive_com_table, derive_su
 use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
 use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
-use latticevm_valida::utils::{get_adjust_pc_clausuer, program_counter_refine_fn};
+use latticevm_valida::utils::{
+    get_adjust_pc_clausuer, get_initial_satisfying_trace, program_counter_refine_fn,
+};
+
+// ############## Final Check Function ##############################
+fn final_check(
+    trace: &AbstractTrace,
+    num_trial: usize,
+    prime: u32,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    let mut output = String::new();
+
+    let mut memory = HashMap::new();
+    let mut recovered_states = vec![];
+    for row in &trace.data {
+        recovered_states.push(valida_abstract_trace_to_abstract_state(row, &memory, prime));
+        memory = recovered_states.last().unwrap().memory.clone();
+    }
+
+    let rs_len = recovered_states.len();
+    for i in 0..rs_len {
+        if i == rs_len - 1 {
+            recovered_states[rs_len - 1 - i].memory = HashMap::new();
+        } else {
+            recovered_states[rs_len - 1 - i].memory =
+                recovered_states[rs_len - 2 - i].memory.clone();
+        }
+    }
+
+    let mut string_representation = String::new();
+    for state in &recovered_states {
+        string_representation.push_str(&format!("{}\n", state));
+        if state.is_done != MayBeFlag::False {
+            break;
+        }
+    }
+
+    if !known_reprt.contains(&string_representation) {
+        known_reprt.insert(string_representation.clone());
+
+        output.push_str(&format!("Trial ID: {}\n\n", num_trial));
+        output.push_str("Malicious States:\n");
+        output.push_str(&string_representation);
+        output.push_str("-----------------\n\n");
+
+        ui.recovered = output;
+
+        fs::write("states.txt", ui.recovered.clone()).unwrap();
+        fs::write("assignments.txt", ui.logs.clone()).unwrap();
+    }
+}
 
 fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
@@ -70,46 +122,6 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     ]);
 
     program
-}
-
-fn get_initial_satisfying_trace(
-    program: &Vec<InstructionWord<i32>>,
-    i: usize,
-    pc: u32,
-    fp: u32,
-) -> Vec<Vec<AbstractInterval>> {
-    let config = get_machine_config();
-    let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
-        prover_options();
-
-    let rom = ProgramROM::new(program.clone());
-    let mut machine = BasicMachine::<BabyBear>::default();
-    machine.set_segment_number(0);
-    machine.set_max_trace_height(65536);
-    machine.set_program_rom(rom, ProgramTableType::Public);
-    machine.set_initial_register_values(valida_cpu::Registers { pc: pc, fp: fp });
-
-    let mut runtime = ValidaRuntime::default_for_field::<BabyBear>();
-    let mut state = machine.start(&mut runtime);
-    let mut metrics = BasicMachineMetrics::initialize();
-    let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
-
-    let mut traces = state.machine.generate_traces(&config, prover_opts);
-
-    // ############# Obtain the inital solution ############################
-    let mut rows = vec![];
-    if let Some(traces) = &mut traces.1[i] {
-        let nrows = traces.values.len() / traces.width();
-        for i in 0..nrows {
-            let row = traces.row_mut(i);
-            rows.push(
-                row.iter()
-                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
-                    .collect(),
-            );
-        }
-    }
-    rows
 }
 
 fn main() -> Result<(), io::Error> {
@@ -170,56 +182,6 @@ fn main() -> Result<(), io::Error> {
 
     let base_abs_main_trace_data = get_initial_satisfying_trace(&program, 0, 0, 0x1000);
     let adjust_pc_program = get_adjust_pc_clausuer(program.clone());
-
-    // ############## Final Check Function ##############################
-    fn final_check(
-        trace: &AbstractTrace,
-        num_trial: usize,
-        prime: u32,
-        known_reprt: &mut HashSet<String>,
-        ui: &mut UiState,
-    ) {
-        let mut output = String::new();
-
-        let mut memory = HashMap::new();
-        let mut recovered_states = vec![];
-        for row in &trace.data {
-            recovered_states.push(valida_abstract_trace_to_abstract_state(row, &memory, prime));
-            memory = recovered_states.last().unwrap().memory.clone();
-        }
-
-        let rs_len = recovered_states.len();
-        for i in 0..rs_len {
-            if i == rs_len - 1 {
-                recovered_states[rs_len - 1 - i].memory = HashMap::new();
-            } else {
-                recovered_states[rs_len - 1 - i].memory =
-                    recovered_states[rs_len - 2 - i].memory.clone();
-            }
-        }
-
-        let mut string_representation = String::new();
-        for state in &recovered_states {
-            string_representation.push_str(&format!("{}\n", state));
-            if state.is_done != MayBeFlag::False {
-                break;
-            }
-        }
-
-        if !known_reprt.contains(&string_representation) {
-            known_reprt.insert(string_representation.clone());
-
-            output.push_str(&format!("Trial ID: {}\n\n", num_trial));
-            output.push_str("Malicious States:\n");
-            output.push_str(&string_representation);
-            output.push_str("-----------------\n\n");
-
-            ui.recovered = output;
-
-            fs::write("states.txt", ui.recovered.clone()).unwrap();
-            fs::write("assignments.txt", ui.logs.clone()).unwrap();
-        }
-    }
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
