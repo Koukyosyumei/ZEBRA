@@ -1,4 +1,4 @@
-Trial ID: 217443210
+Trial ID: 30
 
 Malicious States:
 (clk: 0, pc: 0, is_done: False, memory: [""])
@@ -6,6 +6,6 @@ Malicious States:
 (clk: 2, pc: 2, is_done: False, memory: ["4088: 1, 4092: 2"])
 (clk: 3, pc: 1, is_done: False, memory: ["4088: 1, 4092: 2"])
 (clk: 4, pc: 2, is_done: False, memory: ["4088: 2, 4092: 2"])
-(clk: 0, pc: 3, is_done: True, memory: ["4088: 2, 4092: 2"])
+(clk: 5, pc: 3, is_done: True, memory: ["4088: 2, 4092: 2"])
 -----------------
 
