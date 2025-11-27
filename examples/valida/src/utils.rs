@@ -89,7 +89,7 @@ pub fn refine_pc_interval(
 
 pub fn generate_bootstrap_trace_from_program(
     program: &Vec<InstructionWord<i32>>,
-    i: usize,
+    chip_id: usize,
     pc: u32,
     fp: u32,
 ) -> Vec<Vec<AbstractInterval>> {
@@ -113,7 +113,7 @@ pub fn generate_bootstrap_trace_from_program(
 
     // ############# Obtain the inital solution ############################
     let mut rows = vec![];
-    if let Some(traces) = &mut traces.1[i] {
+    if let Some(traces) = &mut traces.1[chip_id] {
         let nrows = traces.values.len() / traces.width();
         for i in 0..nrows {
             let row = traces.row_mut(i);
