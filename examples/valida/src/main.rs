@@ -122,11 +122,6 @@ fn main() -> Result<(), io::Error> {
     // Columns reserved for program counters / instructions
     let program_cols = (3..8).collect::<Vec<_>>();
 
-    // ############### Config #########################################
-    let config = get_machine_config();
-    let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
-        prover_options();
-
     // ######################## Extract CPU Constraints ##########################
     let machine = BasicMachine::<BabyBear>::default();
 
