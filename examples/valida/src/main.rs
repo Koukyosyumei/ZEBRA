@@ -117,8 +117,9 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
 }
 
 fn main() -> Result<(), io::Error> {
-    // 2^31 - 2^27 + 1
+    // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
+    // Columns reserved for program counters / instructions
     let program_cols = (3..8).collect::<Vec<_>>();
 
     // ############### Config #########################################
@@ -126,7 +127,7 @@ fn main() -> Result<(), io::Error> {
     let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
         prover_options();
 
-    // ############### Extract Constraints ############################
+    // ######################## Extract CPU Constraints ##########################
     let machine = BasicMachine::<BabyBear>::default();
 
     let cpu_air = CpuChip::default();
@@ -134,15 +135,19 @@ fn main() -> Result<(), io::Error> {
         get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &cpu_air,
         );
+
+    // Additional boolean columns
     cpu_potential_boolean_vars.push(18);
     cpu_potential_boolean_vars.push(19);
     cpu_potential_boolean_vars.push(22);
     cpu_potential_boolean_vars.push(24);
+
+    // Columns available for refinement (excluding reserved program columns)
     let mut cpu_target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     cpu_target_cols.retain(|x| !program_cols.contains(x));
-    println!("CPU AIR MAP");
-    println!("  {:?}", CPU_COL_MAP);
+    println!("CPU AIR Column Mapping:\n {:?}", CPU_COL_MAP);
 
+    // ######################## Auxiliary ALU Constraints #######################
     let alu_constraints = get_alu_constraints();
     let aux_objs = vec![
         alu_constraints["Add"].clone(),
@@ -151,37 +156,45 @@ fn main() -> Result<(), io::Error> {
     ];
     let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
 
-    // ############### Parameters of Solver #############################
+    // ######################## Solver Parameters ###############################
     let max_iteration = 1000;
     let minimum_num_taregt_cols = 1;
     let min_row_id = 2;
     let max_row_id = 7;
 
+    // Public trace values (example: program start, memory base, initial step)
     let mut public_vals = vec![AbstractInterval::zero(); 3];
     public_vals[0] = AbstractInterval::from_i64(0);
     public_vals[1] = AbstractInterval::from_i64(4096);
     public_vals[2] = AbstractInterval::from_i64(1);
     let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
+    // ######################## Program Initialization ###########################
     let program = add_program::<BabyBear>();
     let program_len = program.len();
-    let mut program_str = String::new();
-    for inst in &program {
-        program_str.push_str(&format!("{}\n", inst));
-    }
 
+    // Convert program to string for UI display
+    let program_str = program
+        .iter()
+        .map(|inst| format!("{}\n", inst))
+        .collect::<String>();
+
+    // Generate initial abstract main trace from program
     let base_abs_main_trace_data = generate_bootstrap_trace_from_program(&program, 0, 0, 0x1000);
+
+    // Closure to adjust PC intervals to match program semantics
     let adjust_pc_program = make_pc_adjuster(program.clone());
 
+    // ######################## UI Initialization ################################
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut ui = UiState::new();
-
     ui.program = program_str;
 
+    // ######################## Run Solver ######################################
     run_solver(
         &cpu_constraints,
         &cpu_target_cols,
@@ -205,6 +218,7 @@ fn main() -> Result<(), io::Error> {
         &mut terminal,
     );
 
+    // ######################## Cleanup #########################################
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
