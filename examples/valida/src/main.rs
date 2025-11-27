@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
 
@@ -15,23 +14,16 @@ use p3_field::{AbstractField, PrimeField32};
 use p3_matrix::Matrix;
 
 use valida_alu_u32::add::Add32Instruction;
-use valida_basic_api::BasicMachine;
-use valida_basic_api::BasicMachineMetrics;
-use valida_basic_api::ValidaRuntime;
-use valida_cpu::BneInstruction;
-use valida_cpu::Imm32Instruction;
-use valida_cpu::MachineWithRegisters;
-use valida_cpu::StopInstruction;
+use valida_basic_api::{BasicMachine, BasicMachineMetrics, ValidaRuntime};
 use valida_cpu::{
     columns::{CPU_COL_MAP, NUM_CPU_COLS},
-    CpuChip,
+    BneInstruction, CpuChip, Imm32Instruction, MachineWithRegisters, StopInstruction,
 };
 use valida_machine::{
     Instruction, InstructionWord, Machine, Operands, ProgramROM, SegmentMachine, StarkField,
 };
 use valida_opcodes::BYTES_PER_INSTR;
-use valida_program::MachineWithProgramROM;
-use valida_program::ProgramTableType;
+use valida_program::{MachineWithProgramROM, ProgramTableType};
 
 use latticevm::interval::AbstractInterval;
 use latticevm::solver::run_solver;
