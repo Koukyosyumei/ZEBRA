@@ -1,17 +1,9 @@
-use valida_machine::symbolic::symbolic_builder::{
-    get_symbolic_constraints, get_symbolic_lookups, SymbolicAirBuilder,
-};
+use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
 use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::symbolic::symbolic_variable::{SymbolicVariable, Trace};
-use valida_machine::Chip;
 use valida_machine::ChipWithPersistence;
 use valida_machine::StarkConfig;
-use valida_machine::StarkConfigImpl;
-use valida_machine::{
-    check_constraints::display_interaction, Instruction, InstructionWord, Machine, MachineProof,
-    MachineRuntime, MemoryBackendTrait, MultiSegmentMachineProof, Operands, ProgramROM,
-    ProverOptions, SegmentMachine, StarkField, ValidaMemoryBackend, Word,
-};
+use valida_machine::Machine;
 
 use p3_field::PrimeField32;
 
@@ -93,7 +85,7 @@ where
     C: ChipWithPersistence<M, SC>,
 {
     let symbolic_constraints = get_symbolic_constraints::<M, SC, C>(&machine, &chip);
-    let mut tv_constraints = symbolic_constraints
+    let tv_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<SC::Val>(&sc))
         .collect::<Vec<_>>();

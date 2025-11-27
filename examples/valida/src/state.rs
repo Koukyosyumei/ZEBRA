@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use valida_basic_api::machine::basic::ValidaSimpleState;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
