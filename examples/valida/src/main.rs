@@ -72,6 +72,46 @@ fn add_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     program
 }
 
+fn get_initial_satisfying_trace(
+    program: &Vec<InstructionWord<i32>>,
+    i: usize,
+    pc: u32,
+    fp: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let config = get_machine_config();
+    let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
+        prover_options();
+
+    let rom = ProgramROM::new(program.clone());
+    let mut machine = BasicMachine::<BabyBear>::default();
+    machine.set_segment_number(0);
+    machine.set_max_trace_height(65536);
+    machine.set_program_rom(rom, ProgramTableType::Public);
+    machine.set_initial_register_values(valida_cpu::Registers { pc: pc, fp: fp });
+
+    let mut runtime = ValidaRuntime::default_for_field::<BabyBear>();
+    let mut state = machine.start(&mut runtime);
+    let mut metrics = BasicMachineMetrics::initialize();
+    let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
+
+    let mut traces = state.machine.generate_traces(&config, prover_opts);
+
+    // ############# Obtain the inital solution ############################
+    let mut rows = vec![];
+    if let Some(traces) = &mut traces.1[i] {
+        let nrows = traces.values.len() / traces.width();
+        for i in 0..nrows {
+            let row = traces.row_mut(i);
+            rows.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .collect(),
+            );
+        }
+    }
+    rows
+}
+
 fn main() -> Result<(), io::Error> {
     // 2^31 - 2^27 + 1
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
@@ -128,36 +168,7 @@ fn main() -> Result<(), io::Error> {
         program_str.push_str(&format!("{}\n", inst));
     }
 
-    let rom = ProgramROM::new(program.clone());
-    let mut machine = BasicMachine::<BabyBear>::default();
-    machine.set_segment_number(0);
-    machine.set_max_trace_height(65536);
-    machine.set_program_rom(rom, ProgramTableType::Public);
-    machine.set_initial_register_values(valida_cpu::Registers { pc: 0, fp: 0x1000 });
-
-    let mut runtime = ValidaRuntime::default_for_field::<BabyBear>();
-    let mut state = machine.start(&mut runtime);
-    let mut metrics = BasicMachineMetrics::initialize();
-    let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
-
-    let mut traces = state.machine.generate_traces(&config, prover_opts);
-
-    // ############# Obtain the inital solution ############################
-    let mut rows = vec![];
-    if let Some(traces) = &mut traces.1[0] {
-        let nrows = traces.values.len() / traces.width();
-        for i in 0..nrows {
-            let row = traces.row_mut(i);
-            rows.push(
-                row.iter()
-                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
-                    .collect(),
-            );
-        }
-    }
-    let base_abs_main_trace_data = rows.clone();
-    let abs_main_trace = AbstractTrace::new(base_abs_main_trace_data.clone());
-
+    let base_abs_main_trace_data = get_initial_satisfying_trace(&program, 0, 0, 0x1000);
     let adjust_pc_program = get_adjust_pc_clausuer(program.clone());
 
     // ############## Final Check Function ##############################
