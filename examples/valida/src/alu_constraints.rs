@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-
 use p3_baby_bear::BabyBear;
 //use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
 
@@ -28,7 +27,7 @@ pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {
     let aux_add_obj = AbsConstraintObj {
         name: "Add".to_string(),
         aux_constraints: add_constraints,
-        aux_target_cols: add_target_cols,
+        aux_refinement_plan: add_target_cols,
         aux_potential_boolean_vars: add_potential_boolean_vars,
     };
     result.insert("Add".to_string(), aux_add_obj);
@@ -42,7 +41,7 @@ pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {
     let aux_sub_obj = AbsConstraintObj {
         name: "Sub".to_string(),
         aux_constraints: sub_constraints,
-        aux_target_cols: sub_target_cols,
+        aux_refinement_plan: sub_target_cols,
         aux_potential_boolean_vars: sub_potential_boolean_vars,
     };
     result.insert("Sub".to_string(), aux_sub_obj);
@@ -65,7 +64,7 @@ pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {
     let aux_com_obj = AbsConstraintObj {
         name: "Com".to_string(),
         aux_constraints: com_constraints,
-        aux_target_cols: com_target_cols,
+        aux_refinement_plan: com_target_cols,
         aux_potential_boolean_vars: com_potential_boolean_vars,
     };
     result.insert("Com".to_string(), aux_com_obj);
