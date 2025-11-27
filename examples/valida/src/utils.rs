@@ -38,6 +38,8 @@ use latticevm::solver::run_solver;
 use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::UiState;
 
+use crate::config::{get_machine_config, prover_options};
+
 pub fn get_adjust_pc_clausuer(
     program: Vec<InstructionWord<i32>>,
 ) -> impl Fn(&mut AbstractTrace, u32) {
