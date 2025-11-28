@@ -81,6 +81,7 @@ use valida_program::ProgramTableType;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::solver::run_solver;
+use latticevm::solver::RangeType;
 use latticevm::symbolic::eval_air_constraints;
 use latticevm::symbolic::eval_constraints;
 use latticevm::symbolic::gather_boolean_variables;
@@ -181,18 +182,24 @@ fn main() -> Result<(), io::Error> {
 
     let add_air = Add32Chip::default();
     let machine = BasicMachine::<BabyBear>::default();
-    let lookup_constraints =
-        get_symbolic_lookups::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &add_air);
 
-    let mut re = Vec::new();
-    get_lookup_interactions::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &add_air, &mut re);
-    println!("u8: {:?}", re);
+    let mut cols_constrained_by_u8_chip = Vec::new();
+    get_lookup_interactions::<BasicMachine<BabyBear>, MyConfig, _>(
+        &machine,
+        &add_air,
+        &mut cols_constrained_by_u8_chip,
+    );
+    println!("u8: {:?}", cols_constrained_by_u8_chip);
 
-    let alu_constraints = get_alu_constraints();
+    let mut alu_constraints = get_alu_constraints();
     let add_constraints = &alu_constraints["Add"].aux_constraints;
-    let add_target_cols = &alu_constraints["Add"].aux_refinement_plan;
-    let add_range_types = &alu_constraints["Add"].aux_range_types;
+    let mut add_target_cols = alu_constraints["Add"].aux_refinement_plan.clone();
+    let mut add_range_types = alu_constraints["Add"].aux_range_types.clone();
     let add_chip_idx = 3;
+
+    for c in &cols_constrained_by_u8_chip {
+        add_range_types.insert(*c, RangeType::U8);
+    }
 
     let aux_objs = vec![];
     let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
