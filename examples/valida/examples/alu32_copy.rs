@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::rc::Rc;
+use std::time;
 use std::{io, thread, time::Duration};
 
 use crossterm::{
@@ -148,18 +149,18 @@ fn final_check(
     }
 }
 
-fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
+fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
 
     let mut program = vec![];
     program.extend([
         InstructionWord {
             opcode: <Imm32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-4, 2, 0, 0, 0]),
+            operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
             opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-8, -8, 1, 0, 1]),
+            operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
             opcode: <StopInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
@@ -204,7 +205,7 @@ fn main() -> Result<(), io::Error> {
     let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
     // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>();
+    let program = get_target_program::<BabyBear>(3, 4);
     let program_len = program.len();
 
     // Convert program to string for UI display
@@ -227,6 +228,7 @@ fn main() -> Result<(), io::Error> {
     ui.program = program_str;
 
     // ######################## Run Solver ######################################
+    let start_time = time::Instant::now();
     run_solver(
         &add_constraints,
         &add_target_cols,
@@ -257,6 +259,8 @@ fn main() -> Result<(), io::Error> {
         DisableMouseCapture
     )?;
     terminal.show_cursor()?;
+
+    eprintln!("Execution Time    : {:?}", start_time.elapsed());
 
     Ok(())
 }
