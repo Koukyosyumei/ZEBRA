@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::i32;
 use std::io::Stdout;
 use std::time::Duration;
@@ -270,13 +270,32 @@ where
     (None, *num_trial, cumulative_priority, false, final_memo)
 }
 
+#[derive(Clone)]
+pub enum RangeType {
+    Bool,
+    U8,
+    Top,
+}
+
+pub fn make_init_val(col_idx: usize, range_types: &HashMap<usize, RangeType>) -> AbstractInterval {
+    if range_types.contains_key(&col_idx) {
+        match range_types.get(&col_idx).unwrap() {
+            RangeType::Bool => AbstractInterval::bool(),
+            RangeType::U8 => AbstractInterval::u8(),
+            RangeType::Top => AbstractInterval::i4(),
+        }
+    } else {
+        AbstractInterval::i4()
+    }
+}
+
 /// Auxiliary constraint object for multi-phase validation.
 #[derive(Clone)]
 pub struct AbsConstraintObj {
     pub name: String,
     pub aux_constraints: LatticeVMConstraints,
     pub aux_refinement_plan: Vec<usize>,
-    pub aux_potential_boolean_vars: Vec<usize>,
+    pub aux_range_types: HashMap<usize, RangeType>,
 }
 
 /// Orchestrates a full symbolic refinement search over abstract traces, including auxiliary constraints.
@@ -321,7 +340,7 @@ pub struct AbsConstraintObj {
 pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
     refinement_plan: &Vec<usize>,
-    potential_boolean_vars: &Vec<usize>,
+    range_types: &HashMap<usize, RangeType>,
     aux_constraints_objs: &Vec<AbsConstraintObj>,
     aux_table_gen_fns: &Vec<AuxTableGenFn>,
     refinment_target_indicies_pv: &Vec<usize>,
@@ -342,7 +361,11 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
 ) where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
-    AuxTableGenFn: Fn(&Vec<Vec<AbstractInterval>>, &Vec<usize>, u32) -> Vec<Vec<AbstractInterval>>,
+    AuxTableGenFn: Fn(
+        &Vec<Vec<AbstractInterval>>,
+        &HashMap<usize, RangeType>,
+        u32,
+    ) -> Vec<Vec<AbstractInterval>>,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32),
 {
     // RNG and bookkeeping
@@ -370,16 +393,12 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
             // convert combination iterator into Vec<usize>
             let refinment_target_indicies_main: Vec<usize> =
                 column_subset.clone().into_iter().cloned().collect();
-            //// refinment_target_indicies_main.push(1);
+            //refinment_target_indicies_main.push(1);
 
             // apply coarse domain constraints for the chosen columns across rows
             for i in min_row_id..(max_row_id + 1) {
                 for c in &refinment_target_indicies_main {
-                    if potential_boolean_vars.contains(c) {
-                        abs_main_trace_data[i][*c] = AbstractInterval::bool();
-                    } else {
-                        abs_main_trace_data[i][*c] = AbstractInterval::i4();
-                    }
+                    abs_main_trace_data[i][*c] = make_init_val(*c, &range_types);
 
                     // apply program-counter-specific refinement for this cell
                     program_counter_refine_fn(&mut abs_main_trace_data, program_len, i, *c);
@@ -444,7 +463,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                     // #################################################################################
                     for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
                         // generate auxiliary table for the candidate main trace
-                        let aux_table = gfn(&trace.data, &co.aux_potential_boolean_vars, prime);
+                        let aux_table = gfn(&trace.data, &co.aux_range_types, prime);
                         if !aux_table.is_empty() {
                             let abs_aux_trace = AbstractTrace::new(aux_table.clone());
 
