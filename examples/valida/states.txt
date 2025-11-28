@@ -1,11 +1,11 @@
-Trial ID: 30
+Trial ID: 252477
 
 Malicious States:
 (clk: 0, pc: 0, is_done: False, memory: [(Write: addr: 4092, value: 2)])
 (clk: 1, pc: 1, is_done: False, memory: [(Read: addr: 4088, value: 0),(Write: addr: 4088, value: 1)])
-(clk: 2, pc: 2, is_done: False, memory: [(Read: addr: 4088, value: 1),(Read: addr: 4092, value: 2)])
+(clk: 2, pc: 2, is_done: False, memory: [(Read: addr: 4088, value: 1),(Read: addr: [-8, 8], value: 2)])
 (clk: 3, pc: 1, is_done: False, memory: [(Read: addr: 4088, value: 1),(Write: addr: 4088, value: 2)])
-(clk: 4, pc: 2, is_done: False, memory: [(Read: addr: 4088, value: 2),(Read: addr: 4092, value: 2)])
+(clk: 4, pc: 2, is_done: False, memory: [(Read: addr: 4088, value: 2),(Read: addr: [-8, 8], value: 2)])
 (clk: 5, pc: 3, is_done: True, memory: [])
 -----------------
 

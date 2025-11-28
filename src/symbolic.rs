@@ -390,9 +390,9 @@ impl fmt::Display for AbstractTrace {
             write!(f, "* ")?;
             for (_j, val) in row.iter().enumerate() {
                 if val.is_singleton() {
-                    write!(f, "{} ", val)?;
+                    write!(f, "{}, ", val)?;
                 } else {
-                    write!(f, "{} ", val)?;
+                    write!(f, "{}, ", val)?;
                 }
             }
             writeln!(f)?;
