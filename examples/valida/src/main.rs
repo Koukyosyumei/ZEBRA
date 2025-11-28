@@ -31,6 +31,7 @@ use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::UiState;
 
 use latticevm::interval::MayBeFlag;
+use latticevm::solver::RangeType;
 use latticevm_valida::alu_constraints::get_alu_constraints;
 use latticevm_valida::alu_tables::{derive_add_table, derive_com_table, derive_sub_table};
 use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
@@ -124,6 +125,10 @@ fn main() -> Result<(), io::Error> {
     cpu_potential_boolean_vars.push(19);
     cpu_potential_boolean_vars.push(22);
     cpu_potential_boolean_vars.push(24);
+    let cpu_range_types = cpu_potential_boolean_vars
+        .iter()
+        .map(|k| (*k, RangeType::Bool))
+        .collect();
 
     // Columns available for refinement (excluding reserved program columns)
     let mut cpu_target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
@@ -182,7 +187,7 @@ fn main() -> Result<(), io::Error> {
     run_solver(
         &cpu_constraints,
         &cpu_target_cols,
-        &cpu_potential_boolean_vars,
+        &cpu_range_types,
         &aux_objs,
         &aux_tg_fns,
         &refinment_target_indicies_pv,

@@ -10,6 +10,7 @@ use valida_alu_u32::sub::Sub32Chip;
 use valida_basic_api::BasicMachine;
 
 use latticevm::solver::AbsConstraintObj;
+use latticevm::solver::RangeType;
 
 use crate::config::MyConfig;
 use crate::p3_to_tv::get_converted_symbolicconstraints;
@@ -23,12 +24,16 @@ pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {
         get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &add_air,
         );
+    let add_range_types = add_potential_boolean_vars
+        .iter()
+        .map(|k| (*k, RangeType::Bool))
+        .collect();
     let add_target_cols = vec![8, 9, 10, 11, 12, 13, 14];
     let aux_add_obj = AbsConstraintObj {
         name: "Add".to_string(),
         aux_constraints: add_constraints,
         aux_refinement_plan: add_target_cols,
-        aux_potential_boolean_vars: add_potential_boolean_vars,
+        aux_range_types: add_range_types,
     };
     result.insert("Add".to_string(), aux_add_obj);
 
@@ -37,12 +42,16 @@ pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {
         get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &sub_air,
         );
+    let sub_range_types = sub_potential_boolean_vars
+        .iter()
+        .map(|k| (*k, RangeType::Bool))
+        .collect();
     let sub_target_cols = vec![8, 9, 10, 11];
     let aux_sub_obj = AbsConstraintObj {
         name: "Sub".to_string(),
         aux_constraints: sub_constraints,
         aux_refinement_plan: sub_target_cols,
-        aux_potential_boolean_vars: sub_potential_boolean_vars,
+        aux_range_types: sub_range_types,
     };
     result.insert("Sub".to_string(), aux_sub_obj);
 
@@ -61,11 +70,15 @@ pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {
             &machine, &com_air,
         );
     let com_target_cols = vec![8, 9, 10];
+    let com_range_types = com_potential_boolean_vars
+        .iter()
+        .map(|k| (*k, RangeType::Bool))
+        .collect();
     let aux_com_obj = AbsConstraintObj {
         name: "Com".to_string(),
         aux_constraints: com_constraints,
         aux_refinement_plan: com_target_cols,
-        aux_potential_boolean_vars: com_potential_boolean_vars,
+        aux_range_types: com_range_types,
     };
     result.insert("Com".to_string(), aux_com_obj);
 

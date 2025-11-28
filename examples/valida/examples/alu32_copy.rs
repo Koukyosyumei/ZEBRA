@@ -174,8 +174,6 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
 fn main() -> Result<(), io::Error> {
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
-    // Columns reserved for program counters / instructions
-    let program_cols = (3..8).collect::<Vec<_>>();
 
     // ######################## Extract Add Constraints ##########################
     println!("ADD AIR MAP");
@@ -193,7 +191,7 @@ fn main() -> Result<(), io::Error> {
     let alu_constraints = get_alu_constraints();
     let add_constraints = &alu_constraints["Add"].aux_constraints;
     let add_target_cols = &alu_constraints["Add"].aux_refinement_plan;
-    let add_potential_boolean_vars = &alu_constraints["Add"].aux_potential_boolean_vars;
+    let add_range_types = &alu_constraints["Add"].aux_range_types;
     let add_chip_idx = 3;
 
     let aux_objs = vec![];
@@ -241,7 +239,7 @@ fn main() -> Result<(), io::Error> {
     run_solver(
         &add_constraints,
         &add_target_cols,
-        &add_potential_boolean_vars,
+        &add_range_types,
         &aux_objs,
         &aux_tg_fns,
         &refinment_target_indicies_pv,
