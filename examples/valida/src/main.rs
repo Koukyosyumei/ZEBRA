@@ -50,21 +50,9 @@ fn final_check(
 ) {
     let mut output = String::new();
 
-    let mut memory = HashMap::new();
     let mut recovered_states = vec![];
     for row in &trace.data {
-        recovered_states.push(valida_abstract_trace_to_abstract_state(row, &memory, prime));
-        memory = recovered_states.last().unwrap().memory.clone();
-    }
-
-    let rs_len = recovered_states.len();
-    for i in 0..rs_len {
-        if i == rs_len - 1 {
-            recovered_states[rs_len - 1 - i].memory = HashMap::new();
-        } else {
-            recovered_states[rs_len - 1 - i].memory =
-                recovered_states[rs_len - 2 - i].memory.clone();
-        }
+        recovered_states.push(valida_abstract_trace_to_abstract_state(row, prime));
     }
 
     let mut string_representation = String::new();

@@ -63,7 +63,7 @@ use valida_cpu::{
     CpuChip,
 };
 use valida_machine::symbolic::symbolic_builder::{
-    get_symbolic_constraints, get_symbolic_lookups, SymbolicAirBuilder,
+    get_lookup_interactions, get_symbolic_constraints, get_symbolic_lookups, SymbolicAirBuilder,
 };
 use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::Chip;
@@ -180,6 +180,15 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract Add Constraints ##########################
     println!("ADD AIR MAP");
     println!("  {:?}", ADD_COL_MAP);
+
+    let add_air = Add32Chip::default();
+    let machine = BasicMachine::<BabyBear>::default();
+    let lookup_constraints =
+        get_symbolic_lookups::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &add_air);
+
+    let mut re = Vec::new();
+    get_lookup_interactions::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &add_air, &mut re);
+    println!("u8: {:?}", re);
 
     let alu_constraints = get_alu_constraints();
     let add_constraints = &alu_constraints["Add"].aux_constraints;
