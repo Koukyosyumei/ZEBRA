@@ -41,5 +41,6 @@ valida-basic-api = { git = "https://github.com/Koukyosyumei/valida-vm.git", bran
 valida-opcodes = { git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
 valida-alu-u32 = {git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
 valida-program = {git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
+valida-bytes = {git = "https://github.com/Koukyosyumei/valida-vm.git", branch="debuggable-v0.10.0" }
 ratatui = "0.29"
 crossterm = "0.29"

@@ -184,12 +184,18 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
 
     let mut cols_constrained_by_u8_chip = Vec::new();
+    let mut cols_constrained_by_cpu_chip = Vec::new();
+    let mut counter_col = Vec::new();
     get_lookup_interactions::<BasicMachine<BabyBear>, MyConfig, _>(
         &machine,
         &add_air,
         &mut cols_constrained_by_u8_chip,
+        &mut cols_constrained_by_cpu_chip,
+        &mut counter_col,
     );
     println!("u8: {:?}", cols_constrained_by_u8_chip);
+    println!("bus: {:?}", cols_constrained_by_cpu_chip);
+    println!("counter: {:?}", counter_col);
 
     let mut alu_constraints = get_alu_constraints();
     let add_constraints = &alu_constraints["Add"].aux_constraints;
