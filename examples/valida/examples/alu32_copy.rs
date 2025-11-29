@@ -88,6 +88,7 @@ use latticevm::symbolic::gather_boolean_variables;
 use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::UiState;
+use latticevm::utils::create_or_clear_dir;
 
 use latticevm::interval::MayBeFlag;
 use latticevm_valida::alu_constraints::get_alu_constraints;
@@ -138,12 +139,12 @@ fn final_check(
         ui.recovered = string_representation;
 
         fs::write(
-            format!("{}_states.txt", known_reprt.len()),
+            format!("voutput/{}_states.txt", known_reprt.len()),
             ui.recovered.clone(),
         )
         .unwrap();
         fs::write(
-            format!("{}_assignments.txt", known_reprt.len()),
+            format!("voutput/{}_assignments.txt", known_reprt.len()),
             ui.logs.clone(),
         )
         .unwrap();
@@ -173,6 +174,8 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
 }
 
 fn main() -> Result<(), io::Error> {
+    create_or_clear_dir("voutput")?;
+
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
@@ -248,6 +251,7 @@ fn main() -> Result<(), io::Error> {
     ui.program = program_str;
 
     // ######################## Run Solver ######################################
+    let mut known_solution = HashSet::<String>::new();
     let start_time = time::Instant::now();
     run_solver(
         &add_constraints,
@@ -268,6 +272,7 @@ fn main() -> Result<(), io::Error> {
         final_check,
         prime,
         seed,
+        &mut known_solution,
         &mut ui,
         &mut terminal,
     );
@@ -281,6 +286,7 @@ fn main() -> Result<(), io::Error> {
     terminal.show_cursor()?;
 
     eprintln!("Execution Time    : {:?}", start_time.elapsed());
+    eprintln!("#Unique Solution  : {}", known_solution.len());
 
     Ok(())
 }

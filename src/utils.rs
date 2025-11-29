@@ -1,3 +1,5 @@
+use std::{fs, path::Path};
+
 #[derive(Debug)]
 pub struct BitCombinationsDictOrder {
     len: usize,
@@ -36,4 +38,15 @@ impl Iterator for BitCombinationsDictOrder {
         self.current += 1;
         Some(combination)
     }
+}
+
+pub fn create_or_clear_dir(path: &str) -> std::io::Result<()> {
+    let p = Path::new(path);
+
+    if p.exists() {
+        fs::remove_dir_all(p)?;
+    }
+
+    fs::create_dir_all(p)?;
+    Ok(())
 }

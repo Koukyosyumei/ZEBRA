@@ -356,6 +356,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
     final_check: FinalCheckFn,
     prime: u32,
     seed: u64,
+    known_solution: &mut HashSet<String>,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
@@ -373,7 +374,6 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
     let mut found_solution_flag = false;
     let mut global_expansion_count = 0;
     let mut exit_flag = false;
-    let mut known_solution = HashSet::<String>::new();
 
     // ################################################################
     // Stage 1: iterate over subset sizes (from minimal to all columns)
@@ -521,7 +521,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                             &trace,
                             global_expansion_count + result.1,
                             prime,
-                            &mut known_solution,
+                            known_solution,
                             ui,
                         );
                         found_solution_flag = true;

@@ -26,12 +26,13 @@ use valida_opcodes::BYTES_PER_INSTR;
 use valida_program::{MachineWithProgramROM, ProgramTableType};
 
 use latticevm::interval::AbstractInterval;
+use latticevm::interval::MayBeFlag;
 use latticevm::solver::run_solver;
+use latticevm::solver::RangeType;
 use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::UiState;
+use latticevm::utils::create_or_clear_dir;
 
-use latticevm::interval::MayBeFlag;
-use latticevm::solver::RangeType;
 use latticevm_valida::alu_constraints::get_alu_constraints;
 use latticevm_valida::alu_tables::{derive_add_table, derive_com_table, derive_sub_table};
 use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
@@ -106,6 +107,8 @@ fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
 }
 
 fn main() -> Result<(), io::Error> {
+    create_or_clear_dir("voutput")?;
+
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
     // Columns reserved for program counters / instructions
@@ -184,6 +187,7 @@ fn main() -> Result<(), io::Error> {
     ui.program = program_str;
 
     // ######################## Run Solver ######################################
+    let mut known_solution = HashSet::<String>::new();
     run_solver(
         &cpu_constraints,
         &cpu_target_cols,
@@ -203,6 +207,7 @@ fn main() -> Result<(), io::Error> {
         final_check,
         prime,
         seed,
+        &mut known_solution,
         &mut ui,
         &mut terminal,
     );
