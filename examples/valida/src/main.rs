@@ -75,8 +75,16 @@ fn final_check(
 
         ui.recovered = output;
 
-        fs::write("states.txt", ui.recovered.clone()).unwrap();
-        fs::write("assignments.txt", ui.logs.clone()).unwrap();
+        fs::write(
+            format!("voutput/{}_states.txt", known_reprt.len()),
+            ui.recovered.clone(),
+        )
+        .unwrap();
+        fs::write(
+            format!("voutput/{}_assignments.txt", known_reprt.len()),
+            ui.logs.clone(),
+        )
+        .unwrap();
     }
 }
 
@@ -173,6 +181,12 @@ fn main() -> Result<(), io::Error> {
 
     // Generate initial abstract main trace from program
     let base_abs_main_trace_data = generate_bootstrap_trace_from_program(&program, 0, 0, 0x1000);
+    for row in &base_abs_main_trace_data {
+        for col in row {
+            print!("{}, ", col);
+        }
+        println!("");
+    }
 
     // Closure to adjust PC intervals to match program semantics
     let adjust_pc_program = make_pc_adjuster(program.clone());
@@ -220,6 +234,8 @@ fn main() -> Result<(), io::Error> {
         DisableMouseCapture
     )?;
     terminal.show_cursor()?;
+
+    eprintln!("#Unique Solution  : {}", known_solution.len());
 
     Ok(())
 }
