@@ -46,7 +46,7 @@ pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {
         .iter()
         .map(|k| (*k, RangeType::Bool))
         .collect();
-    let sub_target_cols = vec![8, 9, 10, 11];
+    let sub_target_cols = vec![8, 9, 10, 11, 12, 13, 14, 15];
     let aux_sub_obj = AbsConstraintObj {
         name: "Sub".to_string(),
         aux_constraints: sub_constraints,
