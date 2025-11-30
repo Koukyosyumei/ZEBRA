@@ -61,8 +61,18 @@ pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {
         MyConfig,
         _,
     >(&machine, &bitwise_air);
+    let bitwise_range_types = bitsise_potential_boolean_vars
+        .iter()
+        .map(|k| (*k, RangeType::Bool))
+        .collect();
     let bitsise_target_cols = (0..64).collect::<Vec<usize>>();
-    //result.insert("Bitwise".to_string(), aux_sub_obj);
+    let aux_bitwise_obj = AbsConstraintObj {
+        name: "Bitwise".to_string(),
+        aux_constraints: bitsise_constraints,
+        aux_refinement_plan: bitsise_target_cols,
+        aux_range_types: bitwise_range_types,
+    };
+    result.insert("Bitwise".to_string(), aux_bitwise_obj);
 
     let com_air = Com32Chip::default();
     let (com_constraints, com_potential_boolean_vars) =
