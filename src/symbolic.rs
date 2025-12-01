@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fmt;
+use std::hash::Hash;
 use std::ops::{Add, Mul, Neg, Sub};
 
 use serde::Serialize;
@@ -13,6 +14,8 @@ use crate::interval::{AbstractInterval, MayBeFlag};
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum LatticeVMSymbolicEntry {
     Main { is_curr: bool },
+    Permutation { is_curr: bool },
+    Preprocessed { is_curr: bool },
     Public,
 }
 
@@ -20,6 +23,12 @@ impl fmt::Display for LatticeVMSymbolicEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LatticeVMSymbolicEntry::Main { is_curr } => {
+                write!(f, "{}", if *is_curr { "curr" } else { "next" })
+            }
+            LatticeVMSymbolicEntry::Permutation { is_curr } => {
+                write!(f, "{}", if *is_curr { "curr" } else { "next" })
+            }
+            LatticeVMSymbolicEntry::Preprocessed { is_curr } => {
                 write!(f, "{}", if *is_curr { "curr" } else { "next" })
             }
             LatticeVMSymbolicEntry::Public => write!(f, "{}", "public"),
@@ -51,6 +60,34 @@ pub enum LatticeVMSymbolicExpr {
     Sub(Box<Self>, Box<Self>),
     Mul(Box<Self>, Box<Self>),
     Neg(Box<Self>),
+}
+
+pub fn gather_vars(
+    row_index: usize,
+    expr: &LatticeVMSymbolicExpr,
+    memo: &mut HashSet<(usize, usize)>,
+) {
+    match expr {
+        LatticeVMSymbolicExpr::Variable(lattice_vmsymbolic_val) => {
+            memo.insert((row_index, lattice_vmsymbolic_val.index));
+        }
+        LatticeVMSymbolicExpr::Add(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Sub(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Mul(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+        }
+        _ => {}
+    }
 }
 
 pub fn get_curr_i(expr: &LatticeVMSymbolicExpr) -> Option<usize> {
@@ -200,6 +237,26 @@ impl LatticeVMSymbolicExpr {
                         }
                     }
                 }
+                LatticeVMSymbolicEntry::Preprocessed { is_curr } => {
+                    if is_curr {
+                        curr_row[cell.index].clone()
+                    } else {
+                        match next_row {
+                            Some(nr) => nr[cell.index].clone(),
+                            None => AbstractInterval::zero(), //panic!("next_row not provided for next-row variable"),
+                        }
+                    }
+                }
+                LatticeVMSymbolicEntry::Permutation { is_curr } => {
+                    if is_curr {
+                        curr_row[cell.index].clone()
+                    } else {
+                        match next_row {
+                            Some(nr) => nr[cell.index].clone(),
+                            None => AbstractInterval::zero(), //panic!("next_row not provided for next-row variable"),
+                        }
+                    }
+                }
                 LatticeVMSymbolicEntry::Public => match public_vals {
                     Some(pv) => pv[cell.index].clone(),
                     None => panic!("public_vals not provided"),
@@ -330,11 +387,12 @@ pub struct AbstractTrace {
 impl fmt::Display for AbstractTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (_i, row) in self.data.iter().enumerate() {
+            write!(f, "* ")?;
             for (_j, val) in row.iter().enumerate() {
                 if val.is_singleton() {
-                    write!(f, "*{}* ", val)?;
+                    write!(f, "{}, ", val)?;
                 } else {
-                    write!(f, "{} ", val)?;
+                    write!(f, "{}, ", val)?;
                 }
             }
             writeln!(f)?;
@@ -379,10 +437,11 @@ pub fn eval_air_constraints(
     public_vals: Option<&[AbstractInterval]>,
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
-) -> (MayBeFlag, i32) {
+) -> (MayBeFlag, i32, HashSet<(usize, usize)>) {
     let num_steps = trace.data.len();
     let mut is_all_true = true;
     let mut potential = 0;
+    let mut memo = HashSet::<(usize, usize)>::new();
     for i in 0..num_steps {
         for tc in constraints {
             let flag = tc
@@ -403,9 +462,10 @@ pub fn eval_air_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    return (MayBeFlag::False, 0);
+                    return (MayBeFlag::False, 0, memo);
                 }
                 MayBeFlag::MayBe => {
+                    gather_vars(i, tc, &mut memo);
                     is_all_true = false;
                     potential += 1;
                 }
@@ -413,12 +473,13 @@ pub fn eval_air_constraints(
         }
     }
     if is_all_true {
-        (MayBeFlag::True, 0)
+        (MayBeFlag::True, 0, memo)
     } else {
-        (MayBeFlag::MayBe, potential)
+        (MayBeFlag::MayBe, potential, memo)
     }
 }
 
+#[derive(Clone)]
 pub struct LatticeVMConstraints {
     pub air_constraints: Vec<LatticeVMSymbolicExpr>,
     pub pv_pos_constraints: Vec<LatticeVMSymbolicExpr>,
@@ -430,14 +491,14 @@ pub fn eval_constraints(
     public_vals: Option<&[AbstractInterval]>,
     constraints: &LatticeVMConstraints,
     prime: u32,
-) -> (MayBeFlag, i32) {
+) -> (MayBeFlag, i32, HashSet<(usize, usize)>) {
     let mut is_all_true = true;
 
-    let (air_flag, mut potential) =
+    let (air_flag, mut potential, memo) =
         eval_air_constraints(trace, public_vals, &constraints.air_constraints, prime);
     match air_flag {
         MayBeFlag::True => {}
-        MayBeFlag::False => return (MayBeFlag::False, 0),
+        MayBeFlag::False => return (MayBeFlag::False, 0, memo),
         MayBeFlag::MayBe => is_all_true = false,
     }
 
@@ -456,7 +517,7 @@ pub fn eval_constraints(
         match flag {
             MayBeFlag::True => {}
             MayBeFlag::False => {
-                return (MayBeFlag::False, 0);
+                return (MayBeFlag::False, 0, memo);
             }
             MayBeFlag::MayBe => {
                 is_all_true = false;
@@ -480,7 +541,7 @@ pub fn eval_constraints(
         match flag {
             MayBeFlag::True => {}
             MayBeFlag::False => {
-                return (MayBeFlag::False, 0);
+                return (MayBeFlag::False, 0, memo);
             }
             MayBeFlag::MayBe => {
                 is_all_true = false;
@@ -490,19 +551,20 @@ pub fn eval_constraints(
     }
 
     if is_all_true {
-        (MayBeFlag::True, 0)
+        (MayBeFlag::True, 0, memo)
     } else {
-        (MayBeFlag::MayBe, potential)
+        (MayBeFlag::MayBe, potential, memo)
     }
 }
 
 pub fn refine_trace(
     trace: &AbstractTrace,
-    num_refined_points: usize,
     refinment_target_indicies: &Vec<usize>,
+    min_row_id: usize,
     max_row_id: usize,
+    prime: u32,
     rng: &mut StdRng,
-) -> Option<(AbstractTrace, AbstractTrace)> {
+) -> Option<Vec<AbstractTrace>> {
     if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
         return None;
     }
@@ -510,34 +572,32 @@ pub fn refine_trace(
         return None;
     }
     let mut c_refinment_target_indicies = refinment_target_indicies.clone();
-    let mut trace_a = trace.clone();
-    let mut trace_b = trace.clone();
-    for _ in 0..num_refined_points {
-        let i = rng.random_range(0..(max_row_id + 1)) as usize;
-        c_refinment_target_indicies.shuffle(rng);
-        let mut j = 0;
-        while j < c_refinment_target_indicies.len() - 1
-            && trace.data[i][c_refinment_target_indicies[j]].is_singleton()
-        {
-            j += 1;
-        }
-        if !trace.data[i][c_refinment_target_indicies[j]].is_singleton() {
-            let v = trace.data[i][c_refinment_target_indicies[j]].split();
-            if v.0.is_singleton() {
-                trace_a
-                    .singleton_positions
-                    .push((i, c_refinment_target_indicies[j]));
-            }
-            if v.1.is_singleton() {
-                trace_b
-                    .singleton_positions
-                    .push((i, c_refinment_target_indicies[j]));
-            }
-            trace_a.data[i][c_refinment_target_indicies[j]] = v.0;
-            trace_b.data[i][c_refinment_target_indicies[j]] = v.1;
-        }
+    let i = rng.random_range(min_row_id..(max_row_id + 1)) as usize;
+    c_refinment_target_indicies.shuffle(rng);
+    let mut j = 0;
+    while j < c_refinment_target_indicies.len() - 1
+        && trace.data[i][c_refinment_target_indicies[j]].is_singleton()
+    {
+        j += 1;
     }
-    Some((trace_a, trace_b))
+    if !trace.data[i][c_refinment_target_indicies[j]].is_singleton() {
+        let vs = trace.data[i][c_refinment_target_indicies[j]].split(prime);
+        let mut results = vec![];
+        for v in vs {
+            let mut new_trace = trace.clone();
+            if v.is_singleton() {
+                new_trace
+                    .singleton_positions
+                    .push((i, c_refinment_target_indicies[j]));
+            }
+            new_trace.data[i][c_refinment_target_indicies[j]] = v.clone();
+            results.push(new_trace);
+        }
+        Some(results)
+    } else {
+        Some(vec![trace.clone(), trace.clone()])
+    }
+    //}
 }
 
 mod tests {

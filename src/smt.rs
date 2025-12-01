@@ -56,6 +56,7 @@ pub fn expr_to_smt(
                         }
                     }
                     LatticeVMSymbolicEntry::Public => ("public", 0),
+                    _ => todo!(),
                 };
                 let name = format!("{}_{}_{}", ty, base_row, v.index);
                 vars.insert(name.clone());

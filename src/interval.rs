@@ -77,8 +77,8 @@ impl Neg for AbstractInterval {
 impl AbstractInterval {
     pub fn top(prime: u32) -> Self {
         Self {
-            lo: 0_i64,
-            hi: (prime as i64) - 1,
+            lo: -(prime as i64) / 2,
+            hi: (prime as i64) / 2,
         }
     }
 
@@ -175,9 +175,9 @@ impl AbstractInterval {
         self.lo == self.hi
     }
 
-    pub fn split(&self) -> (Self, Self) {
+    pub fn split(&self, _p: u32) -> Vec<Self> {
         if self.hi == self.lo || self.hi == self.lo + 1 {
-            (
+            vec![
                 Self {
                     lo: self.lo,
                     hi: self.lo,
@@ -186,9 +186,9 @@ impl AbstractInterval {
                     lo: self.hi,
                     hi: self.hi,
                 },
-            )
+            ]
         } else {
-            (
+            vec![
                 Self {
                     lo: self.lo,
                     hi: (self.lo + self.hi) / 2,
@@ -197,7 +197,7 @@ impl AbstractInterval {
                     lo: (self.lo + self.hi) / 2 + 1,
                     hi: self.hi,
                 },
-            )
+            ]
         }
     }
 }
