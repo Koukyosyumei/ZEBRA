@@ -1853,7 +1853,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "valida-alu-u32"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "itertools 0.14.0",
  "p3-air",
@@ -1880,7 +1880,7 @@ dependencies = [
 [[package]]
 name = "valida-assembler"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "byteorder",
  "clap",
@@ -1894,7 +1894,7 @@ dependencies = [
 [[package]]
 name = "valida-basic-api"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "ark-std",
  "byteorder",
@@ -1946,7 +1946,7 @@ dependencies = [
 [[package]]
 name = "valida-bus"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-air",
  "p3-baby-bear",
@@ -1959,7 +1959,7 @@ dependencies = [
 [[package]]
 name = "valida-bytes"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-air",
  "p3-field",
@@ -1977,7 +1977,7 @@ dependencies = [
 [[package]]
 name = "valida-cpu"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-air",
  "p3-baby-bear",
@@ -1999,7 +1999,7 @@ dependencies = [
 [[package]]
 name = "valida-derive"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2009,7 +2009,7 @@ dependencies = [
 [[package]]
 name = "valida-elf"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "elf",
  "valida-machine",
@@ -2018,7 +2018,7 @@ dependencies = [
 [[package]]
 name = "valida-elliptic"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "halo2curves",
  "p3-field",
@@ -2030,7 +2030,7 @@ dependencies = [
 [[package]]
 name = "valida-keccak"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-air",
  "p3-baby-bear",
@@ -2057,7 +2057,7 @@ dependencies = [
 [[package]]
 name = "valida-lookups"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-air",
  "p3-field",
@@ -2074,7 +2074,7 @@ dependencies = [
 [[package]]
 name = "valida-machine"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "bitvec",
  "byteorder",
@@ -2105,7 +2105,7 @@ dependencies = [
 [[package]]
 name = "valida-memory"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "bitvec",
  "fxhash",
@@ -2132,7 +2132,7 @@ dependencies = [
 [[package]]
 name = "valida-memory-footprint"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "bitvec",
  "hashbrown 0.12.3",
@@ -2145,7 +2145,7 @@ dependencies = [
 [[package]]
 name = "valida-opcodes"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "num_enum",
 ]
@@ -2153,7 +2153,7 @@ dependencies = [
 [[package]]
 name = "valida-output"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-air",
  "p3-baby-bear",
@@ -2177,7 +2177,7 @@ dependencies = [
 [[package]]
 name = "valida-persistence"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "valida-machine",
 ]
@@ -2185,7 +2185,7 @@ dependencies = [
 [[package]]
 name = "valida-program"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-air",
  "p3-field",
@@ -2205,7 +2205,7 @@ dependencies = [
 [[package]]
 name = "valida-range"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-air",
  "p3-baby-bear",
@@ -2222,7 +2222,7 @@ dependencies = [
 [[package]]
 name = "valida-static-data"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-air",
  "p3-baby-bear",
@@ -2240,7 +2240,7 @@ dependencies = [
 [[package]]
 name = "valida-util"
 version = "0.1.0"
-source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#4b038500b91b76a837bf4dd994a0cce83dcbec09"
+source = "git+https://github.com/Koukyosyumei/valida-vm.git?branch=debuggable-v0.10.0#6c4e266c9afcd462d75d4754df201c961d9605db"
 dependencies = [
  "p3-field",
 ]
@@ -2402,18 +2402,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.30"
+version = "0.8.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ea879c944afe8a2b25fef16bb4ba234f47c694565e97383b36f3a878219065c"
+checksum = "fd74ec98b9250adb3ca554bdde269adf631549f51d8a8f8f0a10b50f1cb298c3"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.30"
+version = "0.8.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf955aa904d6040f70dc8e9384444cb1030aed272ba3cb09bbc4ab9e7c1f34f5"
+checksum = "d8a8d209fdf45cf5138cbb5a506f6b52522a25afccc534d1475dad8e31105c6a"
 dependencies = [
  "proc-macro2",
  "quote",

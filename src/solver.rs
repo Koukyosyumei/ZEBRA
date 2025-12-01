@@ -270,19 +270,27 @@ where
     (None, *num_trial, cumulative_priority, false, final_memo)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum RangeType {
     Bool,
+    U4,
     U8,
     Top,
+    Const(i64),
 }
 
-pub fn make_init_val(col_idx: usize, range_types: &HashMap<usize, RangeType>) -> AbstractInterval {
+pub fn make_init_val(
+    col_idx: usize,
+    range_types: &HashMap<usize, RangeType>,
+    prime: u32,
+) -> AbstractInterval {
     if range_types.contains_key(&col_idx) {
         match range_types.get(&col_idx).unwrap() {
             RangeType::Bool => AbstractInterval::bool(),
             RangeType::U8 => AbstractInterval::u8(),
-            RangeType::Top => AbstractInterval::i4(),
+            RangeType::U4 => AbstractInterval::u4(),
+            RangeType::Top => AbstractInterval::top(prime),
+            RangeType::Const(val) => AbstractInterval::from_i64(*val),
         }
     } else {
         AbstractInterval::i4()
@@ -398,7 +406,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
             // apply coarse domain constraints for the chosen columns across rows
             for i in min_row_id..(max_row_id + 1) {
                 for c in &refinment_target_indicies_main {
-                    abs_main_trace_data[i][*c] = make_init_val(*c, &range_types);
+                    abs_main_trace_data[i][*c] = make_init_val(*c, &range_types, prime);
 
                     // apply program-counter-specific refinement for this cell
                     program_counter_refine_fn(&mut abs_main_trace_data, program_len, i, *c);
