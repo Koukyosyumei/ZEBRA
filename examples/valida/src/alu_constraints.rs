@@ -14,6 +14,7 @@ use valida_machine::ChipWithPersistence;
 use valida_machine::Machine;
 use valida_machine::StarkConfig;
 
+use latticevm::interval::AbstractInterval;
 use latticevm::solver::AbsConstraintObj;
 use latticevm::solver::RangeType;
 
@@ -24,6 +25,7 @@ pub fn get_alu_constraint<M, SC, C>(
     machine: &M,
     chip: &C,
     num_columns: usize,
+    prime: u32,
 ) -> (AbsConstraintObj, Vec<usize>)
 where
     M: Machine<SC::Val>,
@@ -58,6 +60,12 @@ where
     let mut refinable_cols: Vec<usize> = (0..num_columns).collect();
     refinable_cols.retain(|c| !cpu_input_cols.contains(c));
     refinable_cols.retain(|c| !multiplicity_col.contains(c));
+
+    for c in &refinable_cols {
+        if !col_range_types.contains_key(c) {
+            col_range_types.insert(*c, RangeType::Top);
+        }
+    }
 
     (
         AbsConstraintObj {

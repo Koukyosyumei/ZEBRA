@@ -186,25 +186,22 @@ fn main() -> Result<(), io::Error> {
     println!("Bitwise AIR MAP");
     println!("  {:?}", COL_MAP);
 
-    let bitwise_air = Bitwise32Chip::default();
-    let machine = BasicMachine::<BabyBear>::default();
-
-    let mut alu_constraint = get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(
-        &machine,
-        &bitwise_air,
-        NUM_BITWISE_COLS,
-    );
-    alu_constraint.aux_range_types.insert(72, RangeType::Top);
-    alu_constraint.aux_range_types.insert(73, RangeType::Top);
-    alu_constraint.aux_range_types.insert(74, RangeType::Top);
-    alu_constraint.aux_range_types.insert(75, RangeType::Top);
-
-    alu_constraint.aux_refinement_plan.push(64);
-    alu_constraint.aux_refinement_plan.push(68);
-    alu_constraint.aux_range_types.insert(64, RangeType::U4);
-    alu_constraint.aux_range_types.insert(68, RangeType::U4);
-
+    let air = Bitwise32Chip::default();
+    let num_col = NUM_BITWISE_COLS;
     let chip_idx = 10;
+
+    let machine = BasicMachine::<BabyBear>::default();
+    let (mut alu_constraint, cpu_input_cols) =
+        get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &air, num_col, prime);
+    alu_constraint.aux_refinement_plan.push(cpu_input_cols[0]);
+    alu_constraint.aux_refinement_plan.push(cpu_input_cols[4]);
+    alu_constraint
+        .aux_range_types
+        .insert(cpu_input_cols[0], RangeType::U4);
+    alu_constraint
+        .aux_range_types
+        .insert(cpu_input_cols[4], RangeType::U4);
+
     let minimum_num_taregt_cols = alu_constraint.aux_refinement_plan.len();
 
     println!("  Target Columns: {:?}", alu_constraint.aux_refinement_plan);
@@ -251,6 +248,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Run Solver ######################################
     let mut known_solution = HashSet::<String>::new();
+    let mut logs = Vec::new();
     let start_time = time::Instant::now();
     run_solver(
         &alu_constraint.aux_constraints,
@@ -272,6 +270,7 @@ fn main() -> Result<(), io::Error> {
         prime,
         seed,
         &mut known_solution,
+        &mut logs,
         &mut ui,
         &mut terminal,
     );

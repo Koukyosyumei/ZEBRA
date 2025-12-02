@@ -254,6 +254,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Run Solver ######################################
     let mut known_solution = HashSet::<String>::new();
+    let mut logs = Vec::new();
     let start_time = time::Instant::now();
     run_solver(
         &bitwise_constraints,
@@ -275,6 +276,7 @@ fn main() -> Result<(), io::Error> {
         prime,
         seed,
         &mut known_solution,
+        &mut logs,
         &mut ui,
         &mut terminal,
     );
