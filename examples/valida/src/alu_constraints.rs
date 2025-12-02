@@ -20,7 +20,11 @@ use latticevm::solver::RangeType;
 use crate::config::MyConfig;
 use crate::p3_to_tv::get_converted_symbolicconstraints;
 
-pub fn get_alu_constraint<M, SC, C>(machine: &M, chip: &C, num_columns: usize) -> AbsConstraintObj
+pub fn get_alu_constraint<M, SC, C>(
+    machine: &M,
+    chip: &C,
+    num_columns: usize,
+) -> (AbsConstraintObj, Vec<usize>)
 where
     M: Machine<SC::Val>,
     SC: StarkConfig,
@@ -55,12 +59,15 @@ where
     refinable_cols.retain(|c| !cpu_input_cols.contains(c));
     refinable_cols.retain(|c| !multiplicity_col.contains(c));
 
-    AbsConstraintObj {
-        name: "Add".to_string(),
-        aux_constraints: symbolic_constraints,
-        aux_refinement_plan: refinable_cols,
-        aux_range_types: col_range_types,
-    }
+    (
+        AbsConstraintObj {
+            name: "Add".to_string(),
+            aux_constraints: symbolic_constraints,
+            aux_refinement_plan: refinable_cols,
+            aux_range_types: col_range_types,
+        },
+        cpu_input_cols,
+    )
 }
 
 pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {

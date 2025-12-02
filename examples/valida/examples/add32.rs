@@ -186,7 +186,7 @@ fn main() -> Result<(), io::Error> {
     let add_air = Add32Chip::default();
     let machine = BasicMachine::<BabyBear>::default();
 
-    let mut alu_constraint =
+    let (mut alu_constraint, cpu_input_cols) =
         get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &add_air, NUM_ADD_COLS);
     alu_constraint.aux_refinement_plan.push(0);
     alu_constraint.aux_refinement_plan.push(4);
@@ -240,6 +240,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Run Solver ######################################
     let mut known_solution = HashSet::<String>::new();
+    let mut logs = Vec::new();
     let start_time = time::Instant::now();
     run_solver(
         &alu_constraint.aux_constraints,
@@ -261,6 +262,7 @@ fn main() -> Result<(), io::Error> {
         prime,
         seed,
         &mut known_solution,
+        &mut logs,
         &mut ui,
         &mut terminal,
     );
