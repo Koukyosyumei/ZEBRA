@@ -365,6 +365,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
     prime: u32,
     seed: u64,
     known_solution: &mut HashSet<String>,
+    logs_num_solution: &mut Vec<(usize, usize)>,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
@@ -540,6 +541,8 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                                 ui.render::<CrosstermBackend<Stdout>>(f);
                             })
                             .unwrap();
+
+                        logs_num_solution.push((global_expansion_count, known_solution.len()));
                     }
                 }
                 // update global expansion counter and check for exit signal

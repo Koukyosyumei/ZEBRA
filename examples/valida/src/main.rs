@@ -202,6 +202,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Run Solver ######################################
     let mut known_solution = HashSet::<String>::new();
+    let mut logs = Vec::new();
     run_solver(
         &cpu_constraints,
         &cpu_target_cols,
@@ -222,6 +223,7 @@ fn main() -> Result<(), io::Error> {
         prime,
         seed,
         &mut known_solution,
+        &mut logs,
         &mut ui,
         &mut terminal,
     );
@@ -236,6 +238,7 @@ fn main() -> Result<(), io::Error> {
     terminal.show_cursor()?;
 
     eprintln!("#Unique Solution  : {}", known_solution.len());
+    fs::write("voutput/log.txt", format!("{:?}", logs)).unwrap();
 
     Ok(())
 }
