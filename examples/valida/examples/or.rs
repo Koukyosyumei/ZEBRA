@@ -42,7 +42,10 @@ use valida_alu_u32::add::columns::ADD_COL_MAP;
 use valida_alu_u32::add::Add32Chip;
 use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction, MachineWithAdd32Chip};
 use valida_alu_u32::bitwise::columns::COL_MAP;
+use valida_alu_u32::bitwise::columns::NUM_BITWISE_COLS;
+use valida_alu_u32::bitwise::And32Instruction;
 use valida_alu_u32::bitwise::Bitwise32Chip;
+use valida_alu_u32::bitwise::Or32Instruction;
 use valida_alu_u32::com::columns::COM_COL_MAP;
 use valida_alu_u32::com::Com32Chip;
 use valida_alu_u32::com::Eq32Instruction;
@@ -121,18 +124,18 @@ fn final_check(
 ) {
     let string_representation = format!(
         "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][12],
-        trace.data[0][13],
-        trace.data[0][14],
-        trace.data[0][15],
+        trace.data[0][64],
+        trace.data[0][65],
+        trace.data[0][66],
+        trace.data[0][67],
+        trace.data[0][68],
+        trace.data[0][69],
+        trace.data[0][70],
+        trace.data[0][71],
+        trace.data[0][72],
+        trace.data[0][73],
+        trace.data[0][74],
+        trace.data[0][75],
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -162,7 +165,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Sub32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Or32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
@@ -181,20 +184,25 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    println!("SUB AIR MAP");
-    println!("  {:?}", SUB_COL_MAP);
+    println!("Bitwise AIR MAP");
+    println!("  {:?}", COL_MAP);
 
-    let sub_air = Sub32Chip::default();
+    let air = Bitwise32Chip::default();
+    let num_col = NUM_BITWISE_COLS;
+    let chip_idx = 10;
+
     let machine = BasicMachine::<BabyBear>::default();
+    let (mut alu_constraint, cpu_input_cols) =
+        get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &air, num_col, prime);
+    alu_constraint.aux_refinement_plan.push(cpu_input_cols[0]);
+    alu_constraint.aux_refinement_plan.push(cpu_input_cols[4]);
+    alu_constraint
+        .aux_range_types
+        .insert(cpu_input_cols[0], RangeType::U4);
+    alu_constraint
+        .aux_range_types
+        .insert(cpu_input_cols[4], RangeType::U4);
 
-    let mut alu_constraint =
-        get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &sub_air, NUM_SUB_COLS);
-    alu_constraint.aux_refinement_plan.push(0);
-    alu_constraint.aux_refinement_plan.push(4);
-    alu_constraint.aux_range_types.insert(0, RangeType::U4);
-    alu_constraint.aux_range_types.insert(4, RangeType::U4);
-
-    let chip_idx = 4;
     let minimum_num_taregt_cols = alu_constraint.aux_refinement_plan.len();
 
     println!("  Target Columns: {:?}", alu_constraint.aux_refinement_plan);
@@ -204,7 +212,7 @@ fn main() -> Result<(), io::Error> {
     let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 10000000;
+    let max_iteration = 1000000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let seed = 41;
@@ -217,7 +225,7 @@ fn main() -> Result<(), io::Error> {
     let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
     // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>(3, 4);
+    let program = get_target_program::<BabyBear>(9, 11);
     let program_len = program.len();
 
     // Convert program to string for UI display
@@ -241,6 +249,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Run Solver ######################################
     let mut known_solution = HashSet::<String>::new();
+    let mut logs = Vec::new();
     let start_time = time::Instant::now();
     run_solver(
         &alu_constraint.aux_constraints,
@@ -262,6 +271,7 @@ fn main() -> Result<(), io::Error> {
         prime,
         seed,
         &mut known_solution,
+        &mut logs,
         &mut ui,
         &mut terminal,
     );
