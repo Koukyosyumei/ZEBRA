@@ -183,17 +183,21 @@ fn main() -> Result<(), io::Error> {
     println!("ADD AIR MAP");
     println!("  {:?}", ADD_COL_MAP);
 
-    let add_air = Add32Chip::default();
-    let machine = BasicMachine::<BabyBear>::default();
-
-    let (mut alu_constraint, cpu_input_cols) =
-        get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &add_air, NUM_ADD_COLS);
-    alu_constraint.aux_refinement_plan.push(0);
-    alu_constraint.aux_refinement_plan.push(4);
-    alu_constraint.aux_range_types.insert(0, RangeType::U4);
-    alu_constraint.aux_range_types.insert(4, RangeType::U4);
-
+    let air = Add32Chip::default();
+    let num_col = NUM_ADD_COLS;
     let chip_idx = 3;
+
+    let machine = BasicMachine::<BabyBear>::default();
+    let (mut alu_constraint, cpu_input_cols) =
+        get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &air, num_col);
+    alu_constraint.aux_refinement_plan.push(cpu_input_cols[0]);
+    alu_constraint.aux_refinement_plan.push(cpu_input_cols[4]);
+    alu_constraint
+        .aux_range_types
+        .insert(cpu_input_cols[0], RangeType::U4);
+    alu_constraint
+        .aux_range_types
+        .insert(cpu_input_cols[4], RangeType::U4);
     let minimum_num_taregt_cols = alu_constraint.aux_refinement_plan.len();
 
     println!("  Target Columns: {:?}", alu_constraint.aux_refinement_plan);
