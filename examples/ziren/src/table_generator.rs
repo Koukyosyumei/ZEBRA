@@ -81,6 +81,7 @@ pub fn u32_to_opcode(value: u32) -> Option<Opcode> {
     }
 }
 
+/*
 pub fn emit_events(executor: &mut Executor, row: &Vec<u32>) {
     let opcode = u32_to_opcode(row[8]).unwrap();
     let op_a = row[9];
@@ -194,3 +195,4 @@ pub fn emit_events(executor: &mut Executor, row: &Vec<u32>) {
         executor.record.cpu_local_memory_access.push(event);
     }
 }
+*/

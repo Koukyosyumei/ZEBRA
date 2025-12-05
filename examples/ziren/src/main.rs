@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::{io, thread, time::Duration};
 
@@ -42,15 +43,62 @@ use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
 use latticevm::ui::UiState;
+use latticevm::utils::create_or_clear_dir;
 use latticevm::{
     interval::AbstractInterval, solver::run_solver, symbolic::gather_boolean_variables,
     symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
 };
+
 use latticevm_ziren::executor::run_ziren_program;
 use latticevm_ziren::p3_to_tv::convert_p3_expr;
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
-use latticevm_ziren::table_generator::emit_events;
+
+fn program_counter_refine_fn(
+    abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
+    program_len: usize,
+    i: usize,
+    j: usize,
+) {
+}
+
+fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {}
+
+// ############## Final Check Function ##############################
+fn final_check(
+    trace: &AbstractTrace,
+    num_trial: usize,
+    prime: u32,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    let mut output = String::new();
+
+    let recovered_states = trace
+        .data
+        .iter()
+        .map(|row| ziren_abstract_trace_to_abstract_state(row, prime))
+        .collect::<Vec<_>>();
+
+    output.push_str("Malicious States:\n");
+    for rs in &recovered_states {
+        output.push_str(&format!("\t{}\n", rs));
+    }
+    output.push_str("-----------------\n");
+
+    let program = add_program(
+        recovered_states[0].pc.as_canonical_u32(prime),
+        recovered_states[0].pc.as_canonical_u32(prime),
+    );
+    let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
+
+    output.push_str("Original States:\n");
+    for tas in &true_abstract_states {
+        output.push_str(&format!("\t{}\n", tas));
+    }
+
+    ui.recovered = output;
+}
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
@@ -58,11 +106,14 @@ pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
 }
 
 fn main() -> Result<(), io::Error> {
-    // ############### Global Parameters #################################
+    create_or_clear_dir("voutput")?;
+
+    // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
+    // Columns reserved for program counters / instructions
     let program_cols = (8..35).collect::<Vec<_>>();
 
-    // ############### Gather Constraints ################################
+    // ######################## Extract CPU Constraints ##########################
     let air = CpuChip::default();
 
     let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
@@ -71,11 +122,8 @@ fn main() -> Result<(), io::Error> {
         .iter()
         .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
         .collect::<Vec<_>>();
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
     println!("{:?}", CPU_COL_MAP);
-
-    for tv in &tv_constraints {
-        println!("{}", tv);
-    }
 
     // # Additional Public Value Verification
     let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
@@ -87,23 +135,42 @@ fn main() -> Result<(), io::Error> {
         pv_neg_constraints,
     };
 
-    // ############### Preparation of Solver ############################
-    let mut rng = StdRng::seed_from_u64(42);
+    // Columns available for refinement (excluding reserved program columns)
+    let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
+    target_cols.retain(|x| !program_cols.contains(x));
+
+    // ######################## Auxiliary ALU Constraints #######################
+    //let alu_constraints = get_alu_constraints();
+    let aux_objs = vec![];
+    let aux_tg_fns = vec![];
+
+    // ######################## Solver Parameters ###############################
+    let max_iteration = 1000;
+    let minimum_num_taregt_cols = 1;
+    let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 2;
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
+    let seed = 41;
 
-    // ############### Prepare Public Values ############################
+    // Public trace values (example: program start, memory base, initial step)
     let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
     public_vals[40] = AbstractInterval::i4();
     public_vals[41] = AbstractInterval::bool();
     public_vals[44] = AbstractInterval::one();
     let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
 
-    // ############### Target Program ###################################
+    // ######################## Program Initialization ###########################
     let program = add_program(4, 4);
-    let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
+    let program_len = program.instructions.len();
 
+    // Convert program to string for UI display
+    let program_str = program
+        .instructions
+        .iter()
+        .map(|inst| format!("{:?}\n", inst))
+        .collect::<String>();
+
+    let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
     let mut base_abs_main_trace_data = vec![];
     for st in &true_abstract_traces {
         if st.0 == "Cpu" {
@@ -111,78 +178,7 @@ fn main() -> Result<(), io::Error> {
         }
     }
 
-    /*
-    let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
-    let mut u32_cpu_row: Vec<u32> = base_abs_main_trace_data[0]
-        .clone()
-        .into_iter()
-        .map(|v| v.as_canonical_u32(prime))
-        .collect();
-    emit_events(&mut runtime, &u32_cpu_row);
-
-    let chip = AddSubChip::default();
-    let mut trace: RowMajorMatrix<KoalaBear> =
-        chip.generate_trace(&runtime.record, &mut ExecutionRecord::default());
-    println!("AddSub: {:?}", trace.row_mut(0));
-
-    let chip = MemoryLocalChip::new();
-    let mut trace: RowMajorMatrix<KoalaBear> =
-        chip.generate_trace(&runtime.record, &mut ExecutionRecord::default());
-    println!("memLocal: {:?}", trace.row_mut(0));
-    */
-
-    // ############### Construct SMT formula ############################
-    if false {
-        let mut positions = vec![];
-        for i in 0..base_abs_main_trace_data.len() {
-            for j in 0..base_abs_main_trace_data[0].len() {
-                positions.push((i, j, base_abs_main_trace_data[i][j].clone()));
-            }
-        }
-        let smt = expr_to_smt(
-            &constraints,
-            &positions,
-            num_extracted_rows,
-            68,
-            ZKM_PROOF_NUM_PV_ELTS,
-            prime,
-        );
-        println!("{}", smt);
-    }
-
-    // ############## Final Check Function ##############################
-    fn final_check(trace: &AbstractTrace, prime: u32, ui: &mut UiState) {
-        let mut output = String::new();
-
-        let recovered_states = trace
-            .data
-            .iter()
-            .map(|row| ziren_abstract_trace_to_abstract_state(row, prime))
-            .collect::<Vec<_>>();
-
-        output.push_str("Malicious States:\n");
-        for rs in &recovered_states {
-            output.push_str(&format!("\t{}\n", rs));
-        }
-        output.push_str("-----------------\n");
-
-        let program = add_program(
-            recovered_states[0].pc.as_canonical_u32(prime),
-            recovered_states[0].pc.as_canonical_u32(prime),
-        );
-        let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
-
-        output.push_str("Original States:\n");
-        for tas in &true_abstract_states {
-            output.push_str(&format!("\t{}\n", tas));
-        }
-
-        ui.recovered = output;
-    }
-
-    // ############## Solve! ###########################################
-    let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
-    target_cols.retain(|x| !program_cols.contains(x));
+    // ######################## UI Initialization ################################
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -190,24 +186,32 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut ui = UiState::new();
-
-    let mut program_str = String::new();
-    for inst in program.instructions {
-        program_str.push_str(&format!("{:?}\n", inst));
-    }
     ui.program = program_str;
 
+    // ######################## Run Solver ######################################
+    let mut known_solution = HashSet::<String>::new();
+    let mut logs = Vec::new();
     run_solver(
         &constraints,
         &target_cols,
         &potential_boolean_vars,
+        &aux_objs,
+        &aux_tg_fns,
         &refinment_target_indicies_pv,
         &base_abs_main_trace_data,
         public_vals,
+        max_iteration,
+        minimum_num_taregt_cols,
+        min_row_id,
         max_row_id,
+        program_len,
+        program_counter_refine_fn,
+        adjust_pc_program,
         final_check,
         prime,
-        42,
+        seed,
+        &mut known_solution,
+        &mut logs,
         &mut ui,
         &mut terminal,
     );
