@@ -44,6 +44,7 @@ use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction, MachineWithAd
 use valida_alu_u32::bitwise::columns::COL_MAP;
 use valida_alu_u32::bitwise::Bitwise32Chip;
 use valida_alu_u32::com::columns::COM_COL_MAP;
+use valida_alu_u32::com::columns::NUM_COM_COLS;
 use valida_alu_u32::com::Com32Chip;
 use valida_alu_u32::com::Eq32Instruction;
 use valida_alu_u32::com::Ne32Instruction;
@@ -128,10 +129,10 @@ fn final_check(
         trace.data[0][5],
         trace.data[0][6],
         trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
         trace.data[0][11],
+        0,
+        0,
+        0,
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -161,7 +162,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Ne32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
@@ -180,12 +181,12 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    println!("ADD AIR MAP");
-    println!("  {:?}", ADD_COL_MAP);
+    println!("COM AIR MAP");
+    println!("  {:?}", COM_COL_MAP);
 
-    let air = Add32Chip::default();
-    let num_col = NUM_ADD_COLS;
-    let chip_idx = 3;
+    let air = Com32Chip::default();
+    let num_col = NUM_COM_COLS;
+    let chip_idx = 9;
 
     let machine = BasicMachine::<BabyBear>::default();
     let (mut alu_constraint, cpu_input_cols) =
@@ -232,6 +233,7 @@ fn main() -> Result<(), io::Error> {
     // Generate initial abstract main trace from program
     let base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
+    println!("{:?}", base_abs_main_trace_data);
 
     // ######################## UI Initialization ################################
     enable_raw_mode()?;

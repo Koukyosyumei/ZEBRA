@@ -47,7 +47,12 @@ use valida_alu_u32::com::columns::COM_COL_MAP;
 use valida_alu_u32::com::Com32Chip;
 use valida_alu_u32::com::Eq32Instruction;
 use valida_alu_u32::com::Ne32Instruction;
+use valida_alu_u32::lt::columns::LT_COL_MAP;
+use valida_alu_u32::lt::columns::NUM_LT_COLS;
+use valida_alu_u32::lt::Lt32Chip;
+use valida_alu_u32::lt::Lt32Instruction;
 use valida_alu_u32::mul::Mul32Chip;
+use valida_alu_u32::sub::columns::NUM_SUB_COLS;
 use valida_alu_u32::sub::columns::SUB_COL_MAP;
 use valida_alu_u32::sub::Sub32Chip;
 use valida_alu_u32::sub::Sub32Instruction;
@@ -128,10 +133,10 @@ fn final_check(
         trace.data[0][5],
         trace.data[0][6],
         trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
+        trace.data[0][12],
+        trace.data[0][13],
+        trace.data[0][14],
+        trace.data[0][15],
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -161,7 +166,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Lt32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
@@ -180,13 +185,15 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    println!("ADD AIR MAP");
-    println!("  {:?}", ADD_COL_MAP);
+    println!("LT AIR MAP");
+    println!("  {:?}", LT_COL_MAP);
 
-    let air = Add32Chip::default();
-    let num_col = NUM_ADD_COLS;
-    let chip_idx = 3;
+    let air = Lt32Chip::default();
+    let num_col = NUM_LT_COLS;
+    let chip_idx = 8;
 
+    //  input_1: Word([16, 17, 18, 19]), input_2: Word([20, 21, 22, 23])
+    //  output 37
     let machine = BasicMachine::<BabyBear>::default();
     let (mut alu_constraint, cpu_input_cols) =
         get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &air, num_col, prime);

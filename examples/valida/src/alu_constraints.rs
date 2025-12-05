@@ -56,8 +56,16 @@ where
     println!("cpu: {:?}", cpu_lookup_cols);
     println!("mul: {:?}", multiplicity_col);
 
-    let cpu_input_cols: Vec<usize> = cpu_lookup_cols.iter().cloned().take(8).collect();
+    let cpu_selector_cols: Vec<usize> = cpu_lookup_cols[0].clone();
+    let cpu_input_cols: Vec<usize> = cpu_lookup_cols
+        .iter()
+        .cloned()
+        .skip(1)
+        .take(8)
+        .flatten()
+        .collect();
     let mut refinable_cols: Vec<usize> = (0..num_columns).collect();
+    refinable_cols.retain(|c| !cpu_selector_cols.contains(c));
     refinable_cols.retain(|c| !cpu_input_cols.contains(c));
     refinable_cols.retain(|c| !multiplicity_col.contains(c));
 
@@ -110,7 +118,9 @@ pub fn get_alu_constraints() -> HashMap<String, AbsConstraintObj> {
     let input_cols: Vec<usize> = cols_constrained_by_cpu_chip
         .iter()
         .cloned()
+        .skip(1)
         .take(8)
+        .flatten()
         .collect();
     println!("input: {:?}", input_cols);
     let mut add_target_cols: Vec<usize> = (0..NUM_ADD_COLS).collect();
