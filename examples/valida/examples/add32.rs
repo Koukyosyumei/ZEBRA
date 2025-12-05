@@ -42,16 +42,12 @@ use valida_alu_u32::add::columns::ADD_COL_MAP;
 use valida_alu_u32::add::Add32Chip;
 use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction, MachineWithAdd32Chip};
 use valida_alu_u32::bitwise::columns::COL_MAP;
-use valida_alu_u32::bitwise::columns::NUM_BITWISE_COLS;
-use valida_alu_u32::bitwise::And32Instruction;
 use valida_alu_u32::bitwise::Bitwise32Chip;
-use valida_alu_u32::bitwise::Xor32Instruction;
 use valida_alu_u32::com::columns::COM_COL_MAP;
 use valida_alu_u32::com::Com32Chip;
 use valida_alu_u32::com::Eq32Instruction;
 use valida_alu_u32::com::Ne32Instruction;
 use valida_alu_u32::mul::Mul32Chip;
-use valida_alu_u32::sub::columns::NUM_SUB_COLS;
 use valida_alu_u32::sub::columns::SUB_COL_MAP;
 use valida_alu_u32::sub::Sub32Chip;
 use valida_alu_u32::sub::Sub32Instruction;
@@ -124,18 +120,18 @@ fn final_check(
 ) {
     let string_representation = format!(
         "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][64],
-        trace.data[0][65],
-        trace.data[0][66],
-        trace.data[0][67],
-        trace.data[0][68],
-        trace.data[0][69],
-        trace.data[0][70],
-        trace.data[0][71],
-        trace.data[0][72],
-        trace.data[0][73],
-        trace.data[0][74],
-        trace.data[0][75],
+        trace.data[0][0],
+        trace.data[0][1],
+        trace.data[0][2],
+        trace.data[0][3],
+        trace.data[0][4],
+        trace.data[0][5],
+        trace.data[0][6],
+        trace.data[0][7],
+        trace.data[0][8],
+        trace.data[0][9],
+        trace.data[0][10],
+        trace.data[0][11],
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -165,7 +161,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Xor32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
@@ -184,12 +180,12 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    println!("Bitwise AIR MAP");
-    println!("  {:?}", COL_MAP);
+    println!("ADD AIR MAP");
+    println!("  {:?}", ADD_COL_MAP);
 
-    let air = Bitwise32Chip::default();
-    let num_col = NUM_BITWISE_COLS;
-    let chip_idx = 10;
+    let air = Add32Chip::default();
+    let num_col = NUM_ADD_COLS;
+    let chip_idx = 3;
 
     let machine = BasicMachine::<BabyBear>::default();
     let (mut alu_constraint, cpu_input_cols) =
@@ -202,7 +198,6 @@ fn main() -> Result<(), io::Error> {
     alu_constraint
         .aux_range_types
         .insert(cpu_input_cols[4], RangeType::U4);
-
     let minimum_num_taregt_cols = alu_constraint.aux_refinement_plan.len();
 
     println!("  Target Columns: {:?}", alu_constraint.aux_refinement_plan);
@@ -212,7 +207,7 @@ fn main() -> Result<(), io::Error> {
     let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000000000;
+    let max_iteration = 10000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let seed = 41;
@@ -225,7 +220,7 @@ fn main() -> Result<(), io::Error> {
     let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
     // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>(9, 11);
+    let program = get_target_program::<BabyBear>(3, 4);
     let program_len = program.len();
 
     // Convert program to string for UI display

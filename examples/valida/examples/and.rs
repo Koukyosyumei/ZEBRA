@@ -45,7 +45,6 @@ use valida_alu_u32::bitwise::columns::COL_MAP;
 use valida_alu_u32::bitwise::columns::NUM_BITWISE_COLS;
 use valida_alu_u32::bitwise::And32Instruction;
 use valida_alu_u32::bitwise::Bitwise32Chip;
-use valida_alu_u32::bitwise::Xor32Instruction;
 use valida_alu_u32::com::columns::COM_COL_MAP;
 use valida_alu_u32::com::Com32Chip;
 use valida_alu_u32::com::Eq32Instruction;
@@ -165,7 +164,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Xor32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <And32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {

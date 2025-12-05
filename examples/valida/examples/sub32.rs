@@ -48,6 +48,7 @@ use valida_alu_u32::com::Com32Chip;
 use valida_alu_u32::com::Eq32Instruction;
 use valida_alu_u32::com::Ne32Instruction;
 use valida_alu_u32::mul::Mul32Chip;
+use valida_alu_u32::sub::columns::NUM_SUB_COLS;
 use valida_alu_u32::sub::columns::SUB_COL_MAP;
 use valida_alu_u32::sub::Sub32Chip;
 use valida_alu_u32::sub::Sub32Instruction;
@@ -80,6 +81,7 @@ use valida_program::MachineWithProgramROM;
 use valida_program::ProgramTableType;
 
 use latticevm::interval::AbstractInterval;
+use latticevm::interval::MayBeFlag;
 use latticevm::solver::run_solver;
 use latticevm::solver::RangeType;
 use latticevm::symbolic::eval_air_constraints;
@@ -90,8 +92,7 @@ use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
-use latticevm::interval::MayBeFlag;
-use latticevm_valida::alu_constraints::get_alu_constraints;
+use latticevm_valida::alu_constraints::get_alu_constraint;
 use latticevm_valida::alu_tables::{derive_add_table, derive_com_table, derive_sub_table};
 use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
 use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
@@ -183,39 +184,31 @@ fn main() -> Result<(), io::Error> {
     println!("SUB AIR MAP");
     println!("  {:?}", SUB_COL_MAP);
 
-    let sub_air = Sub32Chip::default();
+    let air = Sub32Chip::default();
+    let num_col = NUM_SUB_COLS;
+    let chip_idx = 4;
+
     let machine = BasicMachine::<BabyBear>::default();
+    let (mut alu_constraint, cpu_input_cols) =
+        get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &air, num_col, prime);
+    alu_constraint.aux_refinement_plan.push(cpu_input_cols[0]);
+    alu_constraint.aux_refinement_plan.push(cpu_input_cols[4]);
+    alu_constraint
+        .aux_range_types
+        .insert(cpu_input_cols[0], RangeType::U4);
+    alu_constraint
+        .aux_range_types
+        .insert(cpu_input_cols[4], RangeType::U4);
+    let minimum_num_taregt_cols = alu_constraint.aux_refinement_plan.len();
 
-    let mut cols_constrained_by_u8_chip = Vec::new();
-    let mut cols_constrained_by_cpu_chip = Vec::new();
-    let mut counter_col = Vec::new();
-    get_lookup_interactions::<BasicMachine<BabyBear>, MyConfig, _>(
-        &machine,
-        &sub_air,
-        &mut cols_constrained_by_u8_chip,
-        &mut cols_constrained_by_cpu_chip,
-        &mut counter_col,
-    );
-    println!("u8: {:?}", cols_constrained_by_u8_chip);
-    println!("bus: {:?}", cols_constrained_by_cpu_chip);
-    println!("counter: {:?}", counter_col);
-
-    let mut alu_constraints = get_alu_constraints();
-    let sub_constraints = &alu_constraints["Sub"].aux_constraints;
-    let mut sub_target_cols = alu_constraints["Sub"].aux_refinement_plan.clone();
-    let mut sub_range_types = alu_constraints["Sub"].aux_range_types.clone();
-    let sub_chip_idx = 4;
-
-    for c in &cols_constrained_by_u8_chip {
-        sub_range_types.insert(*c, RangeType::U8);
-    }
+    println!("  Target Columns: {:?}", alu_constraint.aux_refinement_plan);
+    println!("  Range Types   : {:?}", alu_constraint.aux_range_types);
 
     let aux_objs = vec![];
     let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000;
-    let minimum_num_taregt_cols = 8;
+    let max_iteration = 10000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let seed = 41;
@@ -239,7 +232,7 @@ fn main() -> Result<(), io::Error> {
 
     // Generate initial abstract main trace from program
     let base_abs_main_trace_data =
-        generate_bootstrap_trace_from_program(&program, sub_chip_idx, 0, 0x1000);
+        generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
 
     // ######################## UI Initialization ################################
     enable_raw_mode()?;
@@ -252,11 +245,12 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Run Solver ######################################
     let mut known_solution = HashSet::<String>::new();
+    let mut logs = Vec::new();
     let start_time = time::Instant::now();
     run_solver(
-        &sub_constraints,
-        &sub_target_cols,
-        &sub_range_types,
+        &alu_constraint.aux_constraints,
+        &alu_constraint.aux_refinement_plan,
+        &alu_constraint.aux_range_types,
         &aux_objs,
         &aux_tg_fns,
         &refinment_target_indicies_pv,
@@ -273,6 +267,7 @@ fn main() -> Result<(), io::Error> {
         prime,
         seed,
         &mut known_solution,
+        &mut logs,
         &mut ui,
         &mut terminal,
     );

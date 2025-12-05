@@ -17,7 +17,7 @@ pub fn derive_add_table(
         if row[58].as_canonical_u32(prime) != 0 && row[3].as_canonical_u32(prime) == 100 {
             let mut r: Vec<_> = (0..16).map(|_| AbstractInterval::top(prime)).collect();
             for (k, v) in range_types {
-                r[*k] = make_init_val(*k, &range_types);
+                r[*k] = make_init_val(*k, &range_types, prime);
             }
 
             let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
@@ -43,7 +43,7 @@ pub fn derive_sub_table(
         if row[58].as_canonical_u32(prime) != 0 && row[3].as_canonical_u32(prime) == 101 {
             let mut r: Vec<_> = (0..17).map(|_| AbstractInterval::top(prime)).collect();
             for (k, v) in range_types {
-                r[*k] = make_init_val(*k, &range_types);
+                r[*k] = make_init_val(*k, &range_types, prime);
             }
 
             let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44, 45, 46, 47];
@@ -71,7 +71,7 @@ pub fn derive_com_table(
         {
             let mut r: Vec<_> = (0..14).map(|_| AbstractInterval::i4()).collect();
             for (k, v) in range_types {
-                r[*k] = make_init_val(*k, &range_types);
+                r[*k] = make_init_val(*k, &range_types, prime);
             }
 
             let cpu_columns = vec![32, 33, 34, 35, 38, 39, 40, 41, 44];
