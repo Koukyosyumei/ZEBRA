@@ -345,34 +345,81 @@ impl LatticeVMSymbolicExpr {
     }
 }
 
-pub fn gather_boolean_variables(constraints: &[LatticeVMSymbolicExpr]) -> Vec<usize> {
+fn collect_add_vars(expr: &LatticeVMSymbolicExpr) -> Option<HashSet<usize>> {
+    match expr {
+        LatticeVMSymbolicExpr::Add(lhs, rhs) => {
+            let mut left = collect_add_vars(lhs)?;
+            let right = collect_add_vars(rhs)?;
+            left.extend(right);
+            Some(left)
+        }
+        LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { index, .. }) => {
+            let mut set = HashSet::new();
+            set.insert(index.clone());
+            Some(set)
+        }
+        _ => None,
+    }
+}
+
+pub fn is_boolean_constraint(constraint: &LatticeVMSymbolicExpr) -> Option<usize> {
+    use LatticeVMSymbolicExpr::*;
+
+    // helper: find `x - 1`
+    fn is_x_minus_one(expr: &LatticeVMSymbolicExpr) -> Option<usize> {
+        if let Sub(lhs, rhs) = expr {
+            if let (
+                Variable(LatticeVMSymbolicVal { index, .. }),
+                Constant(AbstractInterval { lo: 1, hi: 1 }),
+            ) = (&**lhs, &**rhs)
+            {
+                return Some(index.clone());
+            }
+        }
+        None
+    }
+
+    if let Mul(a, b) = constraint {
+        match (&**a, &**b) {
+            // x * (x - 1)
+            (Variable(LatticeVMSymbolicVal { index, .. }), rhs)
+                if is_x_minus_one(rhs) == Some(index.clone()) =>
+            {
+                return Some(index.clone());
+            }
+
+            // (x - 1) * x
+            (lhs, Variable(LatticeVMSymbolicVal { index, .. }))
+                if is_x_minus_one(lhs) == Some(index.clone()) =>
+            {
+                return Some(index.clone());
+            }
+
+            _ => {}
+        }
+    }
+
+    None
+}
+
+pub fn gather_boolean_variables(
+    constraints: &[LatticeVMSymbolicExpr],
+    multiplicities: &HashSet<usize>,
+) -> Vec<usize> {
     let mut result = HashSet::new();
     for c in constraints {
-        if let LatticeVMSymbolicExpr::Mul(lhs, _) = c {
-            if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { entry: _, index }) =
-                &**lhs
-            {
-                result.insert(index.clone());
-            } else if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = &**lhs {
-                if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { entry: _, index }) =
-                    &**lhs
-                {
-                    if let LatticeVMSymbolicExpr::Constant(AbstractInterval { lo: 1, hi: 1 }) =
-                        &**rhs
-                    {
-                        result.insert(index.clone());
-                    }
-                }
-                if let LatticeVMSymbolicExpr::Constant(AbstractInterval { lo: 1, hi: 1 }) = &**lhs {
-                    if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
-                        entry: _,
-                        index,
-                    }) = &**rhs
-                    {
-                        result.insert(index.clone());
+        if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = c {
+            let add_vars = collect_add_vars(lhs);
+            if let Some(add_vars) = add_vars {
+                if add_vars.is_subset(multiplicities) {
+                    if let Some(idx) = is_boolean_constraint(rhs) {
+                        result.insert(idx);
                     }
                 }
             }
+        }
+        if let Some(idx) = is_boolean_constraint(c) {
+            result.insert(idx);
         }
     }
     result.iter().cloned().collect()

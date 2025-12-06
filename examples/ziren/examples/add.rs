@@ -20,9 +20,12 @@ use ratatui::{
     Terminal,
 };
 
+use p3_air::Air;
+use p3_field::Field;
 use p3_koala_bear::KoalaBear;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_mersenne_31::Mersenne31;
+use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
 use zkm_core_executor::syscalls::SyscallCode;
@@ -37,6 +40,8 @@ use zkm_core_machine::{
     cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
     CpuChip,
 };
+use zkm_stark::LookupBuilder;
+use zkm_stark::LookupKind;
 use zkm_stark::MachineAir;
 use zkm_stark::MachineProver;
 use zkm_stark::ZKMCoreOpts;
@@ -77,6 +82,57 @@ pub fn dummy_table_deriver(
 ) -> Vec<Vec<AbstractInterval>> {
     let out = vec![];
     out
+}
+
+pub fn get_symbolic_constraints_look<F, A>(
+    air: &A,
+    preprocessed_width: usize,
+    num_public_values: usize,
+    u8_cols: &mut Vec<usize>,
+    multiplicities: &mut HashSet<usize>,
+) where
+    F: Field,
+    A: Air<LookupBuilder<F>>,
+{
+    let mut builder = LookupBuilder::new(preprocessed_width, air.width());
+    air.eval(&mut builder);
+    let (sends, receives) = builder.lookups();
+
+    for r in &receives {
+        for (w, _) in &r.multiplicity.column_weights {
+            if let p3_air::PairCol::Main(col_idx) = w {
+                multiplicities.insert(*col_idx);
+            }
+        }
+    }
+    for s in &sends {
+        for (w, _) in &s.multiplicity.column_weights {
+            if let p3_air::PairCol::Main(col_idx) = w {
+                multiplicities.insert(*col_idx);
+            }
+        }
+    }
+
+    for s in &sends {
+        match s.kind {
+            LookupKind::Byte => {
+                let opcode = &s.values[0];
+                let a1 = &s.values[1];
+                let a2 = &s.values[2];
+                let b = &s.values[3];
+                let c = &s.values[4];
+                if opcode.constant == F::from_canonical_u64(4) {
+                    if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
+                        u8_cols.push(col_idx);
+                    }
+                    if let p3_air::PairCol::Main(col_idx) = c.column_weights[0].0 {
+                        u8_cols.push(col_idx);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 // ############## Final Check Function ##############################
@@ -142,13 +198,27 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
 
+    let mut u8_cols = vec![];
+    let mut multiplicities = HashSet::new();
     let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
+    get_symbolic_constraints_look::<KoalaBear, AddSubChip>(
+        &air,
+        0,
+        ZKM_PROOF_NUM_PV_ELTS,
+        &mut u8_cols,
+        &mut multiplicities,
+    );
+
     let tv_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
         .collect::<Vec<_>>();
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
+    for s in &tv_constraints {
+        println!("{}", s);
+    }
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
+    println!("########################: {:?}", potential_boolean_vars);
 
     let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
         .iter()
@@ -172,26 +242,19 @@ fn main() -> Result<(), io::Error> {
 
     // Columns available for refinement (excluding reserved program columns)
     let mut target_cols = (0..NUM_ADD_SUB_COLS).collect::<Vec<_>>();
-    target_cols = vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 13];
-    range_types.insert(2, RangeType::U8);
-    range_types.insert(3, RangeType::U8);
-    range_types.insert(4, RangeType::U8);
-    range_types.insert(5, RangeType::U8);
-    range_types.insert(6, RangeType::Bool);
-    range_types.insert(7, RangeType::Bool);
-    range_types.insert(8, RangeType::Bool);
+    target_cols = vec![2, 3, 4, 5, 6, 7, 8, 9, 13];
+    for c in &u8_cols {
+        range_types.insert(*c, RangeType::U8);
+    }
+    for c in &potential_boolean_vars {
+        range_types.insert(*c, RangeType::Bool);
+    }
 
     range_types.insert(9, RangeType::U4);
-    range_types.insert(10, RangeType::U4);
     range_types.insert(13, RangeType::U4);
 
-    //
-    //range_types.insert(13, RangeType::U4);
-    //range_types.insert(13, RangeType::U4);
-    //mut range_types = target_cols.iter().map(|k| (*k, RangeType::U8)).collect();
     println!("{:?}", target_cols);
     println!("{:?}", range_types);
-    //target_cols.retain(|x| !program_cols.contains(x));
 
     // ######################## Auxiliary ALU Constraints #######################
     //let alu_constraints = get_alu_constraints();
@@ -200,7 +263,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     let max_iteration = 100000000;
-    let minimum_num_taregt_cols = 10;
+    let minimum_num_taregt_cols = 9;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
