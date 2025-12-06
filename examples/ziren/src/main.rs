@@ -23,6 +23,7 @@ use p3_matrix::dense::RowMajorMatrix;
 use p3_mersenne_31::Mersenne31;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
+use zkm_core_executor::syscalls::SyscallCode;
 use zkm_core_executor::ExecutionRecord;
 use zkm_core_executor::Executor;
 use zkm_core_executor::MipsAirId::MemoryLocal;
@@ -97,6 +98,7 @@ fn final_check(
     }
     output.push_str("-----------------\n");
 
+    /*
     let program = add_program(
         recovered_states[0].pc.as_canonical_u32(prime),
         recovered_states[0].pc.as_canonical_u32(prime),
@@ -106,13 +108,20 @@ fn final_check(
     output.push_str("Original States:\n");
     for tas in &true_abstract_states {
         output.push_str(&format!("\t{}\n", tas));
-    }
+    }*/
 
     ui.recovered = output;
 }
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
+    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
+    /*
+    instructions.extend(vec![
+        Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
+        Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
+        Instruction::new(Opcode::SYSCALL, 2, 4, 5, false, false),
+    ]);*/
+
     Program::new(instructions, pc_start, pc_base)
 }
 
