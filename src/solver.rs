@@ -546,8 +546,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                     }
                 }
                 // update global expansion counter and check for exit signal
-                global_expansion_count += result.1;
-
+                //global_expansion_count += result.1;
                 if result.3 {
                     exit_flag = true;
                     break;

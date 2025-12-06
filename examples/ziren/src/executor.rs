@@ -65,19 +65,19 @@ pub fn run_ziren_program(
 
     let mut true_abs_traces = vec![];
     for mt in &mut main_traces[0] {
-        if mt.0 == "Cpu" {
-            let nrows = mt.1.values.len() / mt.1.width;
-            let mut rows = vec![];
-            for i in 0..nrows {
-                let mut row = mt.1.row_mut(i);
-                rows.push(
-                    row.iter()
-                        .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
-                        .collect(),
-                );
-            }
-            true_abs_traces.push((mt.0.clone(), rows));
+        //if mt.0 == "Cpu" {
+        let nrows = mt.1.values.len() / mt.1.width;
+        let mut rows = vec![];
+        for i in 0..nrows {
+            let mut row = mt.1.row_mut(i);
+            rows.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .collect(),
+            );
         }
+        true_abs_traces.push((mt.0.clone(), rows));
+        //}
 
         /*
         println!("{}, {} - {}", mt.0, mt.1.values.len(), mt.1.width);
