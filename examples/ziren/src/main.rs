@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
 use std::{io, thread, time::Duration};
@@ -38,6 +39,7 @@ use zkm_stark::ZKMCoreOpts;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 use latticevm::smt::expr_to_smt;
+use latticevm::solver::RangeType;
 use latticevm::symbolic::eval_constraints;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
@@ -63,6 +65,15 @@ fn program_counter_refine_fn(
 }
 
 fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {}
+
+pub fn dummy_table_deriver(
+    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    range_types: &HashMap<usize, RangeType>,
+    prime: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let out = vec![];
+    out
+}
 
 // ############## Final Check Function ##############################
 fn final_check(
@@ -123,6 +134,12 @@ fn main() -> Result<(), io::Error> {
         .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
         .collect::<Vec<_>>();
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
+
+    let cpu_range_types = potential_boolean_vars
+        .iter()
+        .map(|k| (*k, RangeType::Bool))
+        .collect();
+
     println!("{:?}", CPU_COL_MAP);
 
     // # Additional Public Value Verification
@@ -142,7 +159,7 @@ fn main() -> Result<(), io::Error> {
     // ######################## Auxiliary ALU Constraints #######################
     //let alu_constraints = get_alu_constraints();
     let aux_objs = vec![];
-    let aux_tg_fns = vec![];
+    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Solver Parameters ###############################
     let max_iteration = 1000;
@@ -194,7 +211,7 @@ fn main() -> Result<(), io::Error> {
     run_solver(
         &constraints,
         &target_cols,
-        &potential_boolean_vars,
+        &cpu_range_types,
         &aux_objs,
         &aux_tg_fns,
         &refinment_target_indicies_pv,
