@@ -59,6 +59,10 @@ pub enum LatticeVMSymbolicExpr {
     Add(Box<Self>, Box<Self>),
     Sub(Box<Self>, Box<Self>),
     Mul(Box<Self>, Box<Self>),
+    And(Box<Self>, Box<Self>),
+    Or(Box<Self>, Box<Self>),
+    Xor(Box<Self>, Box<Self>),
+    Lt(Box<Self>, Box<Self>),
     Neg(Box<Self>),
 }
 
@@ -154,6 +158,10 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Sub(x, y) => write!(f, "({} - {})", x, y),
             Self::Mul(x, y) => write!(f, "({} * {})", x, y),
             Self::Neg(x) => write!(f, "-{}", x),
+            Self::And(x, y) => write!(f, "({} && {})", x, y),
+            Self::Or(x, y) => write!(f, "({} || {})", x, y),
+            Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
+            Self::Lt(x, y) => write!(f, "({} < {})", x, y),
         }
     }
 }
@@ -341,6 +349,82 @@ impl LatticeVMSymbolicExpr {
                 is_last_row,
                 prime,
             ),
+            Self::And(a, b) => {
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                ) & b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )
+            }
+            Self::Or(a, b) => {
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                ) | b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )
+            }
+            Self::Xor(a, b) => {
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                ) ^ b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )
+            }
+            Self::Lt(a, b) => a
+                .eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )
+                .ltu(b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )),
         }
     }
 }

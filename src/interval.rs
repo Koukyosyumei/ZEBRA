@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    ops::{Add, Mul, Neg, Sub},
+    ops::{Add, BitAnd, BitOr, BitXor, Mul, Neg, Not, Sub},
 };
 
 use serde::Serialize;
@@ -70,6 +70,92 @@ impl Neg for AbstractInterval {
         Self {
             lo: -self.hi,
             hi: -self.lo,
+        }
+    }
+}
+
+// Helper: Find the mask of bits that vary within the interval [lo, hi]
+pub fn varying_bits(lo: i64, hi: i64) -> u64 {
+    if lo == hi {
+        return 0;
+    }
+    let diff = (lo as u64) ^ (hi as u64);
+    if diff == 0 {
+        return 0;
+    }
+    let msb = 63 - diff.leading_zeros();
+    (1u64 << (msb + 1)) - 1
+}
+
+impl BitAnd<Self> for AbstractInterval {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self {
+        let var1 = varying_bits(self.lo, self.hi);
+        let var2 = varying_bits(rhs.lo, rhs.hi);
+
+        let min_val = (self.lo as u64) & (rhs.lo as u64);
+        let var_result = var1 | var2;
+
+        let res_lo = min_val & (!var_result);
+        let res_hi = min_val | var_result;
+
+        let tight_hi = if self.lo >= 0 && rhs.lo >= 0 {
+            std::cmp::min(res_hi, std::cmp::min(self.hi as u64, rhs.hi as u64))
+        } else {
+            res_hi
+        };
+
+        Self {
+            lo: res_lo as i64,
+            hi: tight_hi as i64,
+        }
+    }
+}
+
+impl BitOr<Self> for AbstractInterval {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        let var1 = varying_bits(self.lo, self.hi);
+        let var2 = varying_bits(rhs.lo, rhs.hi);
+
+        let max_val = (self.hi as u64) | (rhs.hi as u64);
+        let var_result = var1 | var2;
+
+        let res_lo = max_val & (!var_result);
+        let res_hi = max_val | var_result;
+
+        Self {
+            lo: res_lo as i64,
+            hi: res_hi as i64,
+        }
+    }
+}
+
+impl BitXor<Self> for AbstractInterval {
+    type Output = Self;
+    fn bitxor(self, rhs: Self) -> Self {
+        let var1 = varying_bits(self.lo, self.hi);
+        let var2 = varying_bits(rhs.lo, rhs.hi);
+
+        let base = (self.lo as u64) ^ (rhs.lo as u64);
+        let var_result = var1 | var2;
+
+        let res_lo = base & (!var_result);
+        let res_hi = base | var_result;
+
+        Self {
+            lo: res_lo as i64,
+            hi: res_hi as i64,
+        }
+    }
+}
+
+impl Not for AbstractInterval {
+    type Output = Self;
+    fn not(self) -> Self {
+        Self {
+            lo: !self.hi,
+            hi: !self.lo,
         }
     }
 }
@@ -175,6 +261,20 @@ impl AbstractInterval {
             return MayBeFlag::MayBe;
         } else {
             return MayBeFlag::True;
+        }
+    }
+
+    pub fn ltu(&self, rhs: Self) -> AbstractInterval {
+        if self.lo < 0 || rhs.lo < 0 {
+            AbstractInterval::bool()
+        } else {
+            if self.hi < rhs.lo {
+                AbstractInterval::one()
+            } else if self.lo > rhs.hi {
+                AbstractInterval::zero()
+            } else {
+                AbstractInterval::bool()
+            }
         }
     }
 

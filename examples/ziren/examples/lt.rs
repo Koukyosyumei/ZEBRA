@@ -36,6 +36,8 @@ use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::NUM_ADD_SUB_COLS;
 use zkm_core_machine::memory::MemoryLocalChip;
 use zkm_core_machine::AddSubChip;
+use zkm_core_machine::LtChip;
+use zkm_core_machine::MulChip;
 use zkm_core_machine::{
     cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
     CpuChip,
@@ -136,18 +138,17 @@ pub fn get_symbolic_constraints_look<F, A>(
                 let c2 = &r.values[17];
                 let c3 = &r.values[18];
 
-                /*
                 let hi0 = &r.values[19];
                 let hi1 = &r.values[20];
                 let hi2 = &r.values[21];
                 let hi3 = &r.values[22];
-                let op_a_immutable = &r.values[23];
-                let is_rw_a = &r.values[24];
-                let is_check_memory = &r.values[25];
-                let is_halt = &r.values[26];
-                let is_sequential = &r.values[27];
-                let is_sequentiala = &r.values[28];
+                let op_a_immutable = &r.values[24];
+                let is_rw_a = &r.values[25];
+                let is_check_memory = &r.values[26];
+                let is_halt = &r.values[27];
+                let is_sequential = &r.values[28];
 
+                /*
                 println!("shard: {:?}", shard);
                 println!("clk: {:?}", clk);
                 println!("pc: {:?}", pc);
@@ -176,7 +177,6 @@ pub fn get_symbolic_constraints_look<F, A>(
                 println!("is_check_memory: {:?}", is_check_memory);
                 println!("is_halt: {:?}", is_halt);
                 println!("is_sequential: {:?}", is_sequential);
-                println!("is_sequentiala: {:?}", is_sequentiala);
                 */
             }
             _ => {}
@@ -186,6 +186,7 @@ pub fn get_symbolic_constraints_look<F, A>(
     for s in &sends {
         match s.kind {
             LookupKind::Byte => {
+                println!("s: {:?}", s.values);
                 let opcode = &s.values[0];
                 let a1 = &s.values[1];
                 let a2 = &s.values[2];
@@ -247,7 +248,7 @@ fn final_check(
 }
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 2, 3, true, true)];
+    let mut instructions = vec![Instruction::new(Opcode::SLT, 1, 2, 3, true, true)];
     /*
     instructions.extend(vec![
         Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
@@ -266,13 +267,13 @@ fn main() -> Result<(), io::Error> {
     // Columns reserved for program counters / instructions
 
     // ######################## Extract CPU Constraints ##########################
-    let air = AddSubChip::default();
+    let air = LtChip::default();
 
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
     let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    get_symbolic_constraints_look::<KoalaBear, AddSubChip>(
+    get_symbolic_constraints_look::<KoalaBear, LtChip>(
         &air,
         0,
         ZKM_PROOF_NUM_PV_ELTS,
@@ -310,112 +311,113 @@ fn main() -> Result<(), io::Error> {
         pv_neg_constraints,
     };
 
-    // Columns available for refinement (excluding reserved program columns)
-    let mut target_cols = (0..NUM_ADD_SUB_COLS).collect::<Vec<_>>();
-    target_cols = vec![2, 3, 4, 5, 6, 7, 8, 9, 13];
-    for c in &u8_cols {
-        range_types.insert(*c, RangeType::U8);
-    }
-    for c in &potential_boolean_vars {
-        range_types.insert(*c, RangeType::Bool);
-    }
-
-    range_types.insert(9, RangeType::U4);
-    range_types.insert(13, RangeType::U4);
-
-    println!("{:?}", target_cols);
-    println!("{:?}", range_types);
-
-    // ######################## Auxiliary ALU Constraints #######################
-    //let alu_constraints = get_alu_constraints();
-    let aux_objs: Vec<_> = vec![];
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
-
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
-    let minimum_num_taregt_cols = 9;
-    let min_row_id = 0;
-    let max_row_id = 0;
-    let num_extracted_rows = 1;
-    let seed = 41;
-
-    // Public trace values (example: program start, memory base, initial step)
-    let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::i4();
-    public_vals[41] = AbstractInterval::bool();
-    public_vals[44] = AbstractInterval::one();
-    let refinment_target_indicies_pv: Vec<usize> = vec![];
-
-    // ######################## Program Initialization ###########################
-    let program = add_program(4, 4);
-    let program_len = program.instructions.len();
-
-    // Convert program to string for UI display
-    let program_str = program
-        .instructions
-        .iter()
-        .map(|inst| format!("{:?}\n", inst))
-        .collect::<String>();
-
-    let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
-    let mut base_abs_main_trace_data = vec![];
-    for st in &true_abstract_traces {
-        println!("{}", st.0);
-        if st.0 == "AddSub" {
-            base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
+    /*
+        // Columns available for refinement (excluding reserved program columns)
+        let mut target_cols = (0..NUM_ADD_SUB_COLS).collect::<Vec<_>>();
+        target_cols = vec![2, 3, 4, 5, 6, 7, 8, 9, 13];
+        for c in &u8_cols {
+            range_types.insert(*c, RangeType::U8);
         }
-    }
-    println!("{:?}", base_abs_main_trace_data);
+        for c in &potential_boolean_vars {
+            range_types.insert(*c, RangeType::Bool);
+        }
 
-    // ######################## UI Initialization ################################
+        range_types.insert(9, RangeType::U4);
+        range_types.insert(13, RangeType::U4);
 
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let mut ui = UiState::new();
-    ui.program = program_str;
+        println!("{:?}", target_cols);
+        println!("{:?}", range_types);
 
-    // ######################## Run Solver ######################################
-    let mut known_solution = HashSet::<String>::new();
-    let mut logs = Vec::new();
-    let start_time = time::Instant::now();
-    run_solver(
-        &constraints,
-        &target_cols,
-        &range_types,
-        &aux_objs,
-        &aux_tg_fns,
-        &refinment_target_indicies_pv,
-        &base_abs_main_trace_data,
-        public_vals,
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program_len,
-        program_counter_refine_fn,
-        adjust_pc_program,
-        final_check,
-        prime,
-        seed,
-        &mut known_solution,
-        &mut logs,
-        &mut ui,
-        &mut terminal,
-    );
+        // ######################## Auxiliary ALU Constraints #######################
+        //let alu_constraints = get_alu_constraints();
+        let aux_objs: Vec<_> = vec![];
+        let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+        // ######################## Solver Parameters ###############################
+        let max_iteration = 100000000;
+        let minimum_num_taregt_cols = 9;
+        let min_row_id = 0;
+        let max_row_id = 0;
+        let num_extracted_rows = 1;
+        let seed = 41;
 
-    eprintln!("Execution Time    : {:?}", start_time.elapsed());
-    eprintln!("#Unique Solution  : {}", known_solution.len());
+        // Public trace values (example: program start, memory base, initial step)
+        let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
+        public_vals[40] = AbstractInterval::i4();
+        public_vals[41] = AbstractInterval::bool();
+        public_vals[44] = AbstractInterval::one();
+        let refinment_target_indicies_pv: Vec<usize> = vec![];
 
+        // ######################## Program Initialization ###########################
+        let program = add_program(4, 4);
+        let program_len = program.instructions.len();
+
+        // Convert program to string for UI display
+        let program_str = program
+            .instructions
+            .iter()
+            .map(|inst| format!("{:?}\n", inst))
+            .collect::<String>();
+
+        let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
+        let mut base_abs_main_trace_data = vec![];
+        for st in &true_abstract_traces {
+            println!("{}", st.0);
+            if st.0 == "AddSub" {
+                base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
+            }
+        }
+        println!("{:?}", base_abs_main_trace_data);
+
+        // ######################## UI Initialization ################################
+
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
+        let mut ui = UiState::new();
+        ui.program = program_str;
+
+        // ######################## Run Solver ######################################
+        let mut known_solution = HashSet::<String>::new();
+        let mut logs = Vec::new();
+        let start_time = time::Instant::now();
+        run_solver(
+            &constraints,
+            &target_cols,
+            &range_types,
+            &aux_objs,
+            &aux_tg_fns,
+            &refinment_target_indicies_pv,
+            &base_abs_main_trace_data,
+            public_vals,
+            max_iteration,
+            minimum_num_taregt_cols,
+            min_row_id,
+            max_row_id,
+            program_len,
+            program_counter_refine_fn,
+            adjust_pc_program,
+            final_check,
+            prime,
+            seed,
+            &mut known_solution,
+            &mut logs,
+            &mut ui,
+            &mut terminal,
+        );
+
+        disable_raw_mode()?;
+        execute!(
+            terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        )?;
+        terminal.show_cursor()?;
+
+        eprintln!("Execution Time    : {:?}", start_time.elapsed());
+        eprintln!("#Unique Solution  : {}", known_solution.len());
+    */
     Ok(())
 }
