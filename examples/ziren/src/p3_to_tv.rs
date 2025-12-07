@@ -70,6 +70,19 @@ pub fn convert_p3_paircol(pair_col: &PairCol) -> LatticeVMSymbolicVal {
     }
 }
 
+fn get_weighted_var<F: PrimeField32>(paircol: &PairCol, weight: &F) -> LatticeVMSymbolicExpr {
+    if weight.is_one() {
+        LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))
+    } else {
+        LatticeVMSymbolicExpr::Mul(
+            Box::new(LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))),
+            Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+                weight.as_canonical_u32() as i64,
+            ))),
+        )
+    }
+}
+
 pub fn convert_p3_virtual_pair_col<F: PrimeField32>(
     vpair: &VirtualPairCol<F>,
 ) -> LatticeVMSymbolicExpr {
@@ -79,19 +92,10 @@ pub fn convert_p3_virtual_pair_col<F: PrimeField32>(
             hi: vpair.constant.as_canonical_u32() as i64,
         })
     } else {
-        let mut expr = LatticeVMSymbolicExpr::Constant(AbstractInterval::zero());
-        for (paircol, w) in &vpair.column_weights {
+        let mut expr = get_weighted_var(&vpair.column_weights[0].0, &vpair.column_weights[0].1);
+        for (paircol, w) in vpair.column_weights.iter().skip(1) {
             expr = LatticeVMSymbolicExpr::Add(
-                if w.is_one() {
-                    Box::new(LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol)))
-                } else {
-                    Box::new(LatticeVMSymbolicExpr::Mul(
-                        Box::new(LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))),
-                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                            w.as_canonical_u32() as i64,
-                        ))),
-                    ))
-                },
+                Box::new(get_weighted_var(paircol, w)),
                 Box::new(expr.clone()),
             );
         }
