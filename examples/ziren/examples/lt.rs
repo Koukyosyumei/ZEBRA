@@ -205,9 +205,21 @@ pub fn get_symbolic_constraints_look<F, A>(
                         u8_cols.push(col_idx);
                     }
                 } else if opcode.constant == F::from_canonical_u64(0) {
+                    // AND
                     let constraint = LatticeVMSymbolicExpr::Sub(
                         Box::new(convert_p3_virtual_pair_col(a1)),
                         Box::new(LatticeVMSymbolicExpr::And(
+                            Box::new(convert_p3_virtual_pair_col(b)),
+                            Box::new(convert_p3_virtual_pair_col(c)),
+                        )),
+                    );
+
+                    println!("constraint: {}", constraint);
+                } else if opcode.constant == F::from_canonical_u64(6) {
+                    // LT
+                    let constraint = LatticeVMSymbolicExpr::Sub(
+                        Box::new(convert_p3_virtual_pair_col(a1)),
+                        Box::new(LatticeVMSymbolicExpr::Lt(
                             Box::new(convert_p3_virtual_pair_col(b)),
                             Box::new(convert_p3_virtual_pair_col(c)),
                         )),

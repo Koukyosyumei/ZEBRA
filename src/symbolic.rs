@@ -90,6 +90,22 @@ pub fn gather_vars(
         LatticeVMSymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
             gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
         }
+        LatticeVMSymbolicExpr::And(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Or(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Xor(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Lt(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
         _ => {}
     }
 }
