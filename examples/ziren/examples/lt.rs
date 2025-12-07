@@ -63,7 +63,7 @@ use latticevm::{
 };
 
 use latticevm_ziren::executor::run_ziren_program;
-use latticevm_ziren::p3_to_tv::convert_p3_expr;
+use latticevm_ziren::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col};
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
 
@@ -92,8 +92,9 @@ pub fn get_symbolic_constraints_look<F, A>(
     num_public_values: usize,
     u8_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,
+    lookup_constraints: &mut Vec<LatticeVMSymbolicExpr>,
 ) where
-    F: Field,
+    F: p3_field::PrimeField32,
     A: Air<LookupBuilder<F>>,
 {
     let mut builder = LookupBuilder::new(preprocessed_width, air.width());
@@ -186,19 +187,30 @@ pub fn get_symbolic_constraints_look<F, A>(
     for s in &sends {
         match s.kind {
             LookupKind::Byte => {
-                println!("s: {:?}", s.values);
                 let opcode = &s.values[0];
                 let a1 = &s.values[1];
                 let a2 = &s.values[2];
                 let b = &s.values[3];
                 let c = &s.values[4];
+                println!(
+                    "opcode: {:?}, a1: {:?}, a2: {:?}, b: {:?}, c: {:?}",
+                    opcode, a1, a2, b, c
+                );
                 if opcode.constant == F::from_canonical_u64(4) {
+                    // RangeU8
                     if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
                         u8_cols.push(col_idx);
                     }
                     if let p3_air::PairCol::Main(col_idx) = c.column_weights[0].0 {
                         u8_cols.push(col_idx);
                     }
+                } else if opcode.constant == F::from_canonical_u64(0) {
+                    let constraint = LatticeVMSymbolicExpr::And(
+                        Box::new(convert_p3_virtual_pair_col(b)),
+                        Box::new(convert_p3_virtual_pair_col(c)),
+                    );
+
+                    println!("constraint: {:?}", constraint);
                 }
             }
             _ => {}
@@ -271,6 +283,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
+    let mut lookup_symbolic_constraints = Vec::new();
     let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
     get_symbolic_constraints_look::<KoalaBear, LtChip>(
@@ -279,6 +292,7 @@ fn main() -> Result<(), io::Error> {
         ZKM_PROOF_NUM_PV_ELTS,
         &mut u8_cols,
         &mut multiplicities,
+        &mut lookup_symbolic_constraints,
     );
 
     let tv_constraints = symbolic_constraints
