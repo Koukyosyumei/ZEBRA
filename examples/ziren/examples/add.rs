@@ -126,7 +126,7 @@ fn final_check(
     }
 }
 
-pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
+pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 2, 3, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
@@ -140,6 +140,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
+    let air_name = "AddSub";
 
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
@@ -164,15 +165,6 @@ fn main() -> Result<(), io::Error> {
         .collect::<Vec<_>>();
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
 
-    // # Gather Symbolic Constraints
-    let pv_pos_constraints = vec![];
-    let pv_neg_constraints = vec![];
-    let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
-        pv_pos_constraints,
-        pv_neg_constraints,
-    };
-
     // Columns available for refinement (excluding reserved program columns)
     let mut refinable_cols: Vec<usize> = (0..NUM_ADD_SUB_COLS).collect();
     refinable_cols.retain(|c| !multiplicities.contains(c));
@@ -196,6 +188,15 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 
+    // # Gather Symbolic Constraints
+    let pv_pos_constraints = vec![];
+    let pv_neg_constraints = vec![];
+    let constraints = LatticeVMConstraints {
+        air_constraints: tv_constraints.clone(),
+        pv_pos_constraints,
+        pv_neg_constraints,
+    };
+
     // ######################## Auxiliary ALU Constraints #######################
     //let alu_constraints = get_alu_constraints();
     let aux_objs: Vec<_> = vec![];
@@ -217,7 +218,7 @@ fn main() -> Result<(), io::Error> {
     let refinment_target_indicies_pv: Vec<usize> = vec![];
 
     // ######################## Program Initialization ###########################
-    let program = add_program(4, 4);
+    let program = target_program(4, 4);
     let program_len = program.instructions.len();
 
     // Convert program to string for UI display
@@ -231,7 +232,7 @@ fn main() -> Result<(), io::Error> {
     let mut base_abs_main_trace_data = vec![];
     for st in &true_abstract_traces {
         println!("{}", st.0);
-        if st.0 == "AddSub" {
+        if st.0 == air_name {
             base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
         }
     }
