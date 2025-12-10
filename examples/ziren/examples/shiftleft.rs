@@ -36,12 +36,15 @@ use zkm_core_executor::Executor;
 use zkm_core_executor::MipsAirId::MemoryLocal;
 use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::LtCols;
+use zkm_core_machine::alu::ShiftLeftCols;
 use zkm_core_machine::alu::NUM_ADD_SUB_COLS;
 use zkm_core_machine::alu::NUM_LT_COLS;
+use zkm_core_machine::alu::NUM_SHIFT_LEFT_COLS;
 use zkm_core_machine::memory::MemoryLocalChip;
 use zkm_core_machine::AddSubChip;
 use zkm_core_machine::LtChip;
 use zkm_core_machine::MulChip;
+use zkm_core_machine::ShiftLeft;
 use zkm_core_machine::{
     cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
     CpuChip,
@@ -254,6 +257,8 @@ fn final_check(
 ) {
     let string_representation = format!(
         "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
+        trace.data[0][2],
+        trace.data[0][3],
         trace.data[0][4],
         trace.data[0][5],
         trace.data[0][6],
@@ -264,8 +269,6 @@ fn final_check(
         trace.data[0][11],
         trace.data[0][12],
         trace.data[0][13],
-        trace.data[0][14],
-        trace.data[0][15],
     );
 
     // 2130706432
@@ -297,13 +300,13 @@ pub const fn indices_arr<const N: usize>() -> [usize; N] {
     indices_arr
 }
 
-const fn make_col_map() -> LtCols<usize> {
-    let indices_arr = indices_arr::<{ NUM_LT_COLS }>();
-    unsafe { transmute::<[usize; NUM_LT_COLS], LtCols<usize>>(indices_arr) }
+const fn make_col_map() -> ShiftLeftCols<usize> {
+    let indices_arr = indices_arr::<{ NUM_SHIFT_LEFT_COLS }>();
+    unsafe { transmute::<[usize; NUM_SHIFT_LEFT_COLS], ShiftLeftCols<usize>>(indices_arr) }
 }
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::SLT, 1, 2, 3, true, true)];
+    let mut instructions = vec![Instruction::new(Opcode::SLL, 1, 2, 3, true, true)];
     /*
     instructions.extend(vec![
         Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
@@ -322,13 +325,13 @@ fn main() -> Result<(), io::Error> {
     // Columns reserved for program counters / instructions
 
     // ######################## Extract CPU Constraints ##########################
-    let air = LtChip::default();
+    let air = ShiftLeft::default();
     let colmap = make_col_map();
     println!("a: {:?}", colmap.a);
     println!("b: {:?}", colmap.b);
     println!("c: {:?}", colmap.c);
-    println!("{:?}", colmap.byte_equality_check);
-    println!("{:?}", NUM_LT_COLS);
+    //println!("{:?}", colmap.byte_equality_check);
+    println!("{:?}", NUM_SHIFT_LEFT_COLS);
 
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
@@ -336,7 +339,7 @@ fn main() -> Result<(), io::Error> {
     let mut received_vars_from_cpu = HashSet::new();
     let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    get_symbolic_constraints_look::<KoalaBear, LtChip>(
+    get_symbolic_constraints_look::<KoalaBear, ShiftLeft>(
         &air,
         0,
         ZKM_PROOF_NUM_PV_ELTS,
@@ -346,16 +349,16 @@ fn main() -> Result<(), io::Error> {
         &mut received_vars_from_cpu,
     );
 
-    let mut refinable_cols: Vec<usize> = (0..NUM_LT_COLS).collect();
+    let mut refinable_cols: Vec<usize> = (0..NUM_SHIFT_LEFT_COLS).collect();
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
-    refinable_cols.extend(&[4, 5, 6, 7]);
+    refinable_cols.extend(&[2, 3, 4, 5]);
     println!("------------------: {:?}", u8_cols);
     println!("------------------: {:?}", multiplicities);
     println!("------------------: {:?}", received_vars_from_cpu);
 
-    let tmp: Vec<usize> = vec![22];
-    refinable_cols.retain(|c| !tmp.contains(c));
+    //let tmp: Vec<usize> = vec![22];
+    //refinable_cols.retain(|c| !tmp.contains(c));
 
     let mut tv_constraints = symbolic_constraints
         .iter()
@@ -398,8 +401,8 @@ fn main() -> Result<(), io::Error> {
     for c in &potential_boolean_vars {
         range_types.insert(*c, RangeType::Bool);
     }
-    range_types.insert(30, RangeType::U8);
-    range_types.insert(31, RangeType::U8);
+    //range_types.insert(30, RangeType::U8);
+    //range_types.insert(31, RangeType::U8);
 
     //range_types.insert(9, RangeType::U4);
     //range_types.insert(13, RangeType::U4);
@@ -414,7 +417,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     let max_iteration = 100000000;
-    let minimum_num_taregt_cols = 18; //refinable_cols.len();
+    let minimum_num_taregt_cols = refinable_cols.len();
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -442,7 +445,7 @@ fn main() -> Result<(), io::Error> {
     let mut base_abs_main_trace_data = vec![];
     for st in &true_abstract_traces {
         println!("{}", st.0);
-        if st.0 == "Lt" {
+        if st.0 == "ShiftLeft" {
             base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
         }
     }
