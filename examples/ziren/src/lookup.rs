@@ -115,11 +115,33 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                     }
                 }
 
+                println!("{:?}", opcode);
+
                 if opcode.constant == F::from_canonical_u64(0) {
                     // AND
                     let constraint = LatticeVMSymbolicExpr::Sub(
                         Box::new(convert_p3_virtual_pair_col(a1)),
                         Box::new(LatticeVMSymbolicExpr::And(
+                            Box::new(convert_p3_virtual_pair_col(b)),
+                            Box::new(convert_p3_virtual_pair_col(c)),
+                        )),
+                    );
+                    lookup_constraints.push(constraint.clone());
+                } else if opcode.constant == F::from_canonical_u64(1) {
+                    // OR
+                    let constraint = LatticeVMSymbolicExpr::Sub(
+                        Box::new(convert_p3_virtual_pair_col(a1)),
+                        Box::new(LatticeVMSymbolicExpr::Or(
+                            Box::new(convert_p3_virtual_pair_col(b)),
+                            Box::new(convert_p3_virtual_pair_col(c)),
+                        )),
+                    );
+                    lookup_constraints.push(constraint.clone());
+                } else if opcode.constant == F::from_canonical_u64(2) {
+                    // XOR
+                    let constraint = LatticeVMSymbolicExpr::Sub(
+                        Box::new(convert_p3_virtual_pair_col(a1)),
+                        Box::new(LatticeVMSymbolicExpr::Xor(
                             Box::new(convert_p3_virtual_pair_col(b)),
                             Box::new(convert_p3_virtual_pair_col(c)),
                         )),
