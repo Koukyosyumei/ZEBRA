@@ -293,7 +293,7 @@ pub fn make_init_val(
             RangeType::Const(val) => AbstractInterval::from_i64(*val),
         }
     } else {
-        AbstractInterval::i4()
+        AbstractInterval::top(prime)
     }
 }
 
