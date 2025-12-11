@@ -15,6 +15,26 @@ use latticevm::symbolic::LatticeVMSymbolicExpr;
 
 use crate::p3_to_tv::convert_p3_expr;
 
+fn make_impl_constraint(
+    opcode: i64,
+    opcode_condition: &LatticeVMSymbolicExpr,
+    a1: &LatticeVMSymbolicExpr,
+    op_expr: LatticeVMSymbolicExpr,
+) -> LatticeVMSymbolicExpr {
+    LatticeVMSymbolicExpr::Impl(
+        Box::new(LatticeVMSymbolicExpr::Sub(
+            Box::new(opcode_condition.clone()),
+            Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+                opcode,
+            ))),
+        )),
+        Box::new(LatticeVMSymbolicExpr::Sub(
+            Box::new(a1.clone()),
+            Box::new(op_expr),
+        )),
+    )
+}
+
 pub fn get_symbolic_lookup_constraints<F, A>(
     air: &A,
     preprocessed_width: usize,
@@ -121,118 +141,45 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c_expr = convert_p3_virtual_pair_col(&c);
                 let opcode_condition = convert_p3_virtual_pair_col(&opcode);
 
-                let and_constraint = LatticeVMSymbolicExpr::Impl(
-                    Box::new(LatticeVMSymbolicExpr::Sub(
-                        Box::new(opcode_condition.clone()),
-                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::zero())),
-                    )),
-                    Box::new(LatticeVMSymbolicExpr::Sub(
-                        Box::new(a1_expr.clone()),
-                        Box::new(LatticeVMSymbolicExpr::And(
+                let ops = [
+                    (
+                        0,
+                        LatticeVMSymbolicExpr::And(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
-                        )),
-                    )),
-                );
-
-                let or_constraint = LatticeVMSymbolicExpr::Impl(
-                    Box::new(LatticeVMSymbolicExpr::Sub(
-                        Box::new(opcode_condition.clone()),
-                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::one())),
-                    )),
-                    Box::new(LatticeVMSymbolicExpr::Sub(
-                        Box::new(a1_expr.clone()),
-                        Box::new(LatticeVMSymbolicExpr::Or(
+                        ),
+                    ),
+                    (
+                        1,
+                        LatticeVMSymbolicExpr::Or(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
-                        )),
-                    )),
-                );
-
-                let xor_constraint = LatticeVMSymbolicExpr::Impl(
-                    Box::new(LatticeVMSymbolicExpr::Sub(
-                        Box::new(opcode_condition.clone()),
-                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                            2,
-                        ))),
-                    )),
-                    Box::new(LatticeVMSymbolicExpr::Sub(
-                        Box::new(a1_expr.clone()),
-                        Box::new(LatticeVMSymbolicExpr::Xor(
+                        ),
+                    ),
+                    (
+                        2,
+                        LatticeVMSymbolicExpr::Xor(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
-                        )),
-                    )),
-                );
-
-                let lt_constraint = LatticeVMSymbolicExpr::Impl(
-                    Box::new(LatticeVMSymbolicExpr::Sub(
-                        Box::new(opcode_condition.clone()),
-                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                            6,
-                        ))),
-                    )),
-                    Box::new(LatticeVMSymbolicExpr::Sub(
-                        Box::new(a1_expr.clone()),
-                        Box::new(LatticeVMSymbolicExpr::Lt(
+                        ),
+                    ),
+                    (
+                        6,
+                        LatticeVMSymbolicExpr::Lt(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
-                        )),
-                    )),
-                );
+                        ),
+                    ),
+                ];
 
-                lookup_constraints.push(and_constraint.clone());
-                lookup_constraints.push(or_constraint.clone());
-                lookup_constraints.push(xor_constraint.clone());
-                lookup_constraints.push(lt_constraint.clone());
-
-                /*
-                println!(
-                    "opcode: {}, a1: {}, b: {}, c: {}",
-                    opcode_condition, a1_expr, b_expr, c_expr
-                );
-
-                if opcode.constant == F::from_canonical_u64(0) {
-                    // AND
-                    let constraint = LatticeVMSymbolicExpr::Sub(
-                        Box::new(convert_p3_virtual_pair_col(a1)),
-                        Box::new(LatticeVMSymbolicExpr::And(
-                            Box::new(convert_p3_virtual_pair_col(b)),
-                            Box::new(convert_p3_virtual_pair_col(c)),
-                        )),
-                    );
-                    lookup_constraints.push(constraint.clone());
-                } else if opcode.constant == F::from_canonical_u64(1) {
-                    // OR
-                    let constraint = LatticeVMSymbolicExpr::Sub(
-                        Box::new(convert_p3_virtual_pair_col(a1)),
-                        Box::new(LatticeVMSymbolicExpr::Or(
-                            Box::new(convert_p3_virtual_pair_col(b)),
-                            Box::new(convert_p3_virtual_pair_col(c)),
-                        )),
-                    );
-                    lookup_constraints.push(constraint.clone());
-                } else if opcode.constant == F::from_canonical_u64(2) {
-                    // XOR
-                    let constraint = LatticeVMSymbolicExpr::Sub(
-                        Box::new(convert_p3_virtual_pair_col(a1)),
-                        Box::new(LatticeVMSymbolicExpr::Xor(
-                            Box::new(convert_p3_virtual_pair_col(b)),
-                            Box::new(convert_p3_virtual_pair_col(c)),
-                        )),
-                    );
-                    lookup_constraints.push(constraint.clone());
-                } else if opcode.constant == F::from_canonical_u64(6) {
-                    // LT
-                    let constraint = LatticeVMSymbolicExpr::Sub(
-                        Box::new(convert_p3_virtual_pair_col(a1)),
-                        Box::new(LatticeVMSymbolicExpr::Lt(
-                            Box::new(convert_p3_virtual_pair_col(b)),
-                            Box::new(convert_p3_virtual_pair_col(c)),
-                        )),
-                    );
-                    lookup_constraints.push(constraint.clone());
-                }*/
+                for (opcode, op_expr) in ops {
+                    lookup_constraints.push(make_impl_constraint(
+                        opcode,
+                        &opcode_condition,
+                        &a1_expr,
+                        op_expr,
+                    ));
+                }
             }
             _ => {}
         }
