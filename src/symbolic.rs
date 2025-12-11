@@ -63,6 +63,7 @@ pub enum LatticeVMSymbolicExpr {
     Or(Box<Self>, Box<Self>),
     Xor(Box<Self>, Box<Self>),
     Lt(Box<Self>, Box<Self>),
+    Impl(Box<Self>, Box<Self>),
     Neg(Box<Self>),
 }
 
@@ -178,6 +179,7 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Or(x, y) => write!(f, "({} || {})", x, y),
             Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
             Self::Lt(x, y) => write!(f, "({} < {})", x, y),
+            Self::Impl(x, y) => write!(f, "({} => {})", x, y),
         }
     }
 }
@@ -421,6 +423,32 @@ impl LatticeVMSymbolicExpr {
                     is_last_row,
                     prime,
                 )
+            }
+            Self::Impl(a, b) => {
+                // if a is 0, b should be 0
+
+                let cond = a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                );
+                if let MayBeFlag::False = cond.is_zero(prime) {
+                    AbstractInterval::zero()
+                } else {
+                    b.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                }
             }
             Self::Lt(a, b) => a
                 .eval(
