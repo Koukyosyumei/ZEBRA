@@ -70,6 +70,7 @@ use latticevm::{
 };
 
 use latticevm_ziren::executor::run_ziren_program;
+use latticevm_ziren::lookup::get_symbolic_lookup_constraints;
 use latticevm_ziren::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col};
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
@@ -91,160 +92,6 @@ pub fn dummy_table_deriver(
 ) -> Vec<Vec<AbstractInterval>> {
     let out = vec![];
     out
-}
-
-pub fn get_symbolic_constraints_look<F, A>(
-    air: &A,
-    preprocessed_width: usize,
-    num_public_values: usize,
-    u8_cols: &mut Vec<usize>,
-    multiplicities: &mut HashSet<usize>,
-    lookup_constraints: &mut Vec<LatticeVMSymbolicExpr>,
-    received_vars_from_cpu: &mut HashSet<usize>,
-) where
-    F: p3_field::PrimeField32,
-    A: Air<LookupBuilder<F>>,
-{
-    let mut builder = LookupBuilder::new(preprocessed_width, air.width());
-    air.eval(&mut builder);
-    let (sends, receives) = builder.lookups();
-
-    for r in &receives {
-        for (w, _) in &r.multiplicity.column_weights {
-            if let p3_air::PairCol::Main(col_idx) = w {
-                multiplicities.insert(*col_idx);
-            }
-        }
-    }
-    for s in &sends {
-        for (w, _) in &s.multiplicity.column_weights {
-            if let p3_air::PairCol::Main(col_idx) = w {
-                multiplicities.insert(*col_idx);
-            }
-        }
-    }
-
-    for r in &receives {
-        match r.kind {
-            LookupKind::Instruction => {
-                for rv in &r.values {
-                    for c in &rv.column_weights {
-                        if let PairCol::Main(index) = c.0 {
-                            received_vars_from_cpu.insert(index);
-                        }
-                    }
-                }
-                let shard = &r.values[0];
-                let clk = &r.values[1];
-                let pc = &r.values[2];
-                let next_pc = &r.values[3];
-                let next_next_pc = &r.values[4];
-                let num_extra_cycles = &r.values[5];
-                let opcode = &r.values[6];
-                let a0 = &r.values[7];
-                let a1 = &r.values[8];
-                let a2 = &r.values[9];
-                let a3 = &r.values[10];
-                let b0 = &r.values[11];
-                let b1 = &r.values[12];
-                let b2 = &r.values[13];
-                let b3 = &r.values[14];
-                let c0 = &r.values[15];
-                let c1 = &r.values[16];
-                let c2 = &r.values[17];
-                let c3 = &r.values[18];
-
-                let hi0 = &r.values[19];
-                let hi1 = &r.values[20];
-                let hi2 = &r.values[21];
-                let hi3 = &r.values[22];
-                let op_a_immutable = &r.values[24];
-                let is_rw_a = &r.values[25];
-                let is_check_memory = &r.values[26];
-                let is_halt = &r.values[27];
-                let is_sequential = &r.values[28];
-
-                /*
-                println!("shard: {:?}", shard);
-                println!("clk: {:?}", clk);
-                println!("pc: {:?}", pc);
-                println!("next_pc: {:?}", next_pc);
-                println!("next_next_pc: {:?}", next_next_pc);
-                println!("num_extra_cycles: {:?}", num_extra_cycles);
-                println!("opcode: {:?}", opcode);
-                println!("a0: {:?}", a0);
-                println!("a1: {:?}", a1);
-                println!("a2: {:?}", a2);
-                println!("a3: {:?}", a3);
-                println!("b0: {:?}", b0);
-                println!("b1: {:?}", b1);
-                println!("b2: {:?}", b2);
-                println!("b3: {:?}", b3);
-                println!("c0: {:?}", c0);
-                println!("c1: {:?}", c1);
-                println!("c2: {:?}", c2);
-                println!("c3: {:?}", c3);
-                println!("hi0: {:?}", hi0);
-                println!("hi1: {:?}", hi1);
-                println!("hi2: {:?}", hi2);
-                println!("hi3: {:?}", hi3);
-                println!("op_a_immutable: {:?}", op_a_immutable);
-                println!("is_rw_a: {:?}", is_rw_a);
-                println!("is_check_memory: {:?}", is_check_memory);
-                println!("is_halt: {:?}", is_halt);
-                println!("is_sequential: {:?}", is_sequential);
-                */
-            }
-            _ => {}
-        }
-    }
-
-    for s in &sends {
-        match s.kind {
-            LookupKind::Byte => {
-                let opcode = &s.values[0];
-                let a1 = &s.values[1];
-                let a2 = &s.values[2];
-                let b = &s.values[3];
-                let c = &s.values[4];
-                if opcode.constant == F::from_canonical_u64(4) {
-                    // RangeU8
-                    if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
-                        u8_cols.push(col_idx);
-                    }
-                    if let p3_air::PairCol::Main(col_idx) = c.column_weights[0].0 {
-                        u8_cols.push(col_idx);
-                    }
-                } else if opcode.constant == F::from_canonical_u64(0) {
-                    // AND
-                    println!("b: {:?}", b);
-                    let constraint = LatticeVMSymbolicExpr::Sub(
-                        Box::new(convert_p3_virtual_pair_col(a1)),
-                        Box::new(LatticeVMSymbolicExpr::And(
-                            Box::new(convert_p3_virtual_pair_col(b)),
-                            Box::new(convert_p3_virtual_pair_col(c)),
-                        )),
-                    );
-                    lookup_constraints.push(constraint.clone());
-
-                    println!("constraint: {}", constraint);
-                } else if opcode.constant == F::from_canonical_u64(6) {
-                    // LT
-                    let constraint = LatticeVMSymbolicExpr::Sub(
-                        Box::new(convert_p3_virtual_pair_col(a1)),
-                        Box::new(LatticeVMSymbolicExpr::Lt(
-                            Box::new(convert_p3_virtual_pair_col(b)),
-                            Box::new(convert_p3_virtual_pair_col(c)),
-                        )),
-                    );
-                    lookup_constraints.push(constraint.clone());
-
-                    println!("constraint: {}", constraint);
-                }
-            }
-            _ => {}
-        }
-    }
 }
 
 // ############## Final Check Function ##############################
@@ -337,9 +184,10 @@ fn main() -> Result<(), io::Error> {
     let mut multiplicities = HashSet::new();
     let mut lookup_symbolic_constraints = Vec::new();
     let mut received_vars_from_cpu = HashSet::new();
+
     let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    get_symbolic_constraints_look::<KoalaBear, ShiftLeft>(
+    get_symbolic_lookup_constraints::<KoalaBear, ShiftLeft>(
         &air,
         0,
         ZKM_PROOF_NUM_PV_ELTS,
