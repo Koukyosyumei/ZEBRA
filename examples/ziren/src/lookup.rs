@@ -10,6 +10,7 @@ use p3_uni_stark::{SymbolicExpression, SymbolicVariable};
 use zkm_stark::LookupBuilder;
 use zkm_stark::LookupKind;
 
+use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 
 use crate::p3_to_tv::convert_p3_expr;
@@ -115,7 +116,81 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                     }
                 }
 
-                println!("{:?}", opcode);
+                let a1_expr = convert_p3_virtual_pair_col(&a1);
+                let b_expr = convert_p3_virtual_pair_col(&b);
+                let c_expr = convert_p3_virtual_pair_col(&c);
+                let opcode_condition = convert_p3_virtual_pair_col(&opcode);
+
+                let and_constraint = LatticeVMSymbolicExpr::Impl(
+                    Box::new(LatticeVMSymbolicExpr::Sub(
+                        Box::new(opcode_condition.clone()),
+                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::zero())),
+                    )),
+                    Box::new(LatticeVMSymbolicExpr::Sub(
+                        Box::new(a1_expr.clone()),
+                        Box::new(LatticeVMSymbolicExpr::And(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        )),
+                    )),
+                );
+
+                let or_constraint = LatticeVMSymbolicExpr::Impl(
+                    Box::new(LatticeVMSymbolicExpr::Sub(
+                        Box::new(opcode_condition.clone()),
+                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::one())),
+                    )),
+                    Box::new(LatticeVMSymbolicExpr::Sub(
+                        Box::new(a1_expr.clone()),
+                        Box::new(LatticeVMSymbolicExpr::Or(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        )),
+                    )),
+                );
+
+                let xor_constraint = LatticeVMSymbolicExpr::Impl(
+                    Box::new(LatticeVMSymbolicExpr::Sub(
+                        Box::new(opcode_condition.clone()),
+                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+                            2,
+                        ))),
+                    )),
+                    Box::new(LatticeVMSymbolicExpr::Sub(
+                        Box::new(a1_expr.clone()),
+                        Box::new(LatticeVMSymbolicExpr::Xor(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        )),
+                    )),
+                );
+
+                let lt_constraint = LatticeVMSymbolicExpr::Impl(
+                    Box::new(LatticeVMSymbolicExpr::Sub(
+                        Box::new(opcode_condition.clone()),
+                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+                            6,
+                        ))),
+                    )),
+                    Box::new(LatticeVMSymbolicExpr::Sub(
+                        Box::new(a1_expr.clone()),
+                        Box::new(LatticeVMSymbolicExpr::Lt(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        )),
+                    )),
+                );
+
+                lookup_constraints.push(and_constraint.clone());
+                lookup_constraints.push(or_constraint.clone());
+                lookup_constraints.push(xor_constraint.clone());
+                lookup_constraints.push(lt_constraint.clone());
+
+                /*
+                println!(
+                    "opcode: {}, a1: {}, b: {}, c: {}",
+                    opcode_condition, a1_expr, b_expr, c_expr
+                );
 
                 if opcode.constant == F::from_canonical_u64(0) {
                     // AND
@@ -157,7 +232,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         )),
                     );
                     lookup_constraints.push(constraint.clone());
-                }
+                }*/
             }
             _ => {}
         }
