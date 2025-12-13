@@ -132,7 +132,14 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c2 = convert_p3_virtual_pair_col(&s.values[17]);
                 let c3 = convert_p3_virtual_pair_col(&s.values[18]);
 
-                let tmps = vec![(0, OpALU::Add)];
+                let tmps = vec![
+                    (0, OpALU::Add),
+                    (1, OpALU::Sub),
+                    (2, OpALU::Mul),
+                    (15, OpALU::And),
+                    (16, OpALU::Or),
+                    (17, OpALU::Xor),
+                ];
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(
                         &[a0.clone(), a1.clone(), a2.clone(), a3.clone()],
@@ -141,6 +148,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         &t.1,
                     );
                     let impl_constraint = make_impl_constraint(t.0, &opcode, alu_constraint);
+                    lookup_constraints.push(impl_constraint);
                 }
 
                 /*

@@ -67,6 +67,7 @@ use latticevm::{
 };
 
 use latticevm_ziren::executor::run_ziren_program;
+use latticevm_ziren::lookup::get_symbolic_lookup_constraints;
 use latticevm_ziren::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col};
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
@@ -182,7 +183,7 @@ fn main() -> Result<(), io::Error> {
     let mut received_vars_from_cpu = HashSet::new();
     let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
         get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    get_symbolic_constraints_look::<KoalaBear, LtChip>(
+    get_symbolic_lookup_constraints::<KoalaBear, LtChip>(
         &air,
         0,
         ZKM_PROOF_NUM_PV_ELTS,
@@ -195,7 +196,8 @@ fn main() -> Result<(), io::Error> {
     let mut refinable_cols: Vec<usize> = (0..NUM_LT_COLS).collect();
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
-    refinable_cols.extend(&[4, 5, 6, 7]);
+    //refinable_cols.extend(&[4, 5, 6, 7]);
+    refinable_cols.extend(&[4]);
     let tmp = vec![22];
     refinable_cols.retain(|c| !tmp.contains(c));
     println!("------------------: {:?}", u8_cols);
@@ -209,21 +211,16 @@ fn main() -> Result<(), io::Error> {
         .iter()
         .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
         .collect::<Vec<_>>();
-    println!("aaaaaaaaaaaaaaaaaaaa{:?}", lookup_symbolic_constraints);
-    tv_constraints.extend(lookup_symbolic_constraints);
-    for s in &tv_constraints {
+    for s in &lookup_symbolic_constraints {
         println!("{}", s);
     }
+    tv_constraints.extend(lookup_symbolic_constraints);
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
-    println!("########################: {:?}", potential_boolean_vars);
 
     let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
         .iter()
         .map(|k| (*k, RangeType::Bool))
         .collect();
-    //range_types.clear();
-
-    //println!("{:?}", CPU_COL_MAP);
 
     // # Additional Public Value Verification
     //let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
@@ -238,22 +235,21 @@ fn main() -> Result<(), io::Error> {
     };
 
     // Columns available for refinement (excluding reserved program columns)
-    //let mut target_cols = (0..NUM_LT_COLS).collect::<Vec<_>>();
-    //target_cols = vec![2, 3, 4, 5, 6, 7, 8, 9, 13];
     for c in &u8_cols {
         range_types.insert(*c, RangeType::U8);
     }
     for c in &potential_boolean_vars {
         range_types.insert(*c, RangeType::Bool);
     }
-    //range_types.insert(30, RangeType::U8);
-    //range_types.insert(31, RangeType::U8);
-
-    //range_types.insert(9, RangeType::U4);
-    //range_types.insert(13, RangeType::U4);
 
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
+    for r in &refinable_cols {
+        if !range_types.contains_key(r) {
+            print!("{}, ", r);
+        }
+    }
+    println!("");
 
     // ######################## Auxiliary ALU Constraints #######################
     //let alu_constraints = get_alu_constraints();
