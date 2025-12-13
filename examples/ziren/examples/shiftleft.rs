@@ -177,8 +177,6 @@ fn main() -> Result<(), io::Error> {
     println!("a: {:?}", colmap.a);
     println!("b: {:?}", colmap.b);
     println!("c: {:?}", colmap.c);
-    //println!("{:?}", colmap.byte_equality_check);
-    println!("{:?}", NUM_SHIFT_LEFT_COLS);
 
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
@@ -201,32 +199,18 @@ fn main() -> Result<(), io::Error> {
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
     refinable_cols.extend(&[2, 3, 4, 5]);
-    println!("------------------: {:?}", u8_cols);
-    println!("------------------: {:?}", multiplicities);
-    println!("------------------: {:?}", received_vars_from_cpu);
-
-    //let tmp: Vec<usize> = vec![22];
-    //refinable_cols.retain(|c| !tmp.contains(c));
 
     let mut tv_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
         .collect::<Vec<_>>();
-    println!("aaaaaaaaaaaaaaaaaaaa{:?}", lookup_symbolic_constraints);
     tv_constraints.extend(lookup_symbolic_constraints);
-    for s in &tv_constraints {
-        println!("{}", s);
-    }
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
-    println!("########################: {:?}", potential_boolean_vars);
 
     let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
         .iter()
         .map(|k| (*k, RangeType::Bool))
         .collect();
-    //range_types.clear();
-
-    //println!("{:?}", CPU_COL_MAP);
 
     // # Additional Public Value Verification
     //let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
@@ -241,22 +225,21 @@ fn main() -> Result<(), io::Error> {
     };
 
     // Columns available for refinement (excluding reserved program columns)
-    //let mut target_cols = (0..NUM_LT_COLS).collect::<Vec<_>>();
-    //target_cols = vec![2, 3, 4, 5, 6, 7, 8, 9, 13];
     for c in &u8_cols {
         range_types.insert(*c, RangeType::U8);
     }
     for c in &potential_boolean_vars {
         range_types.insert(*c, RangeType::Bool);
     }
-    //range_types.insert(30, RangeType::U8);
-    //range_types.insert(31, RangeType::U8);
-
-    //range_types.insert(9, RangeType::U4);
-    //range_types.insert(13, RangeType::U4);
 
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
+    for r in &refinable_cols {
+        if !range_types.contains_key(r) {
+            print!("{}, ", r);
+        }
+    }
+    println!("");
 
     // ######################## Auxiliary ALU Constraints #######################
     //let alu_constraints = get_alu_constraints();
@@ -292,7 +275,6 @@ fn main() -> Result<(), io::Error> {
     let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
     let mut base_abs_main_trace_data = vec![];
     for st in &true_abstract_traces {
-        println!("{}", st.0);
         if st.0 == "ShiftLeft" {
             base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
         }
@@ -351,38 +333,3 @@ fn main() -> Result<(), io::Error> {
 
     Ok(())
 }
-
-/*
-(curr[25] - (curr[23] * curr[2]))
-(curr[26] - (curr[24] * curr[2]))
-(curr[23] - ((curr[11] - curr[20]) * 2114060289))
-(curr[24] - ((curr[15] - curr[21]) * 2114060289))
-(curr[29] * (curr[29] - 1))
-(curr[29] * (curr[25] - curr[26]))
-((curr[2] + curr[3]) * ((curr[29] - 1) * ((curr[25] + curr[26]) - 1)))
-(curr[4] - ((curr[25] * (1 - curr[26])) + (curr[29] * curr[27])))
-curr[5]
-curr[6]
-curr[7]
-(curr[16] * (curr[16] - 1))
-(curr[17] * (curr[17] - 1))
-(curr[18] * (curr[18] - 1))
-(curr[19] * (curr[19] - 1))
-((((curr[16] + curr[17]) + curr[18]) + curr[19]) * ((((curr[16] + curr[17]) + curr[18]) + curr[19]) - 1))
-((curr[2] + curr[3]) * ((1 - curr[28]) - (((curr[16] + curr[17]) + curr[18]) + curr[19])))
-(curr[28] * (curr[28] - 1))
-(((0 + curr[19]) - 1) * (((curr[11] * curr[3]) + (curr[20] * curr[2])) - ((curr[15] * curr[3]) + (curr[21] * curr[2]))))
-(curr[28] * (0 + curr[19]))
-((((0 + curr[19]) + curr[18]) - 1) * (curr[10] - curr[14]))
-(curr[28] * ((0 + curr[19]) + curr[18]))
-(((((0 + curr[19]) + curr[18]) + curr[17]) - 1) * (curr[9] - curr[13]))
-(curr[28] * (((0 + curr[19]) + curr[18]) + curr[17]))
-((((((0 + curr[19]) + curr[18]) + curr[17]) + curr[16]) - 1) * (curr[8] - curr[12]))
-(curr[28] * ((((0 + curr[19]) + curr[18]) + curr[17]) + curr[16]))
-(curr[30] - ((((0 + (((curr[11] * curr[3]) + (curr[20] * curr[2])) * curr[19])) + (curr[10] * curr[18])) + (curr[9] * curr[17])) + (curr[8] * curr[16])))
-(curr[31] - ((((0 + (((curr[15] * curr[3]) + (curr[21] * curr[2])) * curr[19])) + (curr[14] * curr[18])) + (curr[13] * curr[17])) + (curr[12] * curr[16])))
-((curr[28] - 1) * ((curr[22] * (curr[30] - curr[31])) - (curr[2] + curr[3])))
-(curr[2] * (curr[2] - 1))
-(curr[3] * (curr[3] - 1))
-((curr[2] + curr[3]) * ((curr[2] + curr[3]) - 1))
-*/
