@@ -140,6 +140,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         &[c0.clone(), c1.clone(), c2.clone(), c3.clone()],
                         &t.1,
                     );
+                    let impl_constraint = make_impl_constraint(t.0, &opcode, alu_constraint);
                 }
 
                 /*

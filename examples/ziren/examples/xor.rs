@@ -161,11 +161,6 @@ fn main() -> Result<(), io::Error> {
         &mut received_vars_from_cpu,
     );
 
-    println!(
-        "aaaaaaaaaaaaaaaaaaaaaaaaaa: {}",
-        lookup_symbolic_constraints[0]
-    );
-
     let mut tv_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
