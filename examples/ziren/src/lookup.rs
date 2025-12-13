@@ -10,28 +10,26 @@ use p3_uni_stark::{SymbolicExpression, SymbolicVariable};
 use zkm_stark::LookupBuilder;
 use zkm_stark::LookupKind;
 
+use latticevm::alu::get_alu_constraint;
+use latticevm::alu::OpALU;
 use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 
 use crate::p3_to_tv::convert_p3_expr;
 
 fn make_impl_constraint(
-    opcode: i64,
-    opcode_condition: &LatticeVMSymbolicExpr,
-    a1: &LatticeVMSymbolicExpr,
-    op_expr: LatticeVMSymbolicExpr,
+    opcode_val: i64,
+    opcode_var: &LatticeVMSymbolicExpr,
+    expr: LatticeVMSymbolicExpr,
 ) -> LatticeVMSymbolicExpr {
     LatticeVMSymbolicExpr::Impl(
         Box::new(LatticeVMSymbolicExpr::Sub(
-            Box::new(opcode_condition.clone()),
+            Box::new(opcode_var.clone()),
             Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                opcode,
+                opcode_val,
             ))),
         )),
-        Box::new(LatticeVMSymbolicExpr::Sub(
-            Box::new(a1.clone()),
-            Box::new(op_expr),
-        )),
+        Box::new(expr),
     )
 }
 
@@ -112,6 +110,57 @@ pub fn get_symbolic_lookup_constraints<F, A>(
 
     for s in &sends {
         match s.kind {
+            LookupKind::Instruction => {
+                for rv in &s.values {
+                    for c in &rv.column_weights {
+                        if let PairCol::Main(index) = c.0 {
+                            received_vars_from_cpu.insert(index);
+                        }
+                    }
+                }
+                let opcode = convert_p3_virtual_pair_col(&s.values[6]);
+                let a0 = convert_p3_virtual_pair_col(&s.values[7]);
+                let a1 = convert_p3_virtual_pair_col(&s.values[8]);
+                let a2 = convert_p3_virtual_pair_col(&s.values[9]);
+                let a3 = convert_p3_virtual_pair_col(&s.values[10]);
+                let b0 = convert_p3_virtual_pair_col(&s.values[11]);
+                let b1 = convert_p3_virtual_pair_col(&s.values[12]);
+                let b2 = convert_p3_virtual_pair_col(&s.values[13]);
+                let b3 = convert_p3_virtual_pair_col(&s.values[14]);
+                let c0 = convert_p3_virtual_pair_col(&s.values[15]);
+                let c1 = convert_p3_virtual_pair_col(&s.values[16]);
+                let c2 = convert_p3_virtual_pair_col(&s.values[17]);
+                let c3 = convert_p3_virtual_pair_col(&s.values[18]);
+
+                let tmps = vec![(0, OpALU::Add)];
+                for t in tmps {
+                    let alu_constraint = get_alu_constraint(
+                        &[a0.clone(), a1.clone(), a2.clone(), a3.clone()],
+                        &[b0.clone(), b1.clone(), b2.clone(), b3.clone()],
+                        &[c0.clone(), c1.clone(), c2.clone(), c3.clone()],
+                        &t.1,
+                    );
+                }
+
+                /*
+                let shard = &r.values[0];
+                let clk = &r.values[1];
+                let pc = &r.values[2];
+                let next_pc = &r.values[3];
+                let next_next_pc = &r.values[4];
+                let num_extra_cycles = &r.values[5];
+
+                let hi0 = &r.values[19];
+                let hi1 = &r.values[20];
+                let hi2 = &r.values[21];
+                let hi3 = &r.values[22];
+                let op_a_immutable = &r.values[24];
+                let is_rw_a = &r.values[25];
+                let is_check_memory = &r.values[26];
+                let is_halt = &r.values[27];
+                let is_sequential = &r.values[28];
+                */
+            }
             LookupKind::Byte => {
                 let opcode = &s.values[0];
                 let a1 = &s.values[1];
@@ -176,8 +225,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                     lookup_constraints.push(make_impl_constraint(
                         opcode,
                         &opcode_condition,
-                        &a1_expr,
-                        op_expr,
+                        LatticeVMSymbolicExpr::Sub(Box::new(a1_expr.clone()), Box::new(op_expr)),
                     ));
                 }
             }
