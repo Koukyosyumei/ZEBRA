@@ -198,6 +198,7 @@ fn main() -> Result<(), io::Error> {
     let mut refinable_cols: Vec<usize> = (0..NUM_SHIFT_LEFT_COLS).collect();
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
+    //refinable_cols.retain(|c| !(vec![30].contains(c)));
     refinable_cols.extend(&[2, 3, 4, 5]);
 
     let mut tv_constraints = symbolic_constraints
