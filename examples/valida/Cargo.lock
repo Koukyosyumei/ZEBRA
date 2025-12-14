@@ -804,6 +804,7 @@ dependencies = [
  "valida-bytes",
  "valida-cpu",
  "valida-machine",
+ "valida-memory",
  "valida-opcodes",
  "valida-program",
 ]
