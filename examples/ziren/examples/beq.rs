@@ -184,34 +184,27 @@ fn main() -> Result<(), io::Error> {
         &mut multiplicities,
         &mut lookup_symbolic_constraints,
         &mut received_vars_from_cpu,
+        prime,
     );
-
     println!("u8: {:?}", u8_cols);
-    println!("m: {:?}", multiplicities);
-    println!("rcpu: {:?}", received_vars_from_cpu);
-
-    /*
-    println!(
-        "aaaaaaaaaaaaaaaaaaaaaaaaaa: {}",
-        lookup_symbolic_constraints[0]
-    );*/
 
     let mut tv_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
         .collect::<Vec<_>>();
+    for el in &lookup_symbolic_constraints {
+        println!("{}", el);
+    }
     //println!("aaaaaaaaaaaaaaaaaaaa{:?}", lookup_symbolic_constraints);
     tv_constraints.extend(lookup_symbolic_constraints);
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
-    println!("b: {:?}", potential_boolean_vars);
 
     // Columns available for refinement (excluding reserved program columns)
     let mut refinable_cols: Vec<usize> = (0..NUM_BRANCH_COLS).collect();
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
-    println!("refinable: {:?}", refinable_cols);
-    refinable_cols.extend(&[1, 2]); // output
-                                    //refinable_cols.extend(&[6, 10]); // input
+    refinable_cols.extend(&[1, 2, 3, 4, 23, 24, 25, 26]); // output
+                                                          //refinable_cols.extend(&[6, 10]); // input
 
     let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
         .iter()
@@ -223,20 +216,6 @@ fn main() -> Result<(), io::Error> {
     for c in &potential_boolean_vars {
         range_types.insert(*c, RangeType::Bool);
     }
-    //range_types.insert(0, RangeType::U4);
-    range_types.insert(1, RangeType::U4);
-    range_types.insert(2, RangeType::U4);
-    range_types.insert(3, RangeType::U4);
-    range_types.insert(4, RangeType::U4);
-    range_types.insert(60, RangeType::U8);
-    range_types.insert(61, RangeType::U8);
-    //range_types.insert(23, RangeType::U4);
-    /*
-    range_types.insert(41, RangeType::U4);
-    range_types.insert(45, RangeType::U4);
-    range_types.insert(49, RangeType::U4);
-    */
-    //range_types.insert(10, RangeType::U4);
 
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
@@ -284,12 +263,10 @@ fn main() -> Result<(), io::Error> {
     let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
     let mut base_abs_main_trace_data = vec![];
     for st in &true_abstract_traces {
-        println!("{}", st.0);
         if st.0 == air_name {
             base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
         }
     }
-    println!("{:?}", base_abs_main_trace_data);
 
     // ######################## UI Initialization ################################
 
