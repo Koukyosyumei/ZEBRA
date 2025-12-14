@@ -156,6 +156,10 @@ fn final_check(
             }
         }
 
+        if !is_consistent_flag {
+            break;
+        }
+
         if is_write.is_zero(prime) != MayBeFlag::True {
             for a in addr.lo..(addr.hi + 1) {
                 memory.insert(a, value.clone());
