@@ -137,6 +137,7 @@ fn final_check(
     let def_interval = AbstractInterval::zero();
     let mut memory = HashMap::<i64, AbstractInterval>::new();
     let mut is_consistent_flag = true;
+    let mut break_point = 0;
 
     for i in 0..num_row {
         let addr = trace.data[i][12].clone();
@@ -149,6 +150,7 @@ fn final_check(
                 let prev_value = memory.get(&a).unwrap_or(&def_interval);
                 if (value.clone() - prev_value.clone()).is_zero(prime) != MayBeFlag::True {
                     is_consistent_flag = false;
+                    break_point = i;
                     break;
                 }
             }
@@ -166,12 +168,16 @@ fn final_check(
         ui.recovered = string_representation;
 
         fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
+            format!("voutput/{}_{}_states.txt", known_reprt.len(), break_point),
             ui.recovered.clone(),
         )
         .unwrap();
         fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
+            format!(
+                "voutput/{}_{}_assignments.txt",
+                known_reprt.len(),
+                break_point
+            ),
             ui.logs.clone(),
         )
         .unwrap();
