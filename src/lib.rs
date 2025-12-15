@@ -1,5 +1,6 @@
 pub mod alu;
 pub mod interval;
+pub mod quick;
 pub mod smt;
 pub mod solver;
 pub mod state;
