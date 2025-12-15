@@ -95,11 +95,12 @@ fn main() -> Result<(), io::Error> {
     println!("a: {:?}", colmap.a);
     println!("b: {:?}", colmap.b);
     println!("c: {:?}", colmap.c);
-    println!("{:?}", NUM_LT_COLS);
 
     let (tv_constraints, mut refinable_cols, range_types) =
         extract_constraints_and_range::<KoalaBear, LtChip>(&air, NUM_LT_COLS, prime);
     refinable_cols.extend(&[4]);
+    println!("{:?}", refinable_cols);
+    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
