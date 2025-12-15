@@ -53,6 +53,7 @@ use zkm_stark::MachineProver;
 use zkm_stark::ZKMCoreOpts;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
+use latticevm::quick::quick_api;
 use latticevm::smt::expr_to_smt;
 use latticevm::solver::RangeType;
 use latticevm::symbolic::eval_constraints;
@@ -72,24 +73,10 @@ use latticevm_ziren::p3_to_tv::convert_p3_expr;
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
 
-fn program_counter_refine_fn(
-    abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
-    program_len: usize,
-    i: usize,
-    j: usize,
-) {
-}
-
-fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {}
-
-pub fn dummy_table_deriver(
-    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
-    range_types: &HashMap<usize, RangeType>,
-    prime: u32,
-) -> Vec<Vec<AbstractInterval>> {
-    let out = vec![];
-    out
-}
+use latticevm_ziren::utils::{
+    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+};
 
 // ############## Final Check Function ##############################
 fn final_check(
@@ -135,23 +122,13 @@ fn final_check(
     }
 }
 
-pub const fn indices_arr<const N: usize>() -> [usize; N] {
-    let mut indices_arr = [0; N];
-    let mut i = 0;
-    while i < N {
-        indices_arr[i] = i;
-        i += 1;
-    }
-    indices_arr
-}
-
 const fn make_col_map() -> BranchColumns<usize> {
     let indices_arr = indices_arr::<{ NUM_BRANCH_COLS }>();
     unsafe { transmute::<[usize; NUM_BRANCH_COLS], BranchColumns<usize>>(indices_arr) }
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::BEQ, 5, 2, 3, true, true)];
+    let mut instructions = vec![Instruction::new(Opcode::BEQ, 3, 0, 12, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -160,163 +137,63 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
-    // Columns reserved for program counters / instructions
-
-    // ######################## Extract CPU Constraints ##########################
-    let air = BranchChip::default();
-    let air_name = "Branch";
-
-    let mut u8_cols = vec![];
-    let mut multiplicities = HashSet::new();
-    let mut lookup_symbolic_constraints = Vec::new();
-    let mut received_vars_from_cpu = HashSet::new();
-
-    let a = make_col_map();
-    println!("a: {:?}", a);
-
-    let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
-        get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    get_symbolic_lookup_constraints::<KoalaBear, BranchChip>(
-        &air,
-        0,
-        ZKM_PROOF_NUM_PV_ELTS,
-        &mut u8_cols,
-        &mut multiplicities,
-        &mut lookup_symbolic_constraints,
-        &mut received_vars_from_cpu,
-        prime,
-    );
-    println!("u8: {:?}", u8_cols);
-
-    let mut tv_constraints = symbolic_constraints
-        .iter()
-        .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
-        .collect::<Vec<_>>();
-    for el in &lookup_symbolic_constraints {
-        println!("{}", el);
-    }
-    //println!("aaaaaaaaaaaaaaaaaaaa{:?}", lookup_symbolic_constraints);
-    tv_constraints.extend(lookup_symbolic_constraints);
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
-
-    // Columns available for refinement (excluding reserved program columns)
-    let mut refinable_cols: Vec<usize> = (0..NUM_BRANCH_COLS).collect();
-    refinable_cols.retain(|c| !multiplicities.contains(c));
-    refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
-    refinable_cols.extend(&[1, 2, 3, 4, 23, 24, 25, 26]); // output
-                                                          //refinable_cols.extend(&[6, 10]); // input
-
-    let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
-        .iter()
-        .map(|k| (*k, RangeType::Bool))
-        .collect();
-    for c in &u8_cols {
-        range_types.insert(*c, RangeType::U8);
-    }
-    for c in &potential_boolean_vars {
-        range_types.insert(*c, RangeType::Bool);
-    }
-
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
-
-    // # Gather Symbolic Constraints
-    let pv_pos_constraints = vec![];
-    let pv_neg_constraints = vec![];
-    let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
-        pv_pos_constraints,
-        pv_neg_constraints,
-    };
-
-    // ######################## Auxiliary ALU Constraints #######################
-    //let alu_constraints = get_alu_constraints();
-    let aux_objs: Vec<_> = vec![];
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Solver Parameters ###############################
     let max_iteration = 100000000;
-    let minimum_num_taregt_cols = refinable_cols.len();
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
+    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
-    // Public trace values (example: program start, memory base, initial step)
-    let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::i4();
-    public_vals[41] = AbstractInterval::bool();
-    public_vals[44] = AbstractInterval::one();
-    let refinment_target_indicies_pv: Vec<usize> = vec![];
+    // ######################## Extract CPU Constraints ##########################
+    let air = BranchChip::default();
+    let air_name = "Branch";
+    let colmap = make_col_map();
+    println!("map: {:?}", colmap);
+
+    let (tv_constraints, mut refinable_cols, mut range_types) =
+        extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
+    refinable_cols.extend(&[23, 24, 25, 26]);
+    range_types.insert(23, RangeType::U8);
+    range_types.insert(24, RangeType::U8);
+    range_types.insert(25, RangeType::U8);
+    range_types.insert(26, RangeType::U8);
+    println!("{:?}", refinable_cols);
+    println!("{:?}", range_types);
+
+    let constraints = LatticeVMConstraints {
+        air_constraints: tv_constraints.clone(),
+        pv_pos_constraints: vec![],
+        pv_neg_constraints: vec![],
+    };
+    let minimum_num_taregt_cols = 5; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);
-    let program_len = program.instructions.len();
+    let base_abs_main_trace_data =
+        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
-    // Convert program to string for UI display
-    let program_str = program
-        .instructions
-        .iter()
-        .map(|inst| format!("{:?}\n", inst))
-        .collect::<String>();
-
-    let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
-    let mut base_abs_main_trace_data = vec![];
-    for st in &true_abstract_traces {
-        if st.0 == air_name {
-            base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
-        }
-    }
-
-    // ######################## UI Initialization ################################
-
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let mut ui = UiState::new();
-    ui.program = program_str;
-
-    // ######################## Run Solver ######################################
-    let mut known_solution = HashSet::<String>::new();
-    let mut logs = Vec::new();
-    let start_time = time::Instant::now();
-    run_solver(
+    // ######################## Solve ############################################
+    quick_api(
+        get_program_str(&program),
         &constraints,
         &refinable_cols,
         &range_types,
-        &aux_objs,
+        &vec![],
         &aux_tg_fns,
-        &refinment_target_indicies_pv,
+        &vec![],
         &base_abs_main_trace_data,
-        public_vals,
+        vec![],
         max_iteration,
         minimum_num_taregt_cols,
         min_row_id,
         max_row_id,
-        program_len,
-        program_counter_refine_fn,
-        adjust_pc_program,
+        program.instructions.len(),
+        dummy_program_counter_refine_fn,
+        dummy_adjust_pc_program,
         final_check,
         prime,
         seed,
-        &mut known_solution,
-        &mut logs,
-        &mut ui,
-        &mut terminal,
-    );
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    eprintln!("Execution Time    : {:?}", start_time.elapsed());
-    eprintln!("#Unique Solution  : {}", known_solution.len());
-
-    Ok(())
+    )
 }

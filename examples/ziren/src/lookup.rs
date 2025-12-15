@@ -76,13 +76,14 @@ pub fn get_symbolic_lookup_constraints<F, A>(
             }
         }
     }
+    /*
     for s in &sends {
         for (w, _) in &s.multiplicity.column_weights {
             if let p3_air::PairCol::Main(col_idx) = w {
                 multiplicities.insert(*col_idx);
             }
         }
-    }
+    }*/
 
     for r in &receives {
         match r.kind {
@@ -131,13 +132,14 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     for s in &sends {
         match s.kind {
             LookupKind::Instruction => {
+                /*
                 for rv in &s.values {
                     for c in &rv.column_weights {
                         if let PairCol::Main(index) = c.0 {
                             received_vars_from_cpu.insert(index);
                         }
                     }
-                }
+                }*/
                 let opcode = convert_p3_virtual_pair_col(&s.values[6]);
                 let a0 = convert_p3_virtual_pair_col(&s.values[7]);
                 let a1 = convert_p3_virtual_pair_col(&s.values[8]);
