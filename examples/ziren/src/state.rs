@@ -15,7 +15,7 @@ pub fn ziren_state_to_abstract_state(ziren_state: &ExecutionState) -> AbstractSt
         .into_iter()
         .map(|(addr, record)| (addr, AbstractInterval::from_i64(record.value as i64)))
         .collect();*/
-    let mut memory_ops = HashSet::new();
+    let memory_ops = HashSet::new();
 
     AbstractState {
         clk: AbstractInterval::from_i64(ziren_state.clk as i64),

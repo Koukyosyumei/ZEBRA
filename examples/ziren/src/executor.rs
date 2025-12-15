@@ -1,13 +1,9 @@
-use std::borrow::Borrow;
 use std::io;
 
 use p3_air::BaseAir;
 use p3_field::PrimeField32;
 
 use zkm_core_executor::{ExecutionState, Executor, Program};
-use zkm_core_machine::columns::CpuCols;
-use zkm_core_machine::memory::MemoryInitCols;
-use zkm_core_machine::memory::MemoryLocalCols;
 use zkm_core_machine::mips::MipsAir;
 use zkm_core_machine::utils::trace_checkpoint;
 use zkm_core_machine::utils::ZKMCoreProverError;
@@ -69,7 +65,7 @@ pub fn run_ziren_program(
         let nrows = mt.1.values.len() / mt.1.width;
         let mut rows = vec![];
         for i in 0..nrows {
-            let mut row = mt.1.row_mut(i);
+            let row = mt.1.row_mut(i);
             rows.push(
                 row.iter()
                     .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
