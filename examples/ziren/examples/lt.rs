@@ -124,7 +124,7 @@ const fn make_col_map() -> LtCols<usize> {
     unsafe { transmute::<[usize; NUM_LT_COLS], LtCols<usize>>(indices_arr) }
 }
 
-pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
+pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
     let mut instructions = vec![Instruction::new(Opcode::SLT, 1, 2, 3, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
@@ -161,7 +161,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = add_program(4, 4);
+    let program = target_program(4, 4);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, "Lt".to_string(), num_extracted_rows);
 
