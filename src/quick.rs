@@ -1,37 +1,23 @@
-use core::mem::{size_of, transmute};
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fs;
-use std::rc::Rc;
 use std::time;
-use std::{io, thread, time::Duration};
+use std::io;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use itertools::Itertools;
-use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
-    widgets::{Block, Borders, Paragraph},
     Terminal,
 };
 
-use crate::smt::expr_to_smt;
 use crate::solver::AbsConstraintObj;
 use crate::solver::RangeType;
-use crate::symbolic::eval_constraints;
-use crate::symbolic::LatticeVMSymbolicEntry;
-use crate::symbolic::LatticeVMSymbolicExpr;
-use crate::symbolic::LatticeVMSymbolicVal;
 use crate::ui::UiState;
-use crate::utils::create_or_clear_dir;
 use crate::{
-    interval::AbstractInterval, solver::run_solver, symbolic::gather_boolean_variables,
+    interval::AbstractInterval, solver::run_solver,
     symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
 };
 

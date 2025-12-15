@@ -1,5 +1,5 @@
-use crate::interval::{AbstractInterval, MayBeFlag};
-use crate::symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr};
+use crate::interval::AbstractInterval;
+use crate::symbolic::LatticeVMSymbolicExpr;
 
 pub enum OpALU {
     Add,

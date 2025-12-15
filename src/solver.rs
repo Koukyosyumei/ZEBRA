@@ -381,7 +381,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
     // RNG and bookkeeping
     let mut rng = StdRng::seed_from_u64(seed);
     let mut found_solution_flag = false;
-    let mut global_expansion_count = 0;
+    let global_expansion_count = 0;
     let mut exit_flag = false;
 
     // ################################################################
