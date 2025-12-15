@@ -8,12 +8,8 @@ use itertools::Itertools;
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::alu::LtCols;
-use zkm_core_machine::alu::NUM_LT_COLS;
 use zkm_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
-use zkm_core_machine::memory::MemoryLocalChip;
 use zkm_core_machine::AddSubChip;
-use zkm_core_machine::LtChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
@@ -75,7 +71,7 @@ const fn make_col_map() -> AddSubCols<usize> {
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 2, 3, true, true)];
+    let instructions = vec![Instruction::new(Opcode::ADD, 1, 2, 3, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
