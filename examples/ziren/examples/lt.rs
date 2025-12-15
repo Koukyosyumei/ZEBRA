@@ -163,6 +163,59 @@ pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn extract_constraints_and_range<F, A>(
+    air: &A,
+    num_cols: usize,
+    prime: u32,
+) -> (
+    Vec<LatticeVMSymbolicExpr>,
+    Vec<usize>,
+    HashMap<usize, RangeType>,
+)
+where
+    F: p3_field::PrimeField32,
+    A: Air<LookupBuilder<F>> + Air<SymbolicAirBuilder<F>>,
+{
+    let mut u8_cols = vec![];
+    let mut multiplicities = HashSet::new();
+    let mut lookup_symbolic_constraints = Vec::new();
+    let mut received_vars_from_cpu = HashSet::new();
+
+    let symbolic_constraints: Vec<SymbolicExpression<F>> =
+        get_symbolic_constraints(air, 0, ZKM_PROOF_NUM_PV_ELTS);
+    get_symbolic_lookup_constraints::<F, A>(
+        air,
+        0,
+        ZKM_PROOF_NUM_PV_ELTS,
+        &mut u8_cols,
+        &mut multiplicities,
+        &mut lookup_symbolic_constraints,
+        &mut received_vars_from_cpu,
+        prime,
+    );
+
+    let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
+    refinable_cols.retain(|c| !multiplicities.contains(c));
+    refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
+
+    let mut tv_constraints = symbolic_constraints
+        .iter()
+        .map(|sc| convert_p3_expr::<F>(&sc))
+        .collect::<Vec<_>>();
+    tv_constraints.extend(lookup_symbolic_constraints);
+
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
+    let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
+        .iter()
+        .map(|k| (*k, RangeType::Bool))
+        .collect();
+    for c in &u8_cols {
+        range_types.insert(*c, RangeType::U8);
+    }
+
+    (tv_constraints, refinable_cols, range_types)
+}
+
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
@@ -179,47 +232,9 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", colmap.byte_equality_check);
     println!("{:?}", NUM_LT_COLS);
 
-    let mut u8_cols = vec![];
-    let mut multiplicities = HashSet::new();
-    let mut lookup_symbolic_constraints = Vec::new();
-    let mut received_vars_from_cpu = HashSet::new();
-    let symbolic_constraints: Vec<SymbolicExpression<KoalaBear>> =
-        get_symbolic_constraints(&air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    get_symbolic_lookup_constraints::<KoalaBear, LtChip>(
-        &air,
-        0,
-        ZKM_PROOF_NUM_PV_ELTS,
-        &mut u8_cols,
-        &mut multiplicities,
-        &mut lookup_symbolic_constraints,
-        &mut received_vars_from_cpu,
-        prime,
-    );
-
-    let mut refinable_cols: Vec<usize> = (0..NUM_LT_COLS).collect();
-    refinable_cols.retain(|c| !multiplicities.contains(c));
-    refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
-    //refinable_cols.extend(&[4, 5, 6, 7]);
+    let (tv_constraints, mut refinable_cols, range_types) =
+        extract_constraints_and_range::<KoalaBear, LtChip>(&air, NUM_LT_COLS, prime);
     refinable_cols.extend(&[4]);
-
-    println!("------------------: {:?}", u8_cols);
-    println!("------------------: {:?}", multiplicities);
-    println!("------------------: {:?}", received_vars_from_cpu);
-
-    let mut tv_constraints = symbolic_constraints
-        .iter()
-        .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
-        .collect::<Vec<_>>();
-    for s in &lookup_symbolic_constraints {
-        println!("{}", s);
-    }
-    tv_constraints.extend(lookup_symbolic_constraints);
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
-
-    let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
-        .iter()
-        .map(|k| (*k, RangeType::Bool))
-        .collect();
 
     // # Additional Public Value Verification
     //let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
@@ -232,14 +247,6 @@ fn main() -> Result<(), io::Error> {
         pv_pos_constraints,
         pv_neg_constraints,
     };
-
-    // Columns available for refinement (excluding reserved program columns)
-    for c in &u8_cols {
-        range_types.insert(*c, RangeType::U8);
-    }
-    for c in &potential_boolean_vars {
-        range_types.insert(*c, RangeType::Bool);
-    }
 
     // ######################## Auxiliary ALU Constraints #######################
     let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
