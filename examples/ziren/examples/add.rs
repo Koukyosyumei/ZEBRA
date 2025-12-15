@@ -1,9 +1,8 @@
 use core::mem::transmute;
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-
-use itertools::Itertools;
 
 use p3_koala_bear::KoalaBear;
 
@@ -18,10 +17,9 @@ use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
-use latticevm_ziren::utils::extract_constraints_and_range;
 use latticevm_ziren::utils::{
     dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
-    generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
 
 // ############## Final Check Function ##############################
