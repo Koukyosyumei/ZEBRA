@@ -10,10 +10,14 @@ use p3_koala_bear::KoalaBear;
 use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::LtCols;
 use zkm_core_machine::alu::NUM_LT_COLS;
+use zkm_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
+use zkm_core_machine::memory::MemoryLocalChip;
+use zkm_core_machine::AddSubChip;
 use zkm_core_machine::LtChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
+use latticevm::solver::RangeType;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
@@ -34,11 +38,6 @@ fn final_check(
 ) {
     let string_representation = format!(
         "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][8],
         trace.data[0][9],
         trace.data[0][10],
         trace.data[0][11],
@@ -46,6 +45,11 @@ fn final_check(
         trace.data[0][13],
         trace.data[0][14],
         trace.data[0][15],
+        trace.data[0][16],
+        trace.data[0][2],
+        trace.data[0][3],
+        trace.data[0][4],
+        trace.data[0][5],
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -65,13 +69,13 @@ fn final_check(
     }
 }
 
-const fn make_col_map() -> LtCols<usize> {
-    let indices_arr = indices_arr::<{ NUM_LT_COLS }>();
-    unsafe { transmute::<[usize; NUM_LT_COLS], LtCols<usize>>(indices_arr) }
+const fn make_col_map() -> AddSubCols<usize> {
+    let indices_arr = indices_arr::<{ NUM_ADD_SUB_COLS }>();
+    unsafe { transmute::<[usize; NUM_ADD_SUB_COLS], AddSubCols<usize>>(indices_arr) }
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::SLT, 1, 2, 3, true, true)];
+    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 2, 3, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -90,16 +94,18 @@ fn main() -> Result<(), io::Error> {
     let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
-    let air = LtChip::default();
-    let air_name = "Lt";
+    let air = AddSubChip::default();
+    let air_name = "AddSub";
     let colmap = make_col_map();
-    println!("a: {:?}", colmap.a);
-    println!("b: {:?}", colmap.b);
-    println!("c: {:?}", colmap.c);
+    println!("operand_1: {:?}", colmap.operand_1);
+    println!("operand_2: {:?}", colmap.operand_2);
 
-    let (tv_constraints, mut refinable_cols, range_types) =
-        extract_constraints_and_range::<KoalaBear, LtChip>(&air, NUM_LT_COLS, prime);
-    refinable_cols.extend(&[4]);
+    let (tv_constraints, mut refinable_cols, mut range_types) =
+        extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
+    refinable_cols.extend(&[2, 3, 4, 5]); // output
+    refinable_cols.extend(&[9, 13]); // input
+    range_types.insert(9, RangeType::U4);
+    range_types.insert(13, RangeType::U4);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 
