@@ -72,6 +72,7 @@ use latticevm_ziren::lookup::get_symbolic_lookup_constraints;
 use latticevm_ziren::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col};
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
+use latticevm_ziren::utils::get_program_str;
 
 fn program_counter_refine_fn(
     abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
@@ -240,18 +241,7 @@ fn main() -> Result<(), io::Error> {
         range_types.insert(*c, RangeType::Bool);
     }
 
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
-    for r in &refinable_cols {
-        if !range_types.contains_key(r) {
-            print!("{}, ", r);
-        }
-    }
-    println!("");
-
     // ######################## Auxiliary ALU Constraints #######################
-    //let alu_constraints = get_alu_constraints();
-    let aux_objs: Vec<_> = vec![];
     let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Solver Parameters ###############################
@@ -265,14 +255,6 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let program = add_program(4, 4);
-    let program_len = program.instructions.len();
-
-    // Convert program to string for UI display
-    let program_str = program
-        .instructions
-        .iter()
-        .map(|inst| format!("{:?}\n", inst))
-        .collect::<String>();
 
     let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
     let mut base_abs_main_trace_data = vec![];
@@ -283,11 +265,11 @@ fn main() -> Result<(), io::Error> {
     }
 
     quick_api(
-        program_str,
+        get_program_str(&program),
         &constraints,
         &refinable_cols,
         &range_types,
-        &aux_objs,
+        &vec![],
         &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
@@ -296,7 +278,7 @@ fn main() -> Result<(), io::Error> {
         minimum_num_taregt_cols,
         min_row_id,
         max_row_id,
-        program_len,
+        program.instructions.len(),
         program_counter_refine_fn,
         adjust_pc_program,
         final_check,
