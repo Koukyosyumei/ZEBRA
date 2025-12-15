@@ -15,8 +15,7 @@ use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 use latticevm::solver::RangeType;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::{
-    interval::AbstractInterval, symbolic::gather_boolean_variables,
-    symbolic::AbstractTrace,
+    interval::AbstractInterval, symbolic::gather_boolean_variables, symbolic::AbstractTrace,
 };
 
 use crate::executor::run_ziren_program;
@@ -39,6 +38,7 @@ pub fn generate_abstract_trace(
     let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
     let mut base_abs_main_trace_data = vec![];
     for st in &true_abstract_traces {
+        println!("st.0: {}", st.0);
         if st.0 == key {
             base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
         }
