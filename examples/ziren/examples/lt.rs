@@ -53,6 +53,7 @@ use zkm_stark::MachineProver;
 use zkm_stark::ZKMCoreOpts;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
+use latticevm::quick::quick_api;
 use latticevm::smt::expr_to_smt;
 use latticevm::solver::RangeType;
 use latticevm::symbolic::eval_constraints;
@@ -191,6 +192,7 @@ fn main() -> Result<(), io::Error> {
         &mut multiplicities,
         &mut lookup_symbolic_constraints,
         &mut received_vars_from_cpu,
+        prime,
     );
 
     let mut refinable_cols: Vec<usize> = (0..NUM_LT_COLS).collect();
@@ -198,14 +200,10 @@ fn main() -> Result<(), io::Error> {
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
     //refinable_cols.extend(&[4, 5, 6, 7]);
     refinable_cols.extend(&[4]);
-    let tmp = vec![22];
-    refinable_cols.retain(|c| !tmp.contains(c));
+
     println!("------------------: {:?}", u8_cols);
     println!("------------------: {:?}", multiplicities);
     println!("------------------: {:?}", received_vars_from_cpu);
-
-    let tmp: Vec<usize> = vec![22];
-    refinable_cols.retain(|c| !tmp.contains(c));
 
     let mut tv_constraints = symbolic_constraints
         .iter()
@@ -265,13 +263,6 @@ fn main() -> Result<(), io::Error> {
     let num_extracted_rows = 1;
     let seed = 41;
 
-    // Public trace values (example: program start, memory base, initial step)
-    let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::i4();
-    public_vals[41] = AbstractInterval::bool();
-    public_vals[44] = AbstractInterval::one();
-    let refinment_target_indicies_pv: Vec<usize> = vec![];
-
     // ######################## Program Initialization ###########################
     let program = add_program(4, 4);
     let program_len = program.instructions.len();
@@ -286,40 +277,21 @@ fn main() -> Result<(), io::Error> {
     let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
     let mut base_abs_main_trace_data = vec![];
     for st in &true_abstract_traces {
-        println!("{}", st.0);
         if st.0 == "Lt" {
             base_abs_main_trace_data = st.1[..num_extracted_rows].to_vec();
         }
     }
-    for b in &base_abs_main_trace_data[0] {
-        print!("{}, ", b);
-    }
-    println!("");
-    println!("{:?}", base_abs_main_trace_data);
 
-    // ######################## UI Initialization ################################
-
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let mut ui = UiState::new();
-    ui.program = program_str;
-
-    // ######################## Run Solver ######################################
-    let mut known_solution = HashSet::<String>::new();
-    let mut logs = Vec::new();
-    let start_time = time::Instant::now();
-    run_solver(
+    quick_api(
+        program_str,
         &constraints,
         &refinable_cols,
         &range_types,
         &aux_objs,
         &aux_tg_fns,
-        &refinment_target_indicies_pv,
+        &vec![],
         &base_abs_main_trace_data,
-        public_vals,
+        vec![],
         max_iteration,
         minimum_num_taregt_cols,
         min_row_id,
@@ -330,57 +302,5 @@ fn main() -> Result<(), io::Error> {
         final_check,
         prime,
         seed,
-        &mut known_solution,
-        &mut logs,
-        &mut ui,
-        &mut terminal,
-    );
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    eprintln!("Execution Time    : {:?}", start_time.elapsed());
-    eprintln!("#Unique Solution  : {}", known_solution.len());
-
-    Ok(())
+    )
 }
-
-/*
-(curr[25] - (curr[23] * curr[2]))
-(curr[26] - (curr[24] * curr[2]))
-(curr[23] - ((curr[11] - curr[20]) * 2114060289))
-(curr[24] - ((curr[15] - curr[21]) * 2114060289))
-(curr[29] * (curr[29] - 1))
-(curr[29] * (curr[25] - curr[26]))
-((curr[2] + curr[3]) * ((curr[29] - 1) * ((curr[25] + curr[26]) - 1)))
-(curr[4] - ((curr[25] * (1 - curr[26])) + (curr[29] * curr[27])))
-curr[5]
-curr[6]
-curr[7]
-(curr[16] * (curr[16] - 1))
-(curr[17] * (curr[17] - 1))
-(curr[18] * (curr[18] - 1))
-(curr[19] * (curr[19] - 1))
-((((curr[16] + curr[17]) + curr[18]) + curr[19]) * ((((curr[16] + curr[17]) + curr[18]) + curr[19]) - 1))
-((curr[2] + curr[3]) * ((1 - curr[28]) - (((curr[16] + curr[17]) + curr[18]) + curr[19])))
-(curr[28] * (curr[28] - 1))
-(((0 + curr[19]) - 1) * (((curr[11] * curr[3]) + (curr[20] * curr[2])) - ((curr[15] * curr[3]) + (curr[21] * curr[2]))))
-(curr[28] * (0 + curr[19]))
-((((0 + curr[19]) + curr[18]) - 1) * (curr[10] - curr[14]))
-(curr[28] * ((0 + curr[19]) + curr[18]))
-(((((0 + curr[19]) + curr[18]) + curr[17]) - 1) * (curr[9] - curr[13]))
-(curr[28] * (((0 + curr[19]) + curr[18]) + curr[17]))
-((((((0 + curr[19]) + curr[18]) + curr[17]) + curr[16]) - 1) * (curr[8] - curr[12]))
-(curr[28] * ((((0 + curr[19]) + curr[18]) + curr[17]) + curr[16]))
-(curr[30] - ((((0 + (((curr[11] * curr[3]) + (curr[20] * curr[2])) * curr[19])) + (curr[10] * curr[18])) + (curr[9] * curr[17])) + (curr[8] * curr[16])))
-(curr[31] - ((((0 + (((curr[15] * curr[3]) + (curr[21] * curr[2])) * curr[19])) + (curr[14] * curr[18])) + (curr[13] * curr[17])) + (curr[12] * curr[16])))
-((curr[28] - 1) * ((curr[22] * (curr[30] - curr[31])) - (curr[2] + curr[3])))
-(curr[2] * (curr[2] - 1))
-(curr[3] * (curr[3] - 1))
-((curr[2] + curr[3]) * ((curr[2] + curr[3]) - 1))
-*/
