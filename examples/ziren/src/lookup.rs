@@ -157,10 +157,11 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let tmps = vec![
                     (0, OpALU::Add),
                     (1, OpALU::Sub),
-                    (2, OpALU::Mul),
-                    (15, OpALU::And),
-                    (16, OpALU::Or),
-                    (17, OpALU::Xor),
+                    (4, OpALU::Mul),
+                    (11, OpALU::Lt),
+                    (13, OpALU::And),
+                    (14, OpALU::Or),
+                    (15, OpALU::Xor),
                 ];
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(
@@ -170,6 +171,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         &t.1,
                     );
                     let impl_constraint = make_impl_constraint(t.0, &opcode, alu_constraint, prime);
+                    println!("{:?}: {:?} {:?}", t, impl_constraint, opcode);
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 7..19 {
                             add_u8_col_if_possible(&s.values[i], u8_cols);

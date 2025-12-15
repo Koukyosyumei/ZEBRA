@@ -1,6 +1,7 @@
 use crate::interval::AbstractInterval;
 use crate::symbolic::LatticeVMSymbolicExpr;
 
+#[derive(Debug)]
 pub enum OpALU {
     Add,
     Sub,
