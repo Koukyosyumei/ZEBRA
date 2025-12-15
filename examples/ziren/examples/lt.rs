@@ -16,9 +16,7 @@ use zkm_stark::MachineProver;
 use latticevm::quick::quick_api;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
-use latticevm::{
-    symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
-};
+use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::extract_constraints_and_range;
 use latticevm_ziren::utils::{
@@ -94,7 +92,9 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = LtChip::default();
     let colmap = make_col_map();
-    //println!("{:?}", colmap);
+    println!("a: {:?}", colmap.a);
+    println!("b: {:?}", colmap.b);
+    println!("c: {:?}", colmap.c);
     println!("{:?}", NUM_LT_COLS);
 
     let (tv_constraints, mut refinable_cols, range_types) =
