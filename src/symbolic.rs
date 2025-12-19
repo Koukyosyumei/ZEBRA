@@ -59,6 +59,11 @@ pub enum LatticeVMSymbolicExpr {
     Add(Box<Self>, Box<Self>),
     Sub(Box<Self>, Box<Self>),
     Mul(Box<Self>, Box<Self>),
+    And(Box<Self>, Box<Self>),
+    Or(Box<Self>, Box<Self>),
+    Xor(Box<Self>, Box<Self>),
+    Lt(Box<Self>, Box<Self>),
+    Impl(Box<Self>, Box<Self>),
     Neg(Box<Self>),
 }
 
@@ -85,6 +90,22 @@ pub fn gather_vars(
         }
         LatticeVMSymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
             gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+        }
+        LatticeVMSymbolicExpr::And(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Or(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Xor(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Lt(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
         _ => {}
     }
@@ -154,6 +175,11 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Sub(x, y) => write!(f, "({} - {})", x, y),
             Self::Mul(x, y) => write!(f, "({} * {})", x, y),
             Self::Neg(x) => write!(f, "-{}", x),
+            Self::And(x, y) => write!(f, "({} && {})", x, y),
+            Self::Or(x, y) => write!(f, "({} || {})", x, y),
+            Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
+            Self::Lt(x, y) => write!(f, "({} < {})", x, y),
+            Self::Impl(x, y) => write!(f, "({} => {})", x, y),
         }
     }
 }
@@ -341,38 +367,187 @@ impl LatticeVMSymbolicExpr {
                 is_last_row,
                 prime,
             ),
+            Self::And(a, b) => {
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                ) & b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )
+            }
+            Self::Or(a, b) => {
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                ) | b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )
+            }
+            Self::Xor(a, b) => {
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                ) ^ b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )
+            }
+            Self::Impl(a, b) => {
+                // if a is 0, b should be 0
+
+                let cond = a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                );
+                if let MayBeFlag::False = cond.is_zero(prime) {
+                    AbstractInterval::zero()
+                } else {
+                    b.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                }
+            }
+            Self::Lt(a, b) => a
+                .eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )
+                .ltu(b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )),
         }
     }
 }
 
-pub fn gather_boolean_variables(constraints: &[LatticeVMSymbolicExpr]) -> Vec<usize> {
+fn collect_add_vars(expr: &LatticeVMSymbolicExpr) -> Option<HashSet<usize>> {
+    match expr {
+        LatticeVMSymbolicExpr::Add(lhs, rhs) => {
+            let mut left = collect_add_vars(lhs)?;
+            let right = collect_add_vars(rhs)?;
+            left.extend(right);
+            Some(left)
+        }
+        LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { index, .. }) => {
+            let mut set = HashSet::new();
+            set.insert(index.clone());
+            Some(set)
+        }
+        _ => None,
+    }
+}
+
+pub fn is_boolean_constraint(constraint: &LatticeVMSymbolicExpr) -> Option<usize> {
+    use LatticeVMSymbolicExpr::*;
+
+    // helper: find `x - 1`
+    fn is_x_minus_one(expr: &LatticeVMSymbolicExpr) -> Option<usize> {
+        if let Sub(lhs, rhs) = expr {
+            if let (
+                Variable(LatticeVMSymbolicVal { index, .. }),
+                Constant(AbstractInterval { lo: 1, hi: 1 }),
+            ) = (&**lhs, &**rhs)
+            {
+                return Some(index.clone());
+            }
+        }
+        None
+    }
+
+    if let Mul(a, b) = constraint {
+        match (&**a, &**b) {
+            // x * (x - 1)
+            (Variable(LatticeVMSymbolicVal { index, .. }), rhs)
+                if is_x_minus_one(rhs) == Some(index.clone()) =>
+            {
+                return Some(index.clone());
+            }
+
+            // (x - 1) * x
+            (lhs, Variable(LatticeVMSymbolicVal { index, .. }))
+                if is_x_minus_one(lhs) == Some(index.clone()) =>
+            {
+                return Some(index.clone());
+            }
+
+            _ => {}
+        }
+    }
+
+    None
+}
+
+pub fn gather_boolean_variables(
+    constraints: &[LatticeVMSymbolicExpr],
+    multiplicities: &HashSet<usize>,
+) -> Vec<usize> {
     let mut result = HashSet::new();
     for c in constraints {
-        if let LatticeVMSymbolicExpr::Mul(lhs, _) = c {
-            if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { entry: _, index }) =
-                &**lhs
-            {
-                result.insert(index.clone());
-            } else if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = &**lhs {
-                if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { entry: _, index }) =
-                    &**lhs
-                {
-                    if let LatticeVMSymbolicExpr::Constant(AbstractInterval { lo: 1, hi: 1 }) =
-                        &**rhs
-                    {
-                        result.insert(index.clone());
-                    }
-                }
-                if let LatticeVMSymbolicExpr::Constant(AbstractInterval { lo: 1, hi: 1 }) = &**lhs {
-                    if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
-                        entry: _,
-                        index,
-                    }) = &**rhs
-                    {
-                        result.insert(index.clone());
+        if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = c {
+            let add_vars = collect_add_vars(lhs);
+            if let Some(add_vars) = add_vars {
+                if add_vars.is_subset(multiplicities) {
+                    if let Some(idx) = is_boolean_constraint(rhs) {
+                        result.insert(idx);
                     }
                 }
             }
+        }
+        if let Some(idx) = is_boolean_constraint(c) {
+            result.insert(idx);
         }
     }
     result.iter().cloned().collect()

@@ -1,22 +1,6 @@
-use std::io;
 
-use p3_air::BaseAir;
-use p3_field::PrimeField32;
 
-use zkm_core_executor::events::MemoryAccessPosition;
-use zkm_core_executor::events::MemoryReadRecord;
-use zkm_core_executor::events::MemoryRecordEnum;
-use zkm_core_executor::events::MemoryWriteRecord;
-use zkm_core_executor::Register;
-use zkm_core_executor::{
-    ExecutionState, Executor, Instruction, MemoryAccessRecord, Opcode, Program,
-};
-use zkm_core_machine::mips::MipsAir;
-use zkm_core_machine::utils::trace_checkpoint;
-use zkm_core_machine::utils::ZKMCoreProverError;
-use zkm_stark::koala_bear_poseidon2::KoalaBearPoseidon2;
-use zkm_stark::ZKMCoreOpts;
-use zkm_stark::{CpuProver, MachineProver};
+use zkm_core_executor::Opcode;
 
 pub fn u32_to_opcode(value: u32) -> Option<Opcode> {
     match value {
@@ -81,6 +65,7 @@ pub fn u32_to_opcode(value: u32) -> Option<Opcode> {
     }
 }
 
+/*
 pub fn emit_events(executor: &mut Executor, row: &Vec<u32>) {
     let opcode = u32_to_opcode(row[8]).unwrap();
     let op_a = row[9];
@@ -194,3 +179,4 @@ pub fn emit_events(executor: &mut Executor, row: &Vec<u32>) {
         executor.record.cpu_local_memory_access.push(event);
     }
 }
+*/

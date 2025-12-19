@@ -293,7 +293,7 @@ pub fn make_init_val(
             RangeType::Const(val) => AbstractInterval::from_i64(*val),
         }
     } else {
-        AbstractInterval::i4()
+        AbstractInterval::top(prime)
     }
 }
 
@@ -381,7 +381,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
     // RNG and bookkeeping
     let mut rng = StdRng::seed_from_u64(seed);
     let mut found_solution_flag = false;
-    let mut global_expansion_count = 0;
+    let global_expansion_count = 0;
     let mut exit_flag = false;
 
     // ################################################################
@@ -546,8 +546,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                     }
                 }
                 // update global expansion counter and check for exit signal
-                global_expansion_count += result.1;
-
+                //global_expansion_count += result.1;
                 if result.3 {
                     exit_flag = true;
                     break;

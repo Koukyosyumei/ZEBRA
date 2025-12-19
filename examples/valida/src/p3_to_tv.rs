@@ -1,9 +1,11 @@
+use std::collections::HashSet;
+
 use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
 use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::symbolic::symbolic_variable::{SymbolicVariable, Trace};
 use valida_machine::ChipWithPersistence;
-use valida_machine::StarkConfig;
 use valida_machine::Machine;
+use valida_machine::StarkConfig;
 
 use p3_field::PrimeField32;
 
@@ -89,7 +91,8 @@ where
         .iter()
         .map(|sc| convert_p3_expr::<SC::Val>(&sc))
         .collect::<Vec<_>>();
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
+    let mut multiplicities = HashSet::new();
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
         pv_pos_constraints: vec![],

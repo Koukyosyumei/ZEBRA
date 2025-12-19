@@ -86,6 +86,9 @@ pub fn expr_to_smt(
             LatticeVMSymbolicExpr::Neg(a) => {
                 format!("(- {})", helper(a, row_id, n_rows, n_pvs, vars))
             }
+            _ => {
+                todo!()
+            }
         }
     }
 
