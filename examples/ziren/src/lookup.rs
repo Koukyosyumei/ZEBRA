@@ -9,6 +9,7 @@ use p3_field::PrimeField32;
 use p3_koala_bear::KoalaBear;
 use p3_uni_stark::{SymbolicExpression, SymbolicVariable};
 
+use zkm_core_executor::Opcode;
 use zkm_stark::LookupBuilder;
 use zkm_stark::LookupKind;
 
@@ -119,11 +120,11 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let hi1 = &r.values[20];
                 let hi2 = &r.values[21];
                 let hi3 = &r.values[22];
-                let op_a_immutable = &r.values[24];
-                let is_rw_a = &r.values[25];
-                let is_check_memory = &r.values[26];
-                let is_halt = &r.values[27];
-                let is_sequential = &r.values[28];
+                let op_a_immutable = &r.values[23];
+                let is_rw_a = &r.values[24];
+                let is_check_memory = &r.values[25];
+                let is_halt = &r.values[26];
+                let is_sequential = &r.values[27];
             }
             _ => {}
         }
@@ -155,13 +156,13 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c3 = convert_p3_virtual_pair_col(&s.values[18]);
 
                 let tmps = vec![
-                    (0, OpALU::Add),
-                    (1, OpALU::Sub),
-                    (4, OpALU::Mul),
-                    (11, OpALU::Lt),
-                    (13, OpALU::And),
-                    (14, OpALU::Or),
-                    (15, OpALU::Xor),
+                    (Opcode::ADD as u8, OpALU::Add),
+                    (Opcode::SUB as u8, OpALU::Sub),
+                    (Opcode::MUL as u8, OpALU::Mul),
+                    (Opcode::SLT as u8, OpALU::Lt),
+                    (Opcode::AND as u8, OpALU::And),
+                    (Opcode::OR as u8, OpALU::Or),
+                    (Opcode::XOR as u8, OpALU::Xor),
                 ];
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(
@@ -170,7 +171,8 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         &[c0.clone(), c1.clone(), c2.clone(), c3.clone()],
                         &t.1,
                     );
-                    let impl_constraint = make_impl_constraint(t.0, &opcode, alu_constraint, prime);
+                    let impl_constraint =
+                        make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
                     println!("{:?}: {:?} {:?}", t, impl_constraint, opcode);
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 7..19 {
