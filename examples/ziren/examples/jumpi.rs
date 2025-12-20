@@ -11,12 +11,15 @@ use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::NUM_ADD_SUB_COLS;
 use zkm_core_machine::alu::NUM_BITWISE_COLS;
 use zkm_core_machine::control_flow::BranchColumns;
+use zkm_core_machine::control_flow::JumpColumns;
+use zkm_core_machine::control_flow::NUM_JUMP_COLS;
 use zkm_core_machine::memory::MemoryLocalChip;
 use zkm_core_machine::misc::MovCondCols;
 use zkm_core_machine::misc::NUM_MOV_COND_COLS;
 use zkm_core_machine::AddSubChip;
 use zkm_core_machine::BitwiseChip;
 use zkm_core_machine::BranchChip;
+use zkm_core_machine::JumpChip;
 use zkm_core_machine::MovCondChip;
 use zkm_stark::MachineProver;
 
@@ -76,13 +79,16 @@ fn final_check(
     }
 }
 
-const fn make_col_map() -> MovCondCols<usize> {
-    let indices_arr = indices_arr::<{ NUM_MOV_COND_COLS }>();
-    unsafe { transmute::<[usize; NUM_MOV_COND_COLS], MovCondCols<usize>>(indices_arr) }
+const fn make_col_map() -> JumpColumns<usize> {
+    let indices_arr = indices_arr::<{ NUM_JUMP_COLS }>();
+    unsafe { transmute::<[usize; NUM_JUMP_COLS], JumpColumns<usize>>(indices_arr) }
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::MEQ, 1, 2, 3, true, true)];
+    let instructions = vec![
+        Instruction::new(Opcode::ADD, 31, 0, 0, false, true),
+        Instruction::new(Opcode::Jumpi, 31, 100, 0, true, true),
+    ];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -101,18 +107,18 @@ fn main() -> Result<(), io::Error> {
     let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
-    let air = MovCondChip::default();
-    let air_name = "MovCond";
+    let air = JumpChip::default();
+    let air_name = "Jump";
     let colmap = make_col_map();
+    println!("next_pc: {:?}", colmap.next_pc);
+    println!("next_next_pc: {:?}", colmap.next_next_pc);
     println!("op_a_value: {:?}", colmap.op_a_value);
-    println!("prev_a_value: {:?}", colmap.prev_a_value);
     println!("op_b_value: {:?}", colmap.op_b_value);
     println!("op_c_value: {:?}", colmap.op_c_value);
-    println!("c_eq_0: {:?}", colmap.c_eq_0);
 
     let (tv_constraints, mut refinable_cols, mut range_types) =
-        extract_constraints_and_range::<KoalaBear, MovCondChip>(&air, NUM_MOV_COND_COLS, prime);
-    refinable_cols.extend(&[2, 3, 4, 5]); // output
+        extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
+    refinable_cols.extend(&[19, 20, 21]); // output
                                           //refinable_cols.extend(&[10, 14]); // input
                                           //range_types.insert(6, RangeType::U4);
                                           //range_types.insert(10, RangeType::U4);
@@ -132,6 +138,7 @@ fn main() -> Result<(), io::Error> {
     let program = target_program(4, 4);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+    //println!("{:?}", base_abs_main_trace_data);
 
     // ######################## Solve ############################################
     quick_api(

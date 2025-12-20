@@ -179,7 +179,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                             add_u8_col_if_possible(&s.values[i], u8_cols);
                         }
 
-                        lookup_constraints.push(impl_constraint);
+                        //lookup_constraints.push(impl_constraint);
                     }
                 }
 
