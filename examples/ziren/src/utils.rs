@@ -13,6 +13,8 @@ use zkm_stark::MachineProver;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 use latticevm::solver::RangeType;
+use latticevm::symbolic::gather_vars;
+use latticevm::symbolic::is_koalabear_word_range;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::{
     interval::AbstractInterval, symbolic::gather_boolean_variables, symbolic::AbstractTrace,
@@ -86,7 +88,32 @@ where
         .iter()
         .map(|sc| convert_p3_expr::<F>(&sc))
         .collect::<Vec<_>>();
+
+    let mut new_tv_constraints = Vec::new();
+    let mut is_in_koalabear_word_range_check = false;
+    for t in &tv_constraints {
+        if let Some(expr) = is_koalabear_word_range(t, prime) {
+            if is_in_koalabear_word_range_check {
+                is_in_koalabear_word_range_check = false;
+            } else {
+                new_tv_constraints.push(expr);
+                is_in_koalabear_word_range_check = true;
+            }
+        } else {
+            if !is_in_koalabear_word_range_check {
+                new_tv_constraints.push(t.clone());
+            }
+        }
+    }
+    tv_constraints = new_tv_constraints;
     tv_constraints.extend(lookup_symbolic_constraints);
+
+    let mut used_vars = HashSet::new();
+    for t in &tv_constraints {
+        gather_vars(0, t, &mut used_vars);
+    }
+    let mut used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
+    refinable_cols.retain(|c| used_var_ids.contains(c));
 
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
     let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars

@@ -9,6 +9,7 @@ use rand::rngs::StdRng;
 use rand::seq::{IndexedRandom, SliceRandom};
 use rand::Rng;
 
+use crate::alu::reconstruct_symbolic_word;
 use crate::interval::{AbstractInterval, MayBeFlag};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -488,6 +489,62 @@ fn collect_add_vars(expr: &LatticeVMSymbolicExpr) -> Option<HashSet<usize>> {
         }
         _ => None,
     }
+}
+
+fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
+    match expr {
+        LatticeVMSymbolicExpr::Add(lhs, rhs) => {
+            let mut left = collect_add_vars_vec(lhs)?;
+            let right = collect_add_vars_vec(rhs)?;
+            left.extend(right);
+            Some(left)
+        }
+        LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { index, .. }) => {
+            let mut v = Vec::new();
+            v.push(index.clone());
+            Some(v)
+        }
+        _ => None,
+    }
+}
+
+pub fn is_koalabear_word_range(
+    constraint: &LatticeVMSymbolicExpr,
+    prime: u32,
+) -> Option<LatticeVMSymbolicExpr> {
+    if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = constraint {
+        if let LatticeVMSymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
+            if let LatticeVMSymbolicExpr::Constant(c) = *r_rhs {
+                if c.as_canonical_u32(prime) == 13227174 {
+                    if let Some(word) = collect_add_vars_vec(&r_lhs) {
+                        if word.len() == 4 {
+                            let word_expr: Vec<_> = word
+                                .iter()
+                                .map(|&index| {
+                                    LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                                        entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                                        index,
+                                    })
+                                })
+                                .collect();
+                            let cond = reconstruct_symbolic_word(&word_expr, 0);
+                            return Some(LatticeVMSymbolicExpr::Impl(
+                                lhs.clone(),
+                                Box::new(LatticeVMSymbolicExpr::Lt(
+                                    Box::new(cond),
+                                    Box::new(LatticeVMSymbolicExpr::Constant(
+                                        AbstractInterval::from_i64(2130706433),
+                                    )),
+                                )),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 pub fn is_boolean_constraint(constraint: &LatticeVMSymbolicExpr) -> Option<usize> {
