@@ -82,7 +82,7 @@ const fn make_col_map() -> MovCondCols<usize> {
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::MNE, 1, 2, 3, true, true)];
+    let mut instructions = vec![Instruction::new(Opcode::MNE, 1, 2, 3, false, false)];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -93,7 +93,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000000;
+    let max_iteration = 1000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -113,31 +113,20 @@ fn main() -> Result<(), io::Error> {
     let (tv_constraints, mut refinable_cols, mut range_types) =
         extract_constraints_and_range::<KoalaBear, MovCondChip>(&air, NUM_MOV_COND_COLS, prime);
     refinable_cols.extend(&[2, 3, 4, 5]); // output
-    refinable_cols.extend(&[10, 14]); // input
-                                      //range_types.insert(6, RangeType::U4);
-    range_types.insert(10, RangeType::U4);
-    range_types.insert(14, RangeType::U4);
+                                          //refinable_cols.extend(&[10, 14]); // input
+                                          //range_types.insert(6, RangeType::U4);
+                                          //range_types.insert(10, RangeType::U4);
+                                          //range_types.insert(14, RangeType::U4);
 
-    range_types.insert(2, RangeType::U4);
-    range_types.insert(3, RangeType::U4);
-    range_types.insert(4, RangeType::U4);
-    range_types.insert(5, RangeType::U4);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
-
-    /*
-    [18, 20, 22, 24, 2, 3, 4, 5]
-
-    [14, 19, 31, 26, 21, 10, 28, 30, 23, 25, 29, 27]
-    {14: U4, 19: Bool, 31: Bool, 26: Bool, 21: Bool, 10: U4, 28: Bool, 30: Bool, 23: Bool, 25: Bool, 29: Bool, 27: Bool}
-     */
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = refinable_cols.len();
+    let minimum_num_taregt_cols = 5; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);
