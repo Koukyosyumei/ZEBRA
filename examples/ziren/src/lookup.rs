@@ -156,6 +156,10 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c2 = convert_p3_virtual_pair_col(&s.values[17]);
                 let c3 = convert_p3_virtual_pair_col(&s.values[18]);
 
+                println!("c0: {:?}", s.values[15]);
+                println!("^^^: a0: {}, a1: {}, a2: {}, a3: {}", a0, a1, a2, a3);
+                println!("^^^: c0: {}, c1: {}, c2: {}, c3: {}", c0, c1, c2, c3);
+
                 let tmps = vec![
                     (Opcode::ADD as u8, OpALU::Add),
                     (Opcode::SUB as u8, OpALU::Sub),
@@ -164,6 +168,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                     (Opcode::AND as u8, OpALU::And),
                     (Opcode::OR as u8, OpALU::Or),
                     (Opcode::XOR as u8, OpALU::Xor),
+                    (Opcode::SRL as u8, OpALU::SRL),
                 ];
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(
@@ -176,8 +181,6 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
 
                     if let Some(impl_constraint) = impl_constraint {
-                        println!("################# {:?} {}", t, t.0 as i64);
-                        println!("################# {}", impl_constraint);
                         for i in 7..19 {
                             add_u8_col_if_possible(&s.values[i], u8_cols);
                         }
@@ -249,10 +252,10 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                     ),
                     (
                         6,
-                        LatticeVMSymbolicExpr::Lt(
+                        LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
-                        ),
+                        ))),
                     ),
                 ];
 

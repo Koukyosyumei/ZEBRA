@@ -279,6 +279,7 @@ pub enum RangeType {
     U7,
     Top,
     Const(i64),
+    PosAny(usize),
 }
 
 pub fn make_init_val(
@@ -294,6 +295,10 @@ pub fn make_init_val(
             RangeType::U4 => AbstractInterval::u4(),
             RangeType::Top => AbstractInterval::top(prime),
             RangeType::Const(val) => AbstractInterval::from_i64(*val),
+            RangeType::PosAny(val) => AbstractInterval {
+                lo: 0,
+                hi: *val as i64,
+            },
         }
     } else {
         AbstractInterval::top(prime)

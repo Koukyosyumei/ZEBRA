@@ -92,12 +92,22 @@ pub fn convert_p3_virtual_pair_col<F: PrimeField32>(
             hi: vpair.constant.as_canonical_u32() as i64,
         })
     } else {
-        let mut expr = get_weighted_var(&vpair.column_weights[0].0, &vpair.column_weights[0].1);
-        for (paircol, w) in vpair.column_weights.iter().skip(1) {
-            expr = LatticeVMSymbolicExpr::Add(
-                Box::new(get_weighted_var(paircol, w)),
-                Box::new(expr.clone()),
-            );
+        let mut expr = LatticeVMSymbolicExpr::Constant(AbstractInterval {
+            lo: vpair.constant.as_canonical_u32() as i64,
+            hi: vpair.constant.as_canonical_u32() as i64,
+        }); // get_weighted_var(&vpair.column_weights[0].0, &vpair.column_weights[0].1);
+        for (paircol, w) in vpair.column_weights.iter() {
+            if (w.clone() + F::one()).as_canonical_u32() == 0 {
+                expr = LatticeVMSymbolicExpr::Sub(
+                    Box::new(expr.clone()),
+                    Box::new(get_weighted_var(paircol, &F::one())),
+                );
+            } else {
+                expr = LatticeVMSymbolicExpr::Add(
+                    Box::new(expr.clone()),
+                    Box::new(get_weighted_var(paircol, w)),
+                );
+            }
         }
         expr
     }
