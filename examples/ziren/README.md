@@ -7,6 +7,9 @@
 - WSBH
 - JUMP
 - JUMPI
+- XOR
+- AND
+- OR
 
 - BEQ
 - BGEZ
@@ -17,4 +20,3 @@
 
 - ShiftLeft
 - LT
-- XO
