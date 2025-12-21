@@ -8,15 +8,9 @@ use itertools::Itertools;
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::alu::NUM_ADD_SUB_COLS;
-use zkm_core_machine::alu::NUM_BITWISE_COLS;
 use zkm_core_machine::control_flow::BranchColumns;
-use zkm_core_machine::memory::MemoryLocalChip;
 use zkm_core_machine::misc::MovCondCols;
 use zkm_core_machine::misc::NUM_MOV_COND_COLS;
-use zkm_core_machine::AddSubChip;
-use zkm_core_machine::BitwiseChip;
-use zkm_core_machine::BranchChip;
 use zkm_core_machine::MovCondChip;
 use zkm_stark::MachineProver;
 
@@ -127,6 +121,7 @@ fn main() -> Result<(), io::Error> {
         pv_neg_constraints: vec![],
     };
     let minimum_num_taregt_cols = refinable_cols.len();
+    println!("{}", minimum_num_taregt_cols);
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);

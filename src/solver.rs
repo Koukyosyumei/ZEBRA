@@ -7,8 +7,8 @@ use crossterm::event::KeyModifiers;
 use crossterm::event::{self, Event, KeyCode};
 use itertools::Itertools;
 use priority_queue::PriorityQueue;
-use rand::Rng;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
@@ -119,7 +119,7 @@ where
         // Update UI status string if requested
         if should_update_ui {
             ui.status = format!(
-                "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {} \n {} \n {} \n {} \n {} \n {} \n {} \n {}",
+                "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
                 refinment_target_indicies_main,
                 *num_trial + global_expansion_count,
                 num_trial,
@@ -127,22 +127,6 @@ where
                 queue.len(),
                 -potential.0,
                 cumulative_priority,
-                main_trace.data[0][37],
-                main_trace.data[0][38],
-                main_trace.data[0][39],
-                main_trace.data[0][40],
-                main_trace.data[0][37].clone() 
-                    + main_trace.data[0][38].clone() * AbstractInterval::from_i64(256_u32.pow(1) as i64) 
-                    + main_trace.data[0][39].clone() * AbstractInterval::from_i64(256_u32.pow(2) as i64) 
-                    + main_trace.data[0][40].clone() * AbstractInterval::from_i64(256_u32.pow(3) as i64),
-                (AbstractInterval::from_i64(17) 
-                    + AbstractInterval::from_i64(0) * AbstractInterval::from_i64(256_u32.pow(1) as i64) 
-                    + AbstractInterval::from_i64(0) * AbstractInterval::from_i64(256_u32.pow(2) as i64) 
-                    + AbstractInterval::from_i64(127) * AbstractInterval::from_i64(256_u32.pow(3) as i64)),
-                (AbstractInterval::from_i64(17) 
-                    + AbstractInterval::from_i64(0) * AbstractInterval::from_i64(256_u32.pow(1) as i64) 
-                    + AbstractInterval::from_i64(0) * AbstractInterval::from_i64(256_u32.pow(2) as i64) 
-                    + AbstractInterval::from_i64(127) * AbstractInterval::from_i64(256_u32.pow(3) as i64)).ltu(AbstractInterval::from_i64(2130706433)),
             );
         }
 
@@ -306,7 +290,7 @@ pub fn make_init_val(
         match range_types.get(&col_idx).unwrap() {
             RangeType::Bool => AbstractInterval::bool(),
             RangeType::U8 => AbstractInterval::u8(),
-            RangeType::U7 => AbstractInterval {lo: 0, hi: 126},
+            RangeType::U7 => AbstractInterval { lo: 0, hi: 126 },
             RangeType::U4 => AbstractInterval::u4(),
             RangeType::Top => AbstractInterval::top(prime),
             RangeType::Const(val) => AbstractInterval::from_i64(*val),
