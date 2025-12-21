@@ -14,8 +14,8 @@ use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 use latticevm::solver::RangeType;
 use latticevm::symbolic::gather_vars;
-use latticevm::symbolic::is_koalabear_word_range;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
+use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
 use latticevm::{
     interval::AbstractInterval, symbolic::gather_boolean_variables, symbolic::AbstractTrace,
 };
@@ -91,17 +91,28 @@ where
 
     let mut new_tv_constraints = Vec::new();
     let mut is_in_koalabear_word_range_check = false;
+    let mut is_in_iszero_operator = false;
     for t in &tv_constraints {
-        if let Some(expr) = is_koalabear_word_range(t, prime) {
-            if is_in_koalabear_word_range_check {
-                is_in_koalabear_word_range_check = false;
+        if let Some(exprs) = is_iszero_operator(t, prime) {
+            if is_in_iszero_operator {
+                is_in_iszero_operator = false;
             } else {
-                new_tv_constraints.push(expr);
-                is_in_koalabear_word_range_check = true;
+                new_tv_constraints.push(exprs[0].clone());
+                new_tv_constraints.push(exprs[1].clone());
+                is_in_iszero_operator = true;
             }
         } else {
-            if !is_in_koalabear_word_range_check {
-                new_tv_constraints.push(t.clone());
+            if let Some(expr) = is_koalabear_word_range(t, prime) {
+                if is_in_koalabear_word_range_check {
+                    is_in_koalabear_word_range_check = false;
+                } else {
+                    new_tv_constraints.push(expr);
+                    is_in_koalabear_word_range_check = true;
+                }
+            } else {
+                if (!is_in_koalabear_word_range_check) && (!is_in_iszero_operator) {
+                    new_tv_constraints.push(t.clone());
+                }
             }
         }
     }

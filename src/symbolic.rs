@@ -575,6 +575,49 @@ fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
     }
 }
 
+pub fn is_iszero_operator(
+    constraint: &LatticeVMSymbolicExpr,
+    prime: u32,
+) -> Option<Vec<LatticeVMSymbolicExpr>> {
+    if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = constraint {
+        if let LatticeVMSymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
+            if let LatticeVMSymbolicExpr::Constant(c) = *r_rhs {
+                if c.as_canonical_u32(prime) == 58079999 {
+                    if let LatticeVMSymbolicExpr::Add(x, y) = *r_lhs {
+                        let cond_when_zero = LatticeVMSymbolicExpr::WhenZero(
+                            x.clone(),
+                            Box::new(LatticeVMSymbolicExpr::Sub(
+                                y.clone(),
+                                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::one())),
+                            )),
+                        );
+                        let cond_when_notzero = LatticeVMSymbolicExpr::WhenNonZero(
+                            x,
+                            Box::new(LatticeVMSymbolicExpr::Sub(
+                                y,
+                                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::zero())),
+                            )),
+                        );
+
+                        return Some(vec![
+                            LatticeVMSymbolicExpr::WhenNonZero(
+                                lhs.clone(),
+                                Box::new(cond_when_zero),
+                            ),
+                            LatticeVMSymbolicExpr::WhenNonZero(
+                                lhs.clone(),
+                                Box::new(cond_when_notzero),
+                            ),
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
 pub fn is_koalabear_word_range(
     constraint: &LatticeVMSymbolicExpr,
     prime: u32,

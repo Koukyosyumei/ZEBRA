@@ -111,6 +111,9 @@ fn main() -> Result<(), io::Error> {
                                           //range_types.insert(6, RangeType::U4);
                                           //range_types.insert(10, RangeType::U4);
                                           //range_types.insert(14, RangeType::U4);
+    for t in &tv_constraints {
+        println!("---- {}", t);
+    }
 
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
