@@ -93,7 +93,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000;
+    let max_iteration = 10000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -126,7 +126,7 @@ fn main() -> Result<(), io::Error> {
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = 5; //refinable_cols.len();
+    let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);
