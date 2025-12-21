@@ -100,16 +100,25 @@ fn main() -> Result<(), io::Error> {
 
     let (tv_constraints, mut refinable_cols, mut range_types) =
         extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
-    refinable_cols.extend(&[23, 24, 25, 26]);
+    refinable_cols.extend(&[23, 24, 25, 26, 41, 42, 43, 44]);
     range_types.insert(23, RangeType::U8);
     range_types.insert(24, RangeType::U8);
     range_types.insert(25, RangeType::U8);
     range_types.insert(26, RangeType::U8);
+
+    range_types.insert(19, RangeType::U4);
+    range_types.insert(20, RangeType::U4);
+    range_types.insert(21, RangeType::U4);
+    range_types.insert(22, RangeType::U4);
+
+    range_types.insert(59, RangeType::Bool);
+    range_types.insert(60, RangeType::Bool);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
     for t in &tv_constraints {
         println!("--- {}", t);
     }
+    // 19 20 21 22 59 60 61
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
