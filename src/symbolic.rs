@@ -64,7 +64,8 @@ pub enum LatticeVMSymbolicExpr {
     Or(Box<Self>, Box<Self>),
     Xor(Box<Self>, Box<Self>),
     Lt(Box<Self>, Box<Self>),
-    Impl(Box<Self>, Box<Self>),
+    WhenNonZero(Box<Self>, Box<Self>),
+    WhenZero(Box<Self>, Box<Self>),
     Neg(Box<Self>),
 }
 
@@ -180,7 +181,8 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Or(x, y) => write!(f, "({} || {})", x, y),
             Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
             Self::Lt(x, y) => write!(f, "({} < {})", x, y),
-            Self::Impl(x, y) => write!(f, "({} => {})", x, y),
+            Self::WhenNonZero(x, y) => write!(f, "([{} /= 0] => {})", x, y),
+            Self::WhenZero(x, y) => write!(f, "([{} = 0] => {})", x, y),
         }
     }
 }
@@ -425,8 +427,34 @@ impl LatticeVMSymbolicExpr {
                     prime,
                 )
             }
-            Self::Impl(a, b) => {
-                // if a is 0, b should be 0
+            Self::WhenNonZero(a, b) => {
+                // if a is non-negative, b should be 0
+
+                let cond = a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                );
+                if let MayBeFlag::True = cond.is_zero(prime) {
+                    AbstractInterval::zero()
+                } else {
+                    b.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                }
+            }
+            Self::WhenZero(a, b) => {
+                // if a is non-negative, b should be 0
 
                 let cond = a.eval(
                     curr_row,
@@ -528,7 +556,7 @@ pub fn is_koalabear_word_range(
                                 })
                                 .collect();
                             let cond = reconstruct_symbolic_word(&word_expr, 0);
-                            return Some(LatticeVMSymbolicExpr::Impl(
+                            return Some(LatticeVMSymbolicExpr::WhenNonZero(
                                 lhs.clone(),
                                 Box::new(LatticeVMSymbolicExpr::Lt(
                                     Box::new(cond),

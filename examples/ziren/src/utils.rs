@@ -106,6 +106,11 @@ where
         }
     }
     tv_constraints = new_tv_constraints;
+
+    for el in &lookup_symbolic_constraints {
+        println!("--------- {}", el);
+    }
+
     tv_constraints.extend(lookup_symbolic_constraints);
 
     let mut used_vars = HashSet::new();
@@ -113,6 +118,8 @@ where
         gather_vars(0, t, &mut used_vars);
     }
     let mut used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
+    println!("used_var_ids: {:?}", used_var_ids);
+    println!("refinable_cols: {:?}", refinable_cols);
     refinable_cols.retain(|c| used_var_ids.contains(c));
 
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);

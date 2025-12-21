@@ -286,9 +286,9 @@ impl AbstractInterval {
         }
 
         if self.hi < rhs.lo {
-            AbstractInterval::one()
-        } else if self.lo > rhs.hi {
             AbstractInterval::zero()
+        } else if self.lo >= rhs.hi {
+            AbstractInterval::one()
         } else {
             AbstractInterval::bool()
         }

@@ -33,7 +33,7 @@ fn make_impl_constraint(
             None
         }
     } else {
-        Some(LatticeVMSymbolicExpr::Impl(
+        Some(LatticeVMSymbolicExpr::WhenZero(
             Box::new(LatticeVMSymbolicExpr::Sub(
                 Box::new(opcode_var.clone()),
                 Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
@@ -133,6 +133,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     for s in &sends {
         match s.kind {
             LookupKind::Instruction => {
+                let multiplicities = convert_p3_virtual_pair_col(&s.multiplicity);
                 /*
                 for rv in &s.values {
                     for c in &rv.column_weights {
@@ -173,13 +174,16 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                     );
                     let impl_constraint =
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
-                    println!("{:?}: {:?} {:?}", t, impl_constraint, opcode);
+
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 7..19 {
                             add_u8_col_if_possible(&s.values[i], u8_cols);
                         }
 
-                        //lookup_constraints.push(impl_constraint);
+                        lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                            Box::new(multiplicities.clone()),
+                            Box::new(impl_constraint),
+                        ));
                     }
                 }
 

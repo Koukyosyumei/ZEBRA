@@ -7,6 +7,7 @@ use crossterm::event::KeyModifiers;
 use crossterm::event::{self, Event, KeyCode};
 use itertools::Itertools;
 use priority_queue::PriorityQueue;
+use rand::Rng;
 use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
@@ -118,15 +119,31 @@ where
         // Update UI status string if requested
         if should_update_ui {
             ui.status = format!(
-                    "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
-                    refinment_target_indicies_main,
-                    *num_trial + global_expansion_count,
-                    num_trial,
-                    num_unsatisfied_trial,
-                    queue.len(),
-                    -potential.0,
-                    cumulative_priority,
-                );
+                "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {} \n {} \n {} \n {} \n {} \n {} \n {} \n {}",
+                refinment_target_indicies_main,
+                *num_trial + global_expansion_count,
+                num_trial,
+                num_unsatisfied_trial,
+                queue.len(),
+                -potential.0,
+                cumulative_priority,
+                main_trace.data[0][37],
+                main_trace.data[0][38],
+                main_trace.data[0][39],
+                main_trace.data[0][40],
+                main_trace.data[0][37].clone() 
+                    + main_trace.data[0][38].clone() * AbstractInterval::from_i64(256_u32.pow(1) as i64) 
+                    + main_trace.data[0][39].clone() * AbstractInterval::from_i64(256_u32.pow(2) as i64) 
+                    + main_trace.data[0][40].clone() * AbstractInterval::from_i64(256_u32.pow(3) as i64),
+                (AbstractInterval::from_i64(17) 
+                    + AbstractInterval::from_i64(0) * AbstractInterval::from_i64(256_u32.pow(1) as i64) 
+                    + AbstractInterval::from_i64(0) * AbstractInterval::from_i64(256_u32.pow(2) as i64) 
+                    + AbstractInterval::from_i64(127) * AbstractInterval::from_i64(256_u32.pow(3) as i64)),
+                (AbstractInterval::from_i64(17) 
+                    + AbstractInterval::from_i64(0) * AbstractInterval::from_i64(256_u32.pow(1) as i64) 
+                    + AbstractInterval::from_i64(0) * AbstractInterval::from_i64(256_u32.pow(2) as i64) 
+                    + AbstractInterval::from_i64(127) * AbstractInterval::from_i64(256_u32.pow(3) as i64)).ltu(AbstractInterval::from_i64(2130706433)),
+            );
         }
 
         // Render the UI (non-fatal unwrap for brevity)

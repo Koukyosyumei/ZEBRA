@@ -122,11 +122,19 @@ fn main() -> Result<(), io::Error> {
 
     let (tv_constraints, mut refinable_cols, mut range_types) =
         extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
-    refinable_cols.extend(&[19, 20, 21, 22]); // output
-                                              //refinable_cols.extend(&[10, 14]); // input
-                                              //range_types.insert(6, RangeType::U4);
-                                              //range_types.insert(10, RangeType::U4);
-                                              //range_types.insert(14, RangeType::U4);
+    refinable_cols.extend(&[19, 20, 21, 22, 37, 38, 39, 40]); // output
+    range_types.insert(37, RangeType::U8);
+    range_types.insert(38, RangeType::U8);
+    range_types.insert(39, RangeType::U8);
+    range_types.insert(40, RangeType::U8);
+    //refinable_cols.extend(&[10, 14]); // input
+    //range_types.insert(6, RangeType::U4);
+    //range_types.insert(10, RangeType::U4);
+    /*                                                        //range_types.insert(14, RangeType::U4);
+    range_types.insert(37, RangeType::U4);
+    range_types.insert(38, RangeType::U4);
+    range_types.insert(39, RangeType::U4);
+    range_types.insert(40, RangeType::U4);*/
     for t in &tv_constraints {
         println!("{}", t);
     }
