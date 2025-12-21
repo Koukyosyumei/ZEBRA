@@ -86,10 +86,9 @@ pub fn get_alu_constraint(
         ),
         OpALU::Lt => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Xor(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
-            )),
+            Box::new(LatticeVMSymbolicExpr::Flip(Box::new(
+                LatticeVMSymbolicExpr::Lt(Box::new(b_word.clone()), Box::new(c_word)),
+            ))),
         ),
     }
 }

@@ -67,6 +67,7 @@ pub enum LatticeVMSymbolicExpr {
     WhenNonZero(Box<Self>, Box<Self>),
     WhenZero(Box<Self>, Box<Self>),
     Neg(Box<Self>),
+    Flip(Box<Self>),
 }
 
 pub fn gather_vars(
@@ -177,6 +178,7 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Sub(x, y) => write!(f, "({} - {})", x, y),
             Self::Mul(x, y) => write!(f, "({} * {})", x, y),
             Self::Neg(x) => write!(f, "-{}", x),
+            Self::Flip(x) => write!(f, "~{}", x),
             Self::And(x, y) => write!(f, "({} && {})", x, y),
             Self::Or(x, y) => write!(f, "({} || {})", x, y),
             Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
@@ -370,6 +372,43 @@ impl LatticeVMSymbolicExpr {
                 is_last_row,
                 prime,
             ),
+            Self::Flip(a) => {
+                let is_zero = a
+                    .eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                    .is_zero(prime);
+                if let MayBeFlag::True = is_zero {
+                    AbstractInterval::one()
+                } else {
+                    let tmp = LatticeVMSymbolicExpr::Sub(
+                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::one())),
+                        a.clone(),
+                    );
+                    let is_one = tmp
+                        .eval(
+                            curr_row,
+                            next_row,
+                            public_vals,
+                            is_first_row,
+                            is_transition,
+                            is_last_row,
+                            prime,
+                        )
+                        .is_zero(prime);
+                    if let MayBeFlag::True = is_one {
+                        AbstractInterval::zero()
+                    } else {
+                        AbstractInterval::bool()
+                    }
+                }
+            }
             Self::And(a, b) => {
                 a.eval(
                     curr_row,

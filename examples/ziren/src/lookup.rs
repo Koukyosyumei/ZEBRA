@@ -176,6 +176,8 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
 
                     if let Some(impl_constraint) = impl_constraint {
+                        println!("################# {:?} {}", t, t.0 as i64);
+                        println!("################# {}", impl_constraint);
                         for i in 7..19 {
                             add_u8_col_if_possible(&s.values[i], u8_cols);
                         }

@@ -85,7 +85,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 10000000;
+    let max_iteration = 1000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -107,6 +107,10 @@ fn main() -> Result<(), io::Error> {
     range_types.insert(26, RangeType::U4);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
+
+    for t in &tv_constraints {
+        println!("--- {}", t);
+    }
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
