@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fs;
-use std::mem::transmute;
 use std::io;
+use std::mem::transmute;
 
 use itertools::Itertools;
 
@@ -17,10 +17,7 @@ use latticevm::quick::quick_api;
 use latticevm::solver::RangeType;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
-use latticevm::{
-    symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
-};
-
+use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
     dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
@@ -88,7 +85,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
+    let max_iteration = 10000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -107,7 +104,7 @@ fn main() -> Result<(), io::Error> {
     range_types.insert(23, RangeType::U8);
     range_types.insert(24, RangeType::U8);
     range_types.insert(25, RangeType::U8);
-    range_types.insert(26, RangeType::U8);
+    range_types.insert(26, RangeType::U4);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 
@@ -116,7 +113,7 @@ fn main() -> Result<(), io::Error> {
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = 5; //refinable_cols.len();
+    let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);
