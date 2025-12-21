@@ -17,6 +17,6 @@
 - BLEZ
 - BLTZ
 - BNE
+- LT
 
 - ShiftLeft
-- LT
