@@ -292,6 +292,7 @@ pub enum RangeType {
     Bool,
     U4,
     U8,
+    U7,
     Top,
     Const(i64),
 }
@@ -305,6 +306,7 @@ pub fn make_init_val(
         match range_types.get(&col_idx).unwrap() {
             RangeType::Bool => AbstractInterval::bool(),
             RangeType::U8 => AbstractInterval::u8(),
+            RangeType::U7 => AbstractInterval {lo: 0, hi: 126},
             RangeType::U4 => AbstractInterval::u4(),
             RangeType::Top => AbstractInterval::top(prime),
             RangeType::Const(val) => AbstractInterval::from_i64(*val),

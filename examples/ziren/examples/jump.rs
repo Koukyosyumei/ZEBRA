@@ -126,7 +126,9 @@ fn main() -> Result<(), io::Error> {
     range_types.insert(37, RangeType::U8);
     range_types.insert(38, RangeType::U8);
     range_types.insert(39, RangeType::U8);
-    range_types.insert(40, RangeType::U8);
+    range_types.insert(40, RangeType::U7);
+    //range_types.insert(41, RangeType::U4);
+    //range_types.insert(45, RangeType::U4);
     //refinable_cols.extend(&[10, 14]); // input
     //range_types.insert(6, RangeType::U4);
     //range_types.insert(10, RangeType::U4);
