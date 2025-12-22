@@ -61,7 +61,6 @@ pub fn run_ziren_program(
 
     let mut true_abs_traces = vec![];
     for mt in &mut main_traces[0] {
-        //if mt.0 == "Cpu" {
         let nrows = mt.1.values.len() / mt.1.width;
         let mut rows = vec![];
         for i in 0..nrows {
@@ -73,30 +72,6 @@ pub fn run_ziren_program(
             );
         }
         true_abs_traces.push((mt.0.clone(), rows));
-        //}
-
-        /*
-        println!("{}, {} - {}", mt.0, mt.1.values.len(), mt.1.width);
-        if mt.0 == "MemoryLocal" {
-            for i in 0..4 {
-                let mut row = mt.1.row_mut(i);
-                let local: &MemoryLocalCols<_> = (*row).borrow();
-                println!("  row[{}]: {:?}", i, local);
-            }
-        } else if mt.0 == "MemoryGlobalInit" {
-            for i in 0..4 {
-                let mut row = mt.1.row_mut(i);
-                let local: &MemoryInitCols<_> = (*row).borrow();
-                println!("  row[{}]: {:?}", i, local);
-            }
-        } else if mt.0 == "Cpu" {
-            for i in 0..4 {
-                let mut row = mt.1.row_mut(i);
-                let local: &CpuCols<_> = (*row).borrow();
-                println!("  row[{}]: {:?}", i, local);
-            }
-        }
-        */
     }
 
     (true_abstract_states, true_abs_traces)
