@@ -48,10 +48,25 @@ pub fn run_pico_program(
     //    .pico_iter()
     //    .map(|chip| chip.generate_main(chunk, EmulationRecord::default()));
 
-    let chips_and_main_traces = riscv_machine
+    let mut chips_and_main_traces = riscv_machine
         .base_machine()
         .prover
         .generate_main(&riscv_machine.chips(), chunk);
+
+    let mut true_abs_traces = vec![];
+    for mt in &mut chips_and_main_traces {
+        let nrows = mt.1.values.len() / mt.1.width;
+        let mut rows: Vec<_> = vec![];
+        for i in 0..nrows {
+            let row = mt.1.row_mut(i);
+            rows.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .collect::<Vec<_>>(),
+            );
+        }
+        true_abs_traces.push((mt.0.clone(), rows));
+    }
 
     /*
     // BaseMachin
