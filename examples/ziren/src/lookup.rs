@@ -156,10 +156,6 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c2 = convert_p3_virtual_pair_col(&s.values[17]);
                 let c3 = convert_p3_virtual_pair_col(&s.values[18]);
 
-                println!("c0: {:?}", s.values[15]);
-                println!("^^^: a0: {}, a1: {}, a2: {}, a3: {}", a0, a1, a2, a3);
-                println!("^^^: c0: {}, c1: {}, c2: {}, c3: {}", c0, c1, c2, c3);
-
                 let tmps = vec![
                     (Opcode::ADD as u8, OpALU::Add),
                     (Opcode::SUB as u8, OpALU::Sub),
@@ -273,65 +269,5 @@ pub fn get_symbolic_lookup_constraints<F, A>(
             }
             _ => {}
         }
-    }
-}
-
-pub fn inspect_lookup(builder: LookupBuilder<KoalaBear>) {
-    /*
-    let mut builder = LookupBuilder::<KoalaBear>::new(0, NUM_CPU_COLS);
-    air.eval(&mut builder);
-     */
-    ///////////////////////////////////////////////////////
-    let mut main = builder.main();
-    let (sends, receives) = builder.lookups();
-
-    for lookup in receives {
-        print!("Receive values: ");
-        for value in lookup.values {
-            let expr = value.apply::<SymbolicExpression<KoalaBear>, SymbolicVariable<KoalaBear>>(
-                &[],
-                main.row_mut(0),
-            );
-            print!("{}, ", convert_p3_expr::<KoalaBear>(&expr));
-        }
-
-        let multiplicity = lookup
-            .multiplicity
-            .apply::<SymbolicExpression<KoalaBear>, SymbolicVariable<KoalaBear>>(
-                &[],
-                main.row_mut(0),
-            );
-
-        println!(
-            "   multiplicity: {}",
-            convert_p3_expr::<KoalaBear>(&multiplicity)
-        );
-
-        println!("  scope: {:?}, kind: {:?}", lookup.scope, lookup.kind);
-    }
-
-    for lookup in sends {
-        print!("Send values: ");
-        for value in lookup.values {
-            let expr = value.apply::<SymbolicExpression<KoalaBear>, SymbolicVariable<KoalaBear>>(
-                &[],
-                main.row_mut(0),
-            );
-            print!("{}, ", convert_p3_expr::<KoalaBear>(&expr));
-        }
-
-        let multiplicity = lookup
-            .multiplicity
-            .apply::<SymbolicExpression<KoalaBear>, SymbolicVariable<KoalaBear>>(
-                &[],
-                main.row_mut(0),
-            );
-
-        println!(
-            "   multiplicity: {}",
-            convert_p3_expr::<KoalaBear>(&multiplicity)
-        );
-
-        println!("  scope: {:?}, kind: {:?}", lookup.scope, lookup.kind);
     }
 }
