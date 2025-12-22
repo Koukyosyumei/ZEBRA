@@ -14,6 +14,7 @@ use zkm_core_machine::LtChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
+use latticevm::solver::RangeType;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
@@ -82,7 +83,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
+    let max_iteration = 1000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -97,9 +98,10 @@ fn main() -> Result<(), io::Error> {
     println!("b: {:?}", colmap.b);
     println!("c: {:?}", colmap.c);
 
-    let (tv_constraints, mut refinable_cols, range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types) =
         extract_constraints_and_range::<KoalaBear, LtChip>(&air, NUM_LT_COLS, prime);
     refinable_cols.extend(&[4]);
+    range_types.insert(4, RangeType::U8);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 
@@ -108,7 +110,7 @@ fn main() -> Result<(), io::Error> {
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = refinable_cols.len();
+    let minimum_num_taregt_cols = 2; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);

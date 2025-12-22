@@ -8,6 +8,7 @@ use crossterm::event::{self, Event, KeyCode};
 use itertools::Itertools;
 use priority_queue::PriorityQueue;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
@@ -118,15 +119,15 @@ where
         // Update UI status string if requested
         if should_update_ui {
             ui.status = format!(
-                    "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
-                    refinment_target_indicies_main,
-                    *num_trial + global_expansion_count,
-                    num_trial,
-                    num_unsatisfied_trial,
-                    queue.len(),
-                    -potential.0,
-                    cumulative_priority,
-                );
+                "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
+                refinment_target_indicies_main,
+                *num_trial + global_expansion_count,
+                num_trial,
+                num_unsatisfied_trial,
+                queue.len(),
+                -potential.0,
+                cumulative_priority,
+            );
         }
 
         // Render the UI (non-fatal unwrap for brevity)
@@ -275,8 +276,10 @@ pub enum RangeType {
     Bool,
     U4,
     U8,
+    U7,
     Top,
     Const(i64),
+    PosAny(usize),
 }
 
 pub fn make_init_val(
@@ -288,9 +291,14 @@ pub fn make_init_val(
         match range_types.get(&col_idx).unwrap() {
             RangeType::Bool => AbstractInterval::bool(),
             RangeType::U8 => AbstractInterval::u8(),
+            RangeType::U7 => AbstractInterval { lo: 0, hi: 126 },
             RangeType::U4 => AbstractInterval::u4(),
             RangeType::Top => AbstractInterval::top(prime),
             RangeType::Const(val) => AbstractInterval::from_i64(*val),
+            RangeType::PosAny(val) => AbstractInterval {
+                lo: 0,
+                hi: *val as i64,
+            },
         }
     } else {
         AbstractInterval::top(prime)

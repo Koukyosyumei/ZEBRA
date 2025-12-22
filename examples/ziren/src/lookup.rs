@@ -9,6 +9,7 @@ use p3_field::PrimeField32;
 use p3_koala_bear::KoalaBear;
 use p3_uni_stark::{SymbolicExpression, SymbolicVariable};
 
+use zkm_core_executor::Opcode;
 use zkm_stark::LookupBuilder;
 use zkm_stark::LookupKind;
 
@@ -32,7 +33,7 @@ fn make_impl_constraint(
             None
         }
     } else {
-        Some(LatticeVMSymbolicExpr::Impl(
+        Some(LatticeVMSymbolicExpr::WhenZero(
             Box::new(LatticeVMSymbolicExpr::Sub(
                 Box::new(opcode_var.clone()),
                 Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
@@ -119,11 +120,11 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let hi1 = &r.values[20];
                 let hi2 = &r.values[21];
                 let hi3 = &r.values[22];
-                let op_a_immutable = &r.values[24];
-                let is_rw_a = &r.values[25];
-                let is_check_memory = &r.values[26];
-                let is_halt = &r.values[27];
-                let is_sequential = &r.values[28];
+                let op_a_immutable = &r.values[23];
+                let is_rw_a = &r.values[24];
+                let is_check_memory = &r.values[25];
+                let is_halt = &r.values[26];
+                let is_sequential = &r.values[27];
             }
             _ => {}
         }
@@ -132,6 +133,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     for s in &sends {
         match s.kind {
             LookupKind::Instruction => {
+                let multiplicities = convert_p3_virtual_pair_col(&s.multiplicity);
                 /*
                 for rv in &s.values {
                     for c in &rv.column_weights {
@@ -155,13 +157,14 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c3 = convert_p3_virtual_pair_col(&s.values[18]);
 
                 let tmps = vec![
-                    (0, OpALU::Add),
-                    (1, OpALU::Sub),
-                    (4, OpALU::Mul),
-                    (11, OpALU::Lt),
-                    (13, OpALU::And),
-                    (14, OpALU::Or),
-                    (15, OpALU::Xor),
+                    (Opcode::ADD as u8, OpALU::Add),
+                    (Opcode::SUB as u8, OpALU::Sub),
+                    (Opcode::MUL as u8, OpALU::Mul),
+                    (Opcode::SLT as u8, OpALU::Lt),
+                    (Opcode::AND as u8, OpALU::And),
+                    (Opcode::OR as u8, OpALU::Or),
+                    (Opcode::XOR as u8, OpALU::Xor),
+                    (Opcode::SRL as u8, OpALU::SRL),
                 ];
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(
@@ -170,14 +173,18 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         &[c0.clone(), c1.clone(), c2.clone(), c3.clone()],
                         &t.1,
                     );
-                    let impl_constraint = make_impl_constraint(t.0, &opcode, alu_constraint, prime);
-                    println!("{:?}: {:?} {:?}", t, impl_constraint, opcode);
+                    let impl_constraint =
+                        make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 7..19 {
                             add_u8_col_if_possible(&s.values[i], u8_cols);
                         }
 
-                        lookup_constraints.push(impl_constraint);
+                        lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                            Box::new(multiplicities.clone()),
+                            Box::new(impl_constraint),
+                        ));
                     }
                 }
 
@@ -241,10 +248,10 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                     ),
                     (
                         6,
-                        LatticeVMSymbolicExpr::Lt(
+                        LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
-                        ),
+                        ))),
                     ),
                 ];
 
@@ -262,65 +269,5 @@ pub fn get_symbolic_lookup_constraints<F, A>(
             }
             _ => {}
         }
-    }
-}
-
-pub fn inspect_lookup(builder: LookupBuilder<KoalaBear>) {
-    /*
-    let mut builder = LookupBuilder::<KoalaBear>::new(0, NUM_CPU_COLS);
-    air.eval(&mut builder);
-     */
-    ///////////////////////////////////////////////////////
-    let mut main = builder.main();
-    let (sends, receives) = builder.lookups();
-
-    for lookup in receives {
-        print!("Receive values: ");
-        for value in lookup.values {
-            let expr = value.apply::<SymbolicExpression<KoalaBear>, SymbolicVariable<KoalaBear>>(
-                &[],
-                main.row_mut(0),
-            );
-            print!("{}, ", convert_p3_expr::<KoalaBear>(&expr));
-        }
-
-        let multiplicity = lookup
-            .multiplicity
-            .apply::<SymbolicExpression<KoalaBear>, SymbolicVariable<KoalaBear>>(
-                &[],
-                main.row_mut(0),
-            );
-
-        println!(
-            "   multiplicity: {}",
-            convert_p3_expr::<KoalaBear>(&multiplicity)
-        );
-
-        println!("  scope: {:?}, kind: {:?}", lookup.scope, lookup.kind);
-    }
-
-    for lookup in sends {
-        print!("Send values: ");
-        for value in lookup.values {
-            let expr = value.apply::<SymbolicExpression<KoalaBear>, SymbolicVariable<KoalaBear>>(
-                &[],
-                main.row_mut(0),
-            );
-            print!("{}, ", convert_p3_expr::<KoalaBear>(&expr));
-        }
-
-        let multiplicity = lookup
-            .multiplicity
-            .apply::<SymbolicExpression<KoalaBear>, SymbolicVariable<KoalaBear>>(
-                &[],
-                main.row_mut(0),
-            );
-
-        println!(
-            "   multiplicity: {}",
-            convert_p3_expr::<KoalaBear>(&multiplicity)
-        );
-
-        println!("  scope: {:?}, kind: {:?}", lookup.scope, lookup.kind);
     }
 }

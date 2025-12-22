@@ -9,6 +9,7 @@ use rand::rngs::StdRng;
 use rand::seq::{IndexedRandom, SliceRandom};
 use rand::Rng;
 
+use crate::alu::reconstruct_symbolic_word;
 use crate::interval::{AbstractInterval, MayBeFlag};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -62,9 +63,12 @@ pub enum LatticeVMSymbolicExpr {
     And(Box<Self>, Box<Self>),
     Or(Box<Self>, Box<Self>),
     Xor(Box<Self>, Box<Self>),
+    SRL(Box<Self>, Box<Self>),
     Lt(Box<Self>, Box<Self>),
-    Impl(Box<Self>, Box<Self>),
+    WhenNonZero(Box<Self>, Box<Self>),
+    WhenZero(Box<Self>, Box<Self>),
     Neg(Box<Self>),
+    Flip(Box<Self>),
 }
 
 pub fn gather_vars(
@@ -175,11 +179,14 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Sub(x, y) => write!(f, "({} - {})", x, y),
             Self::Mul(x, y) => write!(f, "({} * {})", x, y),
             Self::Neg(x) => write!(f, "-{}", x),
+            Self::Flip(x) => write!(f, "~{}", x),
             Self::And(x, y) => write!(f, "({} && {})", x, y),
             Self::Or(x, y) => write!(f, "({} || {})", x, y),
             Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
+            Self::SRL(x, y) => write!(f, "({} >> {})", x, y),
             Self::Lt(x, y) => write!(f, "({} < {})", x, y),
-            Self::Impl(x, y) => write!(f, "({} => {})", x, y),
+            Self::WhenNonZero(x, y) => write!(f, "([{} /= 0] => {})", x, y),
+            Self::WhenZero(x, y) => write!(f, "([{} = 0] => {})", x, y),
         }
     }
 }
@@ -367,6 +374,43 @@ impl LatticeVMSymbolicExpr {
                 is_last_row,
                 prime,
             ),
+            Self::Flip(a) => {
+                let is_zero = a
+                    .eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                    .is_zero(prime);
+                if let MayBeFlag::True = is_zero {
+                    AbstractInterval::one()
+                } else {
+                    let tmp = LatticeVMSymbolicExpr::Sub(
+                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::one())),
+                        a.clone(),
+                    );
+                    let is_one = tmp
+                        .eval(
+                            curr_row,
+                            next_row,
+                            public_vals,
+                            is_first_row,
+                            is_transition,
+                            is_last_row,
+                            prime,
+                        )
+                        .is_zero(prime);
+                    if let MayBeFlag::True = is_one {
+                        AbstractInterval::zero()
+                    } else {
+                        AbstractInterval::bool()
+                    }
+                }
+            }
             Self::And(a, b) => {
                 a.eval(
                     curr_row,
@@ -424,8 +468,53 @@ impl LatticeVMSymbolicExpr {
                     prime,
                 )
             }
-            Self::Impl(a, b) => {
-                // if a is 0, b should be 0
+            Self::SRL(a, b) => {
+                a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                ) >> b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                )
+            }
+            Self::WhenNonZero(a, b) => {
+                // if a is non-negative, b should be 0
+
+                let cond = a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                );
+                if let MayBeFlag::True = cond.is_zero(prime) {
+                    AbstractInterval::zero()
+                } else {
+                    b.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                }
+            }
+            Self::WhenZero(a, b) => {
+                // if a is non-negative, b should be 0
 
                 let cond = a.eval(
                     curr_row,
@@ -488,6 +577,105 @@ fn collect_add_vars(expr: &LatticeVMSymbolicExpr) -> Option<HashSet<usize>> {
         }
         _ => None,
     }
+}
+
+fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
+    match expr {
+        LatticeVMSymbolicExpr::Add(lhs, rhs) => {
+            let mut left = collect_add_vars_vec(lhs)?;
+            let right = collect_add_vars_vec(rhs)?;
+            left.extend(right);
+            Some(left)
+        }
+        LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { index, .. }) => {
+            let mut v = Vec::new();
+            v.push(index.clone());
+            Some(v)
+        }
+        _ => None,
+    }
+}
+
+pub fn is_iszero_operator(
+    constraint: &LatticeVMSymbolicExpr,
+    prime: u32,
+) -> Option<Vec<LatticeVMSymbolicExpr>> {
+    if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = constraint {
+        if let LatticeVMSymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
+            if let LatticeVMSymbolicExpr::Constant(c) = *r_rhs {
+                if c.as_canonical_u32(prime) == 58079999 {
+                    if let LatticeVMSymbolicExpr::Add(x, y) = *r_lhs {
+                        let cond_when_zero = LatticeVMSymbolicExpr::WhenZero(
+                            x.clone(),
+                            Box::new(LatticeVMSymbolicExpr::Sub(
+                                y.clone(),
+                                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::one())),
+                            )),
+                        );
+                        let cond_when_notzero = LatticeVMSymbolicExpr::WhenNonZero(
+                            x,
+                            Box::new(LatticeVMSymbolicExpr::Sub(
+                                y,
+                                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::zero())),
+                            )),
+                        );
+
+                        return Some(vec![
+                            LatticeVMSymbolicExpr::WhenNonZero(
+                                lhs.clone(),
+                                Box::new(cond_when_zero),
+                            ),
+                            LatticeVMSymbolicExpr::WhenNonZero(
+                                lhs.clone(),
+                                Box::new(cond_when_notzero),
+                            ),
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+pub fn is_koalabear_word_range(
+    constraint: &LatticeVMSymbolicExpr,
+    prime: u32,
+) -> Option<LatticeVMSymbolicExpr> {
+    if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = constraint {
+        if let LatticeVMSymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
+            if let LatticeVMSymbolicExpr::Constant(c) = *r_rhs {
+                if c.as_canonical_u32(prime) == 13227174 {
+                    if let Some(word) = collect_add_vars_vec(&r_lhs) {
+                        if word.len() == 4 {
+                            let word_expr: Vec<_> = word
+                                .iter()
+                                .map(|&index| {
+                                    LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                                        entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                                        index,
+                                    })
+                                })
+                                .collect();
+                            let cond = reconstruct_symbolic_word(&word_expr, 0);
+                            return Some(LatticeVMSymbolicExpr::WhenNonZero(
+                                lhs.clone(),
+                                Box::new(LatticeVMSymbolicExpr::Lt(
+                                    Box::new(cond),
+                                    Box::new(LatticeVMSymbolicExpr::Constant(
+                                        AbstractInterval::from_i64(2130706433),
+                                    )),
+                                )),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 pub fn is_boolean_constraint(constraint: &LatticeVMSymbolicExpr) -> Option<usize> {

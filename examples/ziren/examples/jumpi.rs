@@ -8,9 +8,19 @@ use itertools::Itertools;
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
+use zkm_core_machine::alu::NUM_ADD_SUB_COLS;
+use zkm_core_machine::alu::NUM_BITWISE_COLS;
 use zkm_core_machine::control_flow::BranchColumns;
-use zkm_core_machine::control_flow::NUM_BRANCH_COLS;
+use zkm_core_machine::control_flow::JumpColumns;
+use zkm_core_machine::control_flow::NUM_JUMP_COLS;
+use zkm_core_machine::memory::MemoryLocalChip;
+use zkm_core_machine::misc::MovCondCols;
+use zkm_core_machine::misc::NUM_MOV_COND_COLS;
+use zkm_core_machine::AddSubChip;
+use zkm_core_machine::BitwiseChip;
 use zkm_core_machine::BranchChip;
+use zkm_core_machine::JumpChip;
+use zkm_core_machine::MovCondChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
@@ -33,22 +43,23 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "pc: {}, next_pc[0]: {}, next_pc[1]: {}, next_pc[2]: {}, next_pc[3]: {}, next_next_pc[0]: {}, next_next_pc[1]: {}, next_next_pc[2]: {}, next_next_pc[3]: {}, is_beq: {}, is_bne: {}, is_bltz: {}, is_blez: {}, is_bgtz: {}, is_bgez: {}",
-        trace.data[0][0],
-        trace.data[0][1],
+        "op_a_value: [{}, {}, {}, {}], prev_a_value: [{}, {}, {}, {}], op_b_value: [{}, {}, {}, {}], op_c_value: [{}, {}, {}, {}]",
         trace.data[0][2],
         trace.data[0][3],
         trace.data[0][4],
-        trace.data[0][23],
-        trace.data[0][24],
-        trace.data[0][25],
-        trace.data[0][26],
-        trace.data[0][53],
-        trace.data[0][54],
-        trace.data[0][55],
-        trace.data[0][56],
-        trace.data[0][57],
-        trace.data[0][58],
+        trace.data[0][5],
+        trace.data[0][6],
+        trace.data[0][7],
+        trace.data[0][8],
+        trace.data[0][9],
+        trace.data[0][10],
+        trace.data[0][11],
+        trace.data[0][12],
+        trace.data[0][13],
+        trace.data[0][14],
+        trace.data[0][15],
+        trace.data[0][16],
+        trace.data[0][17],
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -68,13 +79,16 @@ fn final_check(
     }
 }
 
-const fn make_col_map() -> BranchColumns<usize> {
-    let indices_arr = indices_arr::<{ NUM_BRANCH_COLS }>();
-    unsafe { transmute::<[usize; NUM_BRANCH_COLS], BranchColumns<usize>>(indices_arr) }
+const fn make_col_map() -> JumpColumns<usize> {
+    let indices_arr = indices_arr::<{ NUM_JUMP_COLS }>();
+    unsafe { transmute::<[usize; NUM_JUMP_COLS], JumpColumns<usize>>(indices_arr) }
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::BEQ, 3, 0, 12, true, true)];
+    let instructions = vec![
+        Instruction::new(Opcode::ADD, 31, 0, 0, false, true),
+        Instruction::new(Opcode::Jumpi, 31, 100, 0, true, true),
+    ];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -85,7 +99,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000000;
+    let max_iteration = 10000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -93,32 +107,25 @@ fn main() -> Result<(), io::Error> {
     let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
-    let air = BranchChip::default();
-    let air_name = "Branch";
+    let air = JumpChip::default();
+    let air_name = "Jump";
     let colmap = make_col_map();
-    println!("map: {:?}", colmap);
+    println!("next_pc: {:?}", colmap.next_pc);
+    println!("next_next_pc: {:?}", colmap.next_next_pc);
+    println!("op_a_value: {:?}", colmap.op_a_value);
+    println!("op_b_value: {:?}", colmap.op_b_value);
+    println!("op_c_value: {:?}", colmap.op_c_value);
 
     let (tv_constraints, mut refinable_cols, mut range_types) =
-        extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
-    refinable_cols.extend(&[23, 24, 25, 26, 41, 42, 43, 44]);
-    range_types.insert(23, RangeType::U8);
-    range_types.insert(24, RangeType::U8);
-    range_types.insert(25, RangeType::U8);
-    range_types.insert(26, RangeType::U8);
+        extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
+    refinable_cols.extend(&[19, 20, 21]); // output
+                                          //refinable_cols.extend(&[10, 14]); // input
+                                          //range_types.insert(6, RangeType::U4);
+                                          //range_types.insert(10, RangeType::U4);
+                                          //range_types.insert(14, RangeType::U4);
 
-    range_types.insert(19, RangeType::U4);
-    range_types.insert(20, RangeType::U4);
-    range_types.insert(21, RangeType::U4);
-    range_types.insert(22, RangeType::U4);
-
-    range_types.insert(59, RangeType::Bool);
-    range_types.insert(60, RangeType::Bool);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
-    for t in &tv_constraints {
-        println!("--- {}", t);
-    }
-    // 19 20 21 22 59 60 61
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
@@ -131,6 +138,7 @@ fn main() -> Result<(), io::Error> {
     let program = target_program(4, 4);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+    //println!("{:?}", base_abs_main_trace_data);
 
     // ######################## Solve ############################################
     quick_api(

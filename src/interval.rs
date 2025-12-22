@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    ops::{Add, BitAnd, BitOr, BitXor, Mul, Neg, Not, Sub},
+    ops::{Add, BitAnd, BitOr, BitXor, Mul, Neg, Not, Shl, Shr, Sub},
 };
 
 use serde::Serialize;
@@ -176,6 +176,52 @@ impl Not for AbstractInterval {
     }
 }
 
+impl Shl<AbstractInterval> for AbstractInterval {
+    type Output = Self;
+
+    fn shl(self, rhs: AbstractInterval) -> Self {
+        if self.lo < 0 || rhs.lo < 0 {
+            if self.is_singleton() && rhs.is_singleton() {
+                let val = self.lo << rhs.lo;
+                return Self { lo: val, hi: val };
+            } else {
+                return Self::top(2130706433);
+            }
+        }
+
+        let min_shift = rhs.lo as u32;
+        let max_shift = rhs.hi as u32;
+
+        let lo = self.lo << min_shift;
+        let hi = self.hi << max_shift;
+
+        Self { lo, hi }
+    }
+}
+
+impl Shr<AbstractInterval> for AbstractInterval {
+    type Output = Self;
+
+    fn shr(self, rhs: AbstractInterval) -> Self {
+        if self.lo < 0 || rhs.lo < 0 {
+            if self.is_singleton() && rhs.is_singleton() {
+                let val = self.lo >> rhs.lo;
+                return Self { lo: val, hi: val };
+            } else {
+                return Self::top(2130706433);
+            }
+        }
+
+        let min_shift = rhs.lo as u32;
+        let max_shift = rhs.hi as u32;
+
+        let lo = self.lo >> max_shift;
+        let hi = self.hi >> min_shift;
+
+        Self { lo, hi }
+    }
+}
+
 impl AbstractInterval {
     pub fn top(prime: u32) -> Self {
         Self {
@@ -285,10 +331,11 @@ impl AbstractInterval {
             panic!("LTU for negative region is not supported.");
         }
 
+        // returns zero when self < rhs
         if self.hi < rhs.lo {
-            AbstractInterval::one()
-        } else if self.lo > rhs.hi {
             AbstractInterval::zero()
+        } else if self.lo >= rhs.hi {
+            AbstractInterval::one()
         } else {
             AbstractInterval::bool()
         }

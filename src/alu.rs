@@ -10,6 +10,7 @@ pub enum OpALU {
     Or,
     Xor,
     Lt,
+    SRL,
 }
 
 pub fn reconstruct_symbolic_word(
@@ -84,12 +85,18 @@ pub fn get_alu_constraint(
                 Box::new(c_word),
             )),
         ),
-        OpALU::Lt => LatticeVMSymbolicExpr::Sub(
+        OpALU::SRL => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Xor(
+            Box::new(LatticeVMSymbolicExpr::SRL(
                 Box::new(b_word.clone()),
                 Box::new(c_word),
             )),
+        ),
+        OpALU::Lt => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::Flip(Box::new(
+                LatticeVMSymbolicExpr::Lt(Box::new(b_word.clone()), Box::new(c_word)),
+            ))),
         ),
     }
 }
