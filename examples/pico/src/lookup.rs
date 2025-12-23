@@ -70,8 +70,35 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     let mut builder = SymbolicConstraintFolder::new(preprocessed_width, air.width());
     air.eval(&mut builder);
 
-    /*
     let (sends, receives) = builder.lookups();
+
+    for r in &receives {
+        match r.kind {
+            LookupType::Alu => {
+                let opcode = &r.values[0];
+                let a0 = &r.values[1];
+                let a1 = &r.values[2];
+                let a2 = &r.values[3];
+                let a3 = &r.values[4];
+                let b0 = &r.values[5];
+                let b1 = &r.values[6];
+                let b2 = &r.values[7];
+                let b3 = &r.values[8];
+                let c0 = &r.values[9];
+                let c1 = &r.values[10];
+                let c2 = &r.values[11];
+                let c3 = &r.values[12];
+
+                println!("opcode: {:?}", opcode);
+                println!("a: {:?} {:?} {:?} {:?}", a0, a1, a2, a3);
+                println!("b: {:?} {:?} {:?} {:?}", b0, b1, b2, b3);
+                println!("c: {:?} {:?} {:?} {:?}", c0, c1, c2, c3);
+            }
+            _ => {}
+        }
+    }
+
+    /*
 
     for r in &receives {
         for (w, _) in &r.multiplicity.column_weights {
