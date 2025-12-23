@@ -73,8 +73,24 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     let (sends, receives) = builder.lookups();
 
     for r in &receives {
+        for (w, _) in &r.mult.column_weights {
+            if let p3_air::PairCol::Main(col_idx) = w {
+                multiplicities.insert(*col_idx);
+            }
+        }
+    }
+
+    for r in &receives {
         match r.kind {
             LookupType::Alu => {
+                for rv in &r.values {
+                    for c in &rv.column_weights {
+                        if let PairCol::Main(index) = c.0 {
+                            received_vars_from_cpu.insert(index);
+                        }
+                    }
+                }
+
                 let opcode = &r.values[0];
                 let a0 = &r.values[1];
                 let a1 = &r.values[2];

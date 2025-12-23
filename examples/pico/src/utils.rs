@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 use p3_air::Air;
 use p3_uni_stark::SymbolicAirBuilder;
-use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
+use p3_uni_stark::SymbolicExpression;
 
 use pico_vm::chips::chips::public_values::columns::NUM_PUBLIC_VALUES_COLS;
 use pico_vm::compiler::riscv::opcode::Opcode;
@@ -13,6 +13,7 @@ use pico_vm::compiler::riscv::program::Program;
 use pico_vm::machine::builder::{ChipBuilder, ChipLookupBuilder, LookupBuilder};
 use pico_vm::machine::folder::SymbolicConstraintFolder;
 use pico_vm::machine::lookup::LookupType;
+use pico_vm::machine::utils::get_symbolic_constraints;
 
 use latticevm::solver::RangeType;
 use latticevm::symbolic::gather_vars;
@@ -61,15 +62,14 @@ pub fn extract_constraints_and_range<F, A>(
 )
 where
     F: p3_field::PrimeField32,
-    A: Air<SymbolicConstraintFolder<F>> + Air<SymbolicAirBuilder<F>>,
+    A: Air<SymbolicConstraintFolder<F>>,
 {
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
     let mut lookup_symbolic_constraints = Vec::new();
     let mut received_vars_from_cpu = HashSet::new();
 
-    let symbolic_constraints: Vec<SymbolicExpression<F>> =
-        get_symbolic_constraints(air, 0, NUM_PUBLIC_VALUES_COLS);
+    let symbolic_constraints: Vec<SymbolicExpression<F>> = get_symbolic_constraints(air, 0);
     get_symbolic_lookup_constraints::<F, A>(
         air,
         0,

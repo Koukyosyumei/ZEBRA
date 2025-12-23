@@ -18,16 +18,10 @@ use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_pico::lookup::get_symbolic_lookup_constraints;
-
-pub const fn indices_arr<const N: usize>() -> [usize; N] {
-    let mut indices_arr = [0; N];
-    let mut i = 0;
-    while i < N {
-        indices_arr[i] = i;
-        i += 1;
-    }
-    indices_arr
-}
+use latticevm_pico::utils::{
+    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+};
 
 // ############## Final Check Function ##############################
 fn final_check(
@@ -39,18 +33,18 @@ fn final_check(
 ) {
     let string_representation = format!(
         "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
+        trace.data[0][7],
+        trace.data[0][8],
         trace.data[0][9],
         trace.data[0][10],
         trace.data[0][11],
         trace.data[0][12],
         trace.data[0][13],
         trace.data[0][14],
-        trace.data[0][15],
-        trace.data[0][16],
+        trace.data[0][0],
+        trace.data[0][1],
         trace.data[0][2],
         trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][5],
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -92,6 +86,7 @@ fn main() -> Result<(), io::Error> {
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
+    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
     //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
@@ -102,20 +97,60 @@ fn main() -> Result<(), io::Error> {
     println!("operand_1: {:?}", colmap.values[0].operand_1);
     println!("operand_2: {:?}", colmap.values[0].operand_2);
 
-    let mut u8_cols = vec![];
-    let mut multiplicities = HashSet::new();
-    let mut lookup_constraints = vec![];
-    let mut received_vars_from_cpu = HashSet::new();
-    get_symbolic_lookup_constraints(
-        &air,
-        0,
-        0,
-        &mut u8_cols,
-        &mut multiplicities,
-        &mut lookup_constraints,
-        &mut received_vars_from_cpu,
-        prime,
-    );
+    let (tv_constraints, mut refinable_cols, mut range_types) = extract_constraints_and_range::<
+        KoalaBear,
+        AddSubChip<KoalaBear>,
+    >(&air, NUM_ADD_SUB_COLS, prime);
 
-    Ok(())
+    for t in &tv_constraints {
+        println!("#### {}", t);
+    }
+
+    refinable_cols.extend(&[0, 1, 2, 3]);
+    range_types.insert(0, RangeType::U4);
+    range_types.insert(1, RangeType::U4);
+    range_types.insert(2, RangeType::U4);
+    range_types.insert(3, RangeType::U4);
+
+    /*refinable_cols.extend(&[2, 3, 4, 5]); // output
+    refinable_cols.extend(&[9, 13]); // input
+    range_types.insert(9, RangeType::U4);
+    range_types.insert(13, RangeType::U4);*/
+    println!("{:?}", refinable_cols);
+    println!("{:?}", range_types);
+
+    let constraints = LatticeVMConstraints {
+        air_constraints: tv_constraints.clone(),
+        pv_pos_constraints: vec![],
+        pv_neg_constraints: vec![],
+    };
+    let minimum_num_taregt_cols = refinable_cols.len();
+
+    // ######################## Program Initialization ###########################
+    let program = target_program(4, 4);
+    let base_abs_main_trace_data =
+        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+
+    // ######################## Solve ############################################
+    quick_api(
+        get_program_str(&program),
+        &constraints,
+        &refinable_cols,
+        &range_types,
+        &vec![],
+        &aux_tg_fns,
+        &vec![],
+        &base_abs_main_trace_data,
+        vec![],
+        max_iteration,
+        minimum_num_taregt_cols,
+        min_row_id,
+        max_row_id,
+        program.instructions.len(),
+        dummy_program_counter_refine_fn,
+        dummy_adjust_pc_program,
+        final_check,
+        prime,
+        seed,
+    )
 }
