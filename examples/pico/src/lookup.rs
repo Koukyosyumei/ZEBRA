@@ -92,20 +92,6 @@ pub fn get_symbolic_lookup_constraints<F, A>(
 
     for s in &sends {
         match s.kind {
-            LookupType::Byte => {
-                let opcode = &s.values[0];
-                let a1 = &s.values[1];
-                let a2 = &s.values[2];
-                let b = &s.values[3];
-                let c = &s.values[4];
-
-                if opcode.column_weights.is_empty() {
-                    if opcode.constant.as_canonical_u32() == 7 {
-                        add_u8_col_if_possible(&b, u8_cols);
-                        add_u8_col_if_possible(&c, u8_cols);
-                    }
-                }
-            }
             LookupType::Alu => {
                 let multiplicities = convert_p3_virtual_pair_col(&s.mult);
                 let opcode = convert_p3_virtual_pair_col(&s.values[0]);
@@ -121,11 +107,6 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c1 = convert_p3_virtual_pair_col(&s.values[10]);
                 let c2 = convert_p3_virtual_pair_col(&s.values[11]);
                 let c3 = convert_p3_virtual_pair_col(&s.values[12]);
-
-                println!("send: opcode: {:?}", opcode);
-                println!("send: a: {:?} {:?} {:?} {:?}", a0, a1, a2, a3);
-                println!("send: b: {:?} {:?} {:?} {:?}", b0, b1, b2, b3);
-                println!("send: c: {:?} {:?} {:?} {:?}", c0, c1, c2, c3);
 
                 let tmps = vec![
                     (Opcode::ADD as u8, OpALU::Add),
@@ -157,6 +138,71 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                             Box::new(multiplicities.clone()),
                             Box::new(impl_constraint),
                         ));
+                    }
+                }
+            }
+            LookupType::Byte => {
+                let opcode = &s.values[0];
+                let a1 = &s.values[1];
+                let a2 = &s.values[2];
+                let b = &s.values[3];
+                let c = &s.values[4];
+
+                if opcode.column_weights.is_empty() {
+                    if opcode.constant.as_canonical_u32() == 7 {
+                        add_u8_col_if_possible(&b, u8_cols);
+                        add_u8_col_if_possible(&c, u8_cols);
+                    }
+                }
+
+                println!("send: opcode: {:?}", opcode);
+                println!("send: a: {:?} {:?} {:?} {:?}", a1, a2, b, c);
+
+                let a1_expr = convert_p3_virtual_pair_col(&a1);
+                let b_expr = convert_p3_virtual_pair_col(&b);
+                let c_expr = convert_p3_virtual_pair_col(&c);
+                let opcode_condition = convert_p3_virtual_pair_col(&opcode);
+
+                let ops = [
+                    (
+                        0,
+                        LatticeVMSymbolicExpr::And(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        ),
+                    ),
+                    (
+                        1,
+                        LatticeVMSymbolicExpr::Or(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        ),
+                    ),
+                    (
+                        2,
+                        LatticeVMSymbolicExpr::Xor(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        ),
+                    ),
+                    (
+                        5,
+                        LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        ))),
+                    ),
+                ];
+
+                for (opcode, op_expr) in ops {
+                    let el_constraint = make_impl_constraint(
+                        opcode,
+                        &opcode_condition,
+                        LatticeVMSymbolicExpr::Sub(Box::new(a1_expr.clone()), Box::new(op_expr)),
+                        prime,
+                    );
+                    if let Some(el_constraint) = el_constraint {
+                        lookup_constraints.push(el_constraint);
                     }
                 }
             }
