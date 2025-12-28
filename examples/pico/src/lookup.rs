@@ -114,6 +114,26 @@ pub fn get_symbolic_lookup_constraints<F, A>(
         }
     }
 
+    for s in &sends {
+        match s.kind {
+            LookupType::Byte => {
+                let opcode = &s.values[0];
+                let a1 = &s.values[1];
+                let a2 = &s.values[2];
+                let b = &s.values[3];
+                let c = &s.values[4];
+
+                if opcode.column_weights.is_empty() {
+                    if opcode.constant.as_canonical_u32() == 7 {
+                        add_u8_col_if_possible(&b, u8_cols);
+                        add_u8_col_if_possible(&c, u8_cols);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     /*
 
     for r in &receives {
