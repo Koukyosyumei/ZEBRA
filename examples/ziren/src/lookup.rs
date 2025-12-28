@@ -16,34 +16,10 @@ use zkm_stark::LookupKind;
 use latticevm::alu::get_alu_constraint;
 use latticevm::alu::OpALU;
 use latticevm::interval::AbstractInterval;
+use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 
 use crate::p3_to_tv::convert_p3_expr;
-
-fn make_impl_constraint(
-    opcode_val: i64,
-    opcode_var: &LatticeVMSymbolicExpr,
-    expr: LatticeVMSymbolicExpr,
-    prime: u32,
-) -> Option<LatticeVMSymbolicExpr> {
-    if let LatticeVMSymbolicExpr::Constant(c) = opcode_var {
-        if c.as_canonical_u32(prime) as i64 == opcode_val {
-            Some(expr)
-        } else {
-            None
-        }
-    } else {
-        Some(LatticeVMSymbolicExpr::WhenZero(
-            Box::new(LatticeVMSymbolicExpr::Sub(
-                Box::new(opcode_var.clone()),
-                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                    opcode_val,
-                ))),
-            )),
-            Box::new(expr),
-        ))
-    }
-}
 
 pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
     if !b.column_weights.is_empty() {

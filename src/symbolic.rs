@@ -963,6 +963,31 @@ pub fn refine_trace(
     //}
 }
 
+pub fn make_impl_constraint(
+    opcode_val: i64,
+    opcode_var: &LatticeVMSymbolicExpr,
+    expr: LatticeVMSymbolicExpr,
+    prime: u32,
+) -> Option<LatticeVMSymbolicExpr> {
+    if let LatticeVMSymbolicExpr::Constant(c) = opcode_var {
+        if c.as_canonical_u32(prime) as i64 == opcode_val {
+            Some(expr)
+        } else {
+            None
+        }
+    } else {
+        Some(LatticeVMSymbolicExpr::WhenZero(
+            Box::new(LatticeVMSymbolicExpr::Sub(
+                Box::new(opcode_var.clone()),
+                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+                    opcode_val,
+                ))),
+            )),
+            Box::new(expr),
+        ))
+    }
+}
+
 mod tests {
     #[test]
     fn test_eval_complex_constraints() {
