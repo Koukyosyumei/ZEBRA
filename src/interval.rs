@@ -222,6 +222,15 @@ impl Shr<AbstractInterval> for AbstractInterval {
     }
 }
 
+fn div_floor_i64(x: i64, k: i64) -> i64 {
+    debug_assert!(k > 0);
+    if x >= 0 {
+        x / k
+    } else {
+        -((-x + k - 1) / k)
+    }
+}
+
 impl AbstractInterval {
     pub fn top(prime: u32) -> Self {
         Self {
@@ -346,6 +355,26 @@ impl AbstractInterval {
             AbstractInterval::one()
         } else {
             AbstractInterval::bool()
+        }
+    }
+
+    pub fn div_floor(&self, k: i64) -> Self {
+        debug_assert!(k > 0);
+
+        let lo = div_floor_i64(self.lo, k);
+        let hi = div_floor_i64(self.hi, k);
+
+        AbstractInterval { lo, hi }
+    }
+
+    pub fn intersect(&self, other: &Self) -> Option<Self> {
+        let lo = std::cmp::max(self.lo, other.lo);
+        let hi = std::cmp::min(self.hi, other.hi);
+
+        if lo <= hi {
+            Some(Self { lo, hi })
+        } else {
+            None
         }
     }
 

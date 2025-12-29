@@ -12,6 +12,7 @@ use rand::Rng;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
+use crate::symbolic::refine_trace_with_carry;
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
     symbolic::{eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints},
@@ -77,6 +78,7 @@ pub fn solve<AlignPcToProgramFn>(
     queue: &mut PriorityQueue<SearchNode, Potential>,
     num_trial: &mut usize,
     constraints: &LatticeVMConstraints,
+    range_types: &HashMap<usize, RangeType>,
     _num_refined_points: usize,
     base_refinment_target_indicies_main: &Vec<usize>,
     refinment_target_indicies_pv: &Vec<usize>,
@@ -113,7 +115,7 @@ where
         // POP best candidate from queue
         // -----------------------------
         let (head, potential) = queue.pop().unwrap();
-        let main_trace = head.main_trace;
+        let mut main_trace = head.main_trace;
         let public_trace = head.public_trace;
 
         // Update UI status string if requested
@@ -140,6 +142,16 @@ where
         // accumulate potential (skip the first trial)
         if *num_trial > 1 {
             cumulative_priority += potential.1;
+        }
+
+        let aux_flag = refine_trace_with_carry(
+            &mut main_trace,
+            &constraints.air_constraints,
+            range_types,
+            prime,
+        );
+        if let MayBeFlag::False = aux_flag {
+            continue;
         }
 
         // -----------------------------
@@ -447,6 +459,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                     &mut queue,
                     &mut num_trial,
                     &constraints,
+                    range_types,
                     1,
                     &refinment_target_indicies_main,
                     &refinment_target_indicies_pv,
@@ -504,6 +517,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                                 &mut aux_queue,
                                 &mut aux_num_trial,
                                 &co.aux_constraints,
+                                range_types,
                                 1,
                                 &co.aux_refinement_plan,
                                 &refinment_target_indicies_pv,
