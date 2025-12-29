@@ -17,36 +17,20 @@ use pico_vm::machine::lookup::LookupType;
 use latticevm::alu::get_alu_constraint;
 use latticevm::alu::OpALU;
 use latticevm::interval::AbstractInterval;
+use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 
 use crate::p3_to_tv::convert_p3_expr;
 
-fn make_impl_constraint(
-    opcode_val: i64,
-    opcode_var: &LatticeVMSymbolicExpr,
-    expr: LatticeVMSymbolicExpr,
-    prime: u32,
-) -> Option<LatticeVMSymbolicExpr> {
-    if let LatticeVMSymbolicExpr::Constant(c) = opcode_var {
-        if c.as_canonical_u32(prime) as i64 == opcode_val {
-            Some(expr)
-        } else {
-            None
+pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+    if !b.column_weights.is_empty() {
+        if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
+            u8_cols.push(col_idx);
         }
-    } else {
-        Some(LatticeVMSymbolicExpr::WhenZero(
-            Box::new(LatticeVMSymbolicExpr::Sub(
-                Box::new(opcode_var.clone()),
-                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                    opcode_val,
-                ))),
-            )),
-            Box::new(expr),
-        ))
     }
 }
 
-pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+pub fn add_u16_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
     if !b.column_weights.is_empty() {
         if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
             u8_cols.push(col_idx);
@@ -105,10 +89,14 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c2 = &r.values[11];
                 let c3 = &r.values[12];
 
-                println!("opcode: {:?}", opcode);
-                println!("a: {:?} {:?} {:?} {:?}", a0, a1, a2, a3);
-                println!("b: {:?} {:?} {:?} {:?}", b0, b1, b2, b3);
-                println!("c: {:?} {:?} {:?} {:?}", c0, c1, c2, c3);
+                for i in 1..13 {
+                    add_u8_col_if_possible(&r.values[i], u8_cols);
+                }
+
+                println!("receive opcode: {:?}", opcode);
+                println!("receive a: {:?} {:?} {:?} {:?}", a0, a1, a2, a3);
+                println!("receive b: {:?} {:?} {:?} {:?}", b0, b1, b2, b3);
+                println!("receive c: {:?} {:?} {:?} {:?}", c0, c1, c2, c3);
             }
             _ => {}
         }
@@ -116,111 +104,21 @@ pub fn get_symbolic_lookup_constraints<F, A>(
 
     for s in &sends {
         match s.kind {
-            LookupType::Byte => {
-                let opcode = &s.values[0];
-                let a1 = &s.values[1];
-                let a2 = &s.values[2];
-                let b = &s.values[3];
-                let c = &s.values[4];
-
-                if opcode.column_weights.is_empty() {
-                    if opcode.constant.as_canonical_u32() == 7 {
-                        add_u8_col_if_possible(&b, u8_cols);
-                        add_u8_col_if_possible(&c, u8_cols);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /*
-
-    for r in &receives {
-        for (w, _) in &r.multiplicity.column_weights {
-            if let p3_air::PairCol::Main(col_idx) = w {
-                multiplicities.insert(*col_idx);
-            }
-        }
-    }
-    /*
-    for s in &sends {
-        for (w, _) in &s.multiplicity.column_weights {
-            if let p3_air::PairCol::Main(col_idx) = w {
-                multiplicities.insert(*col_idx);
-            }
-        }
-    }*/
-
-    for r in &receives {
-        match r.kind {
-            LookupType::Instruction => {
-                for rv in &r.values {
-                    for c in &rv.column_weights {
-                        if let PairCol::Main(index) = c.0 {
-                            received_vars_from_cpu.insert(index);
-                        }
-                    }
-                }
-                let shard = &r.values[0];
-                let clk = &r.values[1];
-                let pc = &r.values[2];
-                let next_pc = &r.values[3];
-                let next_next_pc = &r.values[4];
-                let num_extra_cycles = &r.values[5];
-                let opcode = &r.values[6];
-                let a0 = &r.values[7];
-                let a1 = &r.values[8];
-                let a2 = &r.values[9];
-                let a3 = &r.values[10];
-                let b0 = &r.values[11];
-                let b1 = &r.values[12];
-                let b2 = &r.values[13];
-                let b3 = &r.values[14];
-                let c0 = &r.values[15];
-                let c1 = &r.values[16];
-                let c2 = &r.values[17];
-                let c3 = &r.values[18];
-
-                let hi0 = &r.values[19];
-                let hi1 = &r.values[20];
-                let hi2 = &r.values[21];
-                let hi3 = &r.values[22];
-                let op_a_immutable = &r.values[23];
-                let is_rw_a = &r.values[24];
-                let is_check_memory = &r.values[25];
-                let is_halt = &r.values[26];
-                let is_sequential = &r.values[27];
-            }
-            _ => {}
-        }
-    }
-
-    for s in &sends {
-        match s.kind {
-            LookupType::Instruction => {
-                let multiplicities = convert_p3_virtual_pair_col(&s.multiplicity);
-                /*
-                for rv in &s.values {
-                    for c in &rv.column_weights {
-                        if let PairCol::Main(index) = c.0 {
-                            received_vars_from_cpu.insert(index);
-                        }
-                    }
-                }*/
-                let opcode = convert_p3_virtual_pair_col(&s.values[6]);
-                let a0 = convert_p3_virtual_pair_col(&s.values[7]);
-                let a1 = convert_p3_virtual_pair_col(&s.values[8]);
-                let a2 = convert_p3_virtual_pair_col(&s.values[9]);
-                let a3 = convert_p3_virtual_pair_col(&s.values[10]);
-                let b0 = convert_p3_virtual_pair_col(&s.values[11]);
-                let b1 = convert_p3_virtual_pair_col(&s.values[12]);
-                let b2 = convert_p3_virtual_pair_col(&s.values[13]);
-                let b3 = convert_p3_virtual_pair_col(&s.values[14]);
-                let c0 = convert_p3_virtual_pair_col(&s.values[15]);
-                let c1 = convert_p3_virtual_pair_col(&s.values[16]);
-                let c2 = convert_p3_virtual_pair_col(&s.values[17]);
-                let c3 = convert_p3_virtual_pair_col(&s.values[18]);
+            LookupType::Alu => {
+                let multiplicities = convert_p3_virtual_pair_col(&s.mult);
+                let opcode = convert_p3_virtual_pair_col(&s.values[0]);
+                let a0 = convert_p3_virtual_pair_col(&s.values[1]);
+                let a1 = convert_p3_virtual_pair_col(&s.values[2]);
+                let a2 = convert_p3_virtual_pair_col(&s.values[3]);
+                let a3 = convert_p3_virtual_pair_col(&s.values[4]);
+                let b0 = convert_p3_virtual_pair_col(&s.values[5]);
+                let b1 = convert_p3_virtual_pair_col(&s.values[6]);
+                let b2 = convert_p3_virtual_pair_col(&s.values[7]);
+                let b3 = convert_p3_virtual_pair_col(&s.values[8]);
+                let c0 = convert_p3_virtual_pair_col(&s.values[9]);
+                let c1 = convert_p3_virtual_pair_col(&s.values[10]);
+                let c2 = convert_p3_virtual_pair_col(&s.values[11]);
+                let c3 = convert_p3_virtual_pair_col(&s.values[12]);
 
                 let tmps = vec![
                     (Opcode::ADD as u8, OpALU::Add),
@@ -243,35 +141,12 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
 
                     if let Some(impl_constraint) = impl_constraint {
-                        for i in 7..19 {
-                            add_u8_col_if_possible(&s.values[i], u8_cols);
-                        }
-
                         lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
                             Box::new(multiplicities.clone()),
                             Box::new(impl_constraint),
                         ));
                     }
                 }
-
-                /*
-                let shard = &r.values[0];
-                let clk = &r.values[1];
-                let pc = &r.values[2];
-                let next_pc = &r.values[3];
-                let next_next_pc = &r.values[4];
-                let num_extra_cycles = &r.values[5];
-
-                let hi0 = &r.values[19];
-                let hi1 = &r.values[20];
-                let hi2 = &r.values[21];
-                let hi3 = &r.values[22];
-                let op_a_immutable = &r.values[24];
-                let is_rw_a = &r.values[25];
-                let is_check_memory = &r.values[26];
-                let is_halt = &r.values[27];
-                let is_sequential = &r.values[28];
-                */
             }
             LookupType::Byte => {
                 let opcode = &s.values[0];
@@ -280,10 +155,19 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let b = &s.values[3];
                 let c = &s.values[4];
 
-                // Range U8
-                add_u8_col_if_possible(&b, u8_cols);
-                add_u8_col_if_possible(&c, u8_cols);
-                add_u8_col_if_possible(&a1, u8_cols);
+                if opcode.column_weights.is_empty() {
+                    if opcode.constant.as_canonical_u32() == 7 {
+                        add_u8_col_if_possible(&b, u8_cols);
+                        add_u8_col_if_possible(&c, u8_cols);
+                    }
+
+                    if opcode.constant.as_canonical_u32() == 8 {
+                        add_u16_col_if_possible(&a1, u8_cols);
+                    }
+                }
+
+                println!("send: opcode: {:?}", opcode);
+                println!("send: a: {:?} {:?} {:?} {:?}", a1, a2, b, c);
 
                 let a1_expr = convert_p3_virtual_pair_col(&a1);
                 let b_expr = convert_p3_virtual_pair_col(&b);
@@ -313,12 +197,13 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         ),
                     ),
                     (
-                        6,
+                        5,
                         LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
-                        ))),
+                        ))), // lt(b, c) on abstractinterval returns 0 when b < c
                     ),
+                    (6, LatticeVMSymbolicExpr::Msb(Box::new(b_expr.clone()))),
                 ];
 
                 for (opcode, op_expr) in ops {
@@ -335,5 +220,5 @@ pub fn get_symbolic_lookup_constraints<F, A>(
             }
             _ => {}
         }
-    }*/
+    }
 }

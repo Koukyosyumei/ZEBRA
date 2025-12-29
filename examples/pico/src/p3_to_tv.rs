@@ -73,20 +73,20 @@ pub fn convert_p3_paircol(pair_col: &PairCol) -> LatticeVMSymbolicVal {
     }
 }
 
-fn get_weighted_var<F: PrimeField32 + One>(paircol: &PairCol, weight: &F) -> LatticeVMSymbolicExpr {
-    if Field::is_one(weight) {
-        LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))
-    } else {
-        LatticeVMSymbolicExpr::Mul(
-            Box::new(LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))),
-            Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                weight.as_canonical_u32() as i64,
-            ))),
-        )
-    }
+fn get_weighted_var<F: PrimeField32>(paircol: &PairCol, weight: &F) -> LatticeVMSymbolicExpr {
+    //if Field::is_one(weight) {
+    //LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))
+    //} else {
+    LatticeVMSymbolicExpr::Mul(
+        Box::new(LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))),
+        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+            weight.as_canonical_u32() as i64,
+        ))),
+    )
+    //}
 }
 
-pub fn convert_p3_virtual_pair_col<F: PrimeField32 + One>(
+pub fn convert_p3_virtual_pair_col<F: PrimeField32>(
     vpair: &VirtualPairCol<F>,
 ) -> LatticeVMSymbolicExpr {
     if vpair.column_weights.is_empty() {
@@ -100,10 +100,10 @@ pub fn convert_p3_virtual_pair_col<F: PrimeField32 + One>(
             hi: vpair.constant.as_canonical_u32() as i64,
         }); // get_weighted_var(&vpair.column_weights[0].0, &vpair.column_weights[0].1);
         for (paircol, w) in vpair.column_weights.iter() {
-            if (w.clone() + F::one()).as_canonical_u32() == 0 {
+            if (w.clone() + F::ONE).as_canonical_u32() == 0 {
                 expr = LatticeVMSymbolicExpr::Sub(
                     Box::new(expr.clone()),
-                    Box::new(get_weighted_var(paircol, &F::one())),
+                    Box::new(get_weighted_var(paircol, &F::ONE)),
                 );
             } else {
                 expr = LatticeVMSymbolicExpr::Add(
