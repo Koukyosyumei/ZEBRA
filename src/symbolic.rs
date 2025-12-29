@@ -661,12 +661,14 @@ pub fn refine_trace_with_carry(
     constraints: &[LatticeVMSymbolicExpr],
     range_types: &HashMap<usize, RangeType>,
     prime: u32,
-) -> MayBeFlag {
+) -> (MayBeFlag, Vec<(AbstractInterval, AbstractInterval)>) {
+    let mut logs = vec![];
+
     for constraint in constraints {
         let Some((a_idx, b_expr, c_idx)) =
             detect_mod_256_constraint(constraint, prime, range_types)
         else {
-            return MayBeFlag::MayBe;
+            continue;
         };
 
         let num_steps = trace.data.len();
@@ -696,20 +698,22 @@ pub fn refine_trace_with_carry(
 
             // refine
             if let Some(new_c_interval) = row[c_idx].intersect(&c_interval) {
+                logs.push((row[c_idx].clone(), new_c_interval.clone()));
                 row[c_idx] = new_c_interval;
             } else {
-                return MayBeFlag::False;
+                return (MayBeFlag::False, logs);
             }
 
             if let Some(new_a_interval) = row[a_idx].intersect(&a_interval) {
+                logs.push((row[a_idx].clone(), new_a_interval.clone()));
                 row[a_idx] = new_a_interval;
             } else {
-                return MayBeFlag::False;
+                return (MayBeFlag::False, logs);
             }
         }
     }
 
-    MayBeFlag::MayBe
+    (MayBeFlag::MayBe, logs)
 }
 
 pub fn is_iszero_operator(
@@ -1043,12 +1047,12 @@ pub fn refine_trace(
     max_row_id: usize,
     prime: u32,
     rng: &mut StdRng,
-) -> Option<Vec<AbstractTrace>> {
+) -> (Option<Vec<AbstractTrace>>, bool) {
     if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
-        return None;
+        return (None, false);
     }
     if refinment_target_indicies.is_empty() {
-        return None;
+        return (None, false);
     }
     let mut c_refinment_target_indicies = refinment_target_indicies.clone();
     let i = rng.random_range(min_row_id..(max_row_id + 1)) as usize;
@@ -1072,9 +1076,9 @@ pub fn refine_trace(
             new_trace.data[i][c_refinment_target_indicies[j]] = v.clone();
             results.push(new_trace);
         }
-        Some(results)
+        (Some(results), true)
     } else {
-        Some(vec![trace.clone(), trace.clone()])
+        (Some(vec![trace.clone(), trace.clone()]), false)
     }
     //}
 }

@@ -106,6 +106,11 @@ where
     let mut num_unsatisfied_trial = 0;
     let mut cumulative_priority = 0;
     let refinment_target_indicies_main = base_refinment_target_indicies_main.clone();
+    let bool_target_indices: Vec<usize> = refinment_target_indicies_main
+        .iter()
+        .copied()
+        .filter(|idx| matches!(range_types.get(idx), Some(RangeType::Bool)))
+        .collect();
     let mut final_memo = HashSet::new();
 
     while !queue.is_empty() && *num_trial < max_expansions {
@@ -118,8 +123,20 @@ where
         let mut main_trace = head.main_trace;
         let public_trace = head.public_trace;
 
+        let (aux_flag, aux_log) = refine_trace_with_carry(
+            &mut main_trace,
+            &constraints.air_constraints,
+            range_types,
+            prime,
+        );
+
         // Update UI status string if requested
         if should_update_ui {
+            //let mut aux_log_str = "".to_string();
+            //for al in &aux_log {
+            //    aux_log_str.push_str(&format!("{:?}\n", al));
+            //}
+
             ui.status = format!(
                 "Target Columns: {:?}\n #Total Trial: {}\n #Trial {}\n #UNSAT Trial: {}\n #Qued: {}\n Potential: {}\n Sum-Potential: {}",
                 refinment_target_indicies_main,
@@ -130,6 +147,10 @@ where
                 -potential.0,
                 cumulative_priority,
             );
+        }
+
+        if let MayBeFlag::False = aux_flag {
+            continue;
         }
 
         // Render the UI (non-fatal unwrap for brevity)
@@ -144,16 +165,6 @@ where
             cumulative_priority += potential.1;
         }
 
-        let aux_flag = refine_trace_with_carry(
-            &mut main_trace,
-            &constraints.air_constraints,
-            range_types,
-            prime,
-        );
-        if let MayBeFlag::False = aux_flag {
-            continue;
-        }
-
         // -----------------------------
         // CHILDREN GENERATION
         // Steps:
@@ -161,16 +172,32 @@ where
         //  2) refine public_trace columns
         //  3) cartesian combine where needed
         // -----------------------------
-        let refined_main_candidates = refine_trace(
-            &main_trace,
-            &refinment_target_indicies_main,
-            min_row_id,
-            max_row_id,
-            prime,
-            rng,
-        );
 
-        let refined_public_candidates = refine_trace(
+        let refined_main_candidates = {
+            let (refined_main_candidates, refined_flag) = refine_trace(
+                &main_trace,
+                &bool_target_indices,
+                min_row_id,
+                max_row_id,
+                prime,
+                rng,
+            );
+            if refined_flag {
+                refined_main_candidates
+            } else {
+                refine_trace(
+                    &main_trace,
+                    &refinment_target_indicies_main,
+                    min_row_id,
+                    max_row_id,
+                    prime,
+                    rng,
+                )
+                .0
+            }
+        };
+
+        let (refined_public_candidates, _) = refine_trace(
             &public_trace,
             refinment_target_indicies_pv,
             min_row_id,
