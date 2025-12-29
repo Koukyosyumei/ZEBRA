@@ -112,11 +112,6 @@ fn main() -> Result<(), io::Error> {
 
     refinable_cols.extend(&[0, 1, 2, 3]);
 
-    range_types.insert(0, RangeType::U4);
-    range_types.insert(1, RangeType::U4);
-    range_types.insert(2, RangeType::U4);
-    range_types.insert(3, RangeType::U4);
-
     for r in &refinable_cols {
         if !range_types.contains_key(r) {
             println!("-----------#################: {}", r);
