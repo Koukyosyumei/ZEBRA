@@ -30,6 +30,14 @@ pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &
     }
 }
 
+pub fn add_u16_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+    if !b.column_weights.is_empty() {
+        if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
+            u8_cols.push(col_idx);
+        }
+    }
+}
+
 pub fn get_symbolic_lookup_constraints<F, A>(
     air: &A,
     preprocessed_width: usize,
@@ -81,6 +89,10 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c2 = &r.values[11];
                 let c3 = &r.values[12];
 
+                for i in 1..13 {
+                    add_u8_col_if_possible(&r.values[i], u8_cols);
+                }
+
                 println!("receive opcode: {:?}", opcode);
                 println!("receive a: {:?} {:?} {:?} {:?}", a0, a1, a2, a3);
                 println!("receive b: {:?} {:?} {:?} {:?}", b0, b1, b2, b3);
@@ -129,11 +141,6 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
 
                     if let Some(impl_constraint) = impl_constraint {
-                        /*
-                        for i in 7..19 {
-                            add_u8_col_if_possible(&s.values[i], u8_cols);
-                        }*/
-
                         lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
                             Box::new(multiplicities.clone()),
                             Box::new(impl_constraint),
@@ -152,6 +159,10 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                     if opcode.constant.as_canonical_u32() == 7 {
                         add_u8_col_if_possible(&b, u8_cols);
                         add_u8_col_if_possible(&c, u8_cols);
+                    }
+
+                    if opcode.constant.as_canonical_u32() == 8 {
+                        add_u16_col_if_possible(&a1, u8_cols);
                     }
                 }
 
@@ -190,8 +201,9 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                         LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
-                        ))),
+                        ))), // lt(b, c) on abstractinterval returns 0 when b < c
                     ),
+                    (6, LatticeVMSymbolicExpr::Msb(Box::new(b_expr.clone()))),
                 ];
 
                 for (opcode, op_expr) in ops {

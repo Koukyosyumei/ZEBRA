@@ -225,8 +225,8 @@ impl Shr<AbstractInterval> for AbstractInterval {
 impl AbstractInterval {
     pub fn top(prime: u32) -> Self {
         Self {
-            lo: -(prime as i64) / 2,
-            hi: (prime as i64) / 2,
+            lo: 0,                //-(prime as i64) / 2,
+            hi: prime as i64 - 1, //(prime as i64) / 2,
         }
     }
 
@@ -248,6 +248,13 @@ impl AbstractInterval {
         Self {
             lo: 0_i64,
             hi: 255_i64,
+        }
+    }
+
+    pub fn u16() -> Self {
+        Self {
+            lo: 0_i64,
+            hi: 65535_i64,
         }
     }
 
@@ -328,7 +335,8 @@ impl AbstractInterval {
 
     pub fn ltu(&self, rhs: Self) -> AbstractInterval {
         if self.lo < 0 {
-            panic!("LTU for negative region is not supported.");
+            //panic!("LTU for negative region is not supported.");
+            return AbstractInterval::from_i64(123456);
         }
 
         // returns zero when self < rhs
@@ -369,6 +377,29 @@ impl AbstractInterval {
                 },
             ]
         }
+    }
+}
+
+pub fn msb_u8(b: u8) -> bool {
+    (b & 0b1000_0000) != 0
+}
+
+pub fn msb_maybe(interval: &AbstractInterval) -> AbstractInterval {
+    if interval.lo < 0 {
+        return AbstractInterval::bool();
+    }
+
+    let lo_msb = msb_u8(interval.lo as u8);
+    let hi_msb = msb_u8(interval.hi as u8);
+
+    if lo_msb == hi_msb {
+        if lo_msb {
+            AbstractInterval::one()
+        } else {
+            AbstractInterval::zero()
+        }
+    } else {
+        AbstractInterval::bool()
     }
 }
 

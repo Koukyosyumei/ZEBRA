@@ -10,7 +10,7 @@ use rand::seq::{IndexedRandom, SliceRandom};
 use rand::Rng;
 
 use crate::alu::reconstruct_symbolic_word;
-use crate::interval::{AbstractInterval, MayBeFlag};
+use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum LatticeVMSymbolicEntry {
@@ -65,6 +65,7 @@ pub enum LatticeVMSymbolicExpr {
     Xor(Box<Self>, Box<Self>),
     SRL(Box<Self>, Box<Self>),
     Lt(Box<Self>, Box<Self>),
+    Msb(Box<Self>),
     WhenNonZero(Box<Self>, Box<Self>),
     WhenZero(Box<Self>, Box<Self>),
     Neg(Box<Self>),
@@ -185,6 +186,7 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
             Self::SRL(x, y) => write!(f, "({} >> {})", x, y),
             Self::Lt(x, y) => write!(f, "({} < {})", x, y),
+            Self::Msb(x) => write!(f, "msb({})", x),
             Self::WhenNonZero(x, y) => write!(f, "([{} /= 0] => {})", x, y),
             Self::WhenZero(x, y) => write!(f, "([{} = 0] => {})", x, y),
         }
@@ -558,6 +560,15 @@ impl LatticeVMSymbolicExpr {
                     is_last_row,
                     prime,
                 )),
+            Self::Msb(a) => msb_maybe(&a.eval(
+                curr_row,
+                next_row,
+                public_vals,
+                is_first_row,
+                is_transition,
+                is_last_row,
+                prime,
+            )),
         }
     }
 }
