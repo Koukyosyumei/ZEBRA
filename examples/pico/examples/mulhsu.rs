@@ -103,7 +103,7 @@ fn main() -> Result<(), io::Error> {
     println!("b_sign_extend: {:?}", colmap.values[0].b_sign_extend);
     println!("c_sign_extend: {:?}", colmap.values[0].c_sign_extend);
 
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MulChip<KoalaBear>>(&air, NUM_MUL_COLS, prime);
 
     for t in &tv_constraints {
