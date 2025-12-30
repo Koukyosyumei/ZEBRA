@@ -642,16 +642,20 @@ pub fn detect_conditional_var_sub_const_constraints(
             // 1. the left is selector, and the right is Sub expr
             if let Some(s_idx) = get_curr_i(lhs_expr) {
                 if let Some((v_idx, target)) = get_curr_i_sub_const(rhs_expr, prime) {
-                    const_constraints.push((s_idx, v_idx, target));
-                    continue;
+                    if s_idx != v_idx {
+                        const_constraints.push((s_idx, v_idx, target));
+                        continue;
+                    }
                 }
             }
 
             // 2. the left is Sub expr, and the right is the selector
             if let Some(s_idx) = get_curr_i(rhs_expr) {
                 if let Some((v_idx, target)) = get_curr_i_sub_const(lhs_expr, prime) {
-                    const_constraints.push((s_idx, v_idx, target));
-                    continue;
+                    if s_idx != v_idx {
+                        const_constraints.push((s_idx, v_idx, target));
+                        continue;
+                    }
                 }
             }
         }
