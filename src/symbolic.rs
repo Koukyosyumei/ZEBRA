@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
 use std::ops::{Add, Mul, Neg, Sub};
@@ -11,6 +11,7 @@ use rand::Rng;
 
 use crate::alu::reconstruct_symbolic_word;
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
+use crate::solver::RangeType;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum LatticeVMSymbolicEntry {
@@ -607,6 +608,114 @@ fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
     }
 }
 
+pub fn detect_mod_256_constraint(
+    constraint: &LatticeVMSymbolicExpr,
+    prime: u32,
+    range_types: &HashMap<usize, RangeType>,
+) -> Option<(usize, Box<LatticeVMSymbolicExpr>, usize)> {
+    // constraint = a - (b - c*256)
+    let (a, inner) = match constraint {
+        LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
+        _ => return None,
+    };
+
+    // a is variable
+    let a_index = match &**a {
+        LatticeVMSymbolicExpr::Variable(v) => v.index,
+        _ => return None,
+    };
+
+    // a ∈ [0,255]
+    match range_types.get(&a_index) {
+        Some(RangeType::U8) => {}
+        _ => return None,
+    }
+
+    // inner = b - c*256
+    let (b, c_mul) = match &**inner {
+        LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
+        _ => return None,
+    };
+
+    // c_mul = c * 256 or 256 * c
+    let c_index = match &**c_mul {
+        LatticeVMSymbolicExpr::Mul(x, y) => match (&**x, &**y) {
+            (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Constant(k))
+            | (LatticeVMSymbolicExpr::Constant(k), LatticeVMSymbolicExpr::Variable(v)) => {
+                if k.as_canonical_u32(prime) == 256 {
+                    v.index
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    Some((a_index, b.clone(), c_index))
+}
+
+pub fn refine_trace_with_carry(
+    trace: &mut AbstractTrace,
+    constraints: &[LatticeVMSymbolicExpr],
+    range_types: &HashMap<usize, RangeType>,
+    prime: u32,
+) -> (MayBeFlag, Vec<(AbstractInterval, AbstractInterval)>) {
+    let mut logs = vec![];
+
+    for constraint in constraints {
+        let Some((a_idx, b_expr, c_idx)) =
+            detect_mod_256_constraint(constraint, prime, range_types)
+        else {
+            continue;
+        };
+
+        let num_steps = trace.data.len();
+        for i in 0..num_steps {
+            let (first, second) = trace.data.split_at_mut(i + 1);
+            let row = &mut first[first.len() - 1];
+            let next_row: Option<&[AbstractInterval]> = if second.len() > 0 {
+                Some(&second[0])
+            } else {
+                None
+            };
+            let b_interval = b_expr.eval(
+                row,
+                next_row,
+                None,
+                i == 0,
+                i < num_steps - 1,
+                i == num_steps - 1,
+                prime,
+            );
+
+            // c = floor(b / 256)
+            let c_interval = b_interval.div_floor(256);
+
+            // a = b - 256*c
+            let a_interval = b_interval - (c_interval.clone() * AbstractInterval::from_i64(256));
+
+            // refine
+            if let Some(new_c_interval) = row[c_idx].intersect(&c_interval) {
+                logs.push((row[c_idx].clone(), new_c_interval.clone()));
+                row[c_idx] = new_c_interval;
+            } else {
+                return (MayBeFlag::False, logs);
+            }
+
+            if let Some(new_a_interval) = row[a_idx].intersect(&a_interval) {
+                logs.push((row[a_idx].clone(), new_a_interval.clone()));
+                row[a_idx] = new_a_interval;
+            } else {
+                return (MayBeFlag::False, logs);
+            }
+        }
+    }
+
+    (MayBeFlag::MayBe, logs)
+}
+
 pub fn is_iszero_operator(
     constraint: &LatticeVMSymbolicExpr,
     prime: u32,
@@ -938,12 +1047,12 @@ pub fn refine_trace(
     max_row_id: usize,
     prime: u32,
     rng: &mut StdRng,
-) -> Option<Vec<AbstractTrace>> {
+) -> (Option<Vec<AbstractTrace>>, bool) {
     if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
-        return None;
+        return (None, false);
     }
     if refinment_target_indicies.is_empty() {
-        return None;
+        return (None, false);
     }
     let mut c_refinment_target_indicies = refinment_target_indicies.clone();
     let i = rng.random_range(min_row_id..(max_row_id + 1)) as usize;
@@ -967,9 +1076,9 @@ pub fn refine_trace(
             new_trace.data[i][c_refinment_target_indicies[j]] = v.clone();
             results.push(new_trace);
         }
-        Some(results)
+        (Some(results), true)
     } else {
-        Some(vec![trace.clone(), trace.clone()])
+        (Some(vec![trace.clone(), trace.clone()]), false)
     }
     //}
 }

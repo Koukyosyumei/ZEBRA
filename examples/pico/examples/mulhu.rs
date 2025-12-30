@@ -70,7 +70,7 @@ const fn make_col_map() -> MulCols<usize> {
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::MUL, 1, 2, 3, true, true)];
+    let instructions = vec![Instruction::new(Opcode::MULHU, 1, 2, 3, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 

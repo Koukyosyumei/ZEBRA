@@ -1,24 +1,21 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::time;
 use std::io;
+use std::time;
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{
-    backend::CrosstermBackend,
-    Terminal,
-};
+use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::solver::AbsConstraintObj;
 use crate::solver::RangeType;
 use crate::ui::UiState;
 use crate::{
-    interval::AbstractInterval, solver::run_solver,
-    symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
+    interval::AbstractInterval, solver::run_solver, symbolic::AbstractTrace,
+    symbolic::LatticeVMConstraints,
 };
 
 pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToProgramFn>(
