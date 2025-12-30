@@ -12,7 +12,11 @@ use rand::Rng;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use crate::symbolic::refine_trace_with_carry;
+use crate::symbolic::{
+    detect_conditional_var_sub_const_constraints, detect_conditional_var_sub_var_constraints,
+    refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
+    refine_trace_with_carry,
+};
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
     symbolic::{eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints},
@@ -103,6 +107,11 @@ pub fn solve<AlignPcToProgramFn>(
 where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32),
 {
+    let conditional_var_sub_const_constraints =
+        detect_conditional_var_sub_const_constraints(&constraints.air_constraints, prime);
+    let conditional_var_sub_var_constraints =
+        detect_conditional_var_sub_var_constraints(&constraints.air_constraints);
+
     let mut num_unsatisfied_trial = 0;
     let mut cumulative_priority = 0;
     let refinment_target_indicies_main = base_refinment_target_indicies_main.clone();
@@ -123,13 +132,6 @@ where
         let mut main_trace = head.main_trace;
         let public_trace = head.public_trace;
 
-        let (aux_flag, aux_log) = refine_trace_with_carry(
-            &mut main_trace,
-            &constraints.air_constraints,
-            range_types,
-            prime,
-        );
-
         // Update UI status string if requested
         if should_update_ui {
             //let mut aux_log_str = "".to_string();
@@ -149,6 +151,28 @@ where
             );
         }
 
+        let aux_flag = refine_conditional_constraints_var_sub_const(
+            &mut main_trace,
+            &conditional_var_sub_const_constraints,
+        );
+        if let MayBeFlag::False = aux_flag {
+            continue;
+        }
+
+        let aux_flag = refine_conditional_constraints_var_sub_var(
+            &mut main_trace,
+            &conditional_var_sub_var_constraints,
+        );
+        if let MayBeFlag::False = aux_flag {
+            continue;
+        }
+
+        let (aux_flag, _aux_log) = refine_trace_with_carry(
+            &mut main_trace,
+            &constraints.air_constraints,
+            range_types,
+            prime,
+        );
         if let MayBeFlag::False = aux_flag {
             continue;
         }

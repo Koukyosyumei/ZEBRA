@@ -140,6 +140,28 @@ pub fn get_curr_i_sub_cur_j(expr: &LatticeVMSymbolicExpr) -> Option<(usize, usiz
     None
 }
 
+pub fn get_curr_i_sub_const(expr: &LatticeVMSymbolicExpr, _prime: u32) -> Option<(usize, i64)> {
+    if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = expr {
+        // Case: Variable - Constant
+        if let Some(v_idx) = get_curr_i(lhs) {
+            if let LatticeVMSymbolicExpr::Constant(c) = &**rhs {
+                if c.is_singleton() {
+                    return Some((v_idx, c.lo));
+                }
+            }
+        }
+        // Case: Constant - Variable
+        if let LatticeVMSymbolicExpr::Constant(c) = &**lhs {
+            if let Some(v_idx) = get_curr_i(rhs) {
+                if c.is_singleton() {
+                    return Some((v_idx, c.lo));
+                }
+            }
+        }
+    }
+    None
+}
+
 pub fn preprocess_row(
     air_constraints: &Vec<LatticeVMSymbolicExpr>,
     row: &mut Vec<AbstractInterval>,
@@ -606,6 +628,123 @@ fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
         }
         _ => None,
     }
+}
+
+pub fn detect_conditional_var_sub_const_constraints(
+    constraints: &[LatticeVMSymbolicExpr],
+    prime: u32,
+) -> Vec<(usize, usize, i64)> {
+    let mut const_constraints = Vec::new();
+
+    for c in constraints {
+        // Mul(selector, Sub(lhs, rhs))
+        if let LatticeVMSymbolicExpr::Mul(lhs_expr, rhs_expr) = c {
+            // 1. the left is selector, and the right is Sub expr
+            if let Some(s_idx) = get_curr_i(lhs_expr) {
+                if let Some((v_idx, target)) = get_curr_i_sub_const(rhs_expr, prime) {
+                    const_constraints.push((s_idx, v_idx, target));
+                    continue;
+                }
+            }
+
+            // 2. the left is Sub expr, and the right is the selector
+            if let Some(s_idx) = get_curr_i(rhs_expr) {
+                if let Some((v_idx, target)) = get_curr_i_sub_const(lhs_expr, prime) {
+                    const_constraints.push((s_idx, v_idx, target));
+                    continue;
+                }
+            }
+        }
+    }
+
+    const_constraints
+}
+
+/// 1. selector * (curr[val_idx] - target_val) = 0
+pub fn refine_conditional_constraints_var_sub_const(
+    trace: &mut AbstractTrace,
+    const_constraints: &[(usize, usize, i64)], // (selector_idx, value_idx, target_constant)
+) -> MayBeFlag {
+    let num_rows = trace.data.len();
+
+    for r in 0..num_rows {
+        for &(sel_idx, val_idx, target) in const_constraints {
+            let selector = &trace.data[r][sel_idx];
+            let target_interval = AbstractInterval::from_i64(target);
+
+            // selector is one
+            if selector.is_singleton() && selector.lo == 1 {
+                let current_val = &trace.data[r][val_idx];
+                if let Some(refined) = current_val.intersect(&target_interval) {
+                    trace.data[r][val_idx] = refined;
+                } else {
+                    return MayBeFlag::False;
+                }
+            }
+
+            // TODO: if the interval does not contain the target, the selector must be zero.
+        }
+    }
+
+    MayBeFlag::MayBe
+}
+
+pub fn detect_conditional_var_sub_var_constraints(
+    constraints: &[LatticeVMSymbolicExpr],
+) -> Vec<(usize, usize, usize)> {
+    let mut eq_constraints = Vec::new();
+
+    for c in constraints {
+        // Mul(selector, Sub(lhs, rhs))
+        if let LatticeVMSymbolicExpr::Mul(lhs_expr, rhs_expr) = c {
+            // 1. the left is selector, and the right is Sub expr
+            if let Some(s_idx) = get_curr_i(lhs_expr) {
+                if let Some((a_idx, b_idx)) = get_curr_i_sub_cur_j(rhs_expr) {
+                    eq_constraints.push((s_idx, a_idx, b_idx));
+                    continue;
+                }
+            }
+
+            // 2. the left is Sub expr, and the right is the selector
+            if let Some(s_idx) = get_curr_i(rhs_expr) {
+                if let Some((a_idx, b_idx)) = get_curr_i_sub_cur_j(lhs_expr) {
+                    eq_constraints.push((s_idx, a_idx, b_idx));
+                    continue;
+                }
+            }
+        }
+    }
+
+    eq_constraints
+}
+
+/// selector * (curr[a_idx] - curr[b_idx]) = 0
+pub fn refine_conditional_constraints_var_sub_var(
+    trace: &mut AbstractTrace,
+    eq_constraints: &[(usize, usize, usize)], // (selector_idx, a_idx, b_idx)
+) -> MayBeFlag {
+    let num_rows = trace.data.len();
+
+    for r in 0..num_rows {
+        for &(sel_idx, a_idx, b_idx) in eq_constraints {
+            let selector = &trace.data[r][sel_idx];
+
+            if selector.is_singleton() && selector.lo == 1 {
+                let a_val = trace.data[r][a_idx].clone();
+                let b_val = trace.data[r][b_idx].clone();
+
+                if let Some(intersected) = a_val.intersect(&b_val) {
+                    trace.data[r][a_idx] = intersected.clone();
+                    trace.data[r][b_idx] = intersected;
+                } else {
+                    return MayBeFlag::False;
+                }
+            }
+            // TODO: if the intervals of a and b are disjoint, the selector must be zero.
+        }
+    }
+
+    MayBeFlag::MayBe
 }
 
 pub fn detect_mod_256_constraint(
