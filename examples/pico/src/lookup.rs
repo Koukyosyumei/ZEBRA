@@ -19,10 +19,14 @@ use latticevm::alu::OpALU;
 use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
+use latticevm::utils::GeneralLookupInfo;
 
 use crate::p3_to_tv::convert_p3_expr;
 
-pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+pub fn add_single_var_col_if_possible<F: PrimeField32>(
+    b: &VirtualPairCol<F>,
+    u8_cols: &mut Vec<usize>,
+) {
     if !b.column_weights.is_empty() {
         if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
             u8_cols.push(col_idx);
@@ -47,10 +51,12 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     lookup_constraints: &mut Vec<LatticeVMSymbolicExpr>,
     received_vars_from_cpu: &mut HashSet<usize>,
     prime: u32,
-) where
+) -> GeneralLookupInfo
+where
     F: p3_field::PrimeField32,
     A: Air<SymbolicConstraintFolder<F>>,
 {
+    let mut general_lookup_info = GeneralLookupInfo::default();
     let mut builder = SymbolicConstraintFolder::new(preprocessed_width, air.width());
     air.eval(&mut builder);
 
@@ -90,7 +96,26 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c3 = &r.values[12];
 
                 for i in 1..13 {
-                    add_u8_col_if_possible(&r.values[i], u8_cols);
+                    add_single_var_col_if_possible(&r.values[i], u8_cols);
+                }
+
+                for i in 1..5 {
+                    add_single_var_col_if_possible(
+                        &r.values[i],
+                        &mut general_lookup_info.alu_output,
+                    );
+                }
+                for i in 5..9 {
+                    add_single_var_col_if_possible(
+                        &r.values[i],
+                        &mut general_lookup_info.alu_input1,
+                    );
+                }
+                for i in 9..13 {
+                    add_single_var_col_if_possible(
+                        &r.values[i],
+                        &mut general_lookup_info.alu_input2,
+                    );
                 }
 
                 println!("receive opcode: {:?}", opcode);
@@ -157,8 +182,8 @@ pub fn get_symbolic_lookup_constraints<F, A>(
 
                 if opcode.column_weights.is_empty() {
                     if opcode.constant.as_canonical_u32() == 7 {
-                        add_u8_col_if_possible(&b, u8_cols);
-                        add_u8_col_if_possible(&c, u8_cols);
+                        add_single_var_col_if_possible(&b, u8_cols);
+                        add_single_var_col_if_possible(&c, u8_cols);
                     }
 
                     if opcode.constant.as_canonical_u32() == 8 {
@@ -221,4 +246,6 @@ pub fn get_symbolic_lookup_constraints<F, A>(
             _ => {}
         }
     }
+
+    general_lookup_info
 }

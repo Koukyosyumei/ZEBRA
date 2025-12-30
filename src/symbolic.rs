@@ -751,6 +751,61 @@ pub fn refine_conditional_constraints_var_sub_var(
     MayBeFlag::MayBe
 }
 
+pub fn collect_linear(
+    expr: &LatticeVMSymbolicExpr,
+    sign: i64,
+    acc: &mut HashMap<usize, i64>,
+    constant: &mut i64,
+    prime: u32,
+    row: &Vec<AbstractInterval>,
+) -> bool {
+    match expr {
+        LatticeVMSymbolicExpr::Add(a, b) => {
+            collect_linear(a, sign, acc, constant, prime, row)
+                && collect_linear(b, sign, acc, constant, prime, row)
+        }
+        LatticeVMSymbolicExpr::Sub(a, b) => {
+            collect_linear(a, sign, acc, constant, prime, row)
+                && collect_linear(b, -sign, acc, constant, prime, row)
+        }
+        LatticeVMSymbolicExpr::Mul(a, b) => match (&**a, &**b) {
+            (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Constant(k))
+            | (LatticeVMSymbolicExpr::Constant(k), LatticeVMSymbolicExpr::Variable(v)) => {
+                *acc.entry(v.index).or_insert(0) += sign * (k.as_canonical_u32(prime) as i64);
+                true
+            }
+            (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Variable(k)) => {
+                if row[v.index].is_singleton() && !row[k.index].is_singleton() {
+                    *acc.entry(k.index).or_insert(0) +=
+                        sign * (row[v.index].as_canonical_u32(prime) as i64);
+                    return true;
+                } else if !row[v.index].is_singleton() && row[k.index].is_singleton() {
+                    *acc.entry(v.index).or_insert(0) +=
+                        sign * (row[k.index].as_canonical_u32(prime) as i64);
+                    return true;
+                } else if row[v.index].is_singleton() && row[k.index].is_singleton() {
+                    *constant += sign
+                        * (row[v.index].as_canonical_u32(prime)
+                            + row[k.index].as_canonical_u32(prime))
+                            as i64;
+                    return true;
+                }
+                false
+            }
+            _ => false,
+        },
+        LatticeVMSymbolicExpr::Variable(v) => {
+            *acc.entry(v.index).or_insert(0) += sign;
+            true
+        }
+        LatticeVMSymbolicExpr::Constant(k) => {
+            *constant += sign * (k.as_canonical_u32(prime) as i64);
+            true
+        }
+        _ => false,
+    }
+}
+
 pub fn detect_mod_256_constraint(
     constraint: &LatticeVMSymbolicExpr,
     prime: u32,

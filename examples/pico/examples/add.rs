@@ -97,10 +97,13 @@ fn main() -> Result<(), io::Error> {
     println!("operand_1: {:?}", colmap.values[0].operand_1);
     println!("operand_2: {:?}", colmap.values[0].operand_2);
 
-    let (tv_constraints, mut refinable_cols, mut range_types) = extract_constraints_and_range::<
-        KoalaBear,
-        AddSubChip<KoalaBear>,
-    >(&air, NUM_ADD_SUB_COLS, prime);
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
+        extract_constraints_and_range::<KoalaBear, AddSubChip<KoalaBear>>(
+            &air,
+            NUM_ADD_SUB_COLS,
+            prime,
+        );
+    println!("General: {:?}", general_lookup_info);
 
     for t in &tv_constraints {
         println!("#### {}", t);
