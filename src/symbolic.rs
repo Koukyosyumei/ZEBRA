@@ -780,70 +780,60 @@ pub fn refine_conditional_constraints_var_sub_var(
 //   ⌊(h - amin) / d
 // ]
 
-pub fn detect_mod_256_constraint(
-    constraint: &LatticeVMSymbolicExpr,
+pub fn detect_abir_constraint(
+    constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
-    range_types: &HashMap<usize, RangeType>,
-) -> Option<(usize, Box<LatticeVMSymbolicExpr>, usize, u32)> {
-    // constraint = a - (b - c*256)
-    let (a, inner) = match constraint {
-        LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
-        _ => return None,
-    };
+) -> Vec<(usize, Box<LatticeVMSymbolicExpr>, usize, u32)> {
+    let mut abir_constraints = Vec::new();
 
-    // a is variable
-    let a_index = match &**a {
-        LatticeVMSymbolicExpr::Variable(v) => v.index,
-        _ => return None,
-    };
+    for constraint in constraints {
+        // constraint = a - (b - c*256)
+        let (a, inner) = match constraint {
+            LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
+            _ => continue,
+        };
 
-    // a ∈ [0,255]
-    match range_types.get(&a_index) {
-        Some(RangeType::U8) => {}
-        _ => return None,
+        // a is variable
+        let a_index = match &**a {
+            LatticeVMSymbolicExpr::Variable(v) => v.index,
+            _ => continue,
+        };
+
+        // inner = b - c*256
+        let (b, c_mul) = match &**inner {
+            LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
+            _ => continue,
+        };
+
+        // c_mul = c * coeff or coeff * c
+        let (c_index, c_coeff) = match &**c_mul {
+            LatticeVMSymbolicExpr::Mul(x, y) => match (&**x, &**y) {
+                (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Constant(k))
+                | (LatticeVMSymbolicExpr::Constant(k), LatticeVMSymbolicExpr::Variable(v)) => {
+                    (v.index, k.as_canonical_u32(prime))
+                }
+                _ => continue,
+            },
+            LatticeVMSymbolicExpr::Variable(v) => (v.index, 1),
+            _ => continue,
+        };
+
+        if c_coeff > 0 {
+            abir_constraints.push((a_index, b.clone(), c_index, c_coeff));
+        }
     }
 
-    // inner = b - c*256
-    let (b, c_mul) = match &**inner {
-        LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
-        _ => return None,
-    };
-
-    // c_mul = c * coeff or coeff * c
-    let (c_index, c_coeff) = match &**c_mul {
-        LatticeVMSymbolicExpr::Mul(x, y) => match (&**x, &**y) {
-            (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Constant(k))
-            | (LatticeVMSymbolicExpr::Constant(k), LatticeVMSymbolicExpr::Variable(v)) => {
-                (v.index, k.as_canonical_u32(prime))
-            }
-            _ => return None,
-        },
-        LatticeVMSymbolicExpr::Variable(v) => (v.index, 1),
-        _ => return None,
-    };
-
-    if c_coeff == 0 {
-        None
-    } else {
-        Some((a_index, b.clone(), c_index, c_coeff))
-    }
+    abir_constraints
 }
 
 pub fn refine_trace_with_carry(
     trace: &mut AbstractTrace,
-    constraints: &[LatticeVMSymbolicExpr],
-    range_types: &HashMap<usize, RangeType>,
+    abir_constraints: &Vec<(usize, Box<LatticeVMSymbolicExpr>, usize, u32)>,
     prime: u32,
 ) -> (MayBeFlag, Vec<(AbstractInterval, AbstractInterval)>) {
     let mut logs = vec![];
 
-    for constraint in constraints {
-        let Some((a_idx, b_expr, c_idx, c_coeff)) =
-            detect_mod_256_constraint(constraint, prime, range_types)
-        else {
-            continue;
-        };
-
+    for (a_idx, b_expr, c_idx, c_coeff) in abir_constraints {
         let num_steps = trace.data.len();
         for i in 0..num_steps {
             let (first, second) = trace.data.split_at_mut(i + 1);
@@ -864,23 +854,23 @@ pub fn refine_trace_with_carry(
             );
 
             // c = floor(b - a / 256)
-            let c_interval = (b_interval.clone() - row[a_idx].clone()).div_floor(c_coeff as i64);
+            let c_interval = (b_interval.clone() - row[*a_idx].clone()).div_floor(*c_coeff as i64);
 
             // a = b - 256*c
             let a_interval =
-                b_interval - (c_interval.clone() * AbstractInterval::from_i64(c_coeff as i64));
+                b_interval - (c_interval.clone() * AbstractInterval::from_i64(*c_coeff as i64));
 
             // refine
-            if let Some(new_c_interval) = row[c_idx].intersect(&c_interval) {
-                logs.push((row[c_idx].clone(), new_c_interval.clone()));
-                row[c_idx] = new_c_interval;
+            if let Some(new_c_interval) = row[*c_idx].intersect(&c_interval) {
+                logs.push((row[*c_idx].clone(), new_c_interval.clone()));
+                row[*c_idx] = new_c_interval;
             } else {
                 return (MayBeFlag::False, logs);
             }
 
-            if let Some(new_a_interval) = row[a_idx].intersect(&a_interval) {
-                logs.push((row[a_idx].clone(), new_a_interval.clone()));
-                row[a_idx] = new_a_interval;
+            if let Some(new_a_interval) = row[*a_idx].intersect(&a_interval) {
+                logs.push((row[*a_idx].clone(), new_a_interval.clone()));
+                row[*a_idx] = new_a_interval;
             } else {
                 return (MayBeFlag::False, logs);
             }
