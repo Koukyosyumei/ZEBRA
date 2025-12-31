@@ -6,6 +6,8 @@ pub enum OpALU {
     Add,
     Sub,
     Mul,
+    MulH,
+    MulHU,
     And,
     Or,
     Xor,
@@ -60,7 +62,21 @@ pub fn get_alu_constraint(
         ),
         OpALU::Mul => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Add(
+            Box::new(LatticeVMSymbolicExpr::MulLo(
+                Box::new(b_word.clone()),
+                Box::new(c_word),
+            )),
+        ),
+        OpALU::MulH => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::MulHiSS(
+                Box::new(b_word.clone()),
+                Box::new(c_word),
+            )),
+        ),
+        OpALU::MulHU => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::MulHiUU(
                 Box::new(b_word.clone()),
                 Box::new(c_word),
             )),

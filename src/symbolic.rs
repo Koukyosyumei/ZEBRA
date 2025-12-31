@@ -61,6 +61,9 @@ pub enum LatticeVMSymbolicExpr {
     Add(Box<Self>, Box<Self>),
     Sub(Box<Self>, Box<Self>),
     Mul(Box<Self>, Box<Self>),
+    MulLo(Box<Self>, Box<Self>),
+    MulHiSS(Box<Self>, Box<Self>),
+    MulHiUU(Box<Self>, Box<Self>),
     And(Box<Self>, Box<Self>),
     Or(Box<Self>, Box<Self>),
     Xor(Box<Self>, Box<Self>),
@@ -252,6 +255,9 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Add(x, y) => write!(f, "({} + {})", x, y),
             Self::Sub(x, y) => write!(f, "({} - {})", x, y),
             Self::Mul(x, y) => write!(f, "({} * {})", x, y),
+            Self::MulLo(x, y) => write!(f, "({} *_lo {})", x, y),
+            Self::MulHiSS(x, y) => write!(f, "({} *_hiss {})", x, y),
+            Self::MulHiUU(x, y) => write!(f, "({} *_hiuu {})", x, y),
             Self::Neg(x) => write!(f, "-{}", x),
             Self::Flip(x) => write!(f, "~{}", x),
             Self::And(x, y) => write!(f, "({} && {})", x, y),
@@ -439,6 +445,72 @@ impl LatticeVMSymbolicExpr {
                         prime,
                     )
                 }
+            }
+            Self::MulLo(a, b) => {
+                let full = a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                ) * b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                );
+                full.modulo(4294967296)
+            }
+            Self::MulHiSS(a, b) => {
+                let sa = a
+                    .eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                    .to_signed(32);
+                let sb = b
+                    .eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                    .to_signed(32);
+                (sa * sb).div_floor(2 ^ 32)
+            }
+            Self::MulHiUU(a, b) => {
+                let ua = a.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                );
+                let ub = b.eval(
+                    curr_row,
+                    next_row,
+                    public_vals,
+                    is_first_row,
+                    is_transition,
+                    is_last_row,
+                    prime,
+                );
+                (ua * ub).div_floor(2 ^ 32)
             }
             Self::Neg(a) => -a.eval(
                 curr_row,
