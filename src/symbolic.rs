@@ -751,66 +751,40 @@ pub fn refine_conditional_constraints_var_sub_var(
     MayBeFlag::MayBe
 }
 
-pub fn collect_linear(
-    expr: &LatticeVMSymbolicExpr,
-    sign: i64,
-    acc: &mut HashMap<usize, i64>,
-    constant: &mut i64,
-    prime: u32,
-    row: &Vec<AbstractInterval>,
-) -> bool {
-    match expr {
-        LatticeVMSymbolicExpr::Add(a, b) => {
-            collect_linear(a, sign, acc, constant, prime, row)
-                && collect_linear(b, sign, acc, constant, prime, row)
-        }
-        LatticeVMSymbolicExpr::Sub(a, b) => {
-            collect_linear(a, sign, acc, constant, prime, row)
-                && collect_linear(b, -sign, acc, constant, prime, row)
-        }
-        LatticeVMSymbolicExpr::Mul(a, b) => match (&**a, &**b) {
-            (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Constant(k))
-            | (LatticeVMSymbolicExpr::Constant(k), LatticeVMSymbolicExpr::Variable(v)) => {
-                *acc.entry(v.index).or_insert(0) += sign * (k.as_canonical_u32(prime) as i64);
-                true
-            }
-            (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Variable(k)) => {
-                if row[v.index].is_singleton() && !row[k.index].is_singleton() {
-                    *acc.entry(k.index).or_insert(0) +=
-                        sign * (row[v.index].as_canonical_u32(prime) as i64);
-                    return true;
-                } else if !row[v.index].is_singleton() && row[k.index].is_singleton() {
-                    *acc.entry(v.index).or_insert(0) +=
-                        sign * (row[k.index].as_canonical_u32(prime) as i64);
-                    return true;
-                } else if row[v.index].is_singleton() && row[k.index].is_singleton() {
-                    *constant += sign
-                        * (row[v.index].as_canonical_u32(prime)
-                            + row[k.index].as_canonical_u32(prime))
-                            as i64;
-                    return true;
-                }
-                false
-            }
-            _ => false,
-        },
-        LatticeVMSymbolicExpr::Variable(v) => {
-            *acc.entry(v.index).or_insert(0) += sign;
-            true
-        }
-        LatticeVMSymbolicExpr::Constant(k) => {
-            *constant += sign * (k.as_canonical_u32(prime) as i64);
-            true
-        }
-        _ => false,
-    }
-}
+//   a = L - de
+//   d \in [d, d]
+//   a \in [0, d - 1]
+//   L \in [l, h]
+//   a, b \notin FV(L)
+// ----------------------------------------
+//   e \in [[(l - (d - 1)) / d], [h / d]]
+//
+// *Proof*
+//   0 <= L - de <= d - 1
+//   L - (d - 1) <= de <= L
+//   (L - (d - 1) / d) <= e <= L / d
+//   (l - (d - 1)) / d <= e <= h / d
+
+//   **Generalized Version**
+// Affine Backward Interval Refinement (ABIR)
+//
+// a = L - d e
+// d ∈ ℕ, d > 0
+// a ∈ [amin, amax]
+// L ∈ [ℓ, h]
+// a, e ∉ FV(L)
+// ----------------------------------------
+// e :=
+// e ∧ [
+//   ⌊(ℓ - amax) / d ,
+//   ⌊(h - amin) / d
+// ]
 
 pub fn detect_mod_256_constraint(
     constraint: &LatticeVMSymbolicExpr,
     prime: u32,
     range_types: &HashMap<usize, RangeType>,
-) -> Option<(usize, Box<LatticeVMSymbolicExpr>, usize)> {
+) -> Option<(usize, Box<LatticeVMSymbolicExpr>, usize, u32)> {
     // constraint = a - (b - c*256)
     let (a, inner) = match constraint {
         LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
@@ -835,23 +809,24 @@ pub fn detect_mod_256_constraint(
         _ => return None,
     };
 
-    // c_mul = c * 256 or 256 * c
-    let c_index = match &**c_mul {
+    // c_mul = c * coeff or coeff * c
+    let (c_index, c_coeff) = match &**c_mul {
         LatticeVMSymbolicExpr::Mul(x, y) => match (&**x, &**y) {
             (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Constant(k))
             | (LatticeVMSymbolicExpr::Constant(k), LatticeVMSymbolicExpr::Variable(v)) => {
-                if k.as_canonical_u32(prime) == 256 {
-                    v.index
-                } else {
-                    return None;
-                }
+                (v.index, k.as_canonical_u32(prime))
             }
             _ => return None,
         },
+        LatticeVMSymbolicExpr::Variable(v) => (v.index, 1),
         _ => return None,
     };
 
-    Some((a_index, b.clone(), c_index))
+    if c_coeff == 0 {
+        None
+    } else {
+        Some((a_index, b.clone(), c_index, c_coeff))
+    }
 }
 
 pub fn refine_trace_with_carry(
@@ -863,7 +838,7 @@ pub fn refine_trace_with_carry(
     let mut logs = vec![];
 
     for constraint in constraints {
-        let Some((a_idx, b_expr, c_idx)) =
+        let Some((a_idx, b_expr, c_idx, c_coeff)) =
             detect_mod_256_constraint(constraint, prime, range_types)
         else {
             continue;
@@ -888,11 +863,12 @@ pub fn refine_trace_with_carry(
                 prime,
             );
 
-            // c = floor(b / 256)
-            let c_interval = b_interval.div_floor(256);
+            // c = floor(b - a / 256)
+            let c_interval = (b_interval.clone() - row[a_idx].clone()).div_floor(c_coeff as i64);
 
             // a = b - 256*c
-            let a_interval = b_interval - (c_interval.clone() * AbstractInterval::from_i64(256));
+            let a_interval =
+                b_interval - (c_interval.clone() * AbstractInterval::from_i64(c_coeff as i64));
 
             // refine
             if let Some(new_c_interval) = row[c_idx].intersect(&c_interval) {
