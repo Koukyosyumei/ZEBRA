@@ -73,6 +73,56 @@ pub enum LatticeVMSymbolicExpr {
     Flip(Box<Self>),
 }
 
+pub fn gather_vars_simple(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize>) {
+    match expr {
+        LatticeVMSymbolicExpr::Variable(lattice_vmsymbolic_val) => {
+            memo.insert(lattice_vmsymbolic_val.index);
+        }
+        LatticeVMSymbolicExpr::Add(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Sub(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Mul(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+        }
+        LatticeVMSymbolicExpr::And(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Or(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Xor(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Lt(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::SRL(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::Msb(lattice_vmsymbolic_expr) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+        }
+        LatticeVMSymbolicExpr::Flip(lattice_vmsymbolic_expr) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+        }
+        _ => {}
+    }
+}
+
 pub fn gather_vars(
     row_index: usize,
     expr: &LatticeVMSymbolicExpr,
@@ -794,34 +844,42 @@ pub fn move_sub_expr_to_right(expr: &LatticeVMSymbolicExpr) -> LatticeVMSymbolic
 //   ⌊(h - amin) / d
 // ]
 
-pub fn detect_abir_constraint(
+#[derive(Debug, Clone)]
+pub struct AbirConstraint {
+    pub lhs_var: usize,                         // a
+    pub affine_rhs: Box<LatticeVMSymbolicExpr>, // L
+    pub quotient_var: usize,                    // e
+    pub stride: u32,                            // d > 0
+}
+
+pub fn detect_abir_constraints(
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
-) -> Vec<(usize, Box<LatticeVMSymbolicExpr>, usize, u32)> {
-    let mut abir_constraints = Vec::new();
+) -> Vec<AbirConstraint> {
+    let mut result = Vec::new();
 
     for constraint in constraints {
-        // constraint = a - (b - c*256)
-        let (a, inner) = match &*constraint {
+        // Expect: a - RHS
+        let (lhs, rhs) = match constraint {
             LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
             _ => continue,
         };
 
-        // a is variable
-        let a_index = match &**a {
+        let lhs_var = match &**lhs {
             LatticeVMSymbolicExpr::Variable(v) => v.index,
             _ => continue,
         };
 
-        let inner = move_sub_expr_to_right(&inner);
-        // inner = b - c*256
-        let (b, c_mul) = match inner {
+        // Normalize RHS: (L - d*e)
+        let normalized_rhs = move_sub_expr_to_right(rhs);
+
+        let (affine_rhs, de_term) = match normalized_rhs {
             LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
             _ => continue,
         };
 
-        // c_mul = c * coeff or coeff * c
-        let (c_index, c_coeff) = match &*c_mul {
+        // Match d * e
+        let (quotient_var, stride) = match &*de_term {
             LatticeVMSymbolicExpr::Mul(x, y) => match (&**x, &**y) {
                 (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Constant(k))
                 | (LatticeVMSymbolicExpr::Constant(k), LatticeVMSymbolicExpr::Variable(v)) => {
@@ -833,59 +891,69 @@ pub fn detect_abir_constraint(
             _ => continue,
         };
 
-        if c_coeff > 0 {
-            abir_constraints.push((a_index, b.clone(), c_index, c_coeff));
+        if stride == 0 {
+            continue;
         }
+
+        // Side condition: a, e ∉ FV(L)
+        let mut free_vars = HashSet::new();
+        gather_vars_simple(&affine_rhs, &mut free_vars);
+
+        if free_vars.contains(&lhs_var) || free_vars.contains(&quotient_var) {
+            continue;
+        }
+
+        result.push(AbirConstraint {
+            lhs_var,
+            affine_rhs: affine_rhs.clone(),
+            quotient_var,
+            stride,
+        });
     }
 
-    abir_constraints
+    result
 }
 
-pub fn refine_trace_with_carry(
+pub fn apply_abir_refinement(
     trace: &mut AbstractTrace,
-    abir_constraints: &Vec<(usize, Box<LatticeVMSymbolicExpr>, usize, u32)>,
+    constraints: &[AbirConstraint],
     prime: u32,
 ) -> (MayBeFlag, Vec<(AbstractInterval, AbstractInterval)>) {
-    let mut logs = vec![];
+    let mut logs = Vec::new();
 
-    for (a_idx, b_expr, c_idx, c_coeff) in abir_constraints {
+    for constraint in constraints {
+        let AbirConstraint {
+            lhs_var,
+            affine_rhs,
+            quotient_var,
+            stride,
+        } = constraint;
+
         let num_steps = trace.data.len();
-        for i in 0..num_steps {
-            let (first, second) = trace.data.split_at_mut(i + 1);
-            let row = &mut first[first.len() - 1];
-            let next_row: Option<&[AbstractInterval]> = if second.len() > 0 {
-                Some(&second[0])
-            } else {
-                None
-            };
-            let b_interval = b_expr.eval(
+
+        for step in 0..num_steps {
+            let (past, future) = trace.data.split_at_mut(step + 1);
+            let row = &mut past[past.len() - 1];
+            let next_row = future.first().map(|r| &r[..]);
+
+            // Evaluate L
+            let rhs_interval = affine_rhs.eval(
                 row,
                 next_row,
                 None,
-                i == 0,
-                i < num_steps - 1,
-                i == num_steps - 1,
+                step == 0,
+                step + 1 < num_steps,
+                step + 1 == num_steps,
                 prime,
             );
 
-            // c = floor(b - a / 256)
-            let c_interval = (b_interval.clone() - row[*a_idx].clone()).div_floor(*c_coeff as i64);
+            // Weak ABIR:
+            //   e ∈ floor((L - a) / d)
+            let inferred_e = (rhs_interval - row[*lhs_var].clone()).div_floor(*stride as i64);
 
-            // a = b - 256*c
-            let a_interval =
-                b_interval - (c_interval.clone() * AbstractInterval::from_i64(*c_coeff as i64));
-
-            // refine
-            if let Some(new_c_interval) = row[*c_idx].intersect(&c_interval) {
-                logs.push((row[*c_idx].clone(), new_c_interval.clone()));
-                row[*c_idx] = new_c_interval;
-            } else {
-                return (MayBeFlag::False, logs);
-            }
-
-            if let Some(new_a_interval) = row[*a_idx].intersect(&a_interval) {
-                logs.push((row[*a_idx].clone(), new_a_interval.clone()));
-                row[*a_idx] = new_a_interval;
+            if let Some(refined) = row[*quotient_var].intersect(&inferred_e) {
+                logs.push((row[*quotient_var].clone(), refined.clone()));
+                row[*quotient_var] = refined;
             } else {
                 return (MayBeFlag::False, logs);
             }
