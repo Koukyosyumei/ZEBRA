@@ -751,6 +751,20 @@ pub fn refine_conditional_constraints_var_sub_var(
     MayBeFlag::MayBe
 }
 
+pub fn move_sub_expr_to_right(expr: &LatticeVMSymbolicExpr) -> LatticeVMSymbolicExpr {
+    // (a - c) + b ==> (a + b) - c
+    if let LatticeVMSymbolicExpr::Add(lhs_1, rhs_1) = expr {
+        if let LatticeVMSymbolicExpr::Sub(lhs_2, rhs_2) = *lhs_1.clone() {
+            return LatticeVMSymbolicExpr::Sub(
+                Box::new(LatticeVMSymbolicExpr::Add(lhs_2, rhs_1.clone())),
+                rhs_2,
+            );
+        }
+    }
+
+    expr.clone()
+}
+
 //   a = L - de
 //   d \in [d, d]
 //   a \in [0, d - 1]
@@ -788,7 +802,7 @@ pub fn detect_abir_constraint(
 
     for constraint in constraints {
         // constraint = a - (b - c*256)
-        let (a, inner) = match constraint {
+        let (a, inner) = match &*constraint {
             LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
             _ => continue,
         };
@@ -799,14 +813,15 @@ pub fn detect_abir_constraint(
             _ => continue,
         };
 
+        let inner = move_sub_expr_to_right(&inner);
         // inner = b - c*256
-        let (b, c_mul) = match &**inner {
+        let (b, c_mul) = match inner {
             LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
             _ => continue,
         };
 
         // c_mul = c * coeff or coeff * c
-        let (c_index, c_coeff) = match &**c_mul {
+        let (c_index, c_coeff) = match &*c_mul {
             LatticeVMSymbolicExpr::Mul(x, y) => match (&**x, &**y) {
                 (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Constant(k))
                 | (LatticeVMSymbolicExpr::Constant(k), LatticeVMSymbolicExpr::Variable(v)) => {
