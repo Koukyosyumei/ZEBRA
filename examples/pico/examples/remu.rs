@@ -30,7 +30,7 @@ const fn make_col_map() -> DivRemCols<usize> {
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::DIV, 1, 13, 3, true, true)];
+    let instructions = vec![Instruction::new(Opcode::REMU, 1, 13, 3, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
