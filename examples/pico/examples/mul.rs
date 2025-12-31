@@ -13,8 +13,9 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, registe
 
 use latticevm::quick::quick_api;
 use latticevm::solver::RangeType;
-use latticevm::ui::UiState;
+use latticevm::ui::{generate_alu_final_checker, UiState};
 use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::GeneralLookupInfo;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_pico::lookup::get_symbolic_lookup_constraints;
@@ -22,47 +23,6 @@ use latticevm_pico::utils::{
     dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
-
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let string_representation = format!(
-        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
-        trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-    );
-
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
-}
 
 const fn make_col_map() -> MulCols<usize> {
     let indices_arr = indices_arr::<{ NUM_MUL_COLS }>();
@@ -96,32 +56,18 @@ fn main() -> Result<(), io::Error> {
     println!("output: {:?}", colmap.values[0].a);
     println!("operand_1: {:?}", colmap.values[0].b);
     println!("operand_2: {:?}", colmap.values[0].c);
-    println!("carry: {:?}", colmap.values[0].carry);
-    println!("product: {:?}", colmap.values[0].product);
-    println!("b_msb: {:?}", colmap.values[0].b_msb);
-    println!("c_msb: {:?}", colmap.values[0].c_msb);
-    println!("b_sign_extend: {:?}", colmap.values[0].b_sign_extend);
-    println!("c_sign_extend: {:?}", colmap.values[0].c_sign_extend);
 
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MulChip<KoalaBear>>(&air, NUM_MUL_COLS, prime);
+    println!("General: {:?}", general_lookup_info);
+
+    let final_check = generate_alu_final_checker(general_lookup_info.clone());
+    refinable_cols.extend(&general_lookup_info.alu_output);
 
     for t in &tv_constraints {
         println!("#### {}", t);
     }
 
-    refinable_cols.extend(&[0, 1, 2, 3]);
-
-    for r in &refinable_cols {
-        if !range_types.contains_key(r) {
-            println!("-----------#################: {}", r);
-        }
-    }
-
-    /*refinable_cols.extend(&[2, 3, 4, 5]); // output
-    refinable_cols.extend(&[9, 13]); // input
-    range_types.insert(9, RangeType::U4);
-    range_types.insert(13, RangeType::U4);*/
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 

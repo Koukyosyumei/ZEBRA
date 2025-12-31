@@ -50,3 +50,10 @@ pub fn create_or_clear_dir(path: &str) -> std::io::Result<()> {
     fs::create_dir_all(p)?;
     Ok(())
 }
+
+#[derive(Default, Debug, Clone)]
+pub struct GeneralLookupInfo {
+    pub alu_output: Vec<usize>,
+    pub alu_input1: Vec<usize>,
+    pub alu_input2: Vec<usize>,
+}

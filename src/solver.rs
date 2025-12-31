@@ -13,9 +13,9 @@ use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::symbolic::{
-    detect_conditional_var_sub_const_constraints, detect_conditional_var_sub_var_constraints,
-    refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
-    refine_trace_with_carry,
+    apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
+    detect_conditional_var_sub_var_constraints, refine_conditional_constraints_var_sub_const,
+    refine_conditional_constraints_var_sub_var,
 };
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
@@ -111,6 +111,7 @@ where
         detect_conditional_var_sub_const_constraints(&constraints.air_constraints, prime);
     let conditional_var_sub_var_constraints =
         detect_conditional_var_sub_var_constraints(&constraints.air_constraints);
+    let abir_constraints = detect_abir_constraints(&constraints.air_constraints, prime);
 
     let mut num_unsatisfied_trial = 0;
     let mut cumulative_priority = 0;
@@ -167,12 +168,7 @@ where
             continue;
         }
 
-        let (aux_flag, _aux_log) = refine_trace_with_carry(
-            &mut main_trace,
-            &constraints.air_constraints,
-            range_types,
-            prime,
-        );
+        let (aux_flag, _aux_log) = apply_abir_refinement(&mut main_trace, &abir_constraints, prime);
         if let MayBeFlag::False = aux_flag {
             continue;
         }
