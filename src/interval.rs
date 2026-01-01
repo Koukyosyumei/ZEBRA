@@ -407,6 +407,46 @@ impl AbstractInterval {
             ]
         }
     }
+
+    pub fn modulo(&self, m: i64) -> Self {
+        if self.lo >= 0 && self.hi < m {
+            self.clone()
+        } else if self.lo == self.hi {
+            if m == 0 {
+                println!("############### {:?}", m);
+            }
+            // let v = self.lo.rem_euclid(m);
+            let v = self.lo % m;
+            Self { lo: v, hi: v }
+        } else {
+            Self { lo: 0, hi: m - 1 }
+        }
+    }
+
+    pub fn to_signed(&self, bits: u32) -> Self {
+        let bound = 1_i64 << bits;
+        let half = bound >> 1;
+
+        if self.lo == self.hi {
+            let v = self.lo.rem_euclid(bound);
+            let sv = if v < half { v } else { v - bound };
+            return Self { lo: sv, hi: sv };
+        }
+
+        if self.hi < half {
+            self.clone()
+        } else if self.lo >= half {
+            Self {
+                lo: self.lo - bound,
+                hi: self.hi - bound,
+            }
+        } else {
+            Self {
+                lo: -half,
+                hi: half - 1,
+            }
+        }
+    }
 }
 
 pub fn msb_u8(b: u8) -> bool {

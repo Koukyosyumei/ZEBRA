@@ -149,6 +149,8 @@ where
                     (Opcode::ADD as u8, OpALU::Add),
                     (Opcode::SUB as u8, OpALU::Sub),
                     (Opcode::MUL as u8, OpALU::Mul),
+                    (Opcode::MULH as u8, OpALU::MulH),
+                    (Opcode::MULHU as u8, OpALU::MulHU),
                     (Opcode::SLT as u8, OpALU::Lt),
                     (Opcode::AND as u8, OpALU::And),
                     (Opcode::OR as u8, OpALU::Or),
