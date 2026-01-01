@@ -38,10 +38,12 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     lookup_constraints: &mut Vec<LatticeVMSymbolicExpr>,
     received_vars_from_cpu: &mut HashSet<usize>,
     prime: u32,
-) where
+) -> GeneralLookupInfo
+where
     F: p3_field::PrimeField32,
     A: Air<LookupBuilder<F>>,
 {
+    let mut general_lookup_info = GeneralLookupInfo::default();
     let mut builder = LookupBuilder::new(preprocessed_width, air.width());
     air.eval(&mut builder);
     let (sends, receives) = builder.lookups();
@@ -91,6 +93,25 @@ pub fn get_symbolic_lookup_constraints<F, A>(
                 let c1 = &r.values[16];
                 let c2 = &r.values[17];
                 let c3 = &r.values[18];
+
+                for i in 7..11 {
+                    add_single_var_col_if_possible(
+                        &r.values[i],
+                        &mut general_lookup_info.alu_output,
+                    );
+                }
+                for i in 11..15 {
+                    add_single_var_col_if_possible(
+                        &r.values[i],
+                        &mut general_lookup_info.alu_input1,
+                    );
+                }
+                for i in 15..19 {
+                    add_single_var_col_if_possible(
+                        &r.values[i],
+                        &mut general_lookup_info.alu_input2,
+                    );
+                }
 
                 let hi0 = &r.values[19];
                 let hi1 = &r.values[20];
@@ -246,4 +267,6 @@ pub fn get_symbolic_lookup_constraints<F, A>(
             _ => {}
         }
     }
+
+    general_lookup_info
 }
