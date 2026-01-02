@@ -18,10 +18,14 @@ use latticevm::alu::OpALU;
 use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
+use latticevm::utils::GeneralLookupInfo;
 
 use crate::p3_to_tv::convert_p3_expr;
 
-pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+pub fn add_single_var_col_if_possible<F: PrimeField32>(
+    b: &VirtualPairCol<F>,
+    u8_cols: &mut Vec<usize>,
+) {
     if !b.column_weights.is_empty() {
         if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
             u8_cols.push(col_idx);
@@ -175,7 +179,7 @@ where
 
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 7..19 {
-                            add_u8_col_if_possible(&s.values[i], u8_cols);
+                            add_single_var_col_if_possible(&s.values[i], u8_cols);
                         }
 
                         lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
@@ -212,9 +216,9 @@ where
                 let c = &s.values[4];
 
                 // Range U8
-                add_u8_col_if_possible(&b, u8_cols);
-                add_u8_col_if_possible(&c, u8_cols);
-                add_u8_col_if_possible(&a1, u8_cols);
+                add_single_var_col_if_possible(&b, u8_cols);
+                add_single_var_col_if_possible(&c, u8_cols);
+                add_single_var_col_if_possible(&a1, u8_cols);
 
                 let a1_expr = convert_p3_virtual_pair_col(&a1);
                 let b_expr = convert_p3_virtual_pair_col(&b);

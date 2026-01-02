@@ -16,6 +16,7 @@ use latticevm::solver::RangeType;
 use latticevm::symbolic::gather_vars;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
+use latticevm::utils::GeneralLookupInfo;
 use latticevm::{
     interval::AbstractInterval, symbolic::gather_boolean_variables, symbolic::AbstractTrace,
 };
@@ -56,6 +57,7 @@ pub fn extract_constraints_and_range<F, A>(
     Vec<LatticeVMSymbolicExpr>,
     Vec<usize>,
     HashMap<usize, RangeType>,
+    GeneralLookupInfo,
 )
 where
     F: p3_field::PrimeField32,
@@ -68,7 +70,7 @@ where
 
     let symbolic_constraints: Vec<SymbolicExpression<F>> =
         get_symbolic_constraints(air, 0, ZKM_PROOF_NUM_PV_ELTS);
-    get_symbolic_lookup_constraints::<F, A>(
+    let general_lookup_info = get_symbolic_lookup_constraints::<F, A>(
         air,
         0,
         ZKM_PROOF_NUM_PV_ELTS,
@@ -135,7 +137,12 @@ where
         range_types.insert(*c, RangeType::U8);
     }
 
-    (tv_constraints, refinable_cols, range_types)
+    (
+        tv_constraints,
+        refinable_cols,
+        range_types,
+        general_lookup_info,
+    )
 }
 
 pub const fn indices_arr<const N: usize>() -> [usize; N] {

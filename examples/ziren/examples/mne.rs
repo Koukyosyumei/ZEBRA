@@ -110,7 +110,7 @@ fn main() -> Result<(), io::Error> {
     println!("op_c_value: {:?}", colmap.op_c_value);
     println!("c_eq_0: {:?}", colmap.c_eq_0);
 
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MovCondChip>(&air, NUM_MOV_COND_COLS, prime);
     refinable_cols.extend(&[2, 3, 4, 5]); // output
                                           //refinable_cols.extend(&[10, 14]); // input

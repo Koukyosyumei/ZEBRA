@@ -120,7 +120,7 @@ fn main() -> Result<(), io::Error> {
     println!("op_b_value: {:?}", colmap.op_b_value);
     println!("op_c_value: {:?}", colmap.op_c_value);
 
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
     refinable_cols.extend(&[19, 20, 21, 22, 37, 38, 39, 40]); // output
     range_types.insert(37, RangeType::U8);

@@ -108,7 +108,7 @@ fn main() -> Result<(), io::Error> {
     bb: Word([10, 11, 12, 13])
          */
 
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CloClzChip>(&air, NUM_CLOCLZ_COLS, prime);
     //refinable_cols.extend(&[2, 3, 4, 5]); // output
     // refinable_cols.extend(&[6, 10]); // input

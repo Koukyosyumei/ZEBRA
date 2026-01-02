@@ -19,6 +19,7 @@ use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
 use latticevm::solver::RangeType;
+use latticevm::ui::generate_alu_final_checker;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
@@ -27,53 +28,6 @@ use latticevm_ziren::utils::{
     dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
-
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let string_representation = format!(
-        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
-        trace.data[0][12],
-        trace.data[0][13],
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][5],
-    );
-
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
-}
-
-/*
-const fn make_col_map() -> BranchColumns<usize> {
-    let indices_arr = indices_arr::<{ NUM_BITWISE_COLS }>();
-    unsafe { transmute::<[usize; NUM_BITWISE_COLS], BranchColumns<usize>>(indices_arr) }
-}*/
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
     let mut instructions = vec![Instruction::new(Opcode::AND, 1, 2, 3, true, true)];
@@ -97,15 +51,12 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = BitwiseChip::default();
     let air_name = "Bitwise";
-    //let colmap = make_col_map();
-    //println!("map: {:?}", colmap);
 
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BitwiseChip>(&air, NUM_BITWISE_COLS, prime);
-    refinable_cols.extend(&[2, 3, 4, 5]); // output
-    refinable_cols.extend(&[6, 10]); // input
-    range_types.insert(6, RangeType::U4);
-    range_types.insert(10, RangeType::U4);
+    let final_check = generate_alu_final_checker(general_lookup_info.clone());
+    refinable_cols.extend(&general_lookup_info.alu_output);
+
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 
