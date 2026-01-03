@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use std::fs;
 use std::io;
 
 use p3_baby_bear::BabyBear;
@@ -14,8 +16,10 @@ use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::quick::quick_api;
+use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
+use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
@@ -76,6 +80,8 @@ fn main() -> Result<(), io::Error> {
             &machine, &air, num_col, prime,
         );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
+    println!("{:?}", general_lookup_info);
+    //let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
 
     for t in &tv_constraints {

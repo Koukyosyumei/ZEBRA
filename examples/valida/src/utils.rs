@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-
 use p3_baby_bear::BabyBear;
 use p3_field::{AbstractField, PrimeField32};
 use p3_matrix::Matrix;
@@ -14,9 +13,7 @@ use valida_machine::symbolic::symbolic_builder::get_lookup_interactions;
 use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
 use valida_machine::ChipWithPersistence;
 use valida_machine::StarkConfig;
-use valida_machine::{
-    InstructionWord, Machine, ProgramROM, SegmentMachine,
-};
+use valida_machine::{InstructionWord, Machine, ProgramROM, SegmentMachine};
 use valida_program::MachineWithProgramROM;
 use valida_program::ProgramTableType;
 
@@ -148,11 +145,14 @@ where
         &mut nested_received_vars_from_cpu,
         &mut multiplicities,
     );
+    println!("{:?}", nested_received_vars_from_cpu);
     let received_vars_from_cpu: Vec<_> = nested_received_vars_from_cpu
         .iter()
+        .skip(1)
         .flatten()
         .cloned()
         .collect();
+    println!("{:?}", received_vars_from_cpu);
     if let [a, b, c, d, e, f, g, h, i, j, k, el] = received_vars_from_cpu.as_slice() {
         general_lookup_info.alu_input1.extend([*a, *b, *c, *d]);
         general_lookup_info.alu_input2.extend([*e, *f, *g, *h]);
