@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use p3_air::Air;
 use p3_baby_bear::BabyBear;
-use p3_field::Field;
 use p3_field::{AbstractField, PrimeField32};
 use p3_matrix::Matrix;
 
@@ -13,15 +11,12 @@ use valida_basic_api::ValidaRuntime;
 use valida_cpu::MachineWithRegisters;
 use valida_machine::symbolic::symbolic_builder::get_lookup_interactions;
 use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
-use valida_machine::BusArgument;
 use valida_machine::{InstructionWord, ProgramROM, SegmentMachine};
 use valida_program::MachineWithProgramROM;
 use valida_program::ProgramTableType;
 
 use valida_machine::{
-    columns::{PermutationColsView, MAX_PERMUTATION_CONSTRAINT_DEGREE},
-    permutation::MAX_PERMUTATION_HEIGHT,
-    ChipWithPersistence, Interaction, InteractionType, Machine, StarkConfig, ValidaAirBuilder,
+    ChipWithPersistence, Machine, StarkConfig, ValidaAirBuilder,
 };
 
 use latticevm::interval::AbstractInterval;
