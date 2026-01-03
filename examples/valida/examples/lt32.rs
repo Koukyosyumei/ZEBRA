@@ -4,14 +4,6 @@ use std::io;
 
 use p3_baby_bear::BabyBear;
 
-use valida_alu_u32::add::columns::ADD_COL_MAP;
-use valida_alu_u32::add::Add32Chip;
-use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction};
-use valida_alu_u32::com::columns::COM_COL_MAP;
-use valida_alu_u32::com::columns::NUM_COM_COLS;
-use valida_alu_u32::com::Com32Chip;
-use valida_alu_u32::com::Eq32Instruction;
-use valida_alu_u32::com::Ne32Instruction;
 use valida_alu_u32::lt::columns::LT_COL_MAP;
 use valida_alu_u32::lt::columns::NUM_LT_COLS;
 use valida_alu_u32::lt::Lt32Chip;
@@ -25,7 +17,6 @@ use valida_opcodes::BYTES_PER_INSTR;
 use latticevm::quick::quick_api;
 use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
-use latticevm::ui::generate_alu_final_checker;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
