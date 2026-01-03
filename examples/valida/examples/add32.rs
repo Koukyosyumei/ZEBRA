@@ -1,8 +1,6 @@
 use std::io;
 
-
 use p3_baby_bear::BabyBear;
-//use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
 
 use valida_alu_u32::add::columns::ADD_COL_MAP;
 use valida_alu_u32::add::Add32Chip;
@@ -10,9 +8,7 @@ use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction};
 use valida_basic_api::BasicMachine;
 use valida_cpu::Imm32Instruction;
 use valida_cpu::StopInstruction;
-use valida_machine::{
-    Instruction, InstructionWord, Operands, StarkField,
-};
+use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::quick::quick_api;
