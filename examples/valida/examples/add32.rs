@@ -81,6 +81,7 @@ use valida_program::ProgramTableType;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
+use latticevm::quick::quick_api;
 use latticevm::solver::run_solver;
 use latticevm::solver::RangeType;
 use latticevm::symbolic::eval_air_constraints;
@@ -88,6 +89,7 @@ use latticevm::symbolic::eval_constraints;
 use latticevm::symbolic::gather_boolean_variables;
 use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
+use latticevm::ui::generate_alu_final_checker;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
@@ -96,11 +98,12 @@ use latticevm_valida::alu_tables::{derive_add_table, derive_com_table, derive_su
 use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
 use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
+use latticevm_valida::utils::extract_constraints_and_range;
 use latticevm_valida::utils::{
     generate_bootstrap_trace_from_program, make_pc_adjuster, refine_pc_interval,
 };
 
-fn program_counter_refine_fn(
+fn dummy_program_counter_refine_fn(
     abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
     program_len: usize,
     i: usize,
@@ -108,47 +111,15 @@ fn program_counter_refine_fn(
 ) {
 }
 
-fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {}
+fn dummy_adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {}
 
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    num_trial: usize,
+pub fn dummy_table_deriver(
+    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    range_types: &HashMap<usize, RangeType>,
     prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let string_representation = format!(
-        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
-    );
-
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+) -> Vec<Vec<AbstractInterval>> {
+    let out = vec![];
+    out
 }
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
@@ -179,6 +150,22 @@ fn main() -> Result<(), io::Error> {
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
+    // ######################## Solver Parameters ###############################
+    let max_iteration = 100000000;
+    let min_row_id = 0;
+    let max_row_id = 0;
+    let num_extracted_rows = 1;
+    let seed = 41;
+    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
+    //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
+
+    // ######################## Public Values ###################################
+    let mut public_vals = vec![AbstractInterval::zero(); 3];
+    public_vals[0] = AbstractInterval::from_i64(0);
+    public_vals[1] = AbstractInterval::from_i64(4096);
+    public_vals[2] = AbstractInterval::from_i64(1);
+    let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
+
     // ######################## Extract Add Constraints ##########################
     println!("ADD AIR MAP");
     println!("  {:?}", ADD_COL_MAP);
@@ -188,99 +175,57 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 3;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (mut alu_constraint, cpu_input_cols) =
-        get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &air, num_col, prime);
-    alu_constraint.aux_refinement_plan.push(cpu_input_cols[0]);
-    alu_constraint.aux_refinement_plan.push(cpu_input_cols[4]);
-    alu_constraint
-        .aux_range_types
-        .insert(cpu_input_cols[0], RangeType::U4);
-    alu_constraint
-        .aux_range_types
-        .insert(cpu_input_cols[4], RangeType::U4);
-    let minimum_num_taregt_cols = alu_constraint.aux_refinement_plan.len();
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
+        extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
+            &machine, &air, num_col, prime,
+        );
+    let final_check = generate_alu_final_checker(general_lookup_info.clone());
+    refinable_cols.extend(&general_lookup_info.alu_output);
 
-    println!("  Target Columns: {:?}", alu_constraint.aux_refinement_plan);
-    println!("  Range Types   : {:?}", alu_constraint.aux_range_types);
+    for t in &tv_constraints {
+        println!("#### {}", t);
+    }
+    println!("{:?}", refinable_cols);
+    println!("{:?}", range_types);
 
-    let aux_objs = vec![];
-    let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
-
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 10000000;
-    let min_row_id = 0;
-    let max_row_id = 0;
-    let seed = 41;
-
-    // Public trace values (example: program start, memory base, initial step)
-    let mut public_vals = vec![AbstractInterval::zero(); 3];
-    public_vals[0] = AbstractInterval::from_i64(0);
-    public_vals[1] = AbstractInterval::from_i64(4096);
-    public_vals[2] = AbstractInterval::from_i64(1);
-    let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
+    let constraints = LatticeVMConstraints {
+        air_constraints: tv_constraints.clone(),
+        pv_pos_constraints: vec![],
+        pv_neg_constraints: vec![],
+    };
+    let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>(3, 4);
-    let program_len = program.len();
-
-    // Convert program to string for UI display
+    //let program_len = program.len();
     let program_str = program
         .iter()
         .map(|inst| format!("{}\n", inst))
         .collect::<String>();
 
-    // Generate initial abstract main trace from program
     let base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
 
-    // ######################## UI Initialization ################################
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let mut ui = UiState::new();
-    ui.program = program_str;
-
-    // ######################## Run Solver ######################################
-    let mut known_solution = HashSet::<String>::new();
-    let mut logs = Vec::new();
-    let start_time = time::Instant::now();
-    run_solver(
-        &alu_constraint.aux_constraints,
-        &alu_constraint.aux_refinement_plan,
-        &alu_constraint.aux_range_types,
-        &aux_objs,
+    // ######################## Solve ############################################
+    quick_api(
+        program_str,
+        &constraints,
+        &refinable_cols,
+        &range_types,
+        &vec![],
         &aux_tg_fns,
-        &refinment_target_indicies_pv,
+        &vec![],
         &base_abs_main_trace_data,
-        public_vals,
+        vec![],
         max_iteration,
         minimum_num_taregt_cols,
         min_row_id,
         max_row_id,
-        program_len,
-        program_counter_refine_fn,
-        adjust_pc_program,
+        program.len(),
+        dummy_program_counter_refine_fn,
+        dummy_adjust_pc_program,
         final_check,
         prime,
         seed,
-        &mut known_solution,
-        &mut logs,
-        &mut ui,
-        &mut terminal,
-    );
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    eprintln!("Execution Time    : {:?}", start_time.elapsed());
-    eprintln!("#Unique Solution  : {}", known_solution.len());
-
-    Ok(())
+    )
 }
