@@ -91,7 +91,7 @@ where
         .iter()
         .map(|sc| convert_p3_expr::<SC::Val>(&sc))
         .collect::<Vec<_>>();
-    let mut multiplicities = HashSet::new();
+    let multiplicities = HashSet::new();
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),

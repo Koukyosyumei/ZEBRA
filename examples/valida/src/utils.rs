@@ -1,50 +1,31 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fs;
-use std::io;
 
-use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::{backend::CrosstermBackend, Terminal};
 
 use p3_baby_bear::BabyBear;
 use p3_field::{AbstractField, PrimeField32};
 use p3_matrix::Matrix;
 
-use valida_alu_u32::add::Add32Instruction;
 use valida_basic_api::BasicMachine;
 use valida_basic_api::BasicMachineMetrics;
 use valida_basic_api::ValidaRuntime;
-use valida_cpu::BneInstruction;
-use valida_cpu::Imm32Instruction;
 use valida_cpu::MachineWithRegisters;
-use valida_cpu::StopInstruction;
-use valida_cpu::{
-    columns::{CPU_COL_MAP, NUM_CPU_COLS},
-    CpuChip,
-};
 use valida_machine::symbolic::symbolic_builder::get_lookup_interactions;
 use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
 use valida_machine::ChipWithPersistence;
 use valida_machine::StarkConfig;
 use valida_machine::{
-    Instruction, InstructionWord, Machine, Operands, ProgramROM, SegmentMachine, StarkField,
+    InstructionWord, Machine, ProgramROM, SegmentMachine,
 };
-use valida_opcodes::BYTES_PER_INSTR;
 use valida_program::MachineWithProgramROM;
 use valida_program::ProgramTableType;
 
 use latticevm::interval::AbstractInterval;
-use latticevm::solver::run_solver;
 use latticevm::solver::RangeType;
 use latticevm::symbolic::gather_boolean_variables;
 use latticevm::symbolic::gather_vars;
 use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::ui::UiState;
 use latticevm::utils::GeneralLookupInfo;
 
 use crate::config::{get_machine_config, prover_options};
@@ -191,7 +172,7 @@ where
     for t in &tv_constraints {
         gather_vars(0, t, &mut used_vars);
     }
-    let mut used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
+    let used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
     refinable_cols.retain(|c| used_var_ids.contains(c));
 
     let multiplicities: HashSet<_> = multiplicities.iter().map(|v| *v).collect();

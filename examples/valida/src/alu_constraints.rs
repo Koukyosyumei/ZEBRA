@@ -14,7 +14,6 @@ use valida_machine::ChipWithPersistence;
 use valida_machine::Machine;
 use valida_machine::StarkConfig;
 
-use latticevm::interval::AbstractInterval;
 use latticevm::solver::AbsConstraintObj;
 use latticevm::solver::RangeType;
 
