@@ -7,12 +7,19 @@ use valida_machine::{
     ChipWithPersistence, InteractionType, Machine, StarkConfig, ValidaAirBuilder,
 };
 
+use latticevm::symbolic::make_impl_constraint;
+use latticevm::symbolic::LatticeVMSymbolicExpr;
+
+use crate::p3_to_tv::convert_p3_virtual_pair_col;
+
 pub fn inspect_lookup_interactions<M, C, SC, AB>(
     chip: &C,
     builder: &mut AB,
     range_u8_cols: &mut Vec<usize>,
     pc_cols: &mut Vec<Vec<usize>>,
     counter_cols: &mut Vec<usize>,
+    lookup_constraints: &mut Vec<LatticeVMSymbolicExpr>,
+    prime: u32,
 ) where
     M: Machine<SC::Val>,
     C: ChipWithPersistence<M, SC> + Air<AB>,
@@ -45,6 +52,40 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    // Lookup with other byte instructions
+                    if id == 3 {
+                        let opcode_condition =
+                            convert_p3_virtual_pair_col(&e_interaction.fields[0]);
+                        let input = convert_p3_virtual_pair_col(&e_interaction.fields[1]);
+                        let output = convert_p3_virtual_pair_col(&e_interaction.fields[2]);
+                        let multiplicities = convert_p3_virtual_pair_col(&e_interaction.count);
+
+                        let ops = [(1, LatticeVMSymbolicExpr::Msb(Box::new(input.clone())))];
+                        for (opcode, op_expr) in ops {
+                            let el_constraint = make_impl_constraint(
+                                opcode,
+                                &opcode_condition,
+                                LatticeVMSymbolicExpr::Sub(
+                                    Box::new(output.clone()),
+                                    Box::new(op_expr),
+                                ),
+                                prime,
+                            );
+                            if let Some(el_constraint) = el_constraint {
+                                lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                                    Box::new(multiplicities.clone()),
+                                    Box::new(el_constraint),
+                                ));
+                            }
+                        }
+                    }
+
+                    for (col, _weight) in &e_interaction.count.column_weights {
+                        if let p3_air::PairCol::Main(col_idx) = col {
+                            counter_cols.push(*col_idx);
                         }
                     }
                 }
@@ -85,6 +126,8 @@ pub fn get_lookup_interactions<M, SC, C>(
     range_u8_cols: &mut Vec<usize>,
     pc_cols: &mut Vec<Vec<usize>>,
     counter_cols: &mut Vec<usize>,
+    lookup_constraints: &mut Vec<LatticeVMSymbolicExpr>,
+    prime: u32,
 ) where
     M: Machine<SC::Val>,
     SC: StarkConfig,
@@ -98,5 +141,13 @@ pub fn get_lookup_interactions<M, SC, C>(
         chip.permutation_width(machine),
     );
 
-    inspect_lookup_interactions(chip, &mut builder, range_u8_cols, pc_cols, counter_cols);
+    inspect_lookup_interactions(
+        chip,
+        &mut builder,
+        range_u8_cols,
+        pc_cols,
+        counter_cols,
+        lookup_constraints,
+        prime,
+    );
 }

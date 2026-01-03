@@ -1,13 +1,15 @@
 use std::collections::HashSet;
 
+use p3_air::PairCol;
+use p3_air::VirtualPairCol;
+use p3_field::PrimeField32;
+
 use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
 use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::symbolic::symbolic_variable::{SymbolicVariable, Trace};
 use valida_machine::ChipWithPersistence;
 use valida_machine::Machine;
 use valida_machine::StarkConfig;
-
-use p3_field::PrimeField32;
 
 use latticevm::symbolic::gather_boolean_variables;
 use latticevm::symbolic::LatticeVMConstraints;
@@ -74,6 +76,60 @@ pub fn convert_p3_expr<F: PrimeField32>(expr: &SymbolicExpression<F>) -> Lattice
             y,
             degree_multiple: _degree_multiple,
         } => LatticeVMSymbolicExpr::Mul(Box::new(convert_p3_expr(x)), Box::new(convert_p3_expr(y))),
+    }
+}
+
+pub fn convert_p3_paircol(pair_col: &PairCol) -> LatticeVMSymbolicVal {
+    match pair_col {
+        PairCol::Preprocessed(_idx) => todo!(),
+        PairCol::Public(_) => todo!(),
+        PairCol::Main(index) => LatticeVMSymbolicVal {
+            entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+            index: *index,
+        },
+    }
+}
+
+fn get_weighted_var<F: PrimeField32>(paircol: &PairCol, weight: &F) -> LatticeVMSymbolicExpr {
+    //if Field::is_one(weight) {
+    //LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))
+    //} else {
+    LatticeVMSymbolicExpr::Mul(
+        Box::new(LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))),
+        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+            weight.as_canonical_u32() as i64,
+        ))),
+    )
+    //}
+}
+
+pub fn convert_p3_virtual_pair_col<F: PrimeField32>(
+    vpair: &VirtualPairCol<F>,
+) -> LatticeVMSymbolicExpr {
+    if vpair.column_weights.is_empty() {
+        LatticeVMSymbolicExpr::Constant(AbstractInterval {
+            lo: vpair.constant.as_canonical_u32() as i64,
+            hi: vpair.constant.as_canonical_u32() as i64,
+        })
+    } else {
+        let mut expr = LatticeVMSymbolicExpr::Constant(AbstractInterval {
+            lo: vpair.constant.as_canonical_u32() as i64,
+            hi: vpair.constant.as_canonical_u32() as i64,
+        }); // get_weighted_var(&vpair.column_weights[0].0, &vpair.column_weights[0].1);
+        for (paircol, w) in vpair.column_weights.iter() {
+            if (w.clone() + F::one()).as_canonical_u32() == 0 {
+                expr = LatticeVMSymbolicExpr::Sub(
+                    Box::new(expr.clone()),
+                    Box::new(get_weighted_var(paircol, &F::one())),
+                );
+            } else {
+                expr = LatticeVMSymbolicExpr::Add(
+                    Box::new(expr.clone()),
+                    Box::new(get_weighted_var(paircol, w)),
+                );
+            }
+        }
+        expr
     }
 }
 
