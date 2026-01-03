@@ -100,27 +100,9 @@ use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
 use latticevm_valida::utils::extract_constraints_and_range;
 use latticevm_valida::utils::{
+    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
     generate_bootstrap_trace_from_program, make_pc_adjuster, refine_pc_interval,
 };
-
-fn dummy_program_counter_refine_fn(
-    abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
-    program_len: usize,
-    i: usize,
-    j: usize,
-) {
-}
-
-fn dummy_adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {}
-
-pub fn dummy_table_deriver(
-    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
-    range_types: &HashMap<usize, RangeType>,
-    prime: u32,
-) -> Vec<Vec<AbstractInterval>> {
-    let out = vec![];
-    out
-}
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
@@ -159,13 +141,6 @@ fn main() -> Result<(), io::Error> {
     let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
     //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
-    // ######################## Public Values ###################################
-    let mut public_vals = vec![AbstractInterval::zero(); 3];
-    public_vals[0] = AbstractInterval::from_i64(0);
-    public_vals[1] = AbstractInterval::from_i64(4096);
-    public_vals[2] = AbstractInterval::from_i64(1);
-    let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
-
     // ######################## Extract Add Constraints ##########################
     println!("ADD AIR MAP");
     println!("  {:?}", ADD_COL_MAP);
@@ -197,7 +172,6 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>(3, 4);
-    //let program_len = program.len();
     let program_str = program
         .iter()
         .map(|inst| format!("{}\n", inst))
