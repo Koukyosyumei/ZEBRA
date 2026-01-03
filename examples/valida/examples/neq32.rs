@@ -83,7 +83,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Eq32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Ne32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
