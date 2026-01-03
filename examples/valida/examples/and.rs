@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_baby_bear::BabyBear;
@@ -15,10 +13,8 @@ use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::quick::quick_api;
-use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
-use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
