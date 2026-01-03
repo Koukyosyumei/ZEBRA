@@ -1,9 +1,8 @@
-
 use p3_air::Air;
 use p3_field::Field;
 
+use valida_machine::symbolic::symbolic_builder::SymbolicAirBuilder;
 use valida_machine::BusArgument;
-
 use valida_machine::{
     ChipWithPersistence, InteractionType, Machine, StarkConfig, ValidaAirBuilder,
 };
@@ -78,4 +77,26 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
             InteractionType::PersistentReceive => {}
         }
     }
+}
+
+pub fn get_lookup_interactions<M, SC, C>(
+    machine: &M,
+    chip: &C,
+    range_u8_cols: &mut Vec<usize>,
+    pc_cols: &mut Vec<Vec<usize>>,
+    counter_cols: &mut Vec<usize>,
+) where
+    M: Machine<SC::Val>,
+    SC: StarkConfig,
+    C: ChipWithPersistence<M, SC>,
+{
+    let mut builder = SymbolicAirBuilder::new(
+        machine,
+        chip.main_width(),
+        chip.preprocessed_width(),
+        chip.public_width(),
+        chip.permutation_width(machine),
+    );
+
+    inspect_lookup_interactions(chip, &mut builder, range_u8_cols, pc_cols, counter_cols);
 }
