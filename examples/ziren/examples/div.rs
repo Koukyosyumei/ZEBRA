@@ -99,7 +99,7 @@ fn main() -> Result<(), io::Error> {
     println!("b: {:?}", colmap.b);
     println!("c: {:?}", colmap.c);
 
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
     refinable_cols.extend(&[10, 11, 12, 13, 14, 15, 16, 17]); // output
                                                               //refinable_cols.extend(&[9, 13]); // input

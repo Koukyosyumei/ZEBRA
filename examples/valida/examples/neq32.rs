@@ -4,10 +4,14 @@ use std::io;
 
 use p3_baby_bear::BabyBear;
 
-use valida_alu_u32::bitwise::columns::COL_MAP;
-use valida_alu_u32::bitwise::columns::NUM_BITWISE_COLS;
-use valida_alu_u32::bitwise::Bitwise32Chip;
-use valida_alu_u32::bitwise::Xor32Instruction;
+use valida_alu_u32::add::columns::ADD_COL_MAP;
+use valida_alu_u32::add::Add32Chip;
+use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction};
+use valida_alu_u32::com::columns::COM_COL_MAP;
+use valida_alu_u32::com::columns::NUM_COM_COLS;
+use valida_alu_u32::com::Com32Chip;
+use valida_alu_u32::com::Eq32Instruction;
+use valida_alu_u32::com::Ne32Instruction;
 use valida_basic_api::BasicMachine;
 use valida_cpu::Imm32Instruction;
 use valida_cpu::StopInstruction;
@@ -28,6 +32,47 @@ use latticevm_valida::utils::{
     generate_bootstrap_trace_from_program,
 };
 
+// ############## Final Check Function ##############################
+fn final_check(
+    trace: &AbstractTrace,
+    num_trial: usize,
+    prime: u32,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    let string_representation = format!(
+        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
+        trace.data[0][0],
+        trace.data[0][1],
+        trace.data[0][2],
+        trace.data[0][3],
+        trace.data[0][4],
+        trace.data[0][5],
+        trace.data[0][6],
+        trace.data[0][7],
+        trace.data[0][11],
+        0,
+        0,
+        0,
+    );
+
+    if !known_reprt.contains(&string_representation) {
+        known_reprt.insert(string_representation.clone());
+        ui.recovered = string_representation;
+
+        fs::write(
+            format!("voutput/{}_states.txt", known_reprt.len()),
+            ui.recovered.clone(),
+        )
+        .unwrap();
+        fs::write(
+            format!("voutput/{}_assignments.txt", known_reprt.len()),
+            ui.logs.clone(),
+        )
+        .unwrap();
+    }
+}
+
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
 
@@ -38,7 +83,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Xor32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <Ne32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
@@ -66,20 +111,19 @@ fn main() -> Result<(), io::Error> {
     //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract Add Constraints ##########################
-    println!("Bitwise AIR MAP");
-    println!("  {:?}", COL_MAP);
+    println!("COM AIR MAP");
+    println!("  {:?}", COM_COL_MAP);
 
-    let air = Bitwise32Chip::default();
-    let num_col = NUM_BITWISE_COLS;
-    let chip_idx = 10;
+    let air = Com32Chip::default();
+    let num_col = NUM_COM_COLS;
+    let chip_idx = 9;
 
     let machine = BasicMachine::<BabyBear>::default();
     let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
-    let final_check = generate_alu_final_checker(general_lookup_info.clone());
-    refinable_cols.extend(&general_lookup_info.alu_output);
+    refinable_cols.extend(&[11]);
 
     for t in &tv_constraints {
         println!("#### {}", t);

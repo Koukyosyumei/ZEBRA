@@ -101,15 +101,9 @@ fn main() -> Result<(), io::Error> {
     println!("sr1: {:?}", colmap.sr1);
     println!("bb: {:?}", colmap.bb);
 
-    /*
-        a: Word([2, 3, 4, 5])
-    b: Word([6, 7, 8, 9])
-    sr1: Word([15, 16, 17, 18])
-    bb: Word([10, 11, 12, 13])
-         */
-
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CloClzChip>(&air, NUM_CLOCLZ_COLS, prime);
+
     //refinable_cols.extend(&[2, 3, 4, 5]); // output
     // refinable_cols.extend(&[6, 10]); // input
     range_types.insert(2, RangeType::U8);

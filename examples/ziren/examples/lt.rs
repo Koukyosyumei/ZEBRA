@@ -98,7 +98,7 @@ fn main() -> Result<(), io::Error> {
     println!("b: {:?}", colmap.b);
     println!("c: {:?}", colmap.c);
 
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, LtChip>(&air, NUM_LT_COLS, prime);
     refinable_cols.extend(&[4]);
     range_types.insert(4, RangeType::U8);

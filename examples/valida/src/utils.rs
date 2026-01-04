@@ -1,44 +1,32 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fs;
-use std::io;
-
-use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::{backend::CrosstermBackend, Terminal};
 
 use p3_baby_bear::BabyBear;
 use p3_field::{AbstractField, PrimeField32};
 use p3_matrix::Matrix;
 
-use valida_alu_u32::add::Add32Instruction;
 use valida_basic_api::BasicMachine;
 use valida_basic_api::BasicMachineMetrics;
 use valida_basic_api::ValidaRuntime;
-use valida_cpu::BneInstruction;
-use valida_cpu::Imm32Instruction;
 use valida_cpu::MachineWithRegisters;
-use valida_cpu::StopInstruction;
-use valida_cpu::{
-    columns::{CPU_COL_MAP, NUM_CPU_COLS},
-    CpuChip,
-};
-use valida_machine::{
-    Instruction, InstructionWord, Machine, Operands, ProgramROM, SegmentMachine, StarkField,
-};
-use valida_opcodes::BYTES_PER_INSTR;
+use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
+use valida_machine::{InstructionWord, ProgramROM, SegmentMachine};
 use valida_program::MachineWithProgramROM;
 use valida_program::ProgramTableType;
 
+use valida_machine::{ChipWithPersistence, Machine, StarkConfig, ValidaAirBuilder};
+
 use latticevm::interval::AbstractInterval;
-use latticevm::solver::run_solver;
+use latticevm::solver::RangeType;
+use latticevm::symbolic::gather_boolean_variables;
+use latticevm::symbolic::gather_vars;
 use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::UiState;
+use latticevm::symbolic::LatticeVMSymbolicExpr;
+use latticevm::utils::GeneralLookupInfo;
 
 use crate::config::{get_machine_config, prover_options};
+use crate::lookup::get_lookup_interactions;
+use crate::p3_to_tv::convert_p3_expr;
 
 pub fn make_pc_adjuster(program: Vec<InstructionWord<i32>>) -> impl Fn(&mut AbstractTrace, u32) {
     move |main_trace: &mut AbstractTrace, prime: u32| {
@@ -125,4 +113,105 @@ pub fn generate_bootstrap_trace_from_program(
         }
     }
     rows
+}
+
+pub fn extract_constraints_and_range<M, SC, C>(
+    machine: &M,
+    chip: &C,
+    num_cols: usize,
+    prime: u32,
+) -> (
+    Vec<LatticeVMSymbolicExpr>,
+    Vec<usize>,
+    HashMap<usize, RangeType>,
+    GeneralLookupInfo,
+)
+where
+    M: Machine<SC::Val>,
+    SC: StarkConfig,
+    C: ChipWithPersistence<M, SC>,
+{
+    let mut u8_cols = vec![];
+    let mut multiplicities = Vec::new();
+    let mut lookup_symbolic_constraints = Vec::new();
+    let mut nested_received_vars_from_cpu = Vec::new();
+    let mut general_lookup_info = GeneralLookupInfo::default();
+
+    let symbolic_constraints = get_symbolic_constraints::<M, SC, C>(&machine, &chip);
+    get_lookup_interactions(
+        machine,
+        chip,
+        &mut u8_cols,
+        &mut nested_received_vars_from_cpu,
+        &mut multiplicities,
+        &mut lookup_symbolic_constraints,
+        prime,
+    );
+
+    let received_vars_from_cpu: Vec<_> = nested_received_vars_from_cpu
+        .iter()
+        .skip(1)
+        .flatten()
+        .cloned()
+        .collect();
+
+    if let [a, b, c, d, e, f, g, h, i, j, k, el] = received_vars_from_cpu.as_slice() {
+        general_lookup_info.alu_input1.extend([*a, *b, *c, *d]);
+        general_lookup_info.alu_input2.extend([*e, *f, *g, *h]);
+        general_lookup_info.alu_output.extend([*i, *j, *k, *el]);
+    }
+
+    let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
+    refinable_cols.retain(|c| !multiplicities.contains(c));
+    refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
+
+    let mut tv_constraints = symbolic_constraints
+        .iter()
+        .map(|sc| convert_p3_expr::<SC::Val>(&sc))
+        .collect::<Vec<_>>();
+    tv_constraints.extend(lookup_symbolic_constraints);
+
+    let mut used_vars = HashSet::new();
+    for t in &tv_constraints {
+        gather_vars(0, t, &mut used_vars);
+    }
+    let used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
+    refinable_cols.retain(|c| used_var_ids.contains(c));
+
+    let multiplicities: HashSet<_> = multiplicities.iter().map(|v| *v).collect();
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
+
+    let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
+        .iter()
+        .map(|k| (*k, RangeType::Bool))
+        .collect();
+    for c in &u8_cols {
+        range_types.insert(*c, RangeType::U8);
+    }
+
+    (
+        tv_constraints,
+        refinable_cols,
+        range_types,
+        general_lookup_info,
+    )
+}
+
+pub fn dummy_program_counter_refine_fn(
+    abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
+    program_len: usize,
+    i: usize,
+    j: usize,
+) {
+}
+
+pub fn dummy_adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {}
+
+pub fn dummy_table_deriver(
+    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    range_types: &HashMap<usize, RangeType>,
+    prime: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let out = vec![];
+    out
 }

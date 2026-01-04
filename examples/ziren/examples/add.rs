@@ -94,7 +94,7 @@ fn main() -> Result<(), io::Error> {
     println!("operand_1: {:?}", colmap.operand_1);
     println!("operand_2: {:?}", colmap.operand_2);
 
-    let (tv_constraints, mut refinable_cols, mut range_types) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&[2, 3, 4, 5]); // output
     refinable_cols.extend(&[9, 13]); // input
