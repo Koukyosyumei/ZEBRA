@@ -6,7 +6,10 @@ use valida_machine::BusArgument;
 use valida_machine::{
     ChipWithPersistence, InteractionType, Machine, StarkConfig, ValidaAirBuilder,
 };
+use valida_opcodes::Opcode;
 
+use latticevm::alu::get_alu_constraint;
+use latticevm::alu::WordOp;
 use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 
@@ -40,33 +43,34 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
                 BusArgument::Global(id) => {
                     // Lookup with General ALU
                     if id == 0 {
-                        let opcode_condition =
-                            convert_p3_virtual_pair_col(&e_interaction.fields[0]);
+                        let opcode = convert_p3_virtual_pair_col(&e_interaction.fields[0]);
 
-                        let input0_0 = convert_p3_virtual_pair_col(&e_interaction.fields[1]);
-                        let input0_1 = convert_p3_virtual_pair_col(&e_interaction.fields[2]);
-                        let input0_2 = convert_p3_virtual_pair_col(&e_interaction.fields[3]);
-                        let input0_3 = convert_p3_virtual_pair_col(&e_interaction.fields[4]);
+                        let b0 = convert_p3_virtual_pair_col(&e_interaction.fields[1]);
+                        let b1 = convert_p3_virtual_pair_col(&e_interaction.fields[2]);
+                        let b2 = convert_p3_virtual_pair_col(&e_interaction.fields[3]);
+                        let b3 = convert_p3_virtual_pair_col(&e_interaction.fields[4]);
 
-                        let input1_0 = convert_p3_virtual_pair_col(&e_interaction.fields[5]);
-                        let input1_1 = convert_p3_virtual_pair_col(&e_interaction.fields[6]);
-                        let input1_2 = convert_p3_virtual_pair_col(&e_interaction.fields[7]);
-                        let input1_3 = convert_p3_virtual_pair_col(&e_interaction.fields[8]);
+                        let c0 = convert_p3_virtual_pair_col(&e_interaction.fields[5]);
+                        let c1 = convert_p3_virtual_pair_col(&e_interaction.fields[6]);
+                        let c2 = convert_p3_virtual_pair_col(&e_interaction.fields[7]);
+                        let c3 = convert_p3_virtual_pair_col(&e_interaction.fields[8]);
 
-                        let output_0 = convert_p3_virtual_pair_col(&e_interaction.fields[9]);
-                        let output_1 = convert_p3_virtual_pair_col(&e_interaction.fields[10]);
-                        let output_2 = convert_p3_virtual_pair_col(&e_interaction.fields[11]);
-                        let output_3 = convert_p3_virtual_pair_col(&e_interaction.fields[12]);
+                        let a0 = convert_p3_virtual_pair_col(&e_interaction.fields[9]);
+                        let a1 = convert_p3_virtual_pair_col(&e_interaction.fields[10]);
+                        let a2 = convert_p3_virtual_pair_col(&e_interaction.fields[11]);
+                        let a3 = convert_p3_virtual_pair_col(&e_interaction.fields[12]);
 
                         let multiplicities = convert_p3_virtual_pair_col(&e_interaction.count);
 
                         let tmps = vec![
-                            (Opcode::ADD as u8, WordOp::Add),
-                            (Opcode::SUB as u8, WordOp::Sub),
-                            (Opcode::MUL as u8, WordOp::Mul),
-                            (Opcode::LT as u8, WordOp::Lt),
-                            (Opcode::SLT as u8, WordOp::SLt),
-                            (Opcode::MULHU as u8, WordOp::MulHU),
+                            (Opcode::ADD32 as u8, WordOp::Add),
+                            (Opcode::SUB32 as u8, WordOp::Sub),
+                            (Opcode::MUL32 as u8, WordOp::Mul),
+                            (Opcode::LT32 as u8, WordOp::Lt),
+                            (Opcode::SLT32 as u8, WordOp::SLt),
+                            (Opcode::MULHU32 as u8, WordOp::MulHU),
+                            (Opcode::EQ32 as u8, WordOp::Eq),
+                            (Opcode::NE32 as u8, WordOp::NEq),
                         ];
 
                         for t in tmps {
