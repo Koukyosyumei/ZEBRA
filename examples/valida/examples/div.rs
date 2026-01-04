@@ -20,6 +20,7 @@ use latticevm::ui::generate_alu_final_checker;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
+use latticevm::interval::AbstractInterval;
 use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::extract_constraints_and_range;
 use latticevm_valida::utils::{
@@ -96,7 +97,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
+    let max_iteration = 1000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -130,17 +131,18 @@ fn main() -> Result<(), io::Error> {
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = refinable_cols.len();
+    let minimum_num_taregt_cols = 3; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>(3, 4);
+    let program = get_target_program::<BabyBear>(12, 4);
     let program_str = program
         .iter()
         .map(|inst| format!("{}\n", inst))
         .collect::<String>();
 
-    let base_abs_main_trace_data =
+    let mut base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
+    //base_abs_main_trace_data[0][4] = AbstractInterval::from_i64(255);
 
     // ######################## Solve ############################################
     quick_api(

@@ -69,8 +69,11 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
                             (Opcode::LT32 as u8, WordOp::Lt),
                             (Opcode::SLT32 as u8, WordOp::SLt),
                             (Opcode::MULHU32 as u8, WordOp::MulHU),
+                            (Opcode::MULHS32 as u8, WordOp::MulHS),
                             (Opcode::EQ32 as u8, WordOp::Eq),
                             (Opcode::NE32 as u8, WordOp::NEq),
+                            (Opcode::DIV32 as u8, WordOp::Div),
+                            (Opcode::SDIV32 as u8, WordOp::SDiv),
                         ];
 
                         for t in tmps {
