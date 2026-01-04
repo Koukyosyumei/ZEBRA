@@ -8,6 +8,7 @@ pub enum WordOp {
     Mul,
     MulH,
     MulHU,
+    MulHS,
     And,
     Or,
     Xor,
@@ -16,6 +17,8 @@ pub enum WordOp {
     SRL,
     Eq,
     NEq,
+    Div,
+    SDiv,
 }
 
 pub fn reconstruct_symbolic_word(
@@ -81,6 +84,13 @@ pub fn get_alu_constraint(
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
+        WordOp::MulHS => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordMulhs(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
         WordOp::And => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
             Box::new(LatticeVMSymbolicExpr::WordAnd(
@@ -133,6 +143,20 @@ pub fn get_alu_constraint(
         WordOp::NEq => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
             Box::new(LatticeVMSymbolicExpr::WordNEq(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::Div => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordDiv(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::SDiv => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordSDiv(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
