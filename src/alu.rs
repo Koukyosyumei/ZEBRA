@@ -265,20 +265,30 @@ pub fn word_slt(a: &Word, b: &Word) -> AbstractInterval {
     }
 }
 
-pub fn ai(lo: i64, hi: i64) -> AbstractInterval {
-    AbstractInterval { lo, hi }
-}
-
-pub fn byte(v: i64) -> AbstractInterval {
-    ai(v, v)
-}
-
 mod tests {
     use crate::alu::{
-        ai, byte, full_word, word_add, word_div, word_ltu, word_mul, word_mulhs, word_mulhu,
-        word_sdiv, word_slt, word_to_unsigned, Word, WORD_BOUND,
+        full_word, word_add, word_div, word_ltu, word_mul, word_mulhs, word_mulhu, word_sdiv,
+        word_slt, word_to_unsigned, Word, WORD_BOUND,
     };
     use crate::interval::AbstractInterval;
+
+    pub fn signed_word(val_lo: i64, val_hi: i64) -> Word {
+        let top = if val_lo < 0 { 255 } else { 0 };
+        [
+            ai(val_lo & 0xFF, val_hi & 0xFF),
+            byte(top),
+            byte(top),
+            byte(top),
+        ]
+    }
+
+    pub fn ai(lo: i64, hi: i64) -> AbstractInterval {
+        AbstractInterval { lo, hi }
+    }
+
+    pub fn byte(v: i64) -> AbstractInterval {
+        ai(v, v)
+    }
 
     #[test]
     fn test_add_no_wrap() {
@@ -521,5 +531,82 @@ mod tests {
         let a = word_range(15, 25);
         let b = word_range(20, 30);
         assert_eq!(word_ltu(&a, &b), ai(0, 1));
+    }
+
+    #[test]
+    fn test_slt_definitely_less() {
+        // ケース1: 正の範囲同士で完全に小さい [1, 5] < [10, 15]
+        let a = signed_word(1, 5);
+        let b = signed_word(10, 15);
+        assert_eq!(
+            word_slt(&a, &b),
+            ai(1, 1),
+            "Positive range: A < B should be True"
+        );
+
+        // ケース2: 負数 < 正数 [-10, -5] < [1, 2]
+        // 注: signed_word の実装上、-10 は下位が 0xF6, 上位が 0xFF になる想定
+        let a_neg = [ai(240, 250), byte(255), byte(255), byte(255)]; // [-16, -6]
+        let b_pos = [ai(1, 5), byte(0), byte(0), byte(0)]; // [1, 5]
+        assert_eq!(
+            word_slt(&a_neg, &b_pos),
+            ai(1, 1),
+            "Negative A < Positive B should be True"
+        );
+
+        // ケース3: 負の範囲同士で完全に小さい [-20, -15] < [-10, -5]
+        let a_neg_far = [ai(200, 210), byte(255), byte(255), byte(255)];
+        let b_neg_near = [ai(240, 250), byte(255), byte(255), byte(255)];
+        assert_eq!(word_slt(&a_neg_far, &b_neg_near), ai(1, 1));
+    }
+
+    #[test]
+    fn test_slt_definitely_greater_or_equal() {
+        // ケース1: 正の範囲同士で完全に大きい [20, 30] < [5, 10] -> False
+        let a = signed_word(20, 30);
+        let b = signed_word(5, 10);
+        assert_eq!(word_slt(&a, &b), ai(0, 0));
+
+        // ケース2: 正数 < 負数 [1, 5] < [-10, -5] -> False
+        let a_pos = [ai(1, 5), byte(0), byte(0), byte(0)];
+        let b_neg = [ai(240, 250), byte(255), byte(255), byte(255)];
+        assert_eq!(word_slt(&a_pos, &b_neg), ai(0, 0));
+    }
+
+    #[test]
+    fn test_slt_overlap_unknown() {
+        // ケース1: 範囲が重なっている [5, 15] < [10, 20]
+        // 5 < 10 (True) の可能性もあれば、15 < 10 (False) の可能性もあるため Unknown
+        let a = signed_word(5, 15);
+        let b = signed_word(10, 20);
+        assert_eq!(
+            word_slt(&a, &b),
+            ai(0, 1),
+            "Overlapping ranges should return [0, 1]"
+        );
+
+        // ケース2: 境界値が一致している [5, 10] < [10, 15]
+        // a.hi(10) < b.lo(10) は False なので、完全には小さくない
+        let a_edge = signed_word(5, 10);
+        let b_edge = signed_word(10, 15);
+        assert_eq!(word_slt(&a_edge, &b_edge), ai(0, 1));
+
+        // ケース3: 片方がもう片方を包含している
+        let a_inner = signed_word(10, 12);
+        let b_outer = signed_word(5, 20);
+        assert_eq!(word_slt(&a_inner, &b_outer), ai(0, 1));
+    }
+
+    #[test]
+    fn test_slt_max_min_bounds() {
+        // 32bit符号付きの最小値付近のテスト
+        let i32_min = [byte(0), byte(0), byte(0), byte(128)]; // 0x80000000
+        let zero = [byte(0), byte(0), byte(0), byte(0)];
+
+        // INT_MIN < 0 は確実に True
+        assert_eq!(word_slt(&i32_min, &zero), ai(1, 1));
+
+        // 0 < INT_MIN は確実に False
+        assert_eq!(word_slt(&zero, &i32_min), ai(0, 0));
     }
 }
