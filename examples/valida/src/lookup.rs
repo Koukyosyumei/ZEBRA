@@ -38,6 +38,60 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
             InteractionType::GlobalSend => match e_interaction.argument_index {
                 BusArgument::Local(_) => {}
                 BusArgument::Global(id) => {
+                    // Lookup with General ALU
+                    if id == 0 {
+                        let opcode_condition =
+                            convert_p3_virtual_pair_col(&e_interaction.fields[0]);
+
+                        let input0_0 = convert_p3_virtual_pair_col(&e_interaction.fields[1]);
+                        let input0_1 = convert_p3_virtual_pair_col(&e_interaction.fields[2]);
+                        let input0_2 = convert_p3_virtual_pair_col(&e_interaction.fields[3]);
+                        let input0_3 = convert_p3_virtual_pair_col(&e_interaction.fields[4]);
+
+                        let input1_0 = convert_p3_virtual_pair_col(&e_interaction.fields[5]);
+                        let input1_1 = convert_p3_virtual_pair_col(&e_interaction.fields[6]);
+                        let input1_2 = convert_p3_virtual_pair_col(&e_interaction.fields[7]);
+                        let input1_3 = convert_p3_virtual_pair_col(&e_interaction.fields[8]);
+
+                        let output_0 = convert_p3_virtual_pair_col(&e_interaction.fields[9]);
+                        let output_1 = convert_p3_virtual_pair_col(&e_interaction.fields[10]);
+                        let output_2 = convert_p3_virtual_pair_col(&e_interaction.fields[11]);
+                        let output_3 = convert_p3_virtual_pair_col(&e_interaction.fields[12]);
+
+                        let multiplicities = convert_p3_virtual_pair_col(&e_interaction.count);
+
+                        let tmps = vec![
+                            (Opcode::ADD as u8, OpALU::Add),
+                            (Opcode::SUB as u8, OpALU::Sub),
+                            (Opcode::MUL as u8, OpALU::Mul),
+                            (Opcode::LT as u8, OpALU::Lt),
+                            (Opcode::SLT as u8, OpALU::Lt),
+                            (Opcode::MULHU as u8, OpALU::MulHU),
+                        ];
+
+                        for t in tmps {
+                            let alu_constraint = get_alu_constraint(
+                                &[a0.clone(), a1.clone(), a2.clone(), a3.clone()],
+                                &[b0.clone(), b1.clone(), b2.clone(), b3.clone()],
+                                &[c0.clone(), c1.clone(), c2.clone(), c3.clone()],
+                                &t.1,
+                            );
+                            let impl_constraint =
+                                make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+
+                            if let Some(impl_constraint) = impl_constraint {
+                                //for i in 7..19 {
+                                //    add_u8_col_if_possible(&s.values[i], u8_cols);
+                                //}
+
+                                lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                                    Box::new(multiplicities.clone()),
+                                    Box::new(impl_constraint),
+                                ));
+                            }
+                        }
+                    }
+
                     // Lookup with Range8
                     if id == 5 {
                         for pair in &e_interaction.fields {
