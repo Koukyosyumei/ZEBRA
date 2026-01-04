@@ -11,7 +11,7 @@ use rand::Rng;
 
 use crate::alu::{
     reconstruct_symbolic_word, word_add, word_and, word_div, word_ltu, word_mul, word_mulhs,
-    word_mulhu, word_or, word_sdiv, word_slt, word_sub, word_xor,
+    word_mulhu, word_neq, word_or, word_sdiv, word_slt, word_srl, word_sub, word_xor,
 };
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 use crate::solver::RangeType;
@@ -89,6 +89,9 @@ pub enum LatticeVMSymbolicExpr {
     WordAnd([Box<Self>; 4], [Box<Self>; 4]),
     WordOr([Box<Self>; 4], [Box<Self>; 4]),
     WordXOr([Box<Self>; 4], [Box<Self>; 4]),
+    WordEq([Box<Self>; 4], [Box<Self>; 4]),
+    WordNEq([Box<Self>; 4], [Box<Self>; 4]),
+    WordSrl([Box<Self>; 4], [Box<Self>; 4]),
 }
 
 pub fn gather_vars_simple(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize>) {
@@ -341,6 +344,21 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::WordXOr(b, c) => write!(
                 f,
                 "[{}, {}, {}, {}] ^ [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordEq(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] == [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordNEq(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] != [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordSrl(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] >> [{}, {}, {}, {}]",
                 b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
             ),
         }
@@ -1100,6 +1118,84 @@ impl LatticeVMSymbolicExpr {
                 });
 
                 word_xor(&b_ais, &c_ais)
+            }
+            Self::WordEq(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_or(&b_ais, &c_ais)
+            }
+            Self::WordNEq(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_neq(&b_ais, &c_ais)
+            }
+            Self::WordSrl(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_srl(&b_ais, &c_ais)
             }
         }
     }

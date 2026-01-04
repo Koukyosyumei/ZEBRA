@@ -61,12 +61,12 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
                         let multiplicities = convert_p3_virtual_pair_col(&e_interaction.count);
 
                         let tmps = vec![
-                            (Opcode::ADD as u8, OpALU::Add),
-                            (Opcode::SUB as u8, OpALU::Sub),
-                            (Opcode::MUL as u8, OpALU::Mul),
-                            (Opcode::LT as u8, OpALU::Lt),
-                            (Opcode::SLT as u8, OpALU::Lt),
-                            (Opcode::MULHU as u8, OpALU::MulHU),
+                            (Opcode::ADD as u8, WordOp::Add),
+                            (Opcode::SUB as u8, WordOp::Sub),
+                            (Opcode::MUL as u8, WordOp::Mul),
+                            (Opcode::LT as u8, WordOp::Lt),
+                            (Opcode::SLT as u8, WordOp::SLt),
+                            (Opcode::MULHU as u8, WordOp::MulHU),
                         ];
 
                         for t in tmps {
