@@ -265,14 +265,75 @@ pub fn word_slt(a: &Word, b: &Word) -> AbstractInterval {
     }
 }
 
+pub fn word_and(a: &Word, b: &Word) -> AbstractInterval {
+    let a = word_to_unsigned(a);
+    let b = word_to_unsigned(b);
+
+    // AND with a range [0, hi] can never exceed the minimum of the two hi values.
+    // However, the lower bound is tricky. For a simple interval, we know:
+    // 0 <= (a & b) <= min(a.hi, b.hi)
+    // A tighter bound exists but requires bit-by-bit analysis.
+    if a.lo == a.hi && b.lo == b.hi {
+        let res = a.lo & b.lo;
+        AbstractInterval { lo: res, hi: res }
+    } else {
+        // Conservative approximation for intervals
+        AbstractInterval {
+            lo: 0,
+            hi: a.hi.min(b.hi),
+        }
+    }
+}
+
+pub fn word_or(a: &Word, b: &Word) -> AbstractInterval {
+    let a = word_to_unsigned(a);
+    let b = word_to_unsigned(b);
+
+    if a.lo == a.hi && b.lo == b.hi {
+        let res = a.lo | b.lo;
+        AbstractInterval { lo: res, hi: res }
+    } else {
+        // OR can at most set all bits up to the highest bit present in either operand.
+        // We find the smallest power of 2 minus 1 that covers both.
+        let max_possible = (1i64 << (64 - (a.hi | b.hi).leading_zeros())) - 1;
+        AbstractInterval {
+            lo: a.lo.max(b.lo),
+            hi: max_possible.min(WORD_BOUND - 1),
+        }
+    }
+}
+
+pub fn word_xor(a: &Word, b: &Word) -> AbstractInterval {
+    let a = word_to_unsigned(a);
+    let b = word_to_unsigned(b);
+
+    if a.lo == a.hi && b.lo == b.hi {
+        let res = a.lo ^ b.lo;
+        AbstractInterval { lo: res, hi: res }
+    } else {
+        // XOR is the most unpredictable for intervals.
+        // The result's highest bit is bounded by the highest bit of a.hi or b.hi.
+        let max_val = a.hi | b.hi;
+        let hi_bound = if max_val == 0 {
+            0
+        } else {
+            (1i64 << (64 - max_val.leading_zeros())) - 1
+        };
+        AbstractInterval {
+            lo: 0,
+            hi: hi_bound.min(WORD_BOUND - 1),
+        }
+    }
+}
+
 mod tests {
     use crate::alu::{
-        full_word, word_add, word_div, word_ltu, word_mul, word_mulhs, word_mulhu, word_sdiv,
-        word_slt, word_to_unsigned, Word, WORD_BOUND,
+        full_word, word_add, word_and, word_div, word_ltu, word_mul, word_mulhs, word_mulhu,
+        word_or, word_sdiv, word_slt, word_to_unsigned, word_xor, Word, WORD_BOUND,
     };
     use crate::interval::AbstractInterval;
 
-    pub fn signed_word(val_lo: i64, val_hi: i64) -> Word {
+    fn signed_word(val_lo: i64, val_hi: i64) -> Word {
         let top = if val_lo < 0 { 255 } else { 0 };
         [
             ai(val_lo & 0xFF, val_hi & 0xFF),
@@ -282,12 +343,16 @@ mod tests {
         ]
     }
 
-    pub fn ai(lo: i64, hi: i64) -> AbstractInterval {
+    fn ai(lo: i64, hi: i64) -> AbstractInterval {
         AbstractInterval { lo, hi }
     }
 
-    pub fn byte(v: i64) -> AbstractInterval {
+    fn byte(v: i64) -> AbstractInterval {
         ai(v, v)
+    }
+
+    fn word_range(lo: i64, hi: i64) -> Word {
+        [ai(lo, hi), byte(0), byte(0), byte(0)]
     }
 
     #[test]
@@ -436,10 +501,6 @@ mod tests {
         let b: Word = [byte(1), byte(0), byte(0), byte(0)];
 
         assert_eq!(word_slt(&a, &b), ai(1, 1));
-    }
-
-    fn word_range(lo: i64, hi: i64) -> Word {
-        [ai(lo, hi), byte(0), byte(0), byte(0)]
     }
 
     #[test]
@@ -608,5 +669,73 @@ mod tests {
 
         // 0 < INT_MIN は確実に False
         assert_eq!(word_slt(&zero, &i32_min), ai(0, 0));
+    }
+
+    #[test]
+    fn test_word_and_comprehensive() {
+        // 1. Singleton: 0b1100 & 0b1010 = 0b1000 (12 & 10 = 8)
+        let a = word_range(12, 12);
+        let b = word_range(10, 10);
+        assert_eq!(word_and(&a, &b), ai(8, 8));
+
+        // 2. Range: [0, 255] & 0 = 0
+        let a_range = word_range(0, 255);
+        let b_zero = word_range(0, 0);
+        assert_eq!(word_and(&a_range, &b_zero), ai(0, 0));
+
+        // 3. Range: [0, 7] & [0, 7] -> lo=0, hi=7
+        let b_range = word_range(0, 7);
+        assert_eq!(word_and(&a_range, &b_range), ai(0, 7));
+    }
+
+    #[test]
+    fn test_word_or_comprehensive() {
+        // 1. Singleton: 0b1100 | 0b0011 = 0b1111 (12 | 3 = 15)
+        let a = word_range(12, 12);
+        let b = word_range(3, 3);
+        assert_eq!(word_or(&a, &b), ai(15, 15));
+
+        // 2. Range: [1, 2] | [4, 8]
+        // lo should be at least max(1, 4) = 4
+        // hi should be covered by the bitmask of 8 (which is 0b1111 = 15)
+        let a_r = word_range(1, 2);
+        let b_r = word_range(4, 8);
+        let res = word_or(&a_r, &b_r);
+        assert!(res.lo >= 4);
+        assert!(res.hi <= 15);
+    }
+
+    #[test]
+    fn test_word_xor_comprehensive() {
+        // 1. Singleton: 10 ^ 10 = 0
+        let a = word_range(10, 10);
+        assert_eq!(word_xor(&a, &a), ai(0, 0));
+
+        // 2. Singleton: 0b1010 ^ 0b0101 = 0b1111 (10 ^ 5 = 15)
+        let b = word_range(5, 5);
+        assert_eq!(word_xor(&a, &b), ai(15, 15));
+
+        // 3. Range property: [0, 3] ^ [0, 3]
+        // Max possible value is 3 (0b11)
+        let a_r = word_range(0, 3);
+        let res = word_xor(&a_r, &a_r);
+        assert_eq!(res.lo, 0);
+        assert!(res.hi >= 3);
+    }
+
+    #[test]
+    fn test_bitwise_word_boundaries() {
+        // Test with WORD_BOUND
+        let all_ones = [byte(255), byte(255), byte(255), byte(255)]; // 0xFFFFFFFF
+        let zero = [byte(0), byte(0), byte(0), byte(0)];
+
+        // AND: ALL & 0 = 0
+        assert_eq!(word_and(&all_ones, &zero), ai(0, 0));
+
+        // OR: 0 | ALL = ALL
+        assert_eq!(word_or(&zero, &all_ones), ai((1 << 32) - 1, (1 << 32) - 1));
+
+        // XOR: ALL ^ ALL = 0
+        assert_eq!(word_xor(&all_ones, &all_ones), ai(0, 0));
     }
 }
