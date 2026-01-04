@@ -12,8 +12,8 @@ pub enum OpALU {
     Or,
     Xor,
     Lt,
+    SLt,
     SRL,
-    MSB,
 }
 
 pub fn reconstruct_symbolic_word(
@@ -36,9 +36,9 @@ pub fn reconstruct_symbolic_word(
 }
 
 pub fn get_alu_constraint(
-    a: &[LatticeVMSymbolicExpr],
-    b: &[LatticeVMSymbolicExpr],
-    c: &[LatticeVMSymbolicExpr],
+    a: &[LatticeVMSymbolicExpr; 4],
+    b: &[LatticeVMSymbolicExpr; 4],
+    c: &[LatticeVMSymbolicExpr; 4],
     op: &OpALU,
 ) -> LatticeVMSymbolicExpr {
     let a_word = reconstruct_symbolic_word(a, 0);
@@ -48,9 +48,9 @@ pub fn get_alu_constraint(
     match op {
         OpALU::Add => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Add(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordAdd(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
         OpALU::Sub => LatticeVMSymbolicExpr::Sub(
@@ -62,44 +62,58 @@ pub fn get_alu_constraint(
         ),
         OpALU::Mul => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::MulLo(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordMul(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
         OpALU::MulH => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::MulHiSS(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordMulhs(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
         OpALU::MulHU => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::MulHiUU(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordMulhu(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
         OpALU::And => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::And(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordAnd(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
         OpALU::Or => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Or(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordOr(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
         OpALU::Xor => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Xor(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordXOr(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        OpALU::Lt => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordLt(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        OpALU::SLt => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordSLt(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
         OpALU::SRL => LatticeVMSymbolicExpr::Sub(
@@ -108,18 +122,6 @@ pub fn get_alu_constraint(
                 Box::new(b_word.clone()),
                 Box::new(c_word),
             )),
-        ),
-        OpALU::Lt => LatticeVMSymbolicExpr::Sub(
-            Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Flip(Box::new(
-                LatticeVMSymbolicExpr::Lt(Box::new(b_word.clone()), Box::new(c_word)),
-            ))),
-        ),
-        OpALU::MSB => LatticeVMSymbolicExpr::Sub(
-            Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Flip(Box::new(
-                LatticeVMSymbolicExpr::Msb(Box::new(b_word.clone())),
-            ))),
         ),
     }
 }
@@ -157,6 +159,22 @@ pub fn word_add(a: &Word, b: &Word) -> AbstractInterval {
         full_word()
     } else {
         AbstractInterval { lo, hi }
+    }
+}
+
+pub fn word_sub(a: &Word, b: &Word) -> AbstractInterval {
+    let a = word_to_unsigned(a);
+    let b = word_to_unsigned(b);
+
+    // 確実に underflow しない
+    if a.lo >= b.hi {
+        AbstractInterval {
+            lo: a.lo - b.hi,
+            hi: a.hi - b.lo,
+        }
+    } else {
+        // 一部でも underflow の可能性がある
+        full_word()
     }
 }
 
@@ -329,7 +347,7 @@ pub fn word_xor(a: &Word, b: &Word) -> AbstractInterval {
 mod tests {
     use crate::alu::{
         full_word, word_add, word_and, word_div, word_ltu, word_mul, word_mulhs, word_mulhu,
-        word_or, word_sdiv, word_slt, word_to_unsigned, word_xor, Word, WORD_BOUND,
+        word_or, word_sdiv, word_slt, word_sub, word_to_unsigned, word_xor, Word, WORD_BOUND,
     };
     use crate::interval::AbstractInterval;
 
@@ -371,6 +389,58 @@ mod tests {
 
         let r = word_add(&a, &b);
         assert_eq!(r, ai(0, (1 << 32) - 1));
+    }
+
+    #[test]
+    fn test_sub_no_wrap_exact() {
+        // 20 - 5 = 15
+        let a = word_range(20, 20);
+        let b = word_range(5, 5);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, ai(15, 15));
+    }
+
+    #[test]
+    fn test_sub_interval_progression() {
+        // [10, 20] - [1, 3] = [7, 19]
+        let a = word_range(10, 20);
+        let b = word_range(1, 3);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, ai(7, 19));
+    }
+
+    #[test]
+    fn test_sub_near_boundary_no_wrap() {
+        // [100, 110] - [10, 20] = [80, 100]
+        let a = word_range(100, 110);
+        let b = word_range(10, 20);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, ai(80, 100));
+    }
+
+    #[test]
+    fn test_sub_definite_underflow() {
+        // [5, 10] - [20, 30] → 必ず underflow
+        let a = word_range(5, 10);
+        let b = word_range(20, 30);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, full_word());
+    }
+
+    #[test]
+    fn test_sub_partial_underflow() {
+        // [10, 20] - [15, 25]
+        // 10 - 25 = underflow
+        // 20 - 15 = ok
+        let a = word_range(10, 20);
+        let b = word_range(15, 25);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, full_word());
     }
 
     #[test]
