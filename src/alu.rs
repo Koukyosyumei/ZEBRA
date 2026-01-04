@@ -55,9 +55,9 @@ pub fn get_alu_constraint(
         ),
         OpALU::Sub => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Sub(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordSub(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
         OpALU::Mul => LatticeVMSymbolicExpr::Sub(
@@ -344,10 +344,38 @@ pub fn word_xor(a: &Word, b: &Word) -> AbstractInterval {
     }
 }
 
+pub fn word_eq(a: &Word, b: &Word) -> AbstractInterval {
+    let a = word_to_unsigned(a);
+    let b = word_to_unsigned(b);
+
+    // 確実に等しい
+    if a.lo == a.hi && b.lo == b.hi && a.lo == b.lo {
+        AbstractInterval::one()
+    }
+    // 確実に異なる
+    else if a.hi < b.lo || b.hi < a.lo {
+        AbstractInterval::zero()
+    }
+    // 不確実
+    else {
+        AbstractInterval::bool()
+    }
+}
+
+pub fn word_neq(a: &Word, b: &Word) -> AbstractInterval {
+    let r = word_eq(a, b);
+    match (r.lo, r.hi) {
+        (1, 1) => AbstractInterval::zero(),
+        (0, 0) => AbstractInterval::one(),
+        _ => AbstractInterval::bool(),
+    }
+}
+
 mod tests {
     use crate::alu::{
-        full_word, word_add, word_and, word_div, word_ltu, word_mul, word_mulhs, word_mulhu,
-        word_or, word_sdiv, word_slt, word_sub, word_to_unsigned, word_xor, Word, WORD_BOUND,
+        full_word, word_add, word_and, word_div, word_eq, word_ltu, word_mul, word_mulhs,
+        word_mulhu, word_neq, word_or, word_sdiv, word_slt, word_sub, word_to_unsigned, word_xor,
+        Word, WORD_BOUND,
     };
     use crate::interval::AbstractInterval;
 
@@ -807,5 +835,49 @@ mod tests {
 
         // XOR: ALL ^ ALL = 0
         assert_eq!(word_xor(&all_ones, &all_ones), ai(0, 0));
+    }
+
+    #[test]
+    fn test_eq_exact_true() {
+        let a = word_range(10, 10);
+        let b = word_range(10, 10);
+
+        assert_eq!(word_eq(&a, &b), ai(1, 1));
+        assert_eq!(word_neq(&a, &b), ai(0, 0));
+    }
+
+    #[test]
+    fn test_eq_exact_false() {
+        let a = word_range(1, 5);
+        let b = word_range(10, 20);
+
+        assert_eq!(word_eq(&a, &b), ai(0, 0));
+        assert_eq!(word_neq(&a, &b), ai(1, 1));
+    }
+
+    #[test]
+    fn test_eq_overlap_uncertain() {
+        let a = word_range(5, 15);
+        let b = word_range(10, 20);
+
+        assert_eq!(word_eq(&a, &b), ai(0, 1));
+        assert_eq!(word_neq(&a, &b), ai(0, 1));
+    }
+
+    #[test]
+    fn test_eq_concrete() {
+        let a: Word = [byte(42), byte(0), byte(0), byte(0)];
+        let b: Word = [byte(42), byte(0), byte(0), byte(0)];
+
+        assert_eq!(word_eq(&a, &b), ai(1, 1));
+    }
+
+    #[test]
+    fn test_neq_concrete() {
+        let a: Word = [byte(1), byte(0), byte(0), byte(0)];
+        let b: Word = [byte(2), byte(0), byte(0), byte(0)];
+
+        assert_eq!(word_eq(&a, &b), ai(0, 0));
+        assert_eq!(word_neq(&a, &b), ai(1, 1));
     }
 }
