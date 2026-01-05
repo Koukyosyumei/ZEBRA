@@ -1,5 +1,7 @@
 use p3_air::Air;
+use p3_air::VirtualPairCol;
 use p3_field::Field;
+use p3_field::PrimeField32;
 
 use valida_machine::symbolic::symbolic_builder::SymbolicAirBuilder;
 use valida_machine::BusArgument;
@@ -14,6 +16,17 @@ use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 
 use crate::p3_to_tv::convert_p3_virtual_pair_col;
+
+pub fn add_single_var_col_if_possible<F: PrimeField32>(
+    b: &VirtualPairCol<F>,
+    u8_cols: &mut Vec<usize>,
+) {
+    if !b.column_weights.is_empty() {
+        if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
+            u8_cols.push(col_idx);
+        }
+    }
+}
 
 pub fn inspect_lookup_interactions<M, C, SC, AB>(
     chip: &C,
@@ -87,9 +100,12 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
                                 make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
 
                             if let Some(impl_constraint) = impl_constraint {
-                                //for i in 7..19 {
-                                //    add_u8_col_if_possible(&s.values[i], u8_cols);
-                                //}
+                                for i in 1..13 {
+                                    add_single_var_col_if_possible(
+                                        &e_interaction.fields[i],
+                                        range_u8_cols,
+                                    );
+                                }
 
                                 lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
                                     Box::new(multiplicities.clone()),

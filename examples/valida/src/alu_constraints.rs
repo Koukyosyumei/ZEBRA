@@ -1,14 +1,7 @@
 use std::collections::HashMap;
 
-use p3_baby_bear::BabyBear;
 //use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
 
-use valida_alu_u32::add::columns::NUM_ADD_COLS;
-use valida_alu_u32::add::Add32Chip;
-use valida_alu_u32::bitwise::Bitwise32Chip;
-use valida_alu_u32::com::Com32Chip;
-use valida_alu_u32::sub::Sub32Chip;
-use valida_basic_api::BasicMachine;
 use valida_machine::ChipWithPersistence;
 use valida_machine::Machine;
 use valida_machine::StarkConfig;
@@ -16,7 +9,6 @@ use valida_machine::StarkConfig;
 use latticevm::solver::AbsConstraintObj;
 use latticevm::solver::RangeType;
 
-use crate::config::MyConfig;
 use crate::lookup::get_lookup_interactions;
 use crate::p3_to_tv::get_converted_symbolicconstraints;
 

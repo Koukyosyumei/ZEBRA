@@ -18,14 +18,12 @@ use crate::{
     symbolic::LatticeVMConstraints,
 };
 
-pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToProgramFn>(
+pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     program_str: String,
     constraints: &LatticeVMConstraints,
     refinable_cols: &Vec<usize>,
     range_types: &HashMap<usize, RangeType>,
-    aux_constraints_objs: &Vec<AbsConstraintObj>,
-    aux_table_gen_fns: &Vec<AuxTableGenFn>,
-    refinment_target_indicies_pv: &Vec<usize>,
+    refinable_cols_pv: &Vec<usize>,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     max_expansions: usize,
@@ -42,11 +40,6 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToPr
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
-    AuxTableGenFn: Fn(
-        &Vec<Vec<AbstractInterval>>,
-        &HashMap<usize, RangeType>,
-        u32,
-    ) -> Vec<Vec<AbstractInterval>>,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32),
 {
     enable_raw_mode()?;
@@ -65,9 +58,7 @@ where
         &constraints,
         &refinable_cols,
         &range_types,
-        &aux_constraints_objs,
-        &aux_table_gen_fns,
-        &refinment_target_indicies_pv,
+        &refinable_cols_pv,
         &base_abs_main_trace_data,
         public_vals,
         max_expansions,

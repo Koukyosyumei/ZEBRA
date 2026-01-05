@@ -20,10 +20,10 @@ pub fn valida_abstract_trace_to_abstract_state(
     abstract_row: &Vec<AbstractInterval>,
     prime: u32,
 ) -> AbstractState {
-    let mut memory_ops = HashSet::new();
+    let mut memory_ops = Vec::new();
 
     if abstract_row[30].is_non_zero(prime) != MayBeFlag::False {
-        memory_ops.insert(MemoryOp {
+        memory_ops.push(MemoryOp {
             kind: MemoryOpKind::Read,
             addr: abstract_row[31].clone(),
             value: reconstruct_word(abstract_row, 32),
@@ -31,7 +31,7 @@ pub fn valida_abstract_trace_to_abstract_state(
     }
 
     if abstract_row[36].is_non_zero(prime) != MayBeFlag::False {
-        memory_ops.insert(MemoryOp {
+        memory_ops.push(MemoryOp {
             kind: MemoryOpKind::Read,
             addr: abstract_row[37].clone(),
             value: reconstruct_word(abstract_row, 38),
@@ -39,7 +39,7 @@ pub fn valida_abstract_trace_to_abstract_state(
     }
 
     if abstract_row[42].is_non_zero(prime) != MayBeFlag::False {
-        memory_ops.insert(MemoryOp {
+        memory_ops.push(MemoryOp {
             kind: MemoryOpKind::Write,
             addr: abstract_row[43].clone(),
             value: reconstruct_word(abstract_row, 44),
