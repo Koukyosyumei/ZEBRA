@@ -59,7 +59,7 @@ pub struct SearchNode {
 /// * `constraints` - The `LatticeVMConstraints` against which traces are evaluated.
 /// * `_num_refined_points` - Placeholder for number of points to refine (currently unused).
 /// * `base_refinment_target_indicies_main` - Indices of main trace columns to target for refinement.
-/// * `refinment_target_indicies_pv` - Indices of public-value columns to target for refinement.
+/// * `refinement_plan_pv` - Indices of public-value columns to target for refinement.
 /// * `min_row_id` / `max_row_id` - Row bounds within which refinement occurs.
 /// * `align_pc_to_program` - Function or closure that updates opcode and operand intervals based on the PC column.
 /// * `max_expansions` - Maximum number of iterations / expansions allowed.
@@ -85,7 +85,7 @@ pub fn solve<AlignPcToProgramFn>(
     range_types: &HashMap<usize, RangeType>,
     _num_refined_points: usize,
     base_refinment_target_indicies_main: &Vec<usize>,
-    refinment_target_indicies_pv: &Vec<usize>,
+    refinement_plan_pv: &Vec<usize>,
     min_row_id: usize,
     max_row_id: usize,
     align_pc_to_program: &AlignPcToProgramFn,
@@ -219,7 +219,7 @@ where
 
         let (refined_public_candidates, _) = refine_trace(
             &public_trace,
-            refinment_target_indicies_pv,
+            refinement_plan_pv,
             min_row_id,
             max_row_id,
             prime,
@@ -400,7 +400,7 @@ pub struct AbsConstraintObj {
 /// * `potential_boolean_vars` - Column indices of boolean variables that may require special refinement.
 /// * `aux_constraints_objs` - Auxiliary constraints to check on derived traces.
 /// * `aux_table_gen_fns` - Functions to generate auxiliary tables for each auxiliary constraint object.
-/// * `refinment_target_indicies_pv` - Column indices for refining public-value traces.
+/// * `refinement_plan_pv` - Column indices for refining public-value traces.
 /// * `base_abs_main_trace_data` - Initial abstract trace table for main execution.
 /// * `public_vals` - Abstract intervals for public trace values.
 /// * `max_expansions` - Maximum number of search expansions allowed per refinement attempt.
@@ -414,13 +414,11 @@ pub struct AbsConstraintObj {
 /// * `seed` - Seed for deterministic random number generation used in shuffling refinement combinations.
 /// * `ui` - Mutable reference to UI state for displaying search progress.
 /// * `terminal` - Terminal backend used to render the UI.
-pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToProgramFn>(
+pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
     refinement_plan: &Vec<usize>,
     range_types: &HashMap<usize, RangeType>,
-    aux_constraints_objs: &Vec<AbsConstraintObj>,
-    aux_table_gen_fns: &Vec<AuxTableGenFn>,
-    refinment_target_indicies_pv: &Vec<usize>,
+    refinement_plan_pv: &Vec<usize>,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     max_expansions: usize,
@@ -440,11 +438,6 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
 ) where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
-    AuxTableGenFn: Fn(
-        &Vec<Vec<AbstractInterval>>,
-        &HashMap<usize, RangeType>,
-        u32,
-    ) -> Vec<Vec<AbstractInterval>>,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32),
 {
     // RNG and bookkeeping
@@ -509,7 +502,7 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                     range_types,
                     1,
                     &refinment_target_indicies_main,
-                    &refinment_target_indicies_pv,
+                    &refinement_plan_pv,
                     min_row_id,
                     max_row_id,
                     &align_pc_to_program,
@@ -523,7 +516,6 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                     true,
                 );
 
-                // If a main trace was found, perform auxiliary validations
                 if let (Some(trace), _, _, _, _) = result {
                     let mut output = String::new();
                     output.push_str(&format!(
@@ -532,89 +524,27 @@ pub fn run_solver<ProgramCounterRefinFn, FinalCheckFn, AuxTableGenFn, AlignPcToP
                         trace
                     ));
 
-                    let mut pass_all_aux = true;
-
-                    // dummy align function used when validating aux tables (no PC alignment needed)
-                    fn dummy_align_pc_to_program(_at: &mut AbstractTrace, _prime: u32) {}
-
-                    // #################################################################################
-                    // Stage 5: validate auxiliary constraints by generating aux tables and solving them
-                    // #################################################################################
-                    for (co, gfn) in aux_constraints_objs.iter().zip(aux_table_gen_fns.iter()) {
-                        // generate auxiliary table for the candidate main trace
-                        let aux_table = gfn(&trace.data, &co.aux_range_types, prime);
-                        if !aux_table.is_empty() {
-                            let abs_aux_trace = AbstractTrace::new(aux_table.clone());
-
-                            // create new queue & run solve() on aux constraints (depth-limited)
-                            let mut aux_queue: PriorityQueue<SearchNode, Potential> =
-                                PriorityQueue::new();
-                            aux_queue.push(
-                                SearchNode {
-                                    main_trace: abs_aux_trace,
-                                    public_trace: AbstractTrace::new(vec![public_vals.clone()]),
-                                    depth: 0,
-                                },
-                                (0, i32::MAX),
-                            );
-                            let mut aux_num_trial = 0;
-                            let aux_global_expansion_count = 0;
-
-                            let abs_result = solve(
-                                &mut aux_queue,
-                                &mut aux_num_trial,
-                                &co.aux_constraints,
-                                range_types,
-                                1,
-                                &co.aux_refinement_plan,
-                                &refinment_target_indicies_pv,
-                                0,
-                                aux_table.len() - 1,
-                                &dummy_align_pc_to_program,
-                                max_expansions,
-                                aux_global_expansion_count,
-                                prime,
-                                &mut rng,
-                                &format!("{:?}", column_subset),
-                                ui,
-                                terminal,
-                                false,
-                            );
-
-                            if let Some(abs_trace) = abs_result.0 {
-                                // append aux trace output for diagnostics
-                                output.push_str(&format!("\n#{}\n{}", co.name, abs_trace));
-                            } else {
-                                // aux failed — reject this main trace
-                                pass_all_aux = false;
-                                break;
-                            }
-                        }
-                    }
-
                     // #############################################################################
-                    // Stage 6: if all auxiliary checks passed, execute final_check and show results
+                    // Stage 4: Eexecute final_check and show results
                     // #############################################################################
-                    if pass_all_aux {
-                        ui.logs = output;
-                        final_check(
-                            &trace,
-                            global_expansion_count + result.1,
-                            prime,
-                            known_solution,
-                            ui,
-                        );
-                        found_solution_flag = true;
+                    ui.logs = output;
+                    final_check(
+                        &trace,
+                        global_expansion_count + result.1,
+                        prime,
+                        known_solution,
+                        ui,
+                    );
+                    found_solution_flag = true;
 
-                        // re-draw UI to show final result
-                        terminal
-                            .draw(|f| {
-                                ui.render::<CrosstermBackend<Stdout>>(f);
-                            })
-                            .unwrap();
+                    // re-draw UI to show final result
+                    terminal
+                        .draw(|f| {
+                            ui.render::<CrosstermBackend<Stdout>>(f);
+                        })
+                        .unwrap();
 
-                        logs_num_solution.push((global_expansion_count, known_solution.len()));
-                    }
+                    logs_num_solution.push((global_expansion_count, known_solution.len()));
                 }
                 // update global expansion counter and check for exit signal
                 //global_expansion_count += result.1;
