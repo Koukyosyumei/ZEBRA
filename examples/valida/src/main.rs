@@ -33,7 +33,6 @@ use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
-use latticevm_valida::alu_constraints::get_alu_constraints;
 use latticevm_valida::alu_tables::{derive_add_table, derive_com_table, derive_sub_table};
 use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
 use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
@@ -147,12 +146,8 @@ fn main() -> Result<(), io::Error> {
     println!("CPU AIR Column Mapping:\n {:?}", CPU_COL_MAP);
 
     // ######################## Auxiliary ALU Constraints #######################
-    let alu_constraints = get_alu_constraints();
-    let aux_objs = vec![
-        alu_constraints["Add"].clone(),
-        alu_constraints["Sub"].clone(),
-        alu_constraints["Com"].clone(),
-    ];
+    //let alu_constraints = vec![]; // get_alu_constraints();
+    let aux_objs = vec![];
     let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
 
     // ######################## Solver Parameters ###############################
