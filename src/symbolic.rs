@@ -9,7 +9,10 @@ use rand::rngs::StdRng;
 use rand::seq::{IndexedRandom, SliceRandom};
 use rand::Rng;
 
-use crate::alu::reconstruct_symbolic_word;
+use crate::alu::{
+    reconstruct_symbolic_word, word_add, word_and, word_div, word_ltu, word_mul, word_mulhs,
+    word_mulhu, word_neq, word_or, word_sdiv, word_slt, word_srl, word_sub, word_xor,
+};
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 use crate::solver::RangeType;
 
@@ -74,6 +77,21 @@ pub enum LatticeVMSymbolicExpr {
     WhenZero(Box<Self>, Box<Self>),
     Neg(Box<Self>),
     Flip(Box<Self>),
+    WordAdd([Box<Self>; 4], [Box<Self>; 4]),
+    WordSub([Box<Self>; 4], [Box<Self>; 4]),
+    WordMul([Box<Self>; 4], [Box<Self>; 4]),
+    WordMulhu([Box<Self>; 4], [Box<Self>; 4]),
+    WordMulhs([Box<Self>; 4], [Box<Self>; 4]),
+    WordDiv([Box<Self>; 4], [Box<Self>; 4]),
+    WordSDiv([Box<Self>; 4], [Box<Self>; 4]),
+    WordLt([Box<Self>; 4], [Box<Self>; 4]),
+    WordSLt([Box<Self>; 4], [Box<Self>; 4]),
+    WordAnd([Box<Self>; 4], [Box<Self>; 4]),
+    WordOr([Box<Self>; 4], [Box<Self>; 4]),
+    WordXOr([Box<Self>; 4], [Box<Self>; 4]),
+    WordEq([Box<Self>; 4], [Box<Self>; 4]),
+    WordNEq([Box<Self>; 4], [Box<Self>; 4]),
+    WordSrl([Box<Self>; 4], [Box<Self>; 4]),
 }
 
 pub fn gather_vars_simple(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize>) {
@@ -268,6 +286,81 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Msb(x) => write!(f, "msb({})", x),
             Self::WhenNonZero(x, y) => write!(f, "([{} /= 0] => {})", x, y),
             Self::WhenZero(x, y) => write!(f, "([{} = 0] => {})", x, y),
+            Self::WordAdd(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] + [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordSub(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] - [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordMul(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] * [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordMulhu(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] *_hu [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordMulhs(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] *_hs [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordDiv(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] / [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordSDiv(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] /_s [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordLt(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] < [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordSLt(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] <_s [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordAnd(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] & [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordOr(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] | [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordXOr(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] ^ [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordEq(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] == [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordNEq(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] != [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordSrl(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] >> [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
         }
     }
 }
@@ -714,6 +807,396 @@ impl LatticeVMSymbolicExpr {
                 is_last_row,
                 prime,
             )),
+            Self::WordAdd(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_add(&b_ais, &c_ais)
+            }
+            Self::WordSub(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_sub(&b_ais, &c_ais)
+            }
+            Self::WordMul(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_mul(&b_ais, &c_ais)
+            }
+            Self::WordMulhs(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_mulhs(&b_ais, &c_ais)
+            }
+            Self::WordMulhu(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_mulhu(&b_ais, &c_ais)
+            }
+            Self::WordDiv(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_div(&b_ais, &c_ais)
+            }
+            Self::WordSDiv(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_sdiv(&b_ais, &c_ais)
+            }
+            Self::WordLt(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_ltu(&b_ais, &c_ais)
+            }
+            Self::WordSLt(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_slt(&b_ais, &c_ais)
+            }
+            Self::WordAnd(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_and(&b_ais, &c_ais)
+            }
+            Self::WordOr(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_or(&b_ais, &c_ais)
+            }
+            Self::WordXOr(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_xor(&b_ais, &c_ais)
+            }
+            Self::WordEq(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_or(&b_ais, &c_ais)
+            }
+            Self::WordNEq(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_neq(&b_ais, &c_ais)
+            }
+            Self::WordSrl(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_srl(&b_ais, &c_ais)
+            }
         }
     }
 }

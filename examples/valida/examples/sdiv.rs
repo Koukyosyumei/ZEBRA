@@ -6,6 +6,7 @@ use p3_baby_bear::BabyBear;
 
 use valida_alu_u32::div::columns::DIV_COL_MAP;
 use valida_alu_u32::div::Div32Chip;
+use valida_alu_u32::div::SDiv32Instruction;
 use valida_alu_u32::div::{columns::NUM_DIV_COLS, Div32Instruction};
 use valida_basic_api::BasicMachine;
 use valida_cpu::Imm32Instruction;
@@ -78,7 +79,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Div32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: <SDiv32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {

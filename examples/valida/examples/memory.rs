@@ -64,7 +64,7 @@ use valida_cpu::{
     CpuChip,
 };
 use valida_machine::symbolic::symbolic_builder::{
-    get_lookup_interactions, get_symbolic_constraints, get_symbolic_lookups, SymbolicAirBuilder,
+    get_symbolic_constraints, get_symbolic_lookups, SymbolicAirBuilder,
 };
 use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::Chip;
@@ -84,6 +84,7 @@ use valida_program::ProgramTableType;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
+use latticevm::quick::quick_api;
 use latticevm::solver::run_solver;
 use latticevm::solver::RangeType;
 use latticevm::symbolic::eval_air_constraints;
@@ -99,6 +100,10 @@ use latticevm_valida::alu_tables::{derive_add_table, derive_com_table, derive_su
 use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
 use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
+use latticevm_valida::utils::dummy_adjust_pc_program;
+use latticevm_valida::utils::dummy_program_counter_refine_fn;
+use latticevm_valida::utils::dummy_table_deriver;
+use latticevm_valida::utils::extract_constraints_and_range;
 use latticevm_valida::utils::{
     generate_bootstrap_trace_from_program, make_pc_adjuster, refine_pc_interval,
 };
@@ -216,8 +221,17 @@ fn main() -> Result<(), io::Error> {
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
+    // ######################## Solver Parameters ###############################
+    let max_iteration = 3000;
+    let min_row_id = 3;
+    let max_row_id = 4;
+    let num_extracted_rows = 1;
+    let seed = 41;
+    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
+    //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
+
     // ######################## Extract Add Constraints ##########################
-    println!("SUB AIR MAP");
+    println!("MEM AIR MAP");
     println!("  {:?}", MEM_COL_MAP);
 
     let air = MemoryChip::default();
@@ -225,113 +239,54 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 2;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (mem_constraint, mut mem_potential_boolean_vars) =
-        get_converted_symbolicconstraints::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &air);
+    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+        extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
+            &machine, &air, num_col, prime,
+        );
 
-    //let (mut alu_constraint, cpu_input_cols) =
-    //    get_alu_constraint::<BasicMachine<BabyBear>, MyConfig, _>(&machine, &air, num_col, prime);
+    for t in &tv_constraints {
+        println!("#### {}", t);
+    }
+    println!("{:?}", refinable_cols);
+    println!("{:?}", range_types);
 
-    /*
-    alu_constraint.aux_refinement_plan.push(cpu_input_cols[0]);
-    alu_constraint.aux_refinement_plan.push(cpu_input_cols[4]);
-    alu_constraint
-        .aux_range_types
-        .insert(cpu_input_cols[0], RangeType::U4);
-    alu_constraint
-        .aux_range_types
-        .insert(cpu_input_cols[4], RangeType::U4);
-    */
-    //let minimum_num_taregt_cols = mem_constraint.aux_refinement_plan.len();
-    let target_cols: Vec<_> = (0..NUM_MEM_COLS).collect(); //(12..16).collect();
-    let minimum_num_taregt_cols = 4; //target_cols.len();
-
-    let mem_range_types = mem_potential_boolean_vars
-        .iter()
-        .map(|k| (*k, RangeType::Bool))
-        .collect();
-    println!("  Range Types: {:?}", mem_range_types);
-
-    //println!("  Target Columns: {:?}", mem_constraint.aux_refinement_plan);
-    //println!("  Range Types   : {:?}", mem_constraint.aux_range_types);
-
-    let aux_objs = vec![];
-    let aux_tg_fns = vec![derive_add_table, derive_sub_table, derive_com_table];
-
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 3000;
-    let min_row_id = 0;
-    let max_row_id = 4;
-    let seed = 41;
-
-    // Public trace values (example: program start, memory base, initial step)
-    let mut public_vals = vec![AbstractInterval::zero(); 3];
-    public_vals[0] = AbstractInterval::from_i64(0);
-    public_vals[1] = AbstractInterval::from_i64(4096);
-    public_vals[2] = AbstractInterval::from_i64(1);
-    let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
+    let constraints = LatticeVMConstraints {
+        air_constraints: tv_constraints.clone(),
+        pv_pos_constraints: vec![],
+        pv_neg_constraints: vec![],
+    };
+    let minimum_num_taregt_cols = 4; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>(3, 4);
-    let program_len = program.len();
-
-    // Convert program to string for UI display
     let program_str = program
         .iter()
         .map(|inst| format!("{}\n", inst))
         .collect::<String>();
 
-    // Generate initial abstract main trace from program
     let base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
 
-    // ######################## UI Initialization ################################
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let mut ui = UiState::new();
-    ui.program = program_str;
-
-    // ######################## Run Solver ######################################
-    let mut known_solution = HashSet::<String>::new();
-    let mut logs = Vec::new();
-    let start_time = time::Instant::now();
-    run_solver(
-        &mem_constraint,
-        &target_cols,
-        &mem_range_types,
-        &aux_objs,
+    // ######################## Solve ############################################
+    quick_api(
+        program_str,
+        &constraints,
+        &refinable_cols,
+        &range_types,
+        &vec![],
         &aux_tg_fns,
-        &refinment_target_indicies_pv,
+        &vec![],
         &base_abs_main_trace_data,
-        public_vals,
+        vec![],
         max_iteration,
         minimum_num_taregt_cols,
         min_row_id,
         max_row_id,
-        program_len,
-        program_counter_refine_fn,
-        adjust_pc_program,
+        program.len(),
+        dummy_program_counter_refine_fn,
+        dummy_adjust_pc_program,
         final_check,
         prime,
         seed,
-        &mut known_solution,
-        &mut logs,
-        &mut ui,
-        &mut terminal,
-    );
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    eprintln!("Execution Time    : {:?}", start_time.elapsed());
-    eprintln!("#Unique Solution  : {}", known_solution.len());
-
-    Ok(())
+    )
 }

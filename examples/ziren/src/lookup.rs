@@ -14,7 +14,7 @@ use zkm_stark::LookupBuilder;
 use zkm_stark::LookupKind;
 
 use latticevm::alu::get_alu_constraint;
-use latticevm::alu::OpALU;
+use latticevm::alu::WordOp;
 use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
@@ -158,14 +158,14 @@ where
                 let c3 = convert_p3_virtual_pair_col(&s.values[18]);
 
                 let tmps = vec![
-                    (Opcode::ADD as u8, OpALU::Add),
-                    (Opcode::SUB as u8, OpALU::Sub),
-                    (Opcode::MUL as u8, OpALU::Mul),
-                    (Opcode::SLT as u8, OpALU::Lt),
-                    (Opcode::AND as u8, OpALU::And),
-                    (Opcode::OR as u8, OpALU::Or),
-                    (Opcode::XOR as u8, OpALU::Xor),
-                    (Opcode::SRL as u8, OpALU::SRL),
+                    (Opcode::ADD as u8, WordOp::Add),
+                    (Opcode::SUB as u8, WordOp::Sub),
+                    (Opcode::MUL as u8, WordOp::Mul),
+                    (Opcode::SLT as u8, WordOp::SLt),
+                    (Opcode::AND as u8, WordOp::And),
+                    (Opcode::OR as u8, WordOp::Or),
+                    (Opcode::XOR as u8, WordOp::Xor),
+                    (Opcode::SRL as u8, WordOp::Srl),
                 ];
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(

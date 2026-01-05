@@ -2,18 +2,23 @@ use crate::interval::AbstractInterval;
 use crate::symbolic::LatticeVMSymbolicExpr;
 
 #[derive(Debug)]
-pub enum OpALU {
+pub enum WordOp {
     Add,
     Sub,
     Mul,
     MulH,
     MulHU,
+    MulHS,
     And,
     Or,
     Xor,
     Lt,
+    SLt,
     SRL,
-    MSB,
+    Eq,
+    NEq,
+    Div,
+    SDiv,
 }
 
 pub fn reconstruct_symbolic_word(
@@ -36,90 +41,125 @@ pub fn reconstruct_symbolic_word(
 }
 
 pub fn get_alu_constraint(
-    a: &[LatticeVMSymbolicExpr],
-    b: &[LatticeVMSymbolicExpr],
-    c: &[LatticeVMSymbolicExpr],
-    op: &OpALU,
+    a: &[LatticeVMSymbolicExpr; 4],
+    b: &[LatticeVMSymbolicExpr; 4],
+    c: &[LatticeVMSymbolicExpr; 4],
+    op: &WordOp,
 ) -> LatticeVMSymbolicExpr {
     let a_word = reconstruct_symbolic_word(a, 0);
-    let b_word = reconstruct_symbolic_word(b, 0);
-    let c_word = reconstruct_symbolic_word(c, 0);
 
     match op {
-        OpALU::Add => LatticeVMSymbolicExpr::Sub(
+        WordOp::Add => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Add(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordAdd(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
-        OpALU::Sub => LatticeVMSymbolicExpr::Sub(
+        WordOp::Sub => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Sub(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordSub(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
-        OpALU::Mul => LatticeVMSymbolicExpr::Sub(
+        WordOp::Mul => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::MulLo(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordMul(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
-        OpALU::MulH => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulH => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::MulHiSS(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordMulhs(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
-        OpALU::MulHU => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulHU => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::MulHiUU(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordMulhu(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
-        OpALU::And => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulHS => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::And(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordMulhs(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
-        OpALU::Or => LatticeVMSymbolicExpr::Sub(
+        WordOp::And => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Or(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordAnd(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
-        OpALU::Xor => LatticeVMSymbolicExpr::Sub(
+        WordOp::Or => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Xor(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordOr(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
-        OpALU::SRL => LatticeVMSymbolicExpr::Sub(
+        WordOp::Xor => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::SRL(
-                Box::new(b_word.clone()),
-                Box::new(c_word),
+            Box::new(LatticeVMSymbolicExpr::WordXOr(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
             )),
         ),
-        OpALU::Lt => LatticeVMSymbolicExpr::Sub(
+        WordOp::Lt => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Flip(Box::new(
-                LatticeVMSymbolicExpr::Lt(Box::new(b_word.clone()), Box::new(c_word)),
-            ))),
+            Box::new(LatticeVMSymbolicExpr::WordLt(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
         ),
-        OpALU::MSB => LatticeVMSymbolicExpr::Sub(
+        WordOp::SLt => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::Flip(Box::new(
-                LatticeVMSymbolicExpr::Msb(Box::new(b_word.clone())),
-            ))),
+            Box::new(LatticeVMSymbolicExpr::WordSLt(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::SRL => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordSrl(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::Eq => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordEq(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::NEq => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordNEq(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::Div => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordDiv(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::SDiv => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordSDiv(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
         ),
     }
 }
@@ -157,6 +197,22 @@ pub fn word_add(a: &Word, b: &Word) -> AbstractInterval {
         full_word()
     } else {
         AbstractInterval { lo, hi }
+    }
+}
+
+pub fn word_sub(a: &Word, b: &Word) -> AbstractInterval {
+    let a = word_to_unsigned(a);
+    let b = word_to_unsigned(b);
+
+    // 確実に underflow しない
+    if a.lo >= b.hi {
+        AbstractInterval {
+            lo: a.lo - b.hi,
+            hi: a.hi - b.lo,
+        }
+    } else {
+        // 一部でも underflow の可能性がある
+        full_word()
     }
 }
 
@@ -326,10 +382,61 @@ pub fn word_xor(a: &Word, b: &Word) -> AbstractInterval {
     }
 }
 
+pub fn word_eq(a: &Word, b: &Word) -> AbstractInterval {
+    let a = word_to_unsigned(a);
+    let b = word_to_unsigned(b);
+
+    // 確実に等しい
+    if a.lo == a.hi && b.lo == b.hi && a.lo == b.lo {
+        AbstractInterval::one()
+    }
+    // 確実に異なる
+    else if a.hi < b.lo || b.hi < a.lo {
+        AbstractInterval::zero()
+    }
+    // 不確実
+    else {
+        AbstractInterval::bool()
+    }
+}
+
+pub fn word_neq(a: &Word, b: &Word) -> AbstractInterval {
+    let r = word_eq(a, b);
+    match (r.lo, r.hi) {
+        (1, 1) => AbstractInterval::zero(),
+        (0, 0) => AbstractInterval::one(),
+        _ => AbstractInterval::bool(),
+    }
+}
+
+pub fn word_srl(a: &Word, b: &Word) -> AbstractInterval {
+    let a = word_to_unsigned(a);
+    let b = word_to_unsigned(b);
+
+    // シフト量が32ビット以上の場合、結果は常に0
+    if b.lo >= WORD_BITS as i64 {
+        return AbstractInterval::zero();
+    }
+
+    // 最小値: aの最小値を最大のシフト量でシフトしたもの
+    let lo = if b.hi >= WORD_BITS as i64 {
+        0
+    } else {
+        a.lo >> b.hi
+    };
+
+    // 最大値: aの最大値を最小のシフト量でシフトしたもの
+    // (b.lo < 32 は確定している)
+    let hi = a.hi >> b.lo;
+
+    AbstractInterval { lo, hi }
+}
+
 mod tests {
     use crate::alu::{
-        full_word, word_add, word_and, word_div, word_ltu, word_mul, word_mulhs, word_mulhu,
-        word_or, word_sdiv, word_slt, word_to_unsigned, word_xor, Word, WORD_BOUND,
+        full_word, word_add, word_and, word_div, word_eq, word_ltu, word_mul, word_mulhs,
+        word_mulhu, word_neq, word_or, word_sdiv, word_slt, word_srl, word_sub, word_to_unsigned,
+        word_xor, Word, WORD_BOUND,
     };
     use crate::interval::AbstractInterval;
 
@@ -371,6 +478,58 @@ mod tests {
 
         let r = word_add(&a, &b);
         assert_eq!(r, ai(0, (1 << 32) - 1));
+    }
+
+    #[test]
+    fn test_sub_no_wrap_exact() {
+        // 20 - 5 = 15
+        let a = word_range(20, 20);
+        let b = word_range(5, 5);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, ai(15, 15));
+    }
+
+    #[test]
+    fn test_sub_interval_progression() {
+        // [10, 20] - [1, 3] = [7, 19]
+        let a = word_range(10, 20);
+        let b = word_range(1, 3);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, ai(7, 19));
+    }
+
+    #[test]
+    fn test_sub_near_boundary_no_wrap() {
+        // [100, 110] - [10, 20] = [80, 100]
+        let a = word_range(100, 110);
+        let b = word_range(10, 20);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, ai(80, 100));
+    }
+
+    #[test]
+    fn test_sub_definite_underflow() {
+        // [5, 10] - [20, 30] → 必ず underflow
+        let a = word_range(5, 10);
+        let b = word_range(20, 30);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, full_word());
+    }
+
+    #[test]
+    fn test_sub_partial_underflow() {
+        // [10, 20] - [15, 25]
+        // 10 - 25 = underflow
+        // 20 - 15 = ok
+        let a = word_range(10, 20);
+        let b = word_range(15, 25);
+
+        let r = word_sub(&a, &b);
+        assert_eq!(r, full_word());
     }
 
     #[test]
@@ -737,5 +896,107 @@ mod tests {
 
         // XOR: ALL ^ ALL = 0
         assert_eq!(word_xor(&all_ones, &all_ones), ai(0, 0));
+    }
+
+    #[test]
+    fn test_eq_exact_true() {
+        let a = word_range(10, 10);
+        let b = word_range(10, 10);
+
+        assert_eq!(word_eq(&a, &b), ai(1, 1));
+        assert_eq!(word_neq(&a, &b), ai(0, 0));
+    }
+
+    #[test]
+    fn test_eq_exact_false() {
+        let a = word_range(1, 5);
+        let b = word_range(10, 20);
+
+        assert_eq!(word_eq(&a, &b), ai(0, 0));
+        assert_eq!(word_neq(&a, &b), ai(1, 1));
+    }
+
+    #[test]
+    fn test_eq_overlap_uncertain() {
+        let a = word_range(5, 15);
+        let b = word_range(10, 20);
+
+        assert_eq!(word_eq(&a, &b), ai(0, 1));
+        assert_eq!(word_neq(&a, &b), ai(0, 1));
+    }
+
+    #[test]
+    fn test_eq_concrete() {
+        let a: Word = [byte(42), byte(0), byte(0), byte(0)];
+        let b: Word = [byte(42), byte(0), byte(0), byte(0)];
+
+        assert_eq!(word_eq(&a, &b), ai(1, 1));
+    }
+
+    #[test]
+    fn test_neq_concrete() {
+        let a: Word = [byte(1), byte(0), byte(0), byte(0)];
+        let b: Word = [byte(2), byte(0), byte(0), byte(0)];
+
+        assert_eq!(word_eq(&a, &b), ai(0, 0));
+        assert_eq!(word_neq(&a, &b), ai(1, 1));
+    }
+
+    #[test]
+    fn test_srl_singleton() {
+        // 16 >> 2 = 4
+        let a = word_range(16, 16);
+        let b = word_range(2, 2);
+        assert_eq!(word_srl(&a, &b), ai(4, 4));
+    }
+
+    #[test]
+    fn test_srl_range_value() {
+        // [16, 32] >> 1 = [8, 16]
+        let a = word_range(16, 32);
+        let b = word_range(1, 1);
+        assert_eq!(word_srl(&a, &b), ai(8, 16));
+    }
+
+    #[test]
+    fn test_srl_range_shift_amount() {
+        // 100 >> [1, 2]
+        // 100 >> 1 = 50 (max)
+        // 100 >> 2 = 25 (min)
+        let a = word_range(100, 100);
+        let b = word_range(1, 2);
+        assert_eq!(word_srl(&a, &b), ai(25, 50));
+    }
+
+    #[test]
+    fn test_srl_both_ranges() {
+        // [10, 20] >> [1, 2]
+        // min: 10 >> 2 = 2
+        // max: 20 >> 1 = 10
+        let a = word_range(10, 20);
+        let b = word_range(1, 2);
+        assert_eq!(word_srl(&a, &b), ai(2, 10));
+    }
+
+    #[test]
+    fn test_srl_overflow_shift_amount() {
+        // シフト量が32ビットを超える場合
+        let a = word_range(100, 200);
+        let b = word_range(32, 64);
+        assert_eq!(word_srl(&a, &b), ai(0, 0));
+
+        // シフト量の範囲が32を跨ぐ場合: [100, 100] >> [31, 33]
+        // 100 >> 31 = 0
+        // 100 >> 33 = 0
+        let b_cross = word_range(31, 33);
+        assert_eq!(word_srl(&word_range(100, 100), &b_cross), ai(0, 0));
+    }
+
+    #[test]
+    fn test_srl_large_values() {
+        // 0xFFFFFFFF >> 31 = 1
+        let a = [byte(255), byte(255), byte(255), byte(255)];
+        let b = word_range(31, 31);
+        assert_eq!(word_srl(&a, &b), ai(1, 1));
     }
 }
