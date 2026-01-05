@@ -193,13 +193,14 @@ fn process_single_node(
 
 pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     initial_node: &SearchNode,
-    constraints: Arc<LatticeVMConstraints>, // Wrap in Arc for sharing
+    constraints: Arc<LatticeVMConstraints>,
     refinement_plan: Arc<Vec<usize>>,
     refinement_plan_pv: Arc<Vec<usize>>,
     range_types: Arc<HashMap<usize, RangeType>>,
     align_pc_to_program: AlignPcToProgramFn,
     min_row_id: usize,
     max_row_id: usize,
+    max_expansions: usize,
     num_workers: usize,
     seed: u64,
     prime: u32,
@@ -207,7 +208,243 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     final_check: FinalCheckFn,
     known_solution: &mut HashSet<String>,
-) where
+) -> (bool, bool)
+where
+    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
+    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
+{
+    // Filter boolean targets
+    let bool_target_indices: Vec<usize> = refinement_plan
+        .iter()
+        .copied()
+        .filter(|idx| matches!(range_types.get(idx), Some(RangeType::Bool)))
+        .collect();
+
+    // Pre-calculate constraint subsets
+    let conditional_var_sub_const_constraints =
+        detect_conditional_var_sub_const_constraints(&constraints.air_constraints, prime);
+    let conditional_var_sub_var_constraints =
+        detect_conditional_var_sub_var_constraints(&constraints.air_constraints);
+    let abir_constraints = detect_abir_constraints(&constraints.air_constraints, prime);
+
+    // Shared State
+    let queue = Arc::new(Mutex::new(PriorityQueue::<SearchNode, Potential>::new()));
+    let active_workers = Arc::new(AtomicUsize::new(0));
+    let total_trials = Arc::new(AtomicUsize::new(0));
+    let total_unsat = Arc::new(AtomicUsize::new(0));
+
+    // Flags
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let ctrl_q = Arc::new(AtomicBool::new(false));
+
+    let (tx, rx) = mpsc::channel();
+
+    // Push Initial Node
+    queue
+        .lock()
+        .unwrap()
+        .push(initial_node.clone(), (0, i32::MAX));
+
+    // --- Spawn Worker Threads ---
+    for wid in 0..num_workers {
+        let q = queue.clone();
+        let aw = active_workers.clone();
+        let trials = total_trials.clone();
+        let unsat = total_unsat.clone();
+        let shutdown_c = shutdown.clone();
+        let tx = tx.clone();
+
+        // Clone data for thread
+        let constraints = constraints.clone();
+        let range_types = range_types.clone();
+        let refinement_plan = refinement_plan.clone();
+        let refinement_plan_pv = refinement_plan_pv.clone();
+        let bool_target_indices = bool_target_indices.clone();
+        let conditional_var_sub_const_constraints = conditional_var_sub_const_constraints.clone();
+        let conditional_var_sub_var_constraints = conditional_var_sub_var_constraints.clone();
+        let abir_constraints = abir_constraints.clone();
+        let align_pc_to_program = align_pc_to_program.clone();
+
+        thread::spawn(move || {
+            let mut rng = StdRng::seed_from_u64(seed + wid as u64);
+
+            loop {
+                // Check shutdown signal first
+                if shutdown_c.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                // Check Max Expansions
+                if trials.load(Ordering::Relaxed) >= max_expansions {
+                    shutdown_c.store(true, Ordering::Relaxed);
+                    break;
+                }
+
+                // 1. Pop from global queue
+                let task = {
+                    let mut lock = q.lock().unwrap();
+                    lock.pop()
+                };
+
+                let (node, potential) = match task {
+                    Some(t) => t,
+                    None => {
+                        // Termination Detection:
+                        // If I am idle, and active_workers is 0, and queue is empty -> We are done.
+                        let is_queue_empty = q.lock().unwrap().is_empty();
+                        if aw.load(Ordering::Relaxed) == 0 && is_queue_empty {
+                            shutdown_c.store(true, Ordering::Relaxed);
+                            let _ = tx.send(SolverMsg::Finished);
+                            break;
+                        }
+                        // Otherwise sleep briefly to reduce CPU spin
+                        std::thread::sleep(Duration::from_millis(5));
+                        continue;
+                    }
+                };
+
+                // 2. Mark as Active & Increment Trials
+                aw.fetch_add(1, Ordering::SeqCst);
+                let current_trial_count = trials.fetch_add(1, Ordering::Relaxed);
+
+                // 3. Process Node
+                let result = process_single_node(
+                    node,
+                    potential,
+                    &constraints,
+                    &range_types,
+                    prime,
+                    &mut rng,
+                    &align_pc_to_program,
+                    &refinement_plan,
+                    &refinement_plan_pv,
+                    &bool_target_indices,
+                    min_row_id,
+                    max_row_id,
+                    &conditional_var_sub_const_constraints,
+                    &conditional_var_sub_var_constraints,
+                    &abir_constraints,
+                );
+
+                // 4. Handle Result
+                match result {
+                    NodeProcessingResult::Success(trace) => {
+                        shutdown_c.store(true, Ordering::Relaxed); // Stop other workers
+                        let _ = tx.send(SolverMsg::SolutionFound(trace));
+                        break;
+                    }
+                    NodeProcessingResult::Pruned => {
+                        unsat.fetch_add(1, Ordering::Relaxed);
+                    }
+                    NodeProcessingResult::Refined(new_nodes) => {
+                        let mut lock = q.lock().unwrap();
+                        for (n, p) in new_nodes {
+                            lock.push(n, p);
+                        }
+                    }
+                }
+
+                // Mark as Inactive
+                aw.fetch_sub(1, Ordering::SeqCst);
+
+                // 5. Throttled UI Update (CRITICAL FIX: % 50 instead of % 1)
+                // Sending a message every trial floods the channel and freezes the UI.
+                if current_trial_count % 50 == 0 {
+                    let _ = tx.send(SolverMsg::UpdateStats {
+                        trials: current_trial_count,
+                        unsat: unsat.load(Ordering::Relaxed),
+                        queue_len: q.lock().unwrap().len(),
+                    });
+                }
+            }
+        });
+    }
+
+    // --- Main Thread: UI & Event Loop ---
+    let mut exit_loop = false;
+
+    while !exit_loop {
+        // 1. Drain all pending messages (non-blocking)
+        // This prevents the loop from getting stuck if messages come in faster than processed.
+        while let Ok(msg) = rx.try_recv() {
+            match msg {
+                SolverMsg::UpdateStats {
+                    trials,
+                    unsat,
+                    queue_len,
+                } => {
+                    ui.status = format!(
+                        "#Trials: {}\n#Unsat: {}\n#Q: {}\nTarget Columns: {:?}",
+                        trials, unsat, queue_len, refinement_plan
+                    );
+                }
+                SolverMsg::SolutionFound(trace) => {
+                    let global_expansion_count = 0; // Or pass actual count
+                    ui.logs = format!("Trial ID: {}\n\n#Main\n{}", global_expansion_count, trace);
+                    final_check(&trace, global_expansion_count, prime, known_solution, ui);
+
+                    // Force a draw immediately upon solution
+                    terminal
+                        .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
+                        .unwrap();
+                }
+                SolverMsg::Finished => {
+                    exit_loop = true;
+                }
+            }
+        }
+
+        // 2. Poll for Input (Short timeout to keep UI responsive)
+        if event::poll(Duration::from_millis(16)).unwrap() {
+            // ~60 FPS
+            if let Event::Key(key) = event::read().unwrap() {
+                if key.code == KeyCode::Char('q') {
+                    ctrl_q.store(true, Ordering::SeqCst);
+                    shutdown.store(true, Ordering::SeqCst);
+                    exit_loop = true;
+                }
+                // Handle scrolling here if needed
+            }
+        }
+
+        // 3. Draw UI
+        terminal
+            .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
+            .unwrap();
+
+        // 4. Check Global Shutdown
+        if shutdown.load(Ordering::Relaxed) && rx.try_iter().count() == 0 {
+            // Only exit if shutdown is true AND channel is empty
+            // (Ensure we processed the SolutionFound message)
+            exit_loop = true;
+        }
+    }
+
+    (
+        ctrl_q.load(Ordering::SeqCst),
+        shutdown.load(Ordering::SeqCst),
+    )
+}
+
+pub fn parallel_solve_1<AlignPcToProgramFn, FinalCheckFn>(
+    initial_node: &SearchNode,
+    constraints: Arc<LatticeVMConstraints>, // Wrap in Arc for sharing
+    refinement_plan: Arc<Vec<usize>>,
+    refinement_plan_pv: Arc<Vec<usize>>,
+    range_types: Arc<HashMap<usize, RangeType>>,
+    align_pc_to_program: AlignPcToProgramFn,
+    min_row_id: usize,
+    max_row_id: usize,
+    max_expansions: usize,
+    num_workers: usize,
+    seed: u64,
+    prime: u32,
+    ui: &mut UiState,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    final_check: FinalCheckFn,
+    known_solution: &mut HashSet<String>,
+) -> (bool, bool)
+where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
 {
@@ -224,9 +461,12 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     let abir_constraints = detect_abir_constraints(&constraints.air_constraints, prime);
 
     let queue = Arc::new(Mutex::new(PriorityQueue::<SearchNode, Potential>::new()));
+    let active_workers = Arc::new(AtomicUsize::new(0));
     let total_trials = Arc::new(AtomicUsize::new(0));
     let total_unsat = Arc::new(AtomicUsize::new(0));
-    let found_flag = Arc::new(AtomicBool::new(false));
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let ctrl_q = Arc::new(AtomicBool::new(false));
+
     let (tx, rx) = mpsc::channel();
 
     // Initialize queue with starting nodes...
@@ -236,31 +476,34 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
         .push(initial_node.clone(), (0, i32::MAX));
 
     // --- Spawn Worker Threads ---
-    for i in 0..num_workers {
-        let q = Arc::clone(&queue);
+    for wid in 0..num_workers {
+        let q = queue.clone();
+        let aw = active_workers.clone();
+        let trials = total_trials.clone();
+        let unsat = total_unsat.clone();
+        let shutdown_c = shutdown.clone();
         let tx = tx.clone();
-        let found = Arc::clone(&found_flag);
-        let trials = Arc::clone(&total_trials);
-        let unsat = Arc::clone(&total_unsat);
-        let constraints = Arc::clone(&constraints);
-        let range_types = Arc::clone(&range_types);
-        // ... clones for other params ...
 
-        let refinement_plan_copied = Arc::clone(&refinement_plan);
-        let refinement_plan_pv_copied = Arc::clone(&refinement_plan_pv);
-        let bool_target_indices_copied = bool_target_indices.clone();
-        let conditional_var_sub_const_constraints_copied =
-            conditional_var_sub_const_constraints.clone();
-        let conditional_var_sub_var_constraints_copied =
-            conditional_var_sub_var_constraints.clone();
-        let abir_constraints_copied = abir_constraints.clone();
-        let align_pc_to_program_cloned = align_pc_to_program.clone();
+        let constraints = constraints.clone();
+        let range_types = range_types.clone();
+        let refinement_plan = refinement_plan.clone();
+        let refinement_plan_pv = refinement_plan_pv.clone();
+        let bool_target_indices = bool_target_indices.clone();
+        let conditional_var_sub_const_constraints = conditional_var_sub_const_constraints.clone();
+        let conditional_var_sub_var_constraints = conditional_var_sub_var_constraints.clone();
+        let abir_constraints = abir_constraints.clone();
+        let align_pc_to_program = align_pc_to_program.clone();
 
         thread::spawn(move || {
-            let mut rng = StdRng::seed_from_u64(seed + i as u64);
+            let mut rng = StdRng::seed_from_u64(seed + wid as u64);
 
             loop {
-                if found.load(Ordering::Relaxed) {
+                if shutdown_c.load(Ordering::Acquire) {
+                    break;
+                }
+
+                if trials.load(Ordering::Relaxed) >= max_expansions {
+                    shutdown_c.store(true, Ordering::Release);
                     break;
                 }
 
@@ -273,14 +516,20 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
                 let (node, potential) = match task {
                     Some(t) => t,
                     None => {
-                        // Queue empty? Wait briefly or exit if all workers are idle
-                        thread::sleep(Duration::from_millis(10));
+                        if aw.load(Ordering::Acquire) == 0 && q.lock().unwrap().is_empty() {
+                            shutdown_c.store(true, Ordering::Release);
+                            tx.send(SolverMsg::Finished).ok();
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(5));
                         continue;
                     }
                 };
 
                 // 2. Process
-                trials.fetch_add(1, Ordering::SeqCst);
+                aw.fetch_add(1, Ordering::AcqRel);
+                trials.fetch_add(1, Ordering::Relaxed);
+
                 let result = process_single_node(
                     node,
                     potential,
@@ -288,23 +537,21 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
                     &range_types,
                     prime,
                     &mut rng,
-                    &align_pc_to_program_cloned,
-                    &refinement_plan_copied,
-                    &refinement_plan_pv_copied,
-                    &bool_target_indices_copied,
+                    &align_pc_to_program,
+                    &refinement_plan,
+                    &refinement_plan_pv,
+                    &bool_target_indices,
                     min_row_id,
                     max_row_id,
-                    &conditional_var_sub_const_constraints_copied,
-                    &conditional_var_sub_var_constraints_copied,
-                    &abir_constraints_copied,
+                    &conditional_var_sub_const_constraints,
+                    &conditional_var_sub_var_constraints,
+                    &abir_constraints,
                 );
 
                 // 3. Handle Result
                 match result {
                     NodeProcessingResult::Success(trace) => {
-                        found.store(true, Ordering::SeqCst);
-                        let _ = tx.send(SolverMsg::SolutionFound(trace));
-                        break;
+                        tx.send(SolverMsg::SolutionFound(trace)).ok();
                     }
                     NodeProcessingResult::Pruned => {
                         unsat.fetch_add(1, Ordering::SeqCst);
@@ -317,29 +564,37 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
                     }
                 }
 
+                aw.fetch_sub(1, Ordering::AcqRel);
+
                 // 4. Throttled UI Update
-                if trials.load(Ordering::Relaxed) % 50 == 0 {
-                    let _ = tx.send(SolverMsg::UpdateStats {
-                        trials: trials.load(Ordering::Relaxed),
-                        unsat: unsat.load(Ordering::Relaxed),
-                        queue_len: q.lock().unwrap().len(),
-                    });
+                if trials.load(Ordering::Relaxed) % 1 == 0 {
+                    let _ = tx
+                        .send(SolverMsg::UpdateStats {
+                            trials: trials.load(Ordering::Relaxed),
+                            unsat: unsat.load(Ordering::Relaxed),
+                            queue_len: q.lock().unwrap().len(),
+                        })
+                        .ok();
                 }
             }
         });
     }
 
     // --- Main Thread: UI & Event Loop ---
-    loop {
+    let mut exit = false;
+    while !exit {
         // Handle Messages from Workers
-        while let Ok(msg) = rx.try_recv() {
+        while let Ok(msg) = rx.recv_timeout(Duration::from_millis(10)) {
             match msg {
                 SolverMsg::UpdateStats {
                     trials,
                     unsat,
                     queue_len,
                 } => {
-                    ui.status = format!("Trials: {}, Unsat: {}, Q: {}", trials, unsat, queue_len);
+                    ui.status = format!(
+                        "#Trials: {}\n#Unsat: {}\n#Q: {}\nTarget Columns: {:?}",
+                        trials, unsat, queue_len, refinement_plan
+                    );
                 }
                 SolverMsg::SolutionFound(trace) => {
                     let global_expansion_count = 0;
@@ -354,15 +609,11 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
                     // #############################################################################
                     ui.logs = output;
                     final_check(&trace, global_expansion_count, prime, known_solution, ui);
-
-                    // re-draw UI to show final result
-                    terminal
-                        .draw(|f| {
-                            ui.render::<CrosstermBackend<Stdout>>(f);
-                        })
-                        .unwrap();
                 }
-                _ => {}
+                SolverMsg::Finished => {
+                    exit = true;
+                    break;
+                }
             }
         }
 
@@ -374,16 +625,124 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
             .unwrap();
 
         // Handle Keyboard (Quit / Scroll)
-        if event::poll(Duration::from_millis(10)).unwrap() {
+        if event::poll(Duration::from_millis(20)).unwrap() {
             if let Event::Key(key) = event::read().unwrap() {
                 if key.code == KeyCode::Char('q') {
-                    found_flag.store(true, Ordering::SeqCst);
+                    ctrl_q.store(true, Ordering::Release);
+                    exit = true;
                     break;
                 }
             }
         }
 
-        if found_flag.load(Ordering::Relaxed) {
+        if shutdown.load(Ordering::Acquire) {
+            exit = true;
+            break;
+        }
+    }
+
+    (
+        ctrl_q.load(Ordering::SeqCst),
+        shutdown.load(Ordering::SeqCst),
+    )
+}
+
+pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
+    constraints: &LatticeVMConstraints,
+    refinement_plan: &Vec<usize>,
+    range_types: &HashMap<usize, RangeType>,
+    refinement_plan_pv: &Vec<usize>,
+    base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
+    public_vals: Vec<AbstractInterval>,
+    max_expansions: usize,
+    minimum_num_taregt_cols: usize,
+    min_row_id: usize,
+    max_row_id: usize,
+    program_len: usize,
+    program_counter_refine_fn: ProgramCounterRefinFn,
+    align_pc_to_program: AlignPcToProgramFn,
+    final_check: FinalCheckFn,
+    prime: u32,
+    seed: u64,
+    known_solution: &mut HashSet<String>,
+    logs_num_solution: &mut Vec<(usize, usize)>,
+    ui: &mut UiState,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+) where
+    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
+    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
+    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
+{
+    // RNG and bookkeeping
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut found_solution_flag = false;
+    let global_expansion_count = 0;
+    let mut exit_flag = false;
+
+    // ################################################################
+    // Stage 1: iterate over subset sizes (from minimal to all columns)
+    // ################################################################
+    for k in minimum_num_taregt_cols..(refinement_plan.len() + 1) {
+        // generate all k-sized subsets of refinement_plan and shuffle them
+        let mut column_subsets: Vec<_> = refinement_plan.iter().combinations(k).collect();
+        column_subsets.shuffle(&mut rng);
+
+        // ###############################################################################
+        // Stage 2: for each column subset, build initial abstract main trace & run search
+        // ###############################################################################
+        for column_subset in column_subsets {
+            // clone base trace data to start from
+            let mut abs_main_trace_data = base_abs_main_trace_data.clone();
+
+            // convert combination iterator into Vec<usize>
+            let refinment_target_indicies_main: Vec<usize> =
+                column_subset.clone().into_iter().cloned().collect();
+            //refinment_target_indicies_main.push(1);
+
+            // apply coarse domain constraints for the chosen columns across rows
+            for i in min_row_id..(max_row_id + 1) {
+                for c in &refinment_target_indicies_main {
+                    abs_main_trace_data[i][*c] = make_init_val(*c, &range_types, prime);
+
+                    // apply program-counter-specific refinement for this cell
+                    program_counter_refine_fn(&mut abs_main_trace_data, program_len, i, *c);
+                }
+            }
+
+            // Create AbstractTrace from the prepared abstract table
+            let initial_abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
+            let initial_node = SearchNode {
+                main_trace: initial_abs_main_trace,
+                public_trace: AbstractTrace::new(vec![public_vals.clone()]),
+                depth: 0,
+            };
+
+            let (recv_exit_flag, stop_flag) = parallel_solve(
+                &initial_node,
+                Arc::new(constraints.clone()),
+                Arc::new(refinment_target_indicies_main.clone()),
+                Arc::new(refinement_plan_pv.clone()),
+                Arc::new(range_types.clone()),
+                align_pc_to_program.clone(),
+                min_row_id,
+                max_row_id,
+                max_expansions,
+                1,
+                seed,
+                prime,
+                ui,
+                terminal,
+                final_check.clone(),
+                known_solution,
+            );
+            exit_flag = recv_exit_flag;
+
+            if exit_flag || stop_flag {
+                break;
+            }
+        }
+
+        if exit_flag {
             break;
         }
     }
@@ -727,205 +1086,6 @@ pub struct AbsConstraintObj {
     pub aux_constraints: LatticeVMConstraints,
     pub aux_refinement_plan: Vec<usize>,
     pub aux_range_types: HashMap<usize, RangeType>,
-}
-
-pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
-    constraints: &LatticeVMConstraints,
-    refinement_plan: &Vec<usize>,
-    range_types: &HashMap<usize, RangeType>,
-    refinement_plan_pv: &Vec<usize>,
-    base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
-    public_vals: Vec<AbstractInterval>,
-    max_expansions: usize,
-    minimum_num_taregt_cols: usize,
-    min_row_id: usize,
-    max_row_id: usize,
-    program_len: usize,
-    program_counter_refine_fn: ProgramCounterRefinFn,
-    align_pc_to_program: AlignPcToProgramFn,
-    final_check: FinalCheckFn,
-    prime: u32,
-    seed: u64,
-    known_solution: &mut HashSet<String>,
-    logs_num_solution: &mut Vec<(usize, usize)>,
-    ui: &mut UiState,
-    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-) where
-    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
-    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
-    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
-{
-    // RNG and bookkeeping
-    let mut rng = StdRng::seed_from_u64(seed);
-    let mut found_solution_flag = false;
-    let global_expansion_count = 0;
-    let mut exit_flag = false;
-
-    // ################################################################
-    // Stage 1: iterate over subset sizes (from minimal to all columns)
-    // ################################################################
-    for k in minimum_num_taregt_cols..(refinement_plan.len() + 1) {
-        // generate all k-sized subsets of refinement_plan and shuffle them
-        let mut column_subsets: Vec<_> = refinement_plan.iter().combinations(k).collect();
-        column_subsets.shuffle(&mut rng);
-
-        // ###############################################################################
-        // Stage 2: for each column subset, build initial abstract main trace & run search
-        // ###############################################################################
-        for column_subset in column_subsets {
-            // clone base trace data to start from
-            let mut abs_main_trace_data = base_abs_main_trace_data.clone();
-
-            // convert combination iterator into Vec<usize>
-            let refinment_target_indicies_main: Vec<usize> =
-                column_subset.clone().into_iter().cloned().collect();
-            //refinment_target_indicies_main.push(1);
-
-            // apply coarse domain constraints for the chosen columns across rows
-            for i in min_row_id..(max_row_id + 1) {
-                for c in &refinment_target_indicies_main {
-                    abs_main_trace_data[i][*c] = make_init_val(*c, &range_types, prime);
-
-                    // apply program-counter-specific refinement for this cell
-                    program_counter_refine_fn(&mut abs_main_trace_data, program_len, i, *c);
-                }
-            }
-
-            // Create AbstractTrace from the prepared abstract table
-            let initial_abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
-            let initial_node = SearchNode {
-                main_trace: initial_abs_main_trace,
-                public_trace: AbstractTrace::new(vec![public_vals.clone()]),
-                depth: 0,
-            };
-
-            parallel_solve(
-                &initial_node,
-                Arc::new(constraints.clone()),
-                Arc::new(refinement_plan.clone()),
-                Arc::new(refinement_plan_pv.clone()),
-                Arc::new(range_types.clone()),
-                align_pc_to_program.clone(),
-                min_row_id,
-                max_row_id,
-                2,
-                seed,
-                prime,
-                ui,
-                terminal,
-                final_check.clone(),
-                known_solution,
-            );
-
-            /*
-            parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
-                initial_node: &SearchNode,
-                constraints: Arc<LatticeVMConstraints>, // Wrap in Arc for sharing
-                refinement_plan: Arc<Vec<usize>>,
-                refinement_plan_pv: Arc<Vec<usize>>,
-                range_types: Arc<HashMap<usize, RangeType>>,
-                align_pc_to_program: AlignPcToProgramFn,
-                min_row_id: usize,
-                max_row_id: usize,
-                num_workers: usize,
-                seed: u64,
-                prime: u32,
-                ui: &mut UiState,
-                terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-                final_check: FinalCheckFn,
-                known_solution: &mut HashSet<String>,
-            )
-            */
-
-            /*
-            // ###################################################
-            // Stage 3: initialize the queue with the initial node
-            // ###################################################
-            let mut queue: PriorityQueue<SearchNode, Potential> = PriorityQueue::new();
-            queue.push(
-                SearchNode {
-                    main_trace: abs_main_trace,
-                    public_trace: AbstractTrace::new(vec![public_vals.clone()]),
-                    depth: 0,
-                },
-                (0, i32::MAX),
-            );
-
-            // run the main search over this column subset
-            let mut num_trial = 0;
-            while !queue.is_empty() && num_trial < max_expansions {
-                let result = solve(
-                    &mut queue,
-                    &mut num_trial,
-                    &constraints,
-                    range_types,
-                    1,
-                    &refinment_target_indicies_main,
-                    &refinement_plan_pv,
-                    min_row_id,
-                    max_row_id,
-                    &align_pc_to_program,
-                    max_expansions,
-                    global_expansion_count,
-                    prime,
-                    &mut rng,
-                    &format!("{:?}", column_subset),
-                    ui,
-                    terminal,
-                    true,
-                );
-
-                if let (Some(trace), _, _, _, _) = result {
-                    let mut output = String::new();
-                    output.push_str(&format!(
-                        "Trial ID: {}\n\n#Main\n{}",
-                        global_expansion_count + result.1,
-                        trace
-                    ));
-
-                    // #############################################################################
-                    // Stage 4: Eexecute final_check and show results
-                    // #############################################################################
-                    ui.logs = output;
-                    final_check(
-                        &trace,
-                        global_expansion_count + result.1,
-                        prime,
-                        known_solution,
-                        ui,
-                    );
-                    found_solution_flag = true;
-
-                    // re-draw UI to show final result
-                    terminal
-                        .draw(|f| {
-                            ui.render::<CrosstermBackend<Stdout>>(f);
-                        })
-                        .unwrap();
-
-                    logs_num_solution.push((global_expansion_count, known_solution.len()));
-                }
-                // update global expansion counter and check for exit signal
-                //global_expansion_count += result.1;
-                if result.3 {
-                    exit_flag = true;
-                    break;
-                }*/
-        }
-
-        if exit_flag {
-            break;
-        }
-    }
-
-    /*
-    if found_solution_flag {
-        //break;
-    }
-
-    if exit_flag {
-        break;
-    }*/
 }
 
 /// Orchestrates a full symbolic refinement search over abstract traces, including auxiliary constraints.
