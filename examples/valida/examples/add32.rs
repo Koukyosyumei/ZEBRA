@@ -106,8 +106,6 @@ fn main() -> Result<(), io::Error> {
         &refinable_cols,
         &range_types,
         &vec![],
-        &aux_tg_fns,
-        &vec![],
         &base_abs_main_trace_data,
         vec![],
         max_iteration,

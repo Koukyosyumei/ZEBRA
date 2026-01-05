@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::i32;
 use std::io::Stdout;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
 use std::time::Duration;
 
 use crossterm::event::KeyModifiers;
@@ -15,13 +18,31 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use crate::symbolic::{
     apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
     detect_conditional_var_sub_var_constraints, refine_conditional_constraints_var_sub_const,
-    refine_conditional_constraints_var_sub_var,
+    refine_conditional_constraints_var_sub_var, AbirConstraint,
 };
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
     symbolic::{eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints},
     ui::UiState,
 };
+
+/// Messages sent from workers to the UI thread
+pub enum SolverMsg {
+    UpdateStats {
+        trials: usize,
+        unsat: usize,
+        queue_len: usize,
+    },
+    SolutionFound(AbstractTrace),
+    Finished,
+}
+
+/// The outcome of processing a single node
+enum NodeProcessingResult {
+    Success(AbstractTrace),
+    Pruned, // Unsatisfiable
+    Refined(Vec<(SearchNode, Potential)>),
+}
 
 /// Result of constraint checking on a node.
 pub type Potential = (i32, i32);
@@ -33,6 +54,339 @@ pub struct SearchNode {
     main_trace: AbstractTrace,
     public_trace: AbstractTrace,
     depth: usize,
+}
+
+fn process_single_node(
+    head: SearchNode,
+    potential: Potential,
+    constraints: &LatticeVMConstraints,
+    range_types: &HashMap<usize, RangeType>,
+    prime: u32,
+    rng: &mut StdRng,
+    align_pc_to_program: &impl Fn(&mut AbstractTrace, u32),
+    refinment_target_indicies_main: &Vec<usize>,
+    refinement_plan_pv: &Vec<usize>,
+    bool_target_indices: &[usize],
+    min_row_id: usize,
+    max_row_id: usize,
+    conditional_var_sub_const_constraints: &[(usize, usize, i64)],
+    eq_constraints: &[(usize, usize, usize)],
+    abir_constraints: &[AbirConstraint],
+) -> NodeProcessingResult {
+    let mut main_trace = head.main_trace;
+    let public_trace = head.public_trace;
+
+    // 1. Initial Refinements (ABIR, Conditional, etc.)
+    // (Omitted for brevity, but same as your original solve() logic)
+    // If any refinement returns MayBeFlag::False -> return NodeProcessingResult::Pruned
+
+    if let MayBeFlag::False = refine_conditional_constraints_var_sub_const(
+        &mut main_trace,
+        &conditional_var_sub_const_constraints,
+    ) {
+        return NodeProcessingResult::Pruned;
+    }
+    if let MayBeFlag::False =
+        refine_conditional_constraints_var_sub_var(&mut main_trace, &eq_constraints)
+    {
+        return NodeProcessingResult::Pruned;
+    }
+    if let MayBeFlag::False = apply_abir_refinement(&mut main_trace, &abir_constraints, prime).0 {
+        return NodeProcessingResult::Pruned;
+    }
+
+    // 2. Generate Children
+    let refined_main_candidates = {
+        let (refined_main_candidates, refined_flag) = refine_trace(
+            &main_trace,
+            &bool_target_indices.to_vec(),
+            min_row_id,
+            max_row_id,
+            prime,
+            rng,
+        );
+        if refined_flag {
+            refined_main_candidates
+        } else {
+            refine_trace(
+                &main_trace,
+                &refinment_target_indicies_main.to_vec(),
+                min_row_id,
+                max_row_id,
+                prime,
+                rng,
+            )
+            .0
+        }
+    };
+
+    let (refined_public_candidates, _) = refine_trace(
+        &public_trace,
+        &refinement_plan_pv.to_vec(),
+        min_row_id,
+        max_row_id,
+        prime,
+        rng,
+    );
+
+    // produce children as pairs (main_candidate, public_candidate)
+    let mut children = vec![];
+    match (refined_main_candidates, refined_public_candidates) {
+        (Some(main_cands), Some(pub_cands)) => {
+            // combine every pair
+            for pub_c in pub_cands {
+                for main_c in &main_cands {
+                    children.push((main_c.clone(), pub_c.clone()));
+                }
+            }
+        }
+        (Some(main_cands), None) => {
+            for main_c in main_cands {
+                children.push((main_c.clone(), public_trace.clone()));
+            }
+        }
+        (None, Some(pub_cands)) => {
+            for pub_c in pub_cands {
+                children.push((main_trace.clone(), pub_c.clone()));
+            }
+        }
+        (None, None) => {
+            // No refinements produced → continue to next queue entry
+            return NodeProcessingResult::Pruned;
+        }
+    }
+    children.shuffle(rng);
+
+    // 3. Evaluate Children
+    // Note: Since this is already a worker thread, we evaluate children sequentially
+    // or push them all back to the global queue for other workers to grab.
+    // Pushing them back is better for balancing high-level parallelism.
+
+    let mut results = Vec::new();
+    for mut kid_trace in children {
+        align_pc_to_program(&mut kid_trace.0, prime);
+        let (res, pot, _) =
+            eval_constraints(&kid_trace.0, Some(&kid_trace.1.data[0]), constraints, prime);
+
+        match res {
+            MayBeFlag::True => return NodeProcessingResult::Success(kid_trace.0),
+            MayBeFlag::False => {}
+            MayBeFlag::MayBe => {
+                results.push((
+                    SearchNode {
+                        main_trace: kid_trace.0,
+                        public_trace: kid_trace.1,
+                        depth: head.depth + 1,
+                    },
+                    (-pot, (head.depth as i32 + 1)),
+                ));
+            }
+        }
+    }
+
+    if results.is_empty() {
+        NodeProcessingResult::Pruned
+    } else {
+        NodeProcessingResult::Refined(results)
+    }
+}
+
+pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
+    initial_node: &SearchNode,
+    constraints: Arc<LatticeVMConstraints>, // Wrap in Arc for sharing
+    refinement_plan: Arc<Vec<usize>>,
+    refinement_plan_pv: Arc<Vec<usize>>,
+    range_types: Arc<HashMap<usize, RangeType>>,
+    align_pc_to_program: AlignPcToProgramFn,
+    min_row_id: usize,
+    max_row_id: usize,
+    num_workers: usize,
+    seed: u64,
+    prime: u32,
+    ui: &mut UiState,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    final_check: FinalCheckFn,
+    known_solution: &mut HashSet<String>,
+) where
+    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
+    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
+{
+    let bool_target_indices: Vec<usize> = refinement_plan
+        .iter()
+        .copied()
+        .filter(|idx| matches!(range_types.get(idx), Some(RangeType::Bool)))
+        .collect();
+
+    let conditional_var_sub_const_constraints =
+        detect_conditional_var_sub_const_constraints(&constraints.air_constraints, prime);
+    let conditional_var_sub_var_constraints =
+        detect_conditional_var_sub_var_constraints(&constraints.air_constraints);
+    let abir_constraints = detect_abir_constraints(&constraints.air_constraints, prime);
+
+    let queue = Arc::new(Mutex::new(PriorityQueue::<SearchNode, Potential>::new()));
+    let total_trials = Arc::new(AtomicUsize::new(0));
+    let total_unsat = Arc::new(AtomicUsize::new(0));
+    let found_flag = Arc::new(AtomicBool::new(false));
+    let (tx, rx) = mpsc::channel();
+
+    // Initialize queue with starting nodes...
+    queue
+        .lock()
+        .unwrap()
+        .push(initial_node.clone(), (0, i32::MAX));
+
+    // --- Spawn Worker Threads ---
+    for i in 0..num_workers {
+        let q = Arc::clone(&queue);
+        let tx = tx.clone();
+        let found = Arc::clone(&found_flag);
+        let trials = Arc::clone(&total_trials);
+        let unsat = Arc::clone(&total_unsat);
+        let constraints = Arc::clone(&constraints);
+        let range_types = Arc::clone(&range_types);
+        // ... clones for other params ...
+
+        let refinement_plan_copied = Arc::clone(&refinement_plan);
+        let refinement_plan_pv_copied = Arc::clone(&refinement_plan_pv);
+        let bool_target_indices_copied = bool_target_indices.clone();
+        let conditional_var_sub_const_constraints_copied =
+            conditional_var_sub_const_constraints.clone();
+        let conditional_var_sub_var_constraints_copied =
+            conditional_var_sub_var_constraints.clone();
+        let abir_constraints_copied = abir_constraints.clone();
+        let align_pc_to_program_cloned = align_pc_to_program.clone();
+
+        thread::spawn(move || {
+            let mut rng = StdRng::seed_from_u64(seed + i as u64);
+
+            loop {
+                if found.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                // 1. Pop from global queue
+                let task = {
+                    let mut lock = q.lock().unwrap();
+                    lock.pop()
+                };
+
+                let (node, potential) = match task {
+                    Some(t) => t,
+                    None => {
+                        // Queue empty? Wait briefly or exit if all workers are idle
+                        thread::sleep(Duration::from_millis(10));
+                        continue;
+                    }
+                };
+
+                // 2. Process
+                trials.fetch_add(1, Ordering::SeqCst);
+                let result = process_single_node(
+                    node,
+                    potential,
+                    &constraints,
+                    &range_types,
+                    prime,
+                    &mut rng,
+                    &align_pc_to_program_cloned,
+                    &refinement_plan_copied,
+                    &refinement_plan_pv_copied,
+                    &bool_target_indices_copied,
+                    min_row_id,
+                    max_row_id,
+                    &conditional_var_sub_const_constraints_copied,
+                    &conditional_var_sub_var_constraints_copied,
+                    &abir_constraints_copied,
+                );
+
+                // 3. Handle Result
+                match result {
+                    NodeProcessingResult::Success(trace) => {
+                        found.store(true, Ordering::SeqCst);
+                        let _ = tx.send(SolverMsg::SolutionFound(trace));
+                        break;
+                    }
+                    NodeProcessingResult::Pruned => {
+                        unsat.fetch_add(1, Ordering::SeqCst);
+                    }
+                    NodeProcessingResult::Refined(new_nodes) => {
+                        let mut lock = q.lock().unwrap();
+                        for (n, p) in new_nodes {
+                            lock.push(n, p);
+                        }
+                    }
+                }
+
+                // 4. Throttled UI Update
+                if trials.load(Ordering::Relaxed) % 50 == 0 {
+                    let _ = tx.send(SolverMsg::UpdateStats {
+                        trials: trials.load(Ordering::Relaxed),
+                        unsat: unsat.load(Ordering::Relaxed),
+                        queue_len: q.lock().unwrap().len(),
+                    });
+                }
+            }
+        });
+    }
+
+    // --- Main Thread: UI & Event Loop ---
+    loop {
+        // Handle Messages from Workers
+        while let Ok(msg) = rx.try_recv() {
+            match msg {
+                SolverMsg::UpdateStats {
+                    trials,
+                    unsat,
+                    queue_len,
+                } => {
+                    ui.status = format!("Trials: {}, Unsat: {}, Q: {}", trials, unsat, queue_len);
+                }
+                SolverMsg::SolutionFound(trace) => {
+                    let global_expansion_count = 0;
+                    let mut output = String::new();
+                    output.push_str(&format!(
+                        "Trial ID: {}\n\n#Main\n{}",
+                        global_expansion_count, trace
+                    ));
+
+                    // #############################################################################
+                    // Stage 4: Eexecute final_check and show results
+                    // #############################################################################
+                    ui.logs = output;
+                    final_check(&trace, global_expansion_count, prime, known_solution, ui);
+
+                    // re-draw UI to show final result
+                    terminal
+                        .draw(|f| {
+                            ui.render::<CrosstermBackend<Stdout>>(f);
+                        })
+                        .unwrap();
+                }
+                _ => {}
+            }
+        }
+
+        // Draw Terminal
+        terminal
+            .draw(|f| {
+                ui.render::<CrosstermBackend<Stdout>>(f);
+            })
+            .unwrap();
+
+        // Handle Keyboard (Quit / Scroll)
+        if event::poll(Duration::from_millis(10)).unwrap() {
+            if let Event::Key(key) = event::read().unwrap() {
+                if key.code == KeyCode::Char('q') {
+                    found_flag.store(true, Ordering::SeqCst);
+                    break;
+                }
+            }
+        }
+
+        if found_flag.load(Ordering::Relaxed) {
+            break;
+        }
+    }
 }
 
 /// Performs a prioritized, iterative refinement search over abstract execution traces.
@@ -373,6 +727,205 @@ pub struct AbsConstraintObj {
     pub aux_constraints: LatticeVMConstraints,
     pub aux_refinement_plan: Vec<usize>,
     pub aux_range_types: HashMap<usize, RangeType>,
+}
+
+pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
+    constraints: &LatticeVMConstraints,
+    refinement_plan: &Vec<usize>,
+    range_types: &HashMap<usize, RangeType>,
+    refinement_plan_pv: &Vec<usize>,
+    base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
+    public_vals: Vec<AbstractInterval>,
+    max_expansions: usize,
+    minimum_num_taregt_cols: usize,
+    min_row_id: usize,
+    max_row_id: usize,
+    program_len: usize,
+    program_counter_refine_fn: ProgramCounterRefinFn,
+    align_pc_to_program: AlignPcToProgramFn,
+    final_check: FinalCheckFn,
+    prime: u32,
+    seed: u64,
+    known_solution: &mut HashSet<String>,
+    logs_num_solution: &mut Vec<(usize, usize)>,
+    ui: &mut UiState,
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+) where
+    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
+    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
+    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
+{
+    // RNG and bookkeeping
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut found_solution_flag = false;
+    let global_expansion_count = 0;
+    let mut exit_flag = false;
+
+    // ################################################################
+    // Stage 1: iterate over subset sizes (from minimal to all columns)
+    // ################################################################
+    for k in minimum_num_taregt_cols..(refinement_plan.len() + 1) {
+        // generate all k-sized subsets of refinement_plan and shuffle them
+        let mut column_subsets: Vec<_> = refinement_plan.iter().combinations(k).collect();
+        column_subsets.shuffle(&mut rng);
+
+        // ###############################################################################
+        // Stage 2: for each column subset, build initial abstract main trace & run search
+        // ###############################################################################
+        for column_subset in column_subsets {
+            // clone base trace data to start from
+            let mut abs_main_trace_data = base_abs_main_trace_data.clone();
+
+            // convert combination iterator into Vec<usize>
+            let refinment_target_indicies_main: Vec<usize> =
+                column_subset.clone().into_iter().cloned().collect();
+            //refinment_target_indicies_main.push(1);
+
+            // apply coarse domain constraints for the chosen columns across rows
+            for i in min_row_id..(max_row_id + 1) {
+                for c in &refinment_target_indicies_main {
+                    abs_main_trace_data[i][*c] = make_init_val(*c, &range_types, prime);
+
+                    // apply program-counter-specific refinement for this cell
+                    program_counter_refine_fn(&mut abs_main_trace_data, program_len, i, *c);
+                }
+            }
+
+            // Create AbstractTrace from the prepared abstract table
+            let initial_abs_main_trace = AbstractTrace::new(abs_main_trace_data.clone());
+            let initial_node = SearchNode {
+                main_trace: initial_abs_main_trace,
+                public_trace: AbstractTrace::new(vec![public_vals.clone()]),
+                depth: 0,
+            };
+
+            parallel_solve(
+                &initial_node,
+                Arc::new(constraints.clone()),
+                Arc::new(refinement_plan.clone()),
+                Arc::new(refinement_plan_pv.clone()),
+                Arc::new(range_types.clone()),
+                align_pc_to_program.clone(),
+                min_row_id,
+                max_row_id,
+                2,
+                seed,
+                prime,
+                ui,
+                terminal,
+                final_check.clone(),
+                known_solution,
+            );
+
+            /*
+            parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
+                initial_node: &SearchNode,
+                constraints: Arc<LatticeVMConstraints>, // Wrap in Arc for sharing
+                refinement_plan: Arc<Vec<usize>>,
+                refinement_plan_pv: Arc<Vec<usize>>,
+                range_types: Arc<HashMap<usize, RangeType>>,
+                align_pc_to_program: AlignPcToProgramFn,
+                min_row_id: usize,
+                max_row_id: usize,
+                num_workers: usize,
+                seed: u64,
+                prime: u32,
+                ui: &mut UiState,
+                terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+                final_check: FinalCheckFn,
+                known_solution: &mut HashSet<String>,
+            )
+            */
+
+            /*
+            // ###################################################
+            // Stage 3: initialize the queue with the initial node
+            // ###################################################
+            let mut queue: PriorityQueue<SearchNode, Potential> = PriorityQueue::new();
+            queue.push(
+                SearchNode {
+                    main_trace: abs_main_trace,
+                    public_trace: AbstractTrace::new(vec![public_vals.clone()]),
+                    depth: 0,
+                },
+                (0, i32::MAX),
+            );
+
+            // run the main search over this column subset
+            let mut num_trial = 0;
+            while !queue.is_empty() && num_trial < max_expansions {
+                let result = solve(
+                    &mut queue,
+                    &mut num_trial,
+                    &constraints,
+                    range_types,
+                    1,
+                    &refinment_target_indicies_main,
+                    &refinement_plan_pv,
+                    min_row_id,
+                    max_row_id,
+                    &align_pc_to_program,
+                    max_expansions,
+                    global_expansion_count,
+                    prime,
+                    &mut rng,
+                    &format!("{:?}", column_subset),
+                    ui,
+                    terminal,
+                    true,
+                );
+
+                if let (Some(trace), _, _, _, _) = result {
+                    let mut output = String::new();
+                    output.push_str(&format!(
+                        "Trial ID: {}\n\n#Main\n{}",
+                        global_expansion_count + result.1,
+                        trace
+                    ));
+
+                    // #############################################################################
+                    // Stage 4: Eexecute final_check and show results
+                    // #############################################################################
+                    ui.logs = output;
+                    final_check(
+                        &trace,
+                        global_expansion_count + result.1,
+                        prime,
+                        known_solution,
+                        ui,
+                    );
+                    found_solution_flag = true;
+
+                    // re-draw UI to show final result
+                    terminal
+                        .draw(|f| {
+                            ui.render::<CrosstermBackend<Stdout>>(f);
+                        })
+                        .unwrap();
+
+                    logs_num_solution.push((global_expansion_count, known_solution.len()));
+                }
+                // update global expansion counter and check for exit signal
+                //global_expansion_count += result.1;
+                if result.3 {
+                    exit_flag = true;
+                    break;
+                }*/
+        }
+
+        if exit_flag {
+            break;
+        }
+    }
+
+    /*
+    if found_solution_flag {
+        //break;
+    }
+
+    if exit_flag {
+        break;
+    }*/
 }
 
 /// Orchestrates a full symbolic refinement search over abstract traces, including auxiliary constraints.

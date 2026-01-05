@@ -10,6 +10,7 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
+use crate::solver::run_parallel_solver;
 use crate::solver::AbsConstraintObj;
 use crate::solver::RangeType;
 use crate::ui::UiState;
@@ -39,8 +40,8 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
 ) -> Result<(), io::Error>
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
-    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
-    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32),
+    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
+    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -54,6 +55,31 @@ where
     let mut known_solution = HashSet::<String>::new();
     let mut logs = Vec::new();
     let start_time = time::Instant::now();
+
+    run_parallel_solver(
+        constraints,
+        &refinable_cols,
+        range_types,
+        &refinable_cols_pv,
+        base_abs_main_trace_data,
+        public_vals,
+        max_expansions,
+        minimum_num_taregt_cols,
+        min_row_id,
+        max_row_id,
+        program_len,
+        program_counter_refine_fn,
+        align_pc_to_program,
+        final_check,
+        prime,
+        seed,
+        &mut known_solution,
+        &mut logs,
+        &mut ui,
+        &mut terminal,
+    );
+
+    /*
     run_solver(
         &constraints,
         &refinable_cols,
@@ -75,7 +101,7 @@ where
         &mut logs,
         &mut ui,
         &mut terminal,
-    );
+    );*/
 
     disable_raw_mode()?;
     execute!(
