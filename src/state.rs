@@ -42,7 +42,7 @@ impl fmt::Display for MemoryOp {
 pub struct AbstractState {
     pub clk: AbstractInterval,
     pub pc: AbstractInterval,
-    pub memory_ops: HashSet<MemoryOp>,
+    pub memory_ops: Vec<MemoryOp>,
     pub is_done: MayBeFlag,
 }
 

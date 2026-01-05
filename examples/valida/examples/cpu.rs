@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 
-
 use p3_baby_bear::BabyBear;
 use p3_field::AbstractField;
 //use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
@@ -16,9 +15,7 @@ use valida_cpu::{
     columns::{CPU_COL_MAP, NUM_CPU_COLS},
     CpuChip,
 };
-use valida_machine::{
-    Instruction, InstructionWord, Operands, StarkField,
-};
+use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::interval::AbstractInterval;
@@ -35,9 +32,7 @@ use latticevm_valida::utils::dummy_adjust_pc_program;
 use latticevm_valida::utils::dummy_program_counter_refine_fn;
 use latticevm_valida::utils::dummy_table_deriver;
 use latticevm_valida::utils::extract_constraints_and_range;
-use latticevm_valida::utils::{
-    generate_bootstrap_trace_from_program, make_pc_adjuster,
-};
+use latticevm_valida::utils::{generate_bootstrap_trace_from_program, make_pc_adjuster};
 
 // ############## Final Check Function ##############################
 fn final_check(
@@ -137,10 +132,11 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 0;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (tv_constraints, refinable_cols, range_types, general_lookup_info) =
+    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
+    refinable_cols.retain(|x| !program_cols.contains(x));
 
     for t in &tv_constraints {
         println!("#### {}", t);
