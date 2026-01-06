@@ -57,8 +57,6 @@ fn main() -> Result<(), io::Error> {
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
-    //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract Add Constraints ##########################
     println!("ADD AIR MAP");
