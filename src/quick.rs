@@ -11,13 +11,9 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::solver::run_parallel_solver;
-use crate::solver::AbsConstraintObj;
 use crate::solver::RangeType;
 use crate::ui::UiState;
-use crate::{
-    interval::AbstractInterval, solver::run_solver, symbolic::AbstractTrace,
-    symbolic::LatticeVMConstraints,
-};
+use crate::{interval::AbstractInterval, symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     program_str: String,
