@@ -1,4 +1,3 @@
-pub mod alu_constraints;
 pub mod alu_tables;
 pub mod config;
 pub mod lookup;

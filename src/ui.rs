@@ -96,7 +96,7 @@ impl UiState {
 
 pub fn generate_alu_final_checker(
     general_lookup_info: GeneralLookupInfo,
-) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) {
+) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone {
     move |trace: &AbstractTrace,
           _num_trial: usize,
           _prime: u32,

@@ -12,6 +12,7 @@ use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::quick::quick_api;
+use latticevm::solver::RangeType;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
@@ -57,8 +58,6 @@ fn main() -> Result<(), io::Error> {
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
-    //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract Add Constraints ##########################
     println!("ADD AIR MAP");
@@ -69,12 +68,15 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 3;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
+    refinable_cols.extend(&[0, 4]);
+    range_types.insert(0, RangeType::U4);
+    range_types.insert(4, RangeType::U4);
 
     for t in &tv_constraints {
         println!("#### {}", t);
@@ -105,8 +107,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],
