@@ -113,7 +113,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000;
+    let max_iteration = 3000;
     let min_row_id = 2;
     let max_row_id = 7;
     let seed = 41;

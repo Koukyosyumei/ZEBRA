@@ -33,7 +33,7 @@ pub enum SolverMsg {
         unsat: usize,
         queue_len: usize,
     },
-    SolutionFound(AbstractTrace),
+    SolutionFound(AbstractTrace, usize),
     Finished,
 }
 
@@ -315,7 +315,7 @@ where
                 match result {
                     NodeProcessingResult::Success(trace) => {
                         sd.store(true, Ordering::Relaxed);
-                        let _ = tx.send(SolverMsg::SolutionFound(trace));
+                        let _ = tx.send(SolverMsg::SolutionFound(trace, my_trial_id));
                     }
                     NodeProcessingResult::Pruned => {
                         un.fetch_add(1, Ordering::Relaxed);
@@ -332,9 +332,9 @@ where
 
                 // UI UPDATE (Time-based, not count-based)
                 //if last_ui_update.elapsed().as_millis() > 100 {
-                if tr.load(Ordering::Relaxed) % 50 == 0 {
+                if my_trial_id % 50 == 0 {
                     let _ = tx.send(SolverMsg::UpdateStats {
-                        trials: tr.load(Ordering::Relaxed),
+                        trials: my_trial_id, //tr.load(Ordering::Relaxed),
                         unsat: un.load(Ordering::Relaxed),
                         queue_len: q.lock().unwrap().len(),
                     });
@@ -359,20 +359,15 @@ where
                     queue_len,
                 } => {
                     ui.status = format!(
-                        "Subset: {:?}\nTrials: {}\nUnsat: {}\nQueue: {}",
+                        "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
                         refinement_plan, trials, unsat, queue_len
                     );
                 }
-                SolverMsg::SolutionFound(trace) => {
-                    let count = trials.load(Ordering::Relaxed);
-                    let mut output = String::new();
-                    output.push_str(&format!("Trial ID: {}\n\n#Main\n{}", count, trace));
-                    ui.logs = output;
+                SolverMsg::SolutionFound(trace, trials) => {
+                    ui.logs = format!("Trial ID: {}\n\n#Main\n{}", trials, trace);
 
-                    final_check(&trace, count, prime, known_solution, ui);
+                    final_check(&trace, trials, prime, known_solution, ui);
                     solution_found = true;
-                    //shutdown.store(true, Ordering::SeqCst);
-                    //subset_finished = true; // Break loop
                 }
                 SolverMsg::Finished => {
                     // Workers exhausted this subset
