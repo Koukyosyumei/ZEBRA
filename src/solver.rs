@@ -316,7 +316,7 @@ where
 
                 match result {
                     NodeProcessingResult::Success(trace) => {
-                        sd.store(true, Ordering::Relaxed);
+                        //sd.store(true, Ordering::Relaxed);
                         let _ = tx.send(SolverMsg::SolutionFound(trace, my_global_id));
                     }
                     NodeProcessingResult::Pruned => {
@@ -351,11 +351,11 @@ where
     // --- 4. MAIN UI LOOP (BLOCKING FOR THIS SUBSET) ---
     let mut solution_found = false;
     let mut user_quit = false;
-    let mut subset_finished = false;
+    // let mut subset_finished = false;
 
-    while !subset_finished {
+    loop {
         // A. Drain Messages (Non-blocking)
-        match rx.recv_timeout(Duration::from_millis(20)) {
+        match rx.recv_timeout(Duration::from_millis(10)) {
             Ok(msg) => {
                 match msg {
                     SolverMsg::UpdateStats {
@@ -373,11 +373,11 @@ where
 
                         final_check(&trace, trials, prime, known_solution, ui);
                         solution_found = true;
-                        shutdown.store(true, Ordering::SeqCst);
+                        // shutdown.store(true, Ordering::SeqCst);
                     }
                     SolverMsg::Finished => {
                         // Workers exhausted this subset
-                        subset_finished = true;
+                        // subset_finished = true;
                     }
                 }
             }
@@ -389,42 +389,20 @@ where
 
                 if event::poll(Duration::from_millis(1)).unwrap() {
                     if let Event::Key(key) = event::read().unwrap() {
-                        if key.code == KeyCode::Char('q') {
+                        if key.code == KeyCode::Char('q') || key.code == KeyCode::Char('c') {
                             user_quit = true;
                             shutdown.store(true, Ordering::SeqCst);
                             // ユーザー強制終了の場合は即抜ける
-                            return (solution_found, true);
+                            return (solution_found, user_quit);
                         }
                     }
                 }
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                // 全ワーカーのスレッドが終了し、tx がドロップされた
+                // all threads have been terminated
                 break;
             }
         }
-
-        /*
-        // B. Handle User Input
-        if event::poll(Duration::from_millis(10)).unwrap() {
-            if let Event::Key(key) = event::read().unwrap() {
-                if key.code == KeyCode::Char('q') || key.code == KeyCode::Char('c') {
-                    user_quit = true;
-                    shutdown.store(true, Ordering::SeqCst);
-                    subset_finished = true;
-                }
-            }
-        }
-
-        // C. Render
-        terminal
-            .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
-            .unwrap();
-
-        // D. Check manual shutdown (in case worker set shutdown but didn't send Finished msg)
-        if shutdown.load(Ordering::Relaxed) && rx.try_iter().count() == 0 {
-            subset_finished = true;
-        }*/
     }
 
     (solution_found, user_quit)
