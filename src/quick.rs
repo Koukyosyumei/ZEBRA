@@ -79,30 +79,6 @@ where
         &mut terminal,
     );
 
-    /*
-    run_solver(
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &refinable_cols_pv,
-        &base_abs_main_trace_data,
-        public_vals,
-        max_expansions,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program_len,
-        program_counter_refine_fn,
-        align_pc_to_program,
-        final_check,
-        prime,
-        seed,
-        &mut known_solution,
-        &mut logs,
-        &mut ui,
-        &mut terminal,
-    );*/
-
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
