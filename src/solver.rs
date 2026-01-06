@@ -209,6 +209,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     final_check: FinalCheckFn,
     known_solution: &mut HashSet<String>,
+    global_total_trials: Arc<AtomicUsize>,
 ) -> (bool, bool)
 // (Found, Quit)
 where
@@ -232,10 +233,9 @@ where
     // These belong ONLY to this function call. They are dropped when function returns.
     let queue = Arc::new(Mutex::new(PriorityQueue::<SearchNode, Potential>::new()));
     let active_workers = Arc::new(AtomicUsize::new(0));
+    let local_trials = Arc::new(AtomicUsize::new(0));
     let trials = Arc::new(AtomicUsize::new(0));
     let unsat = Arc::new(AtomicUsize::new(0));
-
-    // Flags
     let shutdown = Arc::new(AtomicBool::new(false)); // Stops workers for THIS subset
     let (tx, rx) = mpsc::channel();
 
@@ -249,7 +249,8 @@ where
     for wid in 0..num_workers {
         let q = queue.clone();
         let aw = active_workers.clone();
-        let tr = trials.clone();
+        let l_tr = local_trials.clone();
+        let g_tr = global_total_trials.clone();
         let un = unsat.clone();
         let sd = shutdown.clone();
         let tx = tx.clone();
@@ -276,7 +277,7 @@ where
                 }
 
                 // Check Max Expansions
-                if tr.load(Ordering::Relaxed) >= max_expansions {
+                if l_tr.load(Ordering::Relaxed) >= max_expansions {
                     sd.store(true, Ordering::Relaxed);
                     let _ = tx.send(SolverMsg::Finished); // Signal main thread
                     break;
@@ -304,7 +305,8 @@ where
                 };
 
                 aw.fetch_add(1, Ordering::SeqCst);
-                let my_trial_id = tr.fetch_add(1, Ordering::Relaxed);
+                l_tr.fetch_add(1, Ordering::Relaxed);
+                let my_global_id = g_tr.fetch_add(1, Ordering::SeqCst);
 
                 // PROCESS
                 let result = process_single_node(
@@ -315,7 +317,7 @@ where
                 match result {
                     NodeProcessingResult::Success(trace) => {
                         sd.store(true, Ordering::Relaxed);
-                        let _ = tx.send(SolverMsg::SolutionFound(trace, my_trial_id));
+                        let _ = tx.send(SolverMsg::SolutionFound(trace, my_global_id));
                     }
                     NodeProcessingResult::Pruned => {
                         un.fetch_add(1, Ordering::Relaxed);
@@ -332,9 +334,9 @@ where
 
                 // UI UPDATE (Time-based, not count-based)
                 //if last_ui_update.elapsed().as_millis() > 100 {
-                if my_trial_id % 50 == 0 {
+                if last_ui_update.elapsed().as_millis() > 100 {
                     let _ = tx.send(SolverMsg::UpdateStats {
-                        trials: my_trial_id, //tr.load(Ordering::Relaxed),
+                        trials: my_global_id, //tr.load(Ordering::Relaxed),
                         unsat: un.load(Ordering::Relaxed),
                         queue_len: q.lock().unwrap().len(),
                     });
@@ -344,6 +346,8 @@ where
         });
     }
 
+    drop(tx);
+
     // --- 4. MAIN UI LOOP (BLOCKING FOR THIS SUBSET) ---
     let mut solution_found = false;
     let mut user_quit = false;
@@ -351,31 +355,56 @@ where
 
     while !subset_finished {
         // A. Drain Messages (Non-blocking)
-        while let Ok(msg) = rx.try_recv() {
-            match msg {
-                SolverMsg::UpdateStats {
-                    trials,
-                    unsat,
-                    queue_len,
-                } => {
-                    ui.status = format!(
-                        "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
-                        refinement_plan, trials, unsat, queue_len
-                    );
-                }
-                SolverMsg::SolutionFound(trace, trials) => {
-                    ui.logs = format!("Trial ID: {}\n\n#Main\n{}", trials, trace);
+        match rx.recv_timeout(Duration::from_millis(20)) {
+            Ok(msg) => {
+                match msg {
+                    SolverMsg::UpdateStats {
+                        trials,
+                        unsat,
+                        queue_len,
+                    } => {
+                        ui.status = format!(
+                            "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
+                            refinement_plan, trials, unsat, queue_len
+                        );
+                    }
+                    SolverMsg::SolutionFound(trace, trials) => {
+                        ui.logs = format!("Trial ID: {}\n\n#Main\n{}", trials, trace);
 
-                    final_check(&trace, trials, prime, known_solution, ui);
-                    solution_found = true;
+                        final_check(&trace, trials, prime, known_solution, ui);
+                        solution_found = true;
+                        shutdown.store(true, Ordering::SeqCst);
+                    }
+                    SolverMsg::Finished => {
+                        // Workers exhausted this subset
+                        subset_finished = true;
+                    }
                 }
-                SolverMsg::Finished => {
-                    // Workers exhausted this subset
-                    subset_finished = true;
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                // メッセージが来ない間は描画更新とキー入力チェック
+                terminal
+                    .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
+                    .unwrap();
+
+                if event::poll(Duration::from_millis(1)).unwrap() {
+                    if let Event::Key(key) = event::read().unwrap() {
+                        if key.code == KeyCode::Char('q') {
+                            user_quit = true;
+                            shutdown.store(true, Ordering::SeqCst);
+                            // ユーザー強制終了の場合は即抜ける
+                            return (solution_found, true);
+                        }
+                    }
                 }
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                // 全ワーカーのスレッドが終了し、tx がドロップされた
+                break;
             }
         }
 
+        /*
         // B. Handle User Input
         if event::poll(Duration::from_millis(10)).unwrap() {
             if let Event::Key(key) = event::read().unwrap() {
@@ -395,7 +424,7 @@ where
         // D. Check manual shutdown (in case worker set shutdown but didn't send Finished msg)
         if shutdown.load(Ordering::Relaxed) && rx.try_iter().count() == 0 {
             subset_finished = true;
-        }
+        }*/
     }
 
     (solution_found, user_quit)
@@ -431,6 +460,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     let shared_constraints = Arc::new(constraints.clone());
     let shared_range_types = Arc::new(range_types.clone());
     let shared_pv_plan = Arc::new(refinement_plan_pv.clone());
+    let global_count = Arc::new(AtomicUsize::new(0));
 
     let mut rng = StdRng::seed_from_u64(seed);
 
@@ -477,6 +507,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 terminal,
                 final_check.clone(),
                 known_solution,
+                global_count.clone(),
             );
 
             // 3. DECIDE NEXT STEP
