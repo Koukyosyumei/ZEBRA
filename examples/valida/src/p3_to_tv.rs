@@ -1,19 +1,10 @@
-use std::collections::HashSet;
 
 use p3_air::PairCol;
-use p3_air::VirtualPairCol;
 use p3_field::PrimeField32;
 
-use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
-use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
 use valida_machine::symbolic::symbolic_variable::{SymbolicVariable, Trace};
-use valida_machine::ChipWithPersistence;
-use valida_machine::Machine;
-use valida_machine::StarkConfig;
 
 use latticevm::impl_p3_to_tv_conversion;
-use latticevm::symbolic::gather_boolean_variables;
-use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::{
     interval::AbstractInterval,
     symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr, LatticeVMSymbolicVal},
