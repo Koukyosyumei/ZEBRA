@@ -11,21 +11,18 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::interval::{AbstractInterval, MayBeFlag};
 use latticevm::quick::quick_api;
 use latticevm::solver::RangeType;
 use latticevm::solver::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
+    dummy_adjust_pc_program, dummy_program_counter_refine_fn,
 };
-use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
+use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
-use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
-use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
 use latticevm_valida::utils::{
-    extract_constraints_and_range, generate_bootstrap_trace_from_program, make_pc_adjuster,
+    extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
