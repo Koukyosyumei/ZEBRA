@@ -6,7 +6,8 @@ macro_rules! impl_p3_to_tv_conversion {
         $PairCol:path,
         $VirtualPairCol:path,
         $PrimeField32:path,
-        $convert_var_fn:path     // 変数変換関数のパス
+        $convert_var_fn:path,     // 変数変換関数のパス
+        $one_expr:expr
     ) => {
         // 型をエイリアスとしてインポート（バリアントへのアクセスに使用）
         use $PairCol as GeneralPairCol;
@@ -52,11 +53,12 @@ macro_rules! impl_p3_to_tv_conversion {
                     lo: vpair.constant.as_canonical_u32() as i64,
                     hi: vpair.constant.as_canonical_u32() as i64,
                 });
+                let one: F = $one_expr;
                 for (paircol, w) in vpair.column_weights.iter() {
-                    if (w.clone() + F::one()).as_canonical_u32() == 0 {
+                    if (w.clone() + one).as_canonical_u32() == 0 {
                         expr = LatticeVMSymbolicExpr::Sub(
                             Box::new(expr.clone()),
-                            Box::new(get_weighted_var(paircol, &F::one())),
+                            Box::new(get_weighted_var(paircol, &one)),
                         );
                     } else {
                         expr = LatticeVMSymbolicExpr::Add(
