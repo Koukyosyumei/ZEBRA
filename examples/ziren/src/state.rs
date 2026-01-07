@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 
 use zkm_core_executor::ExecutionState;
 use zkm_stark::MachineProver;
