@@ -12,10 +12,7 @@ use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::quick::quick_api;
-use latticevm::solver::RangeType;
-use latticevm::solver::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn,
-};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
