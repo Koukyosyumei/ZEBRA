@@ -51,6 +51,7 @@ impl_p3_to_tv_conversion!(
     valida_machine::symbolic::symbolic_variable::SymbolicVariable,     // Var型
     p3_air::PairCol,
     p3_air::VirtualPairCol,
+    p3_field::PrimeField32,
     p3_air,
     p3_field,
     convert_valida_variable
