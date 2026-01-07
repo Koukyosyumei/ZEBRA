@@ -165,7 +165,7 @@ where
                     (Opcode::AND as u8, WordOp::And),
                     (Opcode::OR as u8, WordOp::Or),
                     (Opcode::XOR as u8, WordOp::Xor),
-                    (Opcode::SRL as u8, WordOp::Srl),
+                    (Opcode::SRL as u8, WordOp::SRL),
                 ];
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(
