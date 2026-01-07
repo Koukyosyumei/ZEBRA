@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
 use std::ops::{Add, Mul, Neg, Sub};
@@ -14,7 +14,6 @@ use crate::alu::{
     word_mulhu, word_neq, word_or, word_sdiv, word_slt, word_srl, word_sub, word_xor,
 };
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
-use crate::solver::RangeType;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum LatticeVMSymbolicEntry {

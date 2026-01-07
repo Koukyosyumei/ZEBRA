@@ -15,16 +15,14 @@ use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::quick::quick_api;
-use latticevm::symbolic::AbstractTrace;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::symbolic::LatticeVMConstraints;
-use latticevm::ui::UiState;
+use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
-use latticevm_valida::utils::extract_constraints_and_range;
 use latticevm_valida::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
-    generate_bootstrap_trace_from_program,
+    extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
 
 // ############## Final Check Function ##############################

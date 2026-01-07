@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt};
+use std::fmt;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 

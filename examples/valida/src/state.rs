@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
