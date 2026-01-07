@@ -3,24 +3,20 @@ macro_rules! impl_p3_to_tv_conversion {
     (
         $SymbolicExpression:path, // SymbolicExpression列挙型へのフルパス
         $SymbolicVariable:path,   // SymbolicVariable構造体へのフルパス
+        $PairCol:path,
+        $VirtualPairCol:path,
         $p3_air:path,            // p3_air クレート/モジュールへのパス
         $p3_field:path,          // p3_field クレート/モジュールへのパス
         $convert_var_fn:path     // 変数変換関数のパス
     ) => {
         // 型をエイリアスとしてインポート（バリアントへのアクセスに使用）
+        use $PairCol as GeneralPairCol;
         use $SymbolicExpression as GenericSymbolicExpression;
         use $SymbolicVariable as GenericSymbolicVariable;
-
-        /*
-        use $crate::interval::AbstractInterval;
-        use $crate::symbolic::{
-            LatticeVMSymbolicEntry, LatticeVMSymbolicExpr, LatticeVMSymbolicVal,
-        };*/
-        //use $p3_air::{PairCol, VirtualPairCol};
-        //use $p3_field::Field;
+        use $VirtualPairCol as GeneralVirtualPairCol;
 
         // PairColの変換（共通部分）
-        pub fn convert_p3_paircol(pair_col: &PairCol) -> LatticeVMSymbolicVal {
+        pub fn convert_p3_paircol(pair_col: &GeneralPairCol) -> LatticeVMSymbolicVal {
             match pair_col {
                 PairCol::Main(index) => LatticeVMSymbolicVal {
                     entry: LatticeVMSymbolicEntry::Main { is_curr: true },
@@ -32,7 +28,7 @@ macro_rules! impl_p3_to_tv_conversion {
 
         // VirtualPairColの変換
         fn get_weighted_var<F: PrimeField32>(
-            paircol: &PairCol,
+            paircol: &GeneralPairCol,
             weight: &F,
         ) -> LatticeVMSymbolicExpr {
             LatticeVMSymbolicExpr::Mul(
@@ -44,7 +40,7 @@ macro_rules! impl_p3_to_tv_conversion {
         }
 
         pub fn convert_p3_virtual_pair_col<F: PrimeField32>(
-            vpair: &VirtualPairCol<F>,
+            vpair: &GeneralVirtualPairCol<F>,
         ) -> LatticeVMSymbolicExpr {
             if vpair.column_weights.is_empty() {
                 LatticeVMSymbolicExpr::Constant(AbstractInterval {
