@@ -1,17 +1,14 @@
 use std::collections::{HashMap, HashSet};
 use std::i32;
-use std::io::Stdout;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use crossterm::event::KeyModifiers;
 use crossterm::event::{self, Event, KeyCode};
 use itertools::Itertools;
 use priority_queue::PriorityQueue;
 use rand::seq::SliceRandom;
-use rand::Rng;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
 

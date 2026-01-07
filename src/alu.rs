@@ -433,11 +433,7 @@ pub fn word_srl(a: &Word, b: &Word) -> AbstractInterval {
 }
 
 mod tests {
-    use crate::alu::{
-        full_word, word_add, word_and, word_div, word_eq, word_ltu, word_mul, word_mulhs,
-        word_mulhu, word_neq, word_or, word_sdiv, word_slt, word_srl, word_sub, word_to_unsigned,
-        word_xor, Word, WORD_BOUND,
-    };
+    use crate::alu::Word;
     use crate::interval::AbstractInterval;
 
     fn signed_word(val_lo: i64, val_hi: i64) -> Word {
