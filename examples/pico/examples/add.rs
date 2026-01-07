@@ -12,14 +12,13 @@ use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, register::Register};
 
 use latticevm::quick::quick_api;
-use latticevm::solver::RangeType;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_pico::lookup::get_symbolic_lookup_constraints;
 use latticevm_pico::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
 
@@ -86,8 +85,6 @@ fn main() -> Result<(), io::Error> {
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
-    //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air: AddSubChip<KoalaBear> = AddSubChip::default();
@@ -104,17 +101,12 @@ fn main() -> Result<(), io::Error> {
             prime,
         );
     println!("General: {:?}", general_lookup_info);
-
     for t in &tv_constraints {
         println!("#### {}", t);
     }
 
     refinable_cols.extend(&[0, 1, 2, 3]);
 
-    /*refinable_cols.extend(&[2, 3, 4, 5]); // output
-    refinable_cols.extend(&[9, 13]); // input
-    range_types.insert(9, RangeType::U4);
-    range_types.insert(13, RangeType::U4);*/
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 
@@ -136,8 +128,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],

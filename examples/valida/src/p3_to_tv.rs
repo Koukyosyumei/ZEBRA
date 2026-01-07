@@ -1,4 +1,3 @@
-
 use p3_air::PairCol;
 use p3_field::PrimeField32;
 
@@ -43,5 +42,6 @@ impl_p3_to_tv_conversion!(
     p3_air::PairCol,
     p3_air::VirtualPairCol,
     p3_field::PrimeField32,
-    convert_valida_variable
+    convert_valida_variable,
+    F::one()
 );
