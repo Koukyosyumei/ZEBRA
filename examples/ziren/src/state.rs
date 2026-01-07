@@ -15,7 +15,7 @@ pub fn ziren_state_to_abstract_state(ziren_state: &ExecutionState) -> AbstractSt
         .into_iter()
         .map(|(addr, record)| (addr, AbstractInterval::from_i64(record.value as i64)))
         .collect();*/
-    let memory_ops = HashSet::new();
+    let memory_ops = Vec::new();
 
     AbstractState {
         clk: AbstractInterval::from_i64(ziren_state.clk as i64),
@@ -38,6 +38,6 @@ pub fn ziren_abstract_trace_to_abstract_state(
             + abstract_row[2].clone() * AbstractInterval::from_i64(2_usize.pow(16) as i64),
         pc: abstract_row[5].clone(),
         is_done: abstract_row[5].clone().is_zero(prime),
-        memory_ops: HashSet::new(),
+        memory_ops: Vec::new(),
     }
 }
