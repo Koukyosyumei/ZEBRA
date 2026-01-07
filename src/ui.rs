@@ -41,7 +41,7 @@ impl UiState {
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-            .split(f.size());
+            .split(f.area());
 
         let top_chunks = Layout::default()
             .direction(Direction::Horizontal)
