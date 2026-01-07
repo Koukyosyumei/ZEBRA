@@ -53,28 +53,3 @@ impl_p3_to_tv_conversion!(
     p3_field,
     convert_valida_variable
 );
-
-pub fn get_converted_symbolicconstraints<M, SC, C>(
-    machine: &M,
-    chip: &C,
-) -> (LatticeVMConstraints, Vec<usize>)
-where
-    M: Machine<SC::Val>,
-    SC: StarkConfig,
-    C: ChipWithPersistence<M, SC>,
-{
-    let symbolic_constraints = get_symbolic_constraints::<M, SC, C>(&machine, &chip);
-    let tv_constraints = symbolic_constraints
-        .iter()
-        .map(|sc| convert_p3_expr::<SC::Val>(&sc))
-        .collect::<Vec<_>>();
-    let multiplicities = HashSet::new();
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
-    let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
-
-    (constraints, potential_boolean_vars)
-}
