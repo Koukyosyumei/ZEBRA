@@ -528,3 +528,22 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
         }
     }
 }
+
+pub fn dummy_program_counter_refine_fn(
+    _abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
+    _program_len: usize,
+    _i: usize,
+    _j: usize,
+) {
+}
+
+pub fn dummy_adjust_pc_program(_main_trace: &mut AbstractTrace, _prime: u32) {}
+
+pub fn dummy_table_deriver(
+    _cpu_main_trace: &Vec<Vec<AbstractInterval>>,
+    _range_types: &HashMap<usize, RangeType>,
+    _prime: u32,
+) -> Vec<Vec<AbstractInterval>> {
+    let out = vec![];
+    out
+}
