@@ -196,22 +196,3 @@ where
         general_lookup_info,
     )
 }
-
-pub fn dummy_program_counter_refine_fn(
-    abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
-    program_len: usize,
-    i: usize,
-    j: usize,
-) {
-}
-
-pub fn dummy_adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {}
-
-pub fn dummy_table_deriver(
-    cpu_main_trace: &Vec<Vec<AbstractInterval>>,
-    range_types: &HashMap<usize, RangeType>,
-    prime: u32,
-) -> Vec<Vec<AbstractInterval>> {
-    let out = vec![];
-    out
-}
