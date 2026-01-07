@@ -6,8 +6,6 @@ macro_rules! impl_p3_to_tv_conversion {
         $PairCol:path,
         $VirtualPairCol:path,
         $PrimeField32:path,
-        $p3_air:path,            // p3_air クレート/モジュールへのパス
-        $p3_field:path,          // p3_field クレート/モジュールへのパス
         $convert_var_fn:path     // 変数変換関数のパス
     ) => {
         // 型をエイリアスとしてインポート（バリアントへのアクセスに使用）
