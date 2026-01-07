@@ -2,12 +2,9 @@ use std::collections::HashSet;
 
 use crate::p3_to_tv::convert_p3_virtual_pair_col;
 use p3_air::Air;
-use p3_air::AirBuilder;
 use p3_air::PairCol;
 use p3_air::VirtualPairCol;
 use p3_field::PrimeField32;
-use p3_koala_bear::KoalaBear;
-use p3_uni_stark::{SymbolicExpression, SymbolicVariable};
 
 use zkm_core_executor::Opcode;
 use zkm_stark::LookupBuilder;
@@ -15,12 +12,10 @@ use zkm_stark::LookupKind;
 
 use latticevm::alu::get_alu_constraint;
 use latticevm::alu::WordOp;
-use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::utils::GeneralLookupInfo;
 
-use crate::p3_to_tv::convert_p3_expr;
 
 pub fn add_single_var_col_if_possible<F: PrimeField32>(
     b: &VirtualPairCol<F>,

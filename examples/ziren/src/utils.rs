@@ -18,7 +18,7 @@ use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
 use latticevm::utils::GeneralLookupInfo;
 use latticevm::{
-    interval::AbstractInterval, symbolic::gather_boolean_variables, symbolic::AbstractTrace,
+    interval::AbstractInterval, symbolic::gather_boolean_variables,
 };
 
 use crate::executor::run_ziren_program;
@@ -125,7 +125,7 @@ where
     for t in &tv_constraints {
         gather_vars(0, t, &mut used_vars);
     }
-    let mut used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
+    let used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
     refinable_cols.retain(|c| used_var_ids.contains(c));
 
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
