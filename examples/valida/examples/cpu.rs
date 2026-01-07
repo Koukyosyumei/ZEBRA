@@ -18,21 +18,20 @@ use valida_cpu::{
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::interval::AbstractInterval;
-use latticevm::interval::MayBeFlag;
+use latticevm::interval::{AbstractInterval, MayBeFlag};
 use latticevm::quick::quick_api;
-use latticevm::solver::dummy_adjust_pc_program;
-use latticevm::solver::dummy_program_counter_refine_fn;
-use latticevm::solver::dummy_table_deriver;
-use latticevm::symbolic::AbstractTrace;
-use latticevm::symbolic::LatticeVMConstraints;
+use latticevm::solver::{
+    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
+};
+use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
 use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
-use latticevm_valida::utils::extract_constraints_and_range;
-use latticevm_valida::utils::{generate_bootstrap_trace_from_program, make_pc_adjuster};
+use latticevm_valida::utils::{
+    extract_constraints_and_range, generate_bootstrap_trace_from_program, make_pc_adjuster,
+};
 
 // ############## Final Check Function ##############################
 fn final_check(
