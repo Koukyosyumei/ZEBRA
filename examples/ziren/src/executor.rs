@@ -16,12 +16,7 @@ use latticevm::state::AbstractState;
 
 use crate::state::ziren_state_to_abstract_state;
 
-pub fn run_ziren_program(
-    program: &Program,
-) -> (
-    Vec<AbstractState>,
-    Vec<(String, Vec<Vec<AbstractInterval>>)>,
-) {
+pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
     let (checkpoint, done) = runtime.execute_state(false).unwrap();
@@ -33,12 +28,6 @@ pub fn run_ziren_program(
         .save(&mut checkpoint_file)
         .map_err(ZKMCoreProverError::IoError)
         .unwrap();
-
-    let true_abstract_states = runtime
-        .state_history
-        .iter()
-        .map(|s| ziren_state_to_abstract_state(s))
-        .collect::<Vec<_>>();
 
     type SC = KoalaBearPoseidon2;
     let config = KoalaBearPoseidon2::new();
@@ -74,5 +63,5 @@ pub fn run_ziren_program(
         true_abs_traces.push((mt.0.clone(), rows));
     }
 
-    (true_abstract_states, true_abs_traces)
+    true_abs_traces
 }

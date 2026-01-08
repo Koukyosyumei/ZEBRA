@@ -17,9 +17,7 @@ use latticevm::symbolic::gather_vars;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
 use latticevm::utils::GeneralLookupInfo;
-use latticevm::{
-    interval::AbstractInterval, symbolic::gather_boolean_variables,
-};
+use latticevm::{interval::AbstractInterval, symbolic::gather_boolean_variables};
 
 use crate::executor::run_ziren_program;
 use crate::lookup::get_symbolic_lookup_constraints;
@@ -38,7 +36,7 @@ pub fn generate_abstract_trace(
     key: String,
     num_extracted_rows: usize,
 ) -> Vec<Vec<AbstractInterval>> {
-    let (true_abstract_states, true_abstract_traces) = run_ziren_program(&program);
+    let true_abstract_traces = run_ziren_program(&program);
     let mut base_abs_main_trace_data = vec![];
     for st in &true_abstract_traces {
         if st.0 == key {
