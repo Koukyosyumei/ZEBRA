@@ -14,8 +14,6 @@ use zkm_stark::{CpuProver, MachineProver};
 use latticevm::interval::AbstractInterval;
 use latticevm::state::AbstractState;
 
-use crate::state::ziren_state_to_abstract_state;
-
 pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
