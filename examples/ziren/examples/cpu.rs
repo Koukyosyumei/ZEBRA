@@ -1,4 +1,3 @@
-use core::mem::transmute;
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::fs;
@@ -6,7 +5,6 @@ use std::io;
 
 use p3_koala_bear::KoalaBear;
 
-use zkm_core_executor::syscalls::SyscallCode;
 use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::{
     cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
@@ -17,16 +15,15 @@ use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
-use latticevm_ziren::executor::run_ziren_program;
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
 use latticevm_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 // ############## Final Check Function ##############################
@@ -69,7 +66,7 @@ fn final_check(
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
     // this program is expected to invalid according to the semantics of ziren, while
     // we can find the satisfying solution.
-    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
+    let instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
 
     Program::new(instructions, pc_start, pc_base)
 }
@@ -96,7 +93,7 @@ fn main() -> Result<(), io::Error> {
     //println!("operand_1: {:?}", colmap.operand_1);
     //println!("operand_2: {:?}", colmap.operand_2);
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
+    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, prime);
     refinable_cols.retain(|x| !program_cols.contains(x));
 

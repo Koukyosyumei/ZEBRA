@@ -12,7 +12,6 @@ use zkm_stark::ZKMCoreOpts;
 use zkm_stark::{CpuProver, MachineProver};
 
 use latticevm::interval::AbstractInterval;
-use latticevm::state::AbstractState;
 
 pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     // # Execute the Target Program

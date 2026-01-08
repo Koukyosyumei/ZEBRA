@@ -1,8 +1,6 @@
-use zkm_core_executor::ExecutionState;
 use zkm_stark::MachineProver;
 
 use latticevm::interval::AbstractInterval;
-use latticevm::interval::MayBeFlag;
 use latticevm::state::AbstractState;
 
 pub fn ziren_abstract_trace_to_abstract_state(
