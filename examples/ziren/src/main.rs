@@ -116,12 +116,7 @@ fn final_check(
 
 pub fn add_program(pc_start: u32, pc_base: u32) -> Program {
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
-    /*
-    instructions.extend(vec![
-        Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
-        Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
-        Instruction::new(Opcode::SYSCALL, 2, 4, 5, false, false),
-    ]);*/
+    //let mut instructions = vec![Instruction::new(Opcode::MUL, 1, 5, 3, false, true)];
 
     Program::new(instructions, pc_start, pc_base)
 }

@@ -234,8 +234,8 @@ fn div_floor_i64(x: i64, k: i64) -> i64 {
 impl AbstractInterval {
     pub fn top(prime: u32) -> Self {
         Self {
-            lo: 0,                //-(prime as i64) / 2,
-            hi: prime as i64 - 1, //(prime as i64) / 2,
+            lo: -(prime as i64) / 2,
+            hi: (prime as i64) / 2,
         }
     }
 
