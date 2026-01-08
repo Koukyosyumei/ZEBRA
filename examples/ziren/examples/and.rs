@@ -18,14 +18,12 @@ use zkm_core_machine::BranchChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
-use latticevm::solver::RangeType;
-use latticevm::ui::generate_alu_final_checker;
-use latticevm::ui::UiState;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::ui::{generate_alu_final_checker, UiState};
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
 
@@ -46,7 +44,6 @@ fn main() -> Result<(), io::Error> {
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air = BitwiseChip::default();
@@ -78,8 +75,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],

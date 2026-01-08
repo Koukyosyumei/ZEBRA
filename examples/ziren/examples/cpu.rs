@@ -1,26 +1,29 @@
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::mem::transmute;
-
-use itertools::Itertools;
 
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::control_flow::BranchColumns;
-use zkm_core_machine::control_flow::NUM_BRANCH_COLS;
-use zkm_core_machine::BranchChip;
+use zkm_core_machine::{
+    cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
+    CpuChip,
+};
 use zkm_stark::MachineProver;
+use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
+use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::ui::{generate_alu_final_checker, UiState};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
+use latticevm_ziren::pv_constraints::get_pv_constraints;
+use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
 use latticevm_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 // ############## Final Check Function ##############################
@@ -31,24 +34,17 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let string_representation = format!(
-        "pc: {}, next_pc[0]: {}, next_pc[1]: {}, next_pc[2]: {}, next_pc[3]: {}, next_next_pc[0]: {}, next_next_pc[1]: {}, next_next_pc[2]: {}, next_next_pc[3]: {}, is_beq: {}, is_bne: {}, is_bltz: {}, is_blez: {}, is_bgtz: {}, is_bgez: {}",
-        trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][23],
-        trace.data[0][24],
-        trace.data[0][25],
-        trace.data[0][26],
-        trace.data[0][53],
-        trace.data[0][54],
-        trace.data[0][55],
-        trace.data[0][56],
-        trace.data[0][57],
-        trace.data[0][58],
-    );
+    let mut string_representation = String::new();
+    let recovered_states = trace
+        .data
+        .iter()
+        .map(|row| ziren_abstract_trace_to_abstract_state(row, prime))
+        .collect::<Vec<_>>();
+    string_representation.push_str("Malicious States:\n");
+    for rs in &recovered_states {
+        string_representation.push_str(&format!("\t{}\n", rs));
+    }
+    string_representation.push_str("-----------------\n");
 
     if !known_reprt.contains(&string_representation) {
         known_reprt.insert(string_representation.clone());
@@ -67,13 +63,11 @@ fn final_check(
     }
 }
 
-const fn make_col_map() -> BranchColumns<usize> {
-    let indices_arr = indices_arr::<{ NUM_BRANCH_COLS }>();
-    unsafe { transmute::<[usize; NUM_BRANCH_COLS], BranchColumns<usize>>(indices_arr) }
-}
-
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::BEQ, 3, 0, 12, true, true)];
+    // this program is expected to invalid according to the semantics of ziren, while
+    // we can find the satisfying solution.
+    let instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
+
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -82,53 +76,54 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
+    let program_cols = (8..35).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000000000;
+    let max_iteration = 100000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
-    let air = BranchChip::default();
-    let air_name = "Branch";
-    let colmap = make_col_map();
-    println!("map: {:?}", colmap);
+    let air = CpuChip::default();
+    let air_name = "Cpu";
+    println!("{:?}", CPU_COL_MAP);
+    //let colmap = make_col_map();
+    //println!("operand_1: {:?}", colmap.operand_1);
+    //println!("operand_2: {:?}", colmap.operand_2);
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
-    refinable_cols.extend(&[23, 24, 25, 26]);
-    range_types.insert(23, RangeType::U8);
-    range_types.insert(24, RangeType::U8);
-    range_types.insert(25, RangeType::U8);
-    range_types.insert(26, RangeType::U8);
+    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+        extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, prime);
+    refinable_cols.retain(|x| !program_cols.contains(x));
 
-    range_types.insert(19, RangeType::U8);
-    range_types.insert(20, RangeType::U8);
-    range_types.insert(21, RangeType::U8);
-    range_types.insert(22, RangeType::U8);
+    let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
 
-    range_types.insert(59, RangeType::Bool);
-    range_types.insert(60, RangeType::Bool);
+    //refinable_cols.extend(&[2, 3, 4, 5]); // output
+    //refinable_cols.extend(&[9, 13]); // input
+    //range_types.insert(9, RangeType::U4);
+    //range_types.insert(13, RangeType::U4);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
-    for t in &tv_constraints {
-        println!("--- {}", t);
-    }
-    // 19 20 21 22 59 60 61
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
+        pv_pos_constraints,
+        pv_neg_constraints,
     };
-    let minimum_num_taregt_cols = refinable_cols.len() - 3;
+    let minimum_num_taregt_cols = 1; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+
+    // ######################## Public Values ####################################
+    let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
+    public_vals[40] = AbstractInterval::i4();
+    public_vals[41] = AbstractInterval::bool();
+    public_vals[44] = AbstractInterval::one();
+    let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
 
     // ######################## Solve ############################################
     quick_api(
@@ -136,9 +131,9 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
+        &refinment_target_indicies_pv,
         &base_abs_main_trace_data,
-        vec![],
+        public_vals,
         max_iteration,
         minimum_num_taregt_cols,
         min_row_id,

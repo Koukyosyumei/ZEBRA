@@ -66,13 +66,13 @@ pub enum SolverMsg {
         unsat: usize,
         queue_len: usize,
     },
-    SolutionFound(AbstractTrace, usize),
+    SolutionFound(AbstractTrace, AbstractTrace, usize),
     Finished,
 }
 
 /// The outcome of processing a single node
 enum NodeProcessingResult {
-    Success(AbstractTrace),
+    Success(AbstractTrace, AbstractTrace),
     Pruned, // Unsatisfiable
     Refined(Vec<(SearchNode, Potential)>),
 }
@@ -202,7 +202,7 @@ fn process_single_node(
             eval_constraints(&kid_trace.0, Some(&kid_trace.1.data[0]), constraints, prime);
 
         match res {
-            MayBeFlag::True => return NodeProcessingResult::Success(kid_trace.0),
+            MayBeFlag::True => return NodeProcessingResult::Success(kid_trace.0, kid_trace.1),
             MayBeFlag::False => {}
             MayBeFlag::MayBe => {
                 results.push((
@@ -347,9 +347,9 @@ where
                 );
 
                 match result {
-                    NodeProcessingResult::Success(trace) => {
+                    NodeProcessingResult::Success(trace, pv) => {
                         //sd.store(true, Ordering::Relaxed);
-                        let _ = tx.send(SolverMsg::SolutionFound(trace, my_global_id));
+                        let _ = tx.send(SolverMsg::SolutionFound(trace, pv, my_global_id));
                     }
                     NodeProcessingResult::Pruned => {
                         un.fetch_add(1, Ordering::Relaxed);
@@ -365,7 +365,6 @@ where
                 aw.fetch_sub(1, Ordering::SeqCst);
 
                 // UI UPDATE (Time-based, not count-based)
-                //if last_ui_update.elapsed().as_millis() > 100 {
                 if last_ui_update.elapsed().as_millis() > 100 {
                     let _ = tx.send(SolverMsg::UpdateStats {
                         trials: my_global_id, //tr.load(Ordering::Relaxed),
@@ -400,14 +399,15 @@ where
                             refinement_plan, trials, unsat, queue_len
                         );
                     }
-                    SolverMsg::SolutionFound(trace, trials) => {
-                        ui.logs = format!("Trial ID: {}\n\n#Main\n{}", trials, trace);
+                    SolverMsg::SolutionFound(trace, pv, trials) => {
+                        ui.logs = format!("Trial ID: {}\n\n#Main\n{}\n#PV\n{}", trials, trace, pv);
 
                         final_check(&trace, trials, prime, known_solution, ui);
                         solution_found = true;
                         // shutdown.store(true, Ordering::SeqCst);
                     }
                     SolverMsg::Finished => {
+                        // ui.status = format!("Subset: {:?}\nFinished", refinement_plan);
                         // Workers exhausted this subset
                         // subset_finished = true;
                     }
