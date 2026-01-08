@@ -40,6 +40,7 @@ use zkm_stark::ZKMCoreOpts;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 use latticevm::smt::expr_to_smt;
+use latticevm::solver::run_parallel_solver;
 use latticevm::solver::RangeType;
 use latticevm::symbolic::eval_constraints;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
@@ -48,8 +49,8 @@ use latticevm::symbolic::LatticeVMSymbolicVal;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{
-    interval::AbstractInterval, solver::run_solver, symbolic::gather_boolean_variables,
-    symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
+    interval::AbstractInterval, symbolic::gather_boolean_variables, symbolic::AbstractTrace,
+    symbolic::LatticeVMConstraints,
 };
 
 use latticevm_ziren::executor::run_ziren_program;
@@ -142,7 +143,9 @@ fn main() -> Result<(), io::Error> {
         .iter()
         .map(|sc| convert_p3_expr::<KoalaBear>(&sc))
         .collect::<Vec<_>>();
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints);
+
+    let m = HashSet::new();
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &m);
 
     let cpu_range_types = potential_boolean_vars
         .iter()
@@ -165,16 +168,11 @@ fn main() -> Result<(), io::Error> {
     let mut target_cols = (0..NUM_CPU_COLS).collect::<Vec<_>>();
     target_cols.retain(|x| !program_cols.contains(x));
 
-    // ######################## Auxiliary ALU Constraints #######################
-    //let alu_constraints = get_alu_constraints();
-    let aux_objs = vec![];
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
-
     // ######################## Solver Parameters ###############################
     let max_iteration = 1000;
     let minimum_num_taregt_cols = 1;
     let min_row_id = 0;
-    let max_row_id = 0;
+    let max_row_id = 1;
     let num_extracted_rows = 2;
     let seed = 41;
 
@@ -217,12 +215,10 @@ fn main() -> Result<(), io::Error> {
     // ######################## Run Solver ######################################
     let mut known_solution = HashSet::<String>::new();
     let mut logs = Vec::new();
-    run_solver(
+    run_parallel_solver(
         &constraints,
         &target_cols,
         &cpu_range_types,
-        &aux_objs,
-        &aux_tg_fns,
         &refinment_target_indicies_pv,
         &base_abs_main_trace_data,
         public_vals,

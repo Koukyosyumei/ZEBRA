@@ -14,13 +14,12 @@ use zkm_core_machine::BranchChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
-use latticevm::solver::RangeType;
-use latticevm::ui::UiState;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::ui::{generate_alu_final_checker, UiState};
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
 
@@ -85,12 +84,11 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000000;
+    let max_iteration = 1000000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air = BranchChip::default();
@@ -100,16 +98,16 @@ fn main() -> Result<(), io::Error> {
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
-    refinable_cols.extend(&[23, 24, 25, 26, 41, 42, 43, 44]);
+    refinable_cols.extend(&[23, 24, 25, 26]);
     range_types.insert(23, RangeType::U8);
     range_types.insert(24, RangeType::U8);
     range_types.insert(25, RangeType::U8);
     range_types.insert(26, RangeType::U8);
 
-    range_types.insert(19, RangeType::U4);
-    range_types.insert(20, RangeType::U4);
-    range_types.insert(21, RangeType::U4);
-    range_types.insert(22, RangeType::U4);
+    range_types.insert(19, RangeType::U8);
+    range_types.insert(20, RangeType::U8);
+    range_types.insert(21, RangeType::U8);
+    range_types.insert(22, RangeType::U8);
 
     range_types.insert(59, RangeType::Bool);
     range_types.insert(60, RangeType::Bool);
@@ -125,7 +123,7 @@ fn main() -> Result<(), io::Error> {
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = refinable_cols.len();
+    let minimum_num_taregt_cols = refinable_cols.len() - 3;
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);
@@ -138,8 +136,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],
