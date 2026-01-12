@@ -34,43 +34,43 @@ fn final_check(
 ) {
     let prev_state = format!(
         "prev_value: [{}, {}, {}, {}], prev_chunk: {}, prev_clk: {}",
-        trace.data[0][24],
-        trace.data[0][25],
-        trace.data[0][26],
-        trace.data[0][27],
-        trace.data[0][32],
-        trace.data[0][33]
+        trace.data[1][24],
+        trace.data[1][25],
+        trace.data[1][26],
+        trace.data[1][27],
+        trace.data[1][32],
+        trace.data[1][33]
     );
     let op_b_access = format!(
         "value: [{}, {}, {}, {}], prev_chunk: {}, prev_clk: {}",
-        trace.data[0][77],
-        trace.data[0][78],
-        trace.data[0][79],
-        trace.data[0][80],
-        trace.data[0][81],
-        trace.data[0][82]
+        trace.data[1][77],
+        trace.data[1][78],
+        trace.data[1][79],
+        trace.data[1][80],
+        trace.data[1][81],
+        trace.data[1][82]
     );
     let op_c_access = format!(
         "value: [{}, {}, {}, {}], prev_chunk: {}, prev_clk: {}",
-        trace.data[0][86],
-        trace.data[0][87],
-        trace.data[0][88],
-        trace.data[0][89],
-        trace.data[0][90],
-        trace.data[0][91]
+        trace.data[1][86],
+        trace.data[1][87],
+        trace.data[1][88],
+        trace.data[1][89],
+        trace.data[1][90],
+        trace.data[1][91]
     );
     let op_a_access = format!(
         "prev_value: [{}, {}, {}, {}], value: [{}, {}, {}, {}], prev_chunk: {}, prev_clk: {}",
-        trace.data[0][64],
-        trace.data[0][65],
-        trace.data[0][66],
-        trace.data[0][67],
-        trace.data[0][68],
-        trace.data[0][69],
-        trace.data[0][70],
-        trace.data[0][71],
-        trace.data[0][72],
-        trace.data[0][73],
+        trace.data[1][64],
+        trace.data[1][65],
+        trace.data[1][66],
+        trace.data[1][67],
+        trace.data[1][68],
+        trace.data[1][69],
+        trace.data[1][70],
+        trace.data[1][71],
+        trace.data[1][72],
+        trace.data[1][73],
     );
     let string_representation = format!(
         "prev state: {}\nop_b_access: {}\nop_c_access: {}\nop_a_access: {}\nmem_access: [{}, {}, {}, {}]",
@@ -78,10 +78,10 @@ fn final_check(
         op_b_access,
         op_c_access,
         op_a_access,
-        trace.data[0][28],
-        trace.data[0][29],
-        trace.data[0][30],
-        trace.data[0][31],
+        trace.data[1][28],
+        trace.data[1][29],
+        trace.data[1][30],
+        trace.data[1][31],
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -109,8 +109,8 @@ const fn make_col_map() -> MemoryChipCols<usize> {
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
     let instructions = vec![
         Instruction::new(Opcode::ADD, 29, 0, 0x12348765, false, true),
-        Instruction::new(Opcode::SB, 29, 0, 0x27654320, false, true),
-        //Instruction::new(Opcode::LW, 28, 0, 0x27654320, false, true),
+        Instruction::new(Opcode::SW, 29, 0, 0x27654320, false, true),
+        Instruction::new(Opcode::LB, 29, 0, 0x27654320, false, true),
     ];
     Program::new(instructions, pc_start, pc_base)
 }
@@ -123,9 +123,9 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     let max_iteration = 10000;
-    let min_row_id = 0;
-    let max_row_id = 0;
-    let num_extracted_rows = 1;
+    let min_row_id = 1;
+    let max_row_id = 1;
+    let num_extracted_rows = 2;
     let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
@@ -147,7 +147,7 @@ fn main() -> Result<(), io::Error> {
         0, 1, 24, 25, 26, 27, 32, 33, 55, 64, 65, 66, 67, 72, 73, 77, 78, 79, 80, 81, 82, 86, 87,
         88, 89, 90, 91,
     ];
-    semantic_inputs.extend(&[68, 69, 70, 71]);
+    semantic_inputs.extend(&[28, 29, 30, 31]);
     refinable_cols.retain(|c| !semantic_inputs.contains(c));
     refinable_cols.extend(&[83, 84, 85, 92, 93, 94]);
 

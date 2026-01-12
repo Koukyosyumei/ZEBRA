@@ -143,10 +143,11 @@ fn main() -> Result<(), io::Error> {
             NUM_MEMORY_CHIP_COLS,
             prime,
         );
-    let semantic_inputs = vec![
-        0, 1, 24, 25, 26, 27, 32, 33, 55, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 77, 78, 79, 80,
-        81, 82, 86, 87, 88, 89, 90, 91,
+    let mut semantic_inputs = vec![
+        0, 1, 24, 25, 26, 27, 32, 33, 55, 64, 65, 66, 67, 72, 73, 77, 78, 79, 80, 81, 82, 86, 87,
+        88, 89, 90, 91,
     ];
+    semantic_inputs.extend(&[68, 69, 70, 71]);
     refinable_cols.retain(|c| !semantic_inputs.contains(c));
     refinable_cols.extend(&[83, 84, 85, 92, 93, 94]);
 
