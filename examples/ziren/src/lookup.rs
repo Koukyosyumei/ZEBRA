@@ -16,7 +16,6 @@ use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::utils::GeneralLookupInfo;
 
-
 pub fn add_single_var_col_if_possible<F: PrimeField32>(
     b: &VirtualPairCol<F>,
     u8_cols: &mut Vec<usize>,
@@ -127,9 +126,10 @@ where
     }
 
     for s in &sends {
+        let multiplicities = convert_p3_virtual_pair_col(&s.multiplicity);
+
         match s.kind {
             LookupKind::Instruction => {
-                let multiplicities = convert_p3_virtual_pair_col(&s.multiplicity);
                 /*
                 for rv in &s.values {
                     for c in &rv.column_weights {
@@ -259,7 +259,10 @@ where
                         prime,
                     );
                     if let Some(el_constraint) = el_constraint {
-                        lookup_constraints.push(el_constraint);
+                        lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                            Box::new(multiplicities.clone()),
+                            Box::new(el_constraint),
+                        ));
                     }
                 }
             }
