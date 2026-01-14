@@ -148,7 +148,7 @@ fn main() -> Result<(), io::Error> {
             prime,
         );
     let mut semantic_inputs = vec![
-        0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15, 53, 54, 55, 56, 57, 58, 59, 60, 66, 67, 68, 69,
+        0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15, 53, 54, 55, 56, 66, 67, 68, 69,
     ];
     semantic_inputs.extend(&[4, 5, 6, 7]);
     refinable_cols.retain(|c| !semantic_inputs.contains(c));
