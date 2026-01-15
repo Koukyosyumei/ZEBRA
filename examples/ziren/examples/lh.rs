@@ -114,10 +114,31 @@ const fn make_col_map() -> MemoryInstructionsColumns<usize> {
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
+    /*
+((0 + (curr[76] * 1)) * 
+
+(((((0 + ((0 + (curr[4] * 1)) * 1)) + ((0 + (curr[5] * 1)) * 256)) + ((0 + (curr[6] * 1)) * 65536)) + ((0 + (curr[7] * 1)) * 16777216)) 
+- [(0 + (curr[70] * 1)), (0 + (curr[71] * 1)), (0 + (curr[72] * 1)), (0 + (curr[73] * 1))] - [0, (0 + (curr[16] * 1)), (0 + (curr[18] * 1)), 0]))
+
+           Instruction::new(Opcode::ADD, 29, 0, 0x123456, false, true),
+       Instruction::new(Opcode::SW, 29, 0, 0x27654320, false, true),
+       Instruction::new(Opcode::LH, 29, 0, 0x27654320, false, true),
+
+
+               // SAFETY: As we mentioned before, `mem_value_is_neg` is correct in all cases and boolean in all cases.
+        builder.send_alu(
+            Opcode::SUB.as_field::<AB::F>(),
+            local.op_a_value,
+            local.unsigned_mem_val,
+            signed_value,
+            local.mem_value_is_neg,
+        );
+
+    */
     let instructions = vec![
-        Instruction::new(Opcode::ADD, 29, 0, 0x123456, false, true),
+        Instruction::new(Opcode::ADD, 29, 0, 0x12348765, false, true),
         Instruction::new(Opcode::SW, 29, 0, 0x27654320, false, true),
-        Instruction::new(Opcode::LH, 29, 0, 0x27654320, false, true),
+        Instruction::new(Opcode::LH, 28, 0, 0x27654320, false, true),
     ];
     Program::new(instructions, pc_start, pc_base)
 }
@@ -168,7 +189,7 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints,
+        air_constraints: tv_constraints, //[..tv_constraints.len().saturating_sub(1)].to_vec(),
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
@@ -187,6 +208,21 @@ fn main() -> Result<(), io::Error> {
         }
         println!("\n----------------------------");
     }
+
+    let add_sub_table =
+        generate_abstract_trace(&program, "AddSub".to_string(), 6);
+    println!("");
+    for row in &add_sub_table {
+        for v in row {
+            print!("{}, ", v);
+        }
+        println!("\n----------------------------");
+    }
+    /*
+    operand_1: Word([9, 10, 11, 12])
+operand_2: Word([13, 14, 15, 16])
+output: [2, 3, 4, 5]
+     */
 
     // ######################## Solve ############################################
     quick_api(

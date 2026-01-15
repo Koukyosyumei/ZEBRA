@@ -86,7 +86,6 @@ fn main() -> Result<(), io::Error> {
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
@@ -125,8 +124,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],

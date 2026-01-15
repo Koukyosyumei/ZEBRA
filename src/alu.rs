@@ -5,6 +5,7 @@ use crate::symbolic::LatticeVMSymbolicExpr;
 pub enum WordOp {
     Add,
     Sub,
+    SubU,
     Mul,
     MulH,
     MulHU,
@@ -59,6 +60,13 @@ pub fn get_alu_constraint(
         WordOp::Sub => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
             Box::new(LatticeVMSymbolicExpr::WordSub(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::SubU => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordSubU(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
@@ -214,6 +222,39 @@ pub fn word_sub(a: &Word, b: &Word) -> AbstractInterval {
         // 一部でも underflow の可能性がある
         full_word()
     }
+}
+
+pub fn word_subu(b: &Word, c: &Word) -> AbstractInterval {
+    let b = word_to_unsigned(b);
+    let c = word_to_unsigned(c);
+
+    // ★ singleton 同士なら exact に計算
+    if b.lo == b.hi && c.lo == c.hi {
+        let res = (b.lo - c.lo).rem_euclid(WORD_BOUND);
+        return AbstractInterval { lo: res, hi: res };
+    }
+
+    // 確実に underflow しない
+    if b.lo >= c.hi {
+        return AbstractInterval {
+            lo: b.lo - c.hi,
+            hi: b.hi - c.lo,
+        };
+    }
+
+    // 確実に underflow する
+    if b.hi < c.lo {
+        let lo = b.lo + (WORD_BOUND - c.hi);
+        let hi = b.hi + (WORD_BOUND - c.lo);
+
+        return AbstractInterval {
+            lo: lo.max(0).min(WORD_BOUND - 1),
+            hi: hi.max(0).min(WORD_BOUND - 1),
+        };
+    }
+
+    // underflow するか不明
+    full_word()
 }
 
 pub fn word_mul(a: &Word, b: &Word) -> AbstractInterval {
