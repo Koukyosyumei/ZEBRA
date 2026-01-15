@@ -72,6 +72,9 @@ where
 
     for r in &receives {
         match r.kind {
+            LookupType::Memory => {
+                println!("RRRRRRRRRR: {:?}", r);
+            }
             LookupType::Alu => {
                 for rv in &r.values {
                     for c in &rv.column_weights {
@@ -118,10 +121,11 @@ where
                     );
                 }
 
+                /*
                 println!("receive opcode: {:?}", opcode);
                 println!("receive a: {:?} {:?} {:?} {:?}", a0, a1, a2, a3);
                 println!("receive b: {:?} {:?} {:?} {:?}", b0, b1, b2, b3);
-                println!("receive c: {:?} {:?} {:?} {:?}", c0, c1, c2, c3);
+                println!("receive c: {:?} {:?} {:?} {:?}", c0, c1, c2, c3);*/
             }
             _ => {}
         }
@@ -129,6 +133,9 @@ where
 
     for s in &sends {
         match s.kind {
+            LookupType::Memory => {
+                println!("SSSSSSSSSSSSS: {:?}", s);
+            }
             LookupType::Alu => {
                 let multiplicities = convert_p3_virtual_pair_col(&s.mult);
                 let opcode = convert_p3_virtual_pair_col(&s.values[0]);
@@ -193,8 +200,10 @@ where
                     }
                 }
 
+                /*
                 println!("send: opcode: {:?}", opcode);
                 println!("send: a: {:?} {:?} {:?} {:?}", a1, a2, b, c);
+                */
 
                 let a1_expr = convert_p3_virtual_pair_col(&a1);
                 let b_expr = convert_p3_virtual_pair_col(&b);

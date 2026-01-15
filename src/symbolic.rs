@@ -11,7 +11,7 @@ use rand::Rng;
 
 use crate::alu::{
     reconstruct_symbolic_word, word_add, word_and, word_div, word_ltu, word_mul, word_mulhs,
-    word_mulhu, word_neq, word_or, word_sdiv, word_slt, word_srl, word_sub, word_xor,
+    word_mulhu, word_neq, word_or, word_sdiv, word_slt, word_srl, word_sub, word_subu, word_xor,
 };
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 
@@ -78,6 +78,7 @@ pub enum LatticeVMSymbolicExpr {
     Flip(Box<Self>),
     WordAdd([Box<Self>; 4], [Box<Self>; 4]),
     WordSub([Box<Self>; 4], [Box<Self>; 4]),
+    WordSubU([Box<Self>; 4], [Box<Self>; 4]),
     WordMul([Box<Self>; 4], [Box<Self>; 4]),
     WordMulhu([Box<Self>; 4], [Box<Self>; 4]),
     WordMulhs([Box<Self>; 4], [Box<Self>; 4]),
@@ -293,6 +294,11 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::WordSub(b, c) => write!(
                 f,
                 "[{}, {}, {}, {}] - [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordSubU(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] -u [{}, {}, {}, {}]",
                 b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
             ),
             Self::WordMul(b, c) => write!(
@@ -857,6 +863,32 @@ impl LatticeVMSymbolicExpr {
                 });
 
                 word_sub(&b_ais, &c_ais)
+            }
+            Self::WordSubU(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
+                    x.eval(
+                        curr_row,
+                        next_row,
+                        public_vals,
+                        is_first_row,
+                        is_transition,
+                        is_last_row,
+                        prime,
+                    )
+                });
+
+                word_subu(&b_ais, &c_ais)
             }
             Self::WordMul(b, c) => {
                 let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
