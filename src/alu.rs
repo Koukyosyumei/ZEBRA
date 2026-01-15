@@ -228,13 +228,13 @@ pub fn word_subu(b: &Word, c: &Word) -> AbstractInterval {
     let b = word_to_unsigned(b);
     let c = word_to_unsigned(c);
 
-    // ★ singleton 同士なら exact に計算
+    // exact calculation
     if b.lo == b.hi && c.lo == c.hi {
         let res = (b.lo - c.lo).rem_euclid(WORD_BOUND);
         return AbstractInterval { lo: res, hi: res };
     }
 
-    // 確実に underflow しない
+    // surely not underflow
     if b.lo >= c.hi {
         return AbstractInterval {
             lo: b.lo - c.hi,
@@ -242,7 +242,7 @@ pub fn word_subu(b: &Word, c: &Word) -> AbstractInterval {
         };
     }
 
-    // 確実に underflow する
+    // surely underflow
     if b.hi < c.lo {
         let lo = b.lo + (WORD_BOUND - c.hi);
         let hi = b.hi + (WORD_BOUND - c.lo);
@@ -253,7 +253,7 @@ pub fn word_subu(b: &Word, c: &Word) -> AbstractInterval {
         };
     }
 
-    // underflow するか不明
+    // maybe underflow
     full_word()
 }
 
