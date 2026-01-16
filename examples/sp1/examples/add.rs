@@ -4,12 +4,12 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 
-use p3_koala_bear::KoalaBear;
+use p3_baby_bear::BabyBear;
 
-use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
-use zkm_core_machine::AddSubChip;
-use zkm_stark::MachineProver;
+use sp1_core_executor::{Instruction, Opcode, Program};
+use sp1_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
+use sp1_core_machine::riscv::AddSubChip;
+use sp1_stark::MachineProver;
 
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
@@ -17,7 +17,7 @@ use latticevm::ui::UiState;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
-use latticevm_ziren::utils::{
+use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
@@ -31,6 +31,7 @@ fn final_check(
 ) {
     let string_representation = format!(
         "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
+        trace.data[0][8],
         trace.data[0][9],
         trace.data[0][10],
         trace.data[0][11],
@@ -38,11 +39,10 @@ fn final_check(
         trace.data[0][13],
         trace.data[0][14],
         trace.data[0][15],
-        trace.data[0][16],
+        trace.data[0][1],
         trace.data[0][2],
         trace.data[0][3],
         trace.data[0][4],
-        trace.data[0][5],
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -89,15 +89,22 @@ fn main() -> Result<(), io::Error> {
     let air = AddSubChip::default();
     let air_name = "AddSub";
     let colmap = make_col_map();
+    //println!("{:?}", colmap);
     println!("operand_1: {:?}", colmap.operand_1);
     println!("operand_2: {:?}", colmap.operand_2);
+    println!("{:?}", colmap.add_operation);
+    println!("{:?}", colmap.op_a_not_0);
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
-    refinable_cols.extend(&[2, 3, 4, 5]); // output
-                                          //refinable_cols.extend(&[9, 13]); // input
-                                          //range_types.insert(9, RangeType::U4);
-                                          //range_types.insert(13, RangeType::U4);
+        extract_constraints_and_range::<BabyBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
+    refinable_cols.extend(&[1, 2, 3, 4]); // output
+    range_types.insert(16, RangeType::Bool);
+    range_types.insert(5, RangeType::Bool);
+    range_types.insert(6, RangeType::Bool);
+    range_types.insert(7, RangeType::Bool);
+    //refinable_cols.extend(&[9, 13]); // input
+    //range_types.insert(9, RangeType::U4);
+    //range_types.insert(13, RangeType::U4);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 
@@ -116,6 +123,13 @@ fn main() -> Result<(), io::Error> {
     let program = target_program(4, 4);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+
+    for row in &base_abs_main_trace_data {
+        for v in row {
+            print!("{}, ", v);
+        }
+        println!("");
+    }
 
     // ######################## Solve ############################################
     quick_api(

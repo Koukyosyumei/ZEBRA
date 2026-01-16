@@ -68,21 +68,20 @@ where
                 let clk = &r.values[1];
                 let pc = &r.values[2];
                 let next_pc = &r.values[3];
-                let next_next_pc = &r.values[4];
-                let num_extra_cycles = &r.values[5];
-                let opcode = &r.values[6];
-                let a0 = &r.values[7];
-                let a1 = &r.values[8];
-                let a2 = &r.values[9];
-                let a3 = &r.values[10];
-                let b0 = &r.values[11];
-                let b1 = &r.values[12];
-                let b2 = &r.values[13];
-                let b3 = &r.values[14];
-                let c0 = &r.values[15];
-                let c1 = &r.values[16];
-                let c2 = &r.values[17];
-                let c3 = &r.values[18];
+                let num_extra_cycles = &r.values[4];
+                let opcode = &r.values[5];
+                let a0 = &r.values[6];
+                let a1 = &r.values[7];
+                let a2 = &r.values[8];
+                let a3 = &r.values[9];
+                let b0 = &r.values[10];
+                let b1 = &r.values[11];
+                let b2 = &r.values[12];
+                let b3 = &r.values[13];
+                let c0 = &r.values[14];
+                let c1 = &r.values[15];
+                let c2 = &r.values[16];
+                let c3 = &r.values[17];
 
                 for i in 7..11 {
                     add_single_var_col_if_possible(
@@ -103,15 +102,11 @@ where
                     );
                 }
 
-                let hi0 = &r.values[19];
-                let hi1 = &r.values[20];
-                let hi2 = &r.values[21];
-                let hi3 = &r.values[22];
-                let op_a_immutable = &r.values[23];
-                let is_rw_a = &r.values[24];
-                let is_check_memory = &r.values[25];
-                let is_halt = &r.values[26];
-                let is_sequential = &r.values[27];
+                let op_a_0 = &r.values[18];
+                let op_a_immutable = &r.values[19];
+                let is_memory = &r.values[20];
+                let is_syscall = &r.values[21];
+                let is_halt = &r.values[22];
             }
             _ => {}
         }
