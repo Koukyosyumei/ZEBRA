@@ -8,9 +8,9 @@ use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
 use sp1_core_executor::Program;
-use sp1_stark::LookupBuilder;
+use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
+use sp1_stark::InteractionBuilder;
 use sp1_stark::MachineProver;
-use sp1_stark::SP1_PROOF_NUM_PV_ELTS;
 
 use latticevm::solver::RangeType;
 use latticevm::symbolic::gather_vars;
@@ -59,7 +59,7 @@ pub fn extract_constraints_and_range<F, A>(
 )
 where
     F: p3_field::PrimeField32,
-    A: Air<LookupBuilder<F>> + Air<SymbolicAirBuilder<F>>,
+    A: Air<InteractionBuilder<F>> + Air<SymbolicAirBuilder<F>>,
 {
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
