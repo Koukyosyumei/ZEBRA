@@ -98,13 +98,6 @@ fn main() -> Result<(), io::Error> {
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&[1, 2, 3, 4]); // output
-    range_types.insert(16, RangeType::Bool);
-    range_types.insert(5, RangeType::Bool);
-    range_types.insert(6, RangeType::Bool);
-    range_types.insert(7, RangeType::Bool);
-    //refinable_cols.extend(&[9, 13]); // input
-    //range_types.insert(9, RangeType::U4);
-    //range_types.insert(13, RangeType::U4);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 

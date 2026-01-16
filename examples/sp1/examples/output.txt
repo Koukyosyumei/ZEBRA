@@ -1,0 +1,59 @@
+Hello, Rust!
+curr[17] * (curr[17] - 1)
+    lv is 1
+    non-zero
+curr[18] * (curr[18] - 1)
+    lv is 0
+(curr[17] + curr[18]) * ((curr[17] + curr[18]) - 1)
+    lv is 1
+    non-zero
+curr[16] * (((curr[8] + curr[12]) - curr[1]) * (((curr[8] + curr[12]) - curr[1]) - 256))
+    lv is 1
+    non-zero
+curr[16] * ((((curr[9] + curr[13]) - curr[2]) + curr[5]) * ((((curr[9] + curr[13]) - curr[2]) + curr[5]) - 256))
+    lv is 1
+    non-zero
+curr[16] * ((((curr[10] + curr[14]) - curr[3]) + curr[6]) * ((((curr[10] + curr[14]) - curr[3]) + curr[6]) - 256))
+    lv is 1
+    non-zero
+curr[16] * ((((curr[11] + curr[15]) - curr[4]) + curr[7]) * ((((curr[11] + curr[15]) - curr[4]) + curr[7]) - 256))
+    lv is 1
+    non-zero
+curr[16] * (curr[5] * (((curr[8] + curr[12]) - curr[1]) - 256))
+    lv is 1
+    non-zero
+curr[16] * (curr[6] * ((((curr[9] + curr[13]) - curr[2]) + curr[5]) - 256))
+    lv is 1
+    non-zero
+curr[16] * (curr[7] * ((((curr[10] + curr[14]) - curr[3]) + curr[6]) - 256))
+    lv is 1
+    non-zero
+curr[16] * ((curr[5] - 1) * ((curr[8] + curr[12]) - curr[1]))
+    lv is 1
+    non-zero
+curr[16] * ((curr[6] - 1) * (((curr[9] + curr[13]) - curr[2]) + curr[5]))
+    lv is 1
+    non-zero
+curr[16] * ((curr[7] - 1) * (((curr[10] + curr[14]) - curr[3]) + curr[6]))
+    lv is 1
+    non-zero
+curr[16] * (curr[5] * (curr[5] - 1))
+    lv is 1
+    non-zero
+    boolean: 5
+curr[16] * (curr[6] * (curr[6] - 1))
+    lv is 1
+    non-zero
+    boolean: 6
+curr[16] * (curr[7] * (curr[7] - 1))
+    lv is 1
+    non-zero
+    boolean: 7
+curr[16] * (curr[16] * (curr[16] - 1))
+    lv is 1
+    non-zero
+    boolean: 16
+curr[16] * ((curr[17] + curr[18]) - 1)
+    lv is 1
+    non-zero
+[5, 6, 7, 16]
