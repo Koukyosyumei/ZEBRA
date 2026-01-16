@@ -20,7 +20,7 @@ use zkm_stark::MachineProver;
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::ui::{generate_alu_final_checker, UiState};
-use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{

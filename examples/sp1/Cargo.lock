@@ -1075,6 +1075,7 @@ dependencies = [
  "crossterm 0.29.0",
  "itertools 0.14.0",
  "latticevm",
+ "num-traits",
  "p3-air",
  "p3-baby-bear",
  "p3-blake3",
