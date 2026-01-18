@@ -14,11 +14,11 @@ use zkm_stark::MachineProver;
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::ui::UiState;
-use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 // ############## Final Check Function ##############################
@@ -95,11 +95,15 @@ fn main() -> Result<(), io::Error> {
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&[2, 3, 4, 5]); // output
-    refinable_cols.extend(&[9, 13]); // input
-    range_types.insert(9, RangeType::U4);
-    range_types.insert(13, RangeType::U4);
+                                          //refinable_cols.extend(&[9, 13]); // input
+                                          //range_types.insert(9, RangeType::U4);
+                                          //range_types.insert(13, RangeType::U4);
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
+
+    for t in &tv_constraints {
+        println!("# {}", t);
+    }
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),

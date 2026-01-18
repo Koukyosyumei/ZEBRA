@@ -8,10 +8,6 @@ license = "GPL-3.0"
 repository = "https://github.com/Koukyosyumei/TwinVM"
 keywords = ["formal method", "security", "zero-knowledge-proof", "zkp"]
 
-[[bin]]
-name = "latticevm-ziren"
-path = "src/main.rs"
-
 [dependencies]
 rand = "0.9.2"
 itertools = "0.14.0"

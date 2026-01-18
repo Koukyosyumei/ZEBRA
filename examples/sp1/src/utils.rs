@@ -7,10 +7,10 @@ use p3_air::Air;
 use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
-use zkm_core_executor::Program;
-use zkm_stark::LookupBuilder;
-use zkm_stark::MachineProver;
-use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
+use sp1_core_executor::Program;
+use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
+use sp1_stark::InteractionBuilder;
+use sp1_stark::MachineProver;
 
 use latticevm::solver::RangeType;
 use latticevm::symbolic::gather_vars;
@@ -19,7 +19,7 @@ use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
 use latticevm::utils::GeneralLookupInfo;
 use latticevm::{interval::AbstractInterval, symbolic::gather_boolean_variables};
 
-use crate::executor::run_ziren_program;
+use crate::executor::run_sp1_program;
 use crate::lookup::get_symbolic_lookup_constraints;
 use crate::p3_to_tv::convert_p3_expr;
 
@@ -36,7 +36,7 @@ pub fn generate_abstract_trace(
     key: String,
     num_extracted_rows: usize,
 ) -> Vec<Vec<AbstractInterval>> {
-    let true_abstract_traces = run_ziren_program(&program);
+    let true_abstract_traces = run_sp1_program(&program);
     let mut base_abs_main_trace_data = vec![];
     for st in &true_abstract_traces {
         if st.0 == key {
@@ -59,7 +59,7 @@ pub fn extract_constraints_and_range<F, A>(
 )
 where
     F: p3_field::PrimeField32,
-    A: Air<LookupBuilder<F>> + Air<SymbolicAirBuilder<F>>,
+    A: Air<InteractionBuilder<F>> + Air<SymbolicAirBuilder<F>>,
 {
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
@@ -67,11 +67,11 @@ where
     let mut received_vars_from_cpu = HashSet::new();
 
     let symbolic_constraints: Vec<SymbolicExpression<F>> =
-        get_symbolic_constraints(air, 0, ZKM_PROOF_NUM_PV_ELTS);
+        get_symbolic_constraints(air, 0, SP1_PROOF_NUM_PV_ELTS);
     let general_lookup_info = get_symbolic_lookup_constraints::<F, A>(
         air,
         0,
-        ZKM_PROOF_NUM_PV_ELTS,
+        SP1_PROOF_NUM_PV_ELTS,
         &mut u8_cols,
         &mut multiplicities,
         &mut lookup_symbolic_constraints,

@@ -57,3 +57,13 @@ pub struct GeneralLookupInfo {
     pub alu_input1: Vec<usize>,
     pub alu_input2: Vec<usize>,
 }
+
+pub const fn indices_arr<const N: usize>() -> [usize; N] {
+    let mut indices_arr = [0; N];
+    let mut i = 0;
+    while i < N {
+        indices_arr[i] = i;
+        i += 1;
+    }
+    indices_arr
+}

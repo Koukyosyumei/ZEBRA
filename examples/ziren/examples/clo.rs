@@ -23,7 +23,7 @@ use zkm_stark::MachineProver;
 use latticevm::quick::quick_api;
 use latticevm::solver::RangeType;
 use latticevm::ui::UiState;
-use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{

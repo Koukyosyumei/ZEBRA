@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
 use std::i32;
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -14,8 +16,9 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::symbolic::{
     apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
-    detect_conditional_var_sub_var_constraints, refine_conditional_constraints_var_sub_const,
-    refine_conditional_constraints_var_sub_var, AbirConstraint,
+    detect_conditional_var_sub_var_constraints, is_boolean_constraint,
+    refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
+    AbirConstraint, LatticeVMSymbolicExpr,
 };
 use crate::{
     interval::{AbstractInterval, MayBeFlag},
@@ -226,7 +229,7 @@ fn process_single_node(
 
 // Return type: (Did we find a solution?, Did user request global exit?)
 pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
-    initial_node: &SearchNode,
+    initial_node: &mut SearchNode,
     constraints: Arc<LatticeVMConstraints>,
     refinement_plan: Arc<Vec<usize>>, // Specific to this subset
     refinement_plan_pv: Arc<Vec<usize>>,
@@ -249,13 +252,51 @@ where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
 {
+    let mut conditional_bool_target_indices = Vec::<(usize, usize)>::new();
+
+    for t in &constraints.air_constraints {
+        if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = t {
+            for i in min_row_id..(max_row_id + 1) {
+                let lv = lhs.eval(
+                    &initial_node.main_trace.data[i],
+                    if i >= initial_node.main_trace.data.len() - 1 {
+                        None
+                    } else {
+                        Some(&initial_node.main_trace.data[i + 1])
+                    },
+                    Some(&initial_node.public_trace.data[0]),
+                    i == 0,
+                    i <= initial_node.main_trace.data.len() - 2,
+                    i == initial_node.main_trace.data.len() - 1,
+                    prime,
+                );
+                if let MayBeFlag::True = lv.is_non_zero(prime) {
+                    if let Some(j) = is_boolean_constraint(rhs) {
+                        conditional_bool_target_indices.push((i, j));
+                    }
+                }
+            }
+        }
+    }
+
     // --- 1. PREP CONSTRAINTS ---
     // (Do this calculation once per subset)
-    let bool_target_indices: Vec<usize> = refinement_plan
+    let mut bool_target_indices: Vec<usize> = refinement_plan
         .iter()
         .copied()
         .filter(|idx| matches!(range_types.get(idx), Some(RangeType::Bool)))
         .collect();
+    for c in conditional_bool_target_indices {
+        if !bool_target_indices.contains(&c.1) {
+            bool_target_indices.push(c.1.clone());
+            for i in min_row_id..(max_row_id + 1) {
+                if !initial_node.main_trace.data[i][c.1].is_singleton() {
+                    initial_node.main_trace.data[i][c.1] = AbstractInterval::bool();
+                }
+            }
+        }
+    }
+
     let conditional_var_sub_const_constraints =
         detect_conditional_var_sub_const_constraints(&constraints.air_constraints, prime);
     let conditional_var_sub_var_constraints =
@@ -492,7 +533,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 }
             }
 
-            let initial_node = SearchNode {
+            let mut initial_node = SearchNode {
                 main_trace: AbstractTrace::new(abs_main_trace_data),
                 public_trace: AbstractTrace::new(vec![public_vals.clone()]),
                 depth: 0,
@@ -501,7 +542,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
             // 2. RUN SOLVER for THIS subset
             // We pass ownership of subset_indices wrapped in Arc
             let (_found, quit) = parallel_solve(
-                &initial_node,
+                &mut initial_node,
                 shared_constraints.clone(),
                 Arc::new(subset_indices), // Subset specific plan
                 shared_pv_plan.clone(),

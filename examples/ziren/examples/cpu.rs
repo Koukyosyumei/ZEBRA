@@ -17,7 +17,7 @@ use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::UiState;
-use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::pv_constraints::get_pv_constraints;
