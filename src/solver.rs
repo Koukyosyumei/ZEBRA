@@ -254,12 +254,8 @@ where
 {
     let mut conditional_bool_target_indices = Vec::<(usize, usize)>::new();
 
-    let mut file = File::create("output.txt").unwrap();
-    file.write_all(b"Hello, Rust!\n").unwrap();
-
     for t in &constraints.air_constraints {
         if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = t {
-            writeln!(file, "{} * {}", lhs, rhs).unwrap();
             for i in min_row_id..(max_row_id + 1) {
                 let lv = lhs.eval(
                     &initial_node.main_trace.data[i],
@@ -274,11 +270,8 @@ where
                     i == initial_node.main_trace.data.len() - 1,
                     prime,
                 );
-                writeln!(file, "    lv is {}", lv).unwrap();
                 if let MayBeFlag::True = lv.is_non_zero(prime) {
-                    writeln!(file, "    non-zero").unwrap();
                     if let Some(j) = is_boolean_constraint(rhs) {
-                        writeln!(file, "    boolean: {}", j).unwrap();
                         conditional_bool_target_indices.push((i, j));
                     }
                 }
@@ -301,10 +294,9 @@ where
                     initial_node.main_trace.data[i][c.1] = AbstractInterval::bool();
                 }
             }
-            //range_types.insert(k, v)
         }
     }
-    writeln!(file, "{:?}", bool_target_indices).unwrap();
+
     let conditional_var_sub_const_constraints =
         detect_conditional_var_sub_const_constraints(&constraints.air_constraints, prime);
     let conditional_var_sub_var_constraints =
