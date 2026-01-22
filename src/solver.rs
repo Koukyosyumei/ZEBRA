@@ -410,7 +410,7 @@ where
                     let _ = tx.send(SolverMsg::UpdateStats {
                         trials: my_global_id, //tr.load(Ordering::Relaxed),
                         unsat: un.load(Ordering::Relaxed),
-                        queue_len: 1, //q.lock().unwrap().len(),
+                        queue_len: q.lock().unwrap().len(),
                     });
                     last_ui_update = std::time::Instant::now();
                 }

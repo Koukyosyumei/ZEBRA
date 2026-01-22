@@ -96,7 +96,7 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (8..35).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
+    let max_iteration = 100000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 3;
