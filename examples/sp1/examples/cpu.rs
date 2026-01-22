@@ -96,9 +96,9 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (8..35).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000;
+    let max_iteration = 100000000000;
     let min_row_id = 0;
-    let max_row_id = 0;
+    let max_row_id = 1;
     let num_extracted_rows = 3;
     let seed = 41;
 
@@ -124,27 +124,9 @@ fn main() -> Result<(), io::Error> {
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints,
         pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
+        pv_neg_constraints,
     };
     let minimum_num_taregt_cols = 1; //refinable_cols.len();
-
-    /*
-            #Main
-        * 1, 0, 0, 0, 0, 215, 8, 0, 1, 5, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-        * 1, 4, 0, 0, 0, 8, 12, 10, 2, 5, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-        * 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-        #PV
-        * 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 215, 12, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-
-    Malicious States:
-        (clk: 0, pc: 215, is_done: False, memory: [])
-        (clk: 4, pc: 8, is_done: False, memory: [])
-        (clk: 0, pc: 0, is_done: True, memory: [])
-    -----------------
-
-             */
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);
@@ -161,7 +143,7 @@ fn main() -> Result<(), io::Error> {
     // ######################## Public Values ####################################
     let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
     public_vals[40] = AbstractInterval::i8();
-    public_vals[41] = AbstractInterval::i8();
+    public_vals[41] = AbstractInterval::zero();
     public_vals[44] = AbstractInterval::one();
     let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
 
