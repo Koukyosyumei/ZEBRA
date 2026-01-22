@@ -17,6 +17,7 @@ use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::state::AbstractState;
+use latticevm::symbolic::eval_constraints;
 use latticevm::ui::UiState;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
@@ -95,7 +96,7 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (8..35).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 10000;
+    let max_iteration = 100000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 3;
@@ -118,24 +119,59 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 
+    println!("33333333333333333: {}", tv_constraints[37]);
+
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints: tv_constraints,
         pv_pos_constraints,
         pv_neg_constraints,
     };
     let minimum_num_taregt_cols = 1; //refinable_cols.len();
+
+    /*
+            #Main
+        * 1, 0, 0, 0, 0, 215, 8, 0, 1, 5, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        * 1, 4, 0, 0, 0, 8, 12, 10, 2, 5, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        * 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+        #PV
+        * 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 215, 12, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+
+    Malicious States:
+        (clk: 0, pc: 215, is_done: False, memory: [])
+        (clk: 4, pc: 8, is_done: False, memory: [])
+        (clk: 0, pc: 0, is_done: True, memory: [])
+    -----------------
+
+             */
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
+    for row in &base_abs_main_trace_data {
+        for v in row {
+            print!("{}, ", v);
+        }
+        println!("\n-----------------");
+    }
+
     // ######################## Public Values ####################################
     let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::i4();
-    public_vals[41] = AbstractInterval::bool();
+    public_vals[40] = AbstractInterval::i8();
+    public_vals[41] = AbstractInterval::i8();
     public_vals[44] = AbstractInterval::one();
     let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
+
+    let a = eval_constraints(
+        &AbstractTrace::new(base_abs_main_trace_data.clone()),
+        Some(&public_vals),
+        &constraints,
+        prime,
+    );
+    println!("##########: {:?}", a);
 
     // ######################## Solve ############################################
     quick_api(
