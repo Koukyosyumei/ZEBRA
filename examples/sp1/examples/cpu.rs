@@ -123,8 +123,8 @@ fn main() -> Result<(), io::Error> {
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints,
-        pv_pos_constraints,
-        pv_neg_constraints,
+        pv_pos_constraints: vec![],
+        pv_neg_constraints: vec![],
     };
     let minimum_num_taregt_cols = 1; //refinable_cols.len();
 
