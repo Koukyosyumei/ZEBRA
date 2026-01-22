@@ -1,5 +1,7 @@
 use std::{fs, path::Path};
 
+use crate::symbolic::LatticeVMSymbolicExpr;
+
 #[derive(Debug)]
 pub struct BitCombinationsDictOrder {
     len: usize,
@@ -56,6 +58,7 @@ pub struct GeneralLookupInfo {
     pub alu_output: Vec<usize>,
     pub alu_input1: Vec<usize>,
     pub alu_input2: Vec<usize>,
+    pub pc_table_is_real: LatticeVMSymbolicExpr,
 }
 
 pub const fn indices_arr<const N: usize>() -> [usize; N] {

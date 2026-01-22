@@ -5,6 +5,7 @@ use std::io;
 
 use p3_baby_bear::BabyBear;
 
+use sp1_core_executor::syscalls::SyscallCode;
 use sp1_core_executor::{Instruction, Opcode, Program};
 use sp1_core_machine::{
     cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
@@ -14,6 +15,7 @@ use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
 use sp1_stark::MachineProver;
 
 use latticevm::interval::AbstractInterval;
+use latticevm::interval::MayBeFlag;
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::state::AbstractState;
@@ -49,11 +51,19 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let mut string_representation = String::new();
+    let mut recovered_states = vec![];
+    for row in &trace.data {
+        if let MayBeFlag::False = row[56].is_zero(prime) {
+            recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
+        }
+    }
+    /*
     let recovered_states = trace
         .data
         .iter()
         .map(|row| sp1_abstract_trace_to_abstract_state(row, prime))
         .collect::<Vec<_>>();
+    */
     string_representation.push_str("Malicious States:\n");
     for rs in &recovered_states {
         string_representation.push_str(&format!("\t{}\n", rs));
@@ -77,13 +87,19 @@ fn final_check(
     }
 }
 
+/*
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+*/
+
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
     // this program is expected to invalid according to the semantics of ziren, while
     // we can find the satisfying solution.
-    let instructions = vec![
-        Instruction::new(Opcode::ADD, 1, 5, 3, false, true),
-        Instruction::new(Opcode::MUL, 2, 5, 3, false, true),
-    ];
+    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
+    instructions.extend(vec![
+        Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
+        Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
+        Instruction::new(Opcode::ECALL, 2, 4, 5, false, false),
+    ]);
 
     Program::new(instructions, pc_start, pc_base)
 }
@@ -92,14 +108,14 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
-    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
+    let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
     let program_cols = (8..35).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000000;
+    let max_iteration = 100000;
     let min_row_id = 0;
-    let max_row_id = 1;
-    let num_extracted_rows = 3;
+    let max_row_id = 3;
+    let num_extracted_rows = 5;
     let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
@@ -119,19 +135,68 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
 
-    println!("33333333333333333: {}", tv_constraints[37]);
+    println!("ggg {:?}", general_lookup_info);
+
+    println!("33333333333333333: {}", tv_constraints[43]);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints,
-        pv_pos_constraints: vec![],
+        pv_pos_constraints,
         pv_neg_constraints,
     };
     let minimum_num_taregt_cols = 1; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
-    let base_abs_main_trace_data =
+    //                           2130706433
+    //                           117440509
+    let program = target_program(2013265921 - 8, 2013265921 - 8);
+    let mut base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+
+    let pad_ref_data = base_abs_main_trace_data[base_abs_main_trace_data.len() - 1].clone();
+    let adjust_pc_program = move |main_trace: &mut AbstractTrace, prime: u32| {
+        let num_steps = main_trace.data.len();
+        for i in 0..num_steps {
+            if general_lookup_info
+                .pc_table_is_real
+                .eval(
+                    &main_trace.data[i],
+                    if i + 1 < num_steps {
+                        Some(&main_trace.data[i + 1])
+                    } else {
+                        None
+                    },
+                    None,
+                    i == 0,
+                    i < num_steps - 1,
+                    i == num_steps - 1,
+                    prime,
+                )
+                .is_zero(prime)
+                == MayBeFlag::True
+            {
+                main_trace.data[i] = pad_ref_data.clone();
+            }
+        }
+    };
+
+    /*
+    let ts = vec![
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    let mut i = 0;
+    for t in &ts {
+        if *t == 0 {
+            base_abs_main_trace_data[2][i] = AbstractInterval::zero();
+            base_abs_main_trace_data[3][i] = AbstractInterval::zero();
+        } else {
+            base_abs_main_trace_data[2][i] = AbstractInterval::one();
+            base_abs_main_trace_data[3][i] = AbstractInterval::one();
+        }
+
+        i += 1;
+    }*/
 
     for row in &base_abs_main_trace_data {
         for v in row {
@@ -142,10 +207,10 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Public Values ####################################
     let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::i8();
+    public_vals[40] = AbstractInterval::from_i64(2013265921 - 8);
     public_vals[41] = AbstractInterval::zero();
     public_vals[44] = AbstractInterval::one();
-    let refinment_target_indicies_pv: Vec<usize> = vec![40, 41];
+    let refinment_target_indicies_pv: Vec<usize> = vec![];
 
     let a = eval_constraints(
         &AbstractTrace::new(base_abs_main_trace_data.clone()),
@@ -170,7 +235,7 @@ fn main() -> Result<(), io::Error> {
         max_row_id,
         program.instructions.len(),
         dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
+        adjust_pc_program,
         final_check,
         prime,
         seed,

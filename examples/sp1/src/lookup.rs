@@ -117,6 +117,9 @@ where
         let multiplicities = convert_p3_virtual_pair_col(&s.multiplicity);
 
         match s.kind {
+            InteractionKind::Program => {
+                general_lookup_info.pc_table_is_real = multiplicities.clone();
+            }
             InteractionKind::Instruction => {
                 let _shard = &s.values[0];
                 let _clk = &s.values[1];
@@ -156,7 +159,6 @@ where
                     );
                     let impl_constraint =
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
-
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 7..19 {
                             add_single_var_col_if_possible(&s.values[i], u8_cols);
@@ -177,10 +179,14 @@ where
                             ))),
                         )),
                     );
-                    lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
-                        Box::new(multiplicities.clone()),
-                        Box::new(pc_constraint),
-                    ));
+                    let impl_pc_constraint =
+                        make_impl_constraint(t.0 as i64, &opcode, pc_constraint, prime);
+                    if let Some(impl_pc_constraint) = impl_pc_constraint {
+                        lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                            Box::new(multiplicities.clone()),
+                            Box::new(impl_pc_constraint),
+                        ));
+                    }
                 }
 
                 /*

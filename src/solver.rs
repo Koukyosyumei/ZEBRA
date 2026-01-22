@@ -559,8 +559,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
         for column_subset in column_subsets {
             // 1. Prepare Initial Trace for this subset
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
-            let mut subset_indices: Vec<usize> = column_subset.iter().cloned().cloned().collect();
-            subset_indices = vec![5, 6];
+            let subset_indices: Vec<usize> = column_subset.iter().cloned().cloned().collect();
 
             for i in min_row_id..(max_row_id + 1) {
                 for c in &subset_indices {
