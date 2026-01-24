@@ -16,7 +16,6 @@ use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::utils::GeneralLookupInfo;
 
-
 pub fn add_single_var_col_if_possible<F: PrimeField32>(
     b: &VirtualPairCol<F>,
     u8_cols: &mut Vec<usize>,
@@ -78,19 +77,19 @@ where
                     }
                 }
 
-                let opcode = &r.values[0];
-                let a0 = &r.values[1];
-                let a1 = &r.values[2];
-                let a2 = &r.values[3];
-                let a3 = &r.values[4];
-                let b0 = &r.values[5];
-                let b1 = &r.values[6];
-                let b2 = &r.values[7];
-                let b3 = &r.values[8];
-                let c0 = &r.values[9];
-                let c1 = &r.values[10];
-                let c2 = &r.values[11];
-                let c3 = &r.values[12];
+                let _opcode = &r.values[0];
+                let _a0 = &r.values[1];
+                let _a1 = &r.values[2];
+                let _a2 = &r.values[3];
+                let _a3 = &r.values[4];
+                let _b0 = &r.values[5];
+                let _b1 = &r.values[6];
+                let _b2 = &r.values[7];
+                let _b3 = &r.values[8];
+                let _c0 = &r.values[9];
+                let _c1 = &r.values[10];
+                let _c2 = &r.values[11];
+                let _c3 = &r.values[12];
 
                 for i in 1..13 {
                     add_single_var_col_if_possible(&r.values[i], u8_cols);
@@ -114,12 +113,6 @@ where
                         &mut general_lookup_info.alu_input2,
                     );
                 }
-
-                /*
-                println!("receive opcode: {:?}", opcode);
-                println!("receive a: {:?} {:?} {:?} {:?}", a0, a1, a2, a3);
-                println!("receive b: {:?} {:?} {:?} {:?}", b0, b1, b2, b3);
-                println!("receive c: {:?} {:?} {:?} {:?}", c0, c1, c2, c3);*/
             }
             _ => {}
         }
