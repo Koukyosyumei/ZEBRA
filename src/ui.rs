@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fs};
 
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -191,5 +191,27 @@ pub fn pad_dummy_rows_with_last_dummy(
                 }
             }
         }
+    }
+}
+
+pub fn save_repr_if_unique(
+    string_representation: &String,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    if !known_reprt.contains(string_representation) {
+        known_reprt.insert(string_representation.clone());
+        ui.recovered = string_representation.clone();
+
+        fs::write(
+            format!("voutput/{}_states.txt", known_reprt.len()),
+            ui.recovered.clone(),
+        )
+        .unwrap();
+        fs::write(
+            format!("voutput/{}_assignments.txt", known_reprt.len()),
+            ui.logs.clone(),
+        )
+        .unwrap();
     }
 }

@@ -57,13 +57,7 @@ fn final_check(
             recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
         }
     }
-    /*
-    let recovered_states = trace
-        .data
-        .iter()
-        .map(|row| sp1_abstract_trace_to_abstract_state(row, prime))
-        .collect::<Vec<_>>();
-    */
+
     string_representation.push_str("Malicious States:\n");
     for rs in &recovered_states {
         string_representation.push_str(&format!("\t{}\n", rs));
