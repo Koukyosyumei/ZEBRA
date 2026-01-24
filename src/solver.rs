@@ -5,7 +5,7 @@ use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode};
 use itertools::Itertools;
@@ -159,8 +159,8 @@ fn process_single_node(
     let (refined_public_candidates, _) = refine_trace(
         &public_trace,
         &refinement_plan_pv.to_vec(),
-        min_row_id,
-        max_row_id,
+        0,
+        0,
         prime,
         rng,
     );
@@ -425,57 +425,92 @@ where
     let mut user_quit = false;
     // let mut subset_finished = false;
 
+    // 描画更新の頻度を制御（例: 30 FPS = 約33ms, ここでは少し余裕を見て 50ms）
+    let tick_rate = Duration::from_millis(50);
+    let mut last_tick = std::time::Instant::now();
+
     loop {
-        // A. Drain Messages (Non-blocking)
-        match rx.recv_timeout(Duration::from_millis(10)) {
-            Ok(msg) => {
-                match msg {
-                    SolverMsg::UpdateStats {
-                        trials,
-                        unsat,
-                        queue_len,
-                    } => {
-                        ui.status = format!(
-                            "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
-                            refinement_plan, trials, unsat, queue_len
-                        );
-                    }
-                    SolverMsg::SolutionFound(trace, pv, trials) => {
-                        ui.logs = format!("Trial ID: {}\n\n#Main\n{}\n#PV\n{}", trials, trace, pv);
-
-                        final_check(&trace, trials, prime, known_solution, ui);
-                        solution_found = true;
-                        // shutdown.store(true, Ordering::SeqCst);
-                    }
-                    SolverMsg::Finished => {
-                        // ui.status = format!("Subset: {:?}\nFinished", refinement_plan);
-                        // Workers exhausted this subset
-                        // subset_finished = true;
-                    }
+        for msg in rx.try_iter() {
+            match msg {
+                SolverMsg::UpdateStats {
+                    trials,
+                    unsat,
+                    queue_len,
+                } => {
+                    // 書式生成はコストがかかるので、本当に描画が必要な時だけやる手もありますが、
+                    // ここでは最新状態で上書きし続ける
+                    ui.status = format!(
+                        "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
+                        refinement_plan, trials, unsat, queue_len
+                    );
                 }
-            }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                // メッセージが来ない間は描画更新とキー入力チェック
-                terminal
-                    .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
-                    .unwrap();
-
-                if event::poll(Duration::from_millis(1)).unwrap() {
-                    if let Event::Key(key) = event::read().unwrap() {
-                        if key.code == KeyCode::Char('q') || key.code == KeyCode::Char('c') {
-                            user_quit = true;
-                            shutdown.store(true, Ordering::SeqCst);
-                            // ユーザー強制終了の場合は即抜ける
-                            return (solution_found, user_quit);
-                        }
-                    }
+                SolverMsg::SolutionFound(trace, pv, trials) => {
+                    ui.logs = format!("Trial ID: {}\n\n#Main\n{}\n#PV\n{}", trials, trace, pv);
+                    final_check(&trace, trials, prime, known_solution, ui);
+                    solution_found = true;
                 }
-            }
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                // all threads have been terminated
-                break;
+                SolverMsg::Finished => {
+                    // ui.status = format!("Subset: {:?}\nFinished", refinement_plan);
+                    // Workers exhausted this subset
+                    // subset_finished = true;
+                }
             }
         }
+
+        // 全スレッドが終了し、かつメッセージもない場合のチェック
+        // (rx.try_iter()が終わった時点でDisconnectなら終了)
+        // ただし、mpscは送信側がすべてドロップされると RecvError を返しますが、
+        // try_iter は単にループを抜けるので、ここで明示的な終了判定を入れるか、
+        // active_workers 等を見るのが確実です。
+        // 簡単のため、shutdownフラグと solution_found で判定します。
+
+        // --------------------------------------------------------
+        // 2. キー入力のチェック (最優先)
+        // --------------------------------------------------------
+        // timeout ブロックの中ではなく、ループ毎に必ずチェックします。
+        // poll(Duration::ZERO) はノンブロッキングです。
+        if event::poll(Duration::from_millis(0)).unwrap() {
+            if let Event::Key(key) = event::read().unwrap() {
+                match key.code {
+                    KeyCode::Char('q') | KeyCode::Char('c') => {
+                        user_quit = true;
+                        shutdown.store(true, Ordering::SeqCst);
+                        return (solution_found, user_quit);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // --------------------------------------------------------
+        // 3. 描画更新 (一定時間経過時のみ)
+        // --------------------------------------------------------
+        if last_tick.elapsed() >= tick_rate {
+            terminal
+                .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
+                .unwrap();
+            last_tick = std::time::Instant::now();
+        }
+
+        // 全ワーカーが終了したかの判定
+        // (厳密には active_workers == 0 && queue empty ですが、
+        //  SolverMsg::Finished をカウントする等の方法もあります。
+        //  ここではシンプルに channel が切断されているかを確認する手段として
+        //  rx.try_recv()のエラーを見る方法もありますが、
+        //  上の try_iter ループを抜けたということは空なので、
+        //  active_workers が 0 なら終了とみなせます)
+
+        let workers_active = Arc::strong_count(&queue) > 1; // メインスレッドも持っているので > 1
+        if !workers_active {
+            break;
+        }
+
+        // ワーカーが全員死んでチャネルも空ならループを抜ける
+        // (簡略化のため、Disconnect検知は recv() で行うのが一般的ですが、
+        //  ここでは active_workers を見るか、単に少し sleep してループさせる)
+
+        // 短いスリープを入れてCPU使用率100%を防ぐ
+        thread::sleep(Duration::from_millis(10));
     }
 
     (solution_found, user_quit)

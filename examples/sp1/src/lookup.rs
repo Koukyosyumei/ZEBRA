@@ -12,6 +12,7 @@ use sp1_stark::InteractionKind;
 
 use latticevm::alu::get_alu_constraint;
 use latticevm::alu::WordOp;
+use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::utils::GeneralLookupInfo;
@@ -116,28 +117,28 @@ where
         let multiplicities = convert_p3_virtual_pair_col(&s.multiplicity);
 
         match s.kind {
+            InteractionKind::Program => {
+                general_lookup_info.pc_table_is_real = multiplicities.clone();
+            }
             InteractionKind::Instruction => {
-                /*
-                for rv in &s.values {
-                    for c in &rv.column_weights {
-                        if let PairCol::Main(index) = c.0 {
-                            received_vars_from_cpu.insert(index);
-                        }
-                    }
-                }*/
-                let opcode = convert_p3_virtual_pair_col(&s.values[6]);
-                let a0 = convert_p3_virtual_pair_col(&s.values[7]);
-                let a1 = convert_p3_virtual_pair_col(&s.values[8]);
-                let a2 = convert_p3_virtual_pair_col(&s.values[9]);
-                let a3 = convert_p3_virtual_pair_col(&s.values[10]);
-                let b0 = convert_p3_virtual_pair_col(&s.values[11]);
-                let b1 = convert_p3_virtual_pair_col(&s.values[12]);
-                let b2 = convert_p3_virtual_pair_col(&s.values[13]);
-                let b3 = convert_p3_virtual_pair_col(&s.values[14]);
-                let c0 = convert_p3_virtual_pair_col(&s.values[15]);
-                let c1 = convert_p3_virtual_pair_col(&s.values[16]);
-                let c2 = convert_p3_virtual_pair_col(&s.values[17]);
-                let c3 = convert_p3_virtual_pair_col(&s.values[18]);
+                let _shard = &s.values[0];
+                let _clk = &s.values[1];
+                let pc = convert_p3_virtual_pair_col(&s.values[2]);
+                let next_pc = convert_p3_virtual_pair_col(&s.values[3]);
+
+                let opcode = convert_p3_virtual_pair_col(&s.values[5]);
+                let a0 = convert_p3_virtual_pair_col(&s.values[6]);
+                let a1 = convert_p3_virtual_pair_col(&s.values[7]);
+                let a2 = convert_p3_virtual_pair_col(&s.values[8]);
+                let a3 = convert_p3_virtual_pair_col(&s.values[9]);
+                let b0 = convert_p3_virtual_pair_col(&s.values[10]);
+                let b1 = convert_p3_virtual_pair_col(&s.values[11]);
+                let b2 = convert_p3_virtual_pair_col(&s.values[12]);
+                let b3 = convert_p3_virtual_pair_col(&s.values[13]);
+                let c0 = convert_p3_virtual_pair_col(&s.values[14]);
+                let c1 = convert_p3_virtual_pair_col(&s.values[15]);
+                let c2 = convert_p3_virtual_pair_col(&s.values[16]);
+                let c3 = convert_p3_virtual_pair_col(&s.values[17]);
 
                 let tmps = vec![
                     (Opcode::ADD as u8, WordOp::Add),
@@ -158,7 +159,6 @@ where
                     );
                     let impl_constraint =
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
-
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 7..19 {
                             add_single_var_col_if_possible(&s.values[i], u8_cols);
@@ -167,6 +167,24 @@ where
                         lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
                             Box::new(multiplicities.clone()),
                             Box::new(impl_constraint),
+                        ));
+                    }
+
+                    let pc_constraint = LatticeVMSymbolicExpr::Sub(
+                        Box::new(next_pc.clone()),
+                        Box::new(LatticeVMSymbolicExpr::Add(
+                            Box::new(pc.clone()),
+                            Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+                                4,
+                            ))),
+                        )),
+                    );
+                    let impl_pc_constraint =
+                        make_impl_constraint(t.0 as i64, &opcode, pc_constraint, prime);
+                    if let Some(impl_pc_constraint) = impl_pc_constraint {
+                        lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                            Box::new(multiplicities.clone()),
+                            Box::new(impl_pc_constraint),
                         ));
                     }
                 }

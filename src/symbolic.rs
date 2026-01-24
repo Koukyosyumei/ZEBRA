@@ -94,6 +94,12 @@ pub enum LatticeVMSymbolicExpr {
     WordSrl([Box<Self>; 4], [Box<Self>; 4]),
 }
 
+impl Default for LatticeVMSymbolicExpr {
+    fn default() -> Self {
+        Self::Constant(AbstractInterval::zero())
+    }
+}
+
 pub fn gather_vars_simple(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize>) {
     match expr {
         LatticeVMSymbolicExpr::Variable(lattice_vmsymbolic_val) => {
