@@ -20,7 +20,7 @@ use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::state::AbstractState;
 use latticevm::symbolic::eval_constraints;
-use latticevm::ui::UiState;
+use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
@@ -154,49 +154,7 @@ fn main() -> Result<(), io::Error> {
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
     let pad_ref_data = base_abs_main_trace_data[base_abs_main_trace_data.len() - 1].clone();
-    let adjust_pc_program = move |main_trace: &mut AbstractTrace, prime: u32| {
-        let num_steps = main_trace.data.len();
-        for i in 0..num_steps {
-            if general_lookup_info
-                .pc_table_is_real
-                .eval(
-                    &main_trace.data[i],
-                    if i + 1 < num_steps {
-                        Some(&main_trace.data[i + 1])
-                    } else {
-                        None
-                    },
-                    None,
-                    i == 0,
-                    i < num_steps - 1,
-                    i == num_steps - 1,
-                    prime,
-                )
-                .is_zero(prime)
-                == MayBeFlag::True
-            {
-                main_trace.data[i] = pad_ref_data.clone();
-            }
-        }
-    };
-
-    /*
-    let ts = vec![
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    ];
-    let mut i = 0;
-    for t in &ts {
-        if *t == 0 {
-            base_abs_main_trace_data[2][i] = AbstractInterval::zero();
-            base_abs_main_trace_data[3][i] = AbstractInterval::zero();
-        } else {
-            base_abs_main_trace_data[2][i] = AbstractInterval::one();
-            base_abs_main_trace_data[3][i] = AbstractInterval::one();
-        }
-
-        i += 1;
-    }*/
+    let adjust_pc_program = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
 
     for row in &base_abs_main_trace_data {
         for v in row {
