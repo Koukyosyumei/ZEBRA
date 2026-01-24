@@ -1,7 +1,4 @@
 use core::mem::transmute;
-use itertools::Itertools;
-use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -9,18 +6,15 @@ use p3_koala_bear::KoalaBear;
 use pico_vm::chips::chips::alu::divrem::columns::{DivRemCols, NUM_DIVREM_COLS};
 use pico_vm::chips::chips::alu::divrem::DivRemChip;
 use pico_vm::compiler::riscv::program::Program;
-use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, register::Register};
+use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
 use latticevm::quick::quick_api;
-use latticevm::solver::RangeType;
-use latticevm::ui::{generate_alu_final_checker, UiState};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::LatticeVMConstraints;
+use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
-use latticevm::utils::GeneralLookupInfo;
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
-use latticevm_pico::lookup::get_symbolic_lookup_constraints;
 use latticevm_pico::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
 
@@ -29,12 +23,24 @@ const fn make_col_map() -> DivRemCols<usize> {
     unsafe { transmute::<[usize; NUM_DIVREM_COLS], DivRemCols<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::DIVU, 1, 13, 3, true, true)];
+pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "DIV" => Opcode::DIV,
+        "DIVU" => Opcode::DIVU,
+        "REM" => Opcode::REM,
+        "REMU" => Opcode::REMU,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "DIV";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -46,16 +52,11 @@ fn main() -> Result<(), io::Error> {
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
-    //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air: DivRemChip<KoalaBear> = DivRemChip::default();
     let air_name = "DivRem";
-    let colmap = make_col_map();
-    println!("output: {:?}", colmap.values[0].a);
-    println!("operand_1: {:?}", colmap.values[0].b);
-    println!("operand_2: {:?}", colmap.values[0].c);
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, DivRemChip<KoalaBear>>(
@@ -63,17 +64,9 @@ fn main() -> Result<(), io::Error> {
             NUM_DIVREM_COLS,
             prime,
         );
-    println!("General: {:?}", general_lookup_info);
 
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
-
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
@@ -83,7 +76,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = 2;
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 13, 3);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
@@ -93,8 +86,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],

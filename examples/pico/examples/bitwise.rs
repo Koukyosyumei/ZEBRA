@@ -10,9 +10,9 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
-use latticevm::symbolic::LatticeVMConstraints;
 
 use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
