@@ -14,7 +14,7 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, registe
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::ui::{save_repr_if_unique, UiState};
-use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::{create_or_clear_dir, trace_fmt_with_idxs};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_pico::lookup::get_symbolic_lookup_constraints;
@@ -22,31 +22,43 @@ use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
 
+fn canonical_repr_add(trace: &AbstractTrace) -> String {
+    format!(
+        "input0: [{}], input1: [{}], output: [{}]",
+        trace_fmt_with_idxs(trace, &[7, 8, 9, 10]),
+        trace_fmt_with_idxs(trace, &[11, 12, 13, 14]),
+        trace_fmt_with_idxs(trace, &[0, 1, 2, 3]),
+    )
+}
+
+fn canonical_repr_sub(trace: &AbstractTrace) -> String {
+    format!(
+        "input0: [{}], input1: [{}], output: [{}]",
+        trace_fmt_with_idxs(trace, &[7, 8, 9, 10]),
+        trace_fmt_with_idxs(trace, &[11, 12, 13, 14]),
+        trace_fmt_with_idxs(trace, &[0, 1, 2, 3]),
+    )
+}
+
 // ############## Final Check Function ##############################
-fn final_check(
+fn final_check_add(
     trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
+    _num_trial: usize,
+    _prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let string_representation = format!(
-        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
-        trace.data[0][12],
-        trace.data[0][13],
-        trace.data[0][14],
-        trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-    );
+    save_repr_if_unique(&canonical_repr_add(trace), known_reprt, ui);
+}
 
-    save_repr_if_unique(&string_representation, known_reprt, ui);
+fn final_check_sub(
+    trace: &AbstractTrace,
+    _num_trial: usize,
+    _prime: u32,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    save_repr_if_unique(&canonical_repr_sub(trace), known_reprt, ui);
 }
 
 const fn make_col_map() -> AddSubCols<usize> {
@@ -54,12 +66,14 @@ const fn make_col_map() -> AddSubCols<usize> {
     unsafe { transmute::<[usize; NUM_ADD_SUB_COLS], AddSubCols<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::ADD, 1, 2, 3, true, true)];
+pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "ADD";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -93,7 +107,19 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(
+        if target_opcode == "ADD" {
+            Opcode::ADD
+        } else if target_opcode == "SUB" {
+            Opcode::SUB
+        } else {
+            panic!("unsupported instruction")
+        },
+        4,
+        4,
+        2,
+        3,
+    );
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
@@ -113,7 +139,13 @@ fn main() -> Result<(), io::Error> {
         program.instructions.len(),
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
-        final_check,
+        if target_opcode == "ADD" {
+            final_check_add
+        } else if target_opcode == "SUB" {
+            final_check_sub
+        } else {
+            panic!("unsupported instruction")
+        },
         prime,
         seed,
     )
