@@ -71,6 +71,14 @@ pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u3
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "ADD" => Opcode::ADD,
+        "SUB" => Opcode::SUB,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
     let target_opcode = "ADD";
 
@@ -107,19 +115,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(
-        if target_opcode == "ADD" {
-            Opcode::ADD
-        } else if target_opcode == "SUB" {
-            Opcode::SUB
-        } else {
-            panic!("unsupported instruction")
-        },
-        4,
-        4,
-        2,
-        3,
-    );
+    let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
