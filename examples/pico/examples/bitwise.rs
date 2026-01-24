@@ -1,7 +1,4 @@
 use core::mem::transmute;
-use itertools::Itertools;
-use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -9,16 +6,14 @@ use p3_koala_bear::KoalaBear;
 use pico_vm::chips::chips::alu::bitwise::columns::{BitwiseCols, NUM_BITWISE_COLS};
 use pico_vm::chips::chips::alu::bitwise::BitwiseChip;
 use pico_vm::compiler::riscv::program::Program;
-use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, register::Register};
+use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
 use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::generate_alu_final_checker;
-use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::symbolic::LatticeVMConstraints;
 
-use latticevm_pico::lookup::get_symbolic_lookup_constraints;
 use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
@@ -62,7 +57,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Bitwise";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
+    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BitwiseChip<KoalaBear>>(
             &air,
             NUM_BITWISE_COLS,

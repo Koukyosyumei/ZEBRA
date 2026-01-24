@@ -1,4 +1,3 @@
-use std::io;
 use std::sync::Arc;
 
 use p3_air::BaseAir;
@@ -8,21 +7,16 @@ use p3_koala_bear::KoalaBear;
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::configs::config::StarkGenericConfig;
 use pico_vm::emulator::opts::EmulatorOpts;
-use pico_vm::emulator::record::RecordBehavior;
 use pico_vm::emulator::riscv::emulator::RiscvEmulator;
-use pico_vm::emulator::riscv::record::EmulationRecord;
 use pico_vm::instances::chiptype::riscv_chiptype::RiscvChipType;
 use pico_vm::instances::configs::embed_kb_bn254_poseidon2::KoalaBearBn254Poseidon2;
 use pico_vm::instances::machine::riscv::RiscvMachine;
-use pico_vm::iter::IntoPicoRefIterator;
 use pico_vm::iter::PicoIterator;
-use pico_vm::machine::chip::{ChipBehavior, MetaChip};
+use pico_vm::machine::chip::ChipBehavior;
 use pico_vm::machine::machine::MachineBehavior;
 use pico_vm::primitives::consts::RISCV_NUM_PVS;
-use pico_vm::primitives::Poseidon2Init;
 
 use latticevm::interval::AbstractInterval;
-use latticevm::state::AbstractState;
 
 pub fn run_pico_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     let config = KoalaBearBn254Poseidon2::new();
