@@ -87,10 +87,6 @@ fn final_check(
     }
 }
 
-/*
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-*/
-
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
     // this program is expected to invalid according to the semantics of ziren, while
     // we can find the satisfying solution.
@@ -126,19 +122,7 @@ fn main() -> Result<(), io::Error> {
     let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, prime);
     refinable_cols.retain(|x| !program_cols.contains(x));
-
-    for t in &tv_constraints {
-        println!("{}", t);
-    }
-
     let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
-
-    println!("ggg {:?}", general_lookup_info);
-
-    println!("33333333333333333: {}", tv_constraints[43]);
-
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints,
         pv_pos_constraints,
@@ -147,8 +131,6 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = 1; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    //                           2130706433
-    //                           117440509
     let program = target_program(2013265921 - 8, 2013265921 - 8);
     let mut base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
@@ -156,27 +138,12 @@ fn main() -> Result<(), io::Error> {
     let pad_ref_data = base_abs_main_trace_data[base_abs_main_trace_data.len() - 1].clone();
     let adjust_pc_program = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
 
-    for row in &base_abs_main_trace_data {
-        for v in row {
-            print!("{}, ", v);
-        }
-        println!("\n-----------------");
-    }
-
     // ######################## Public Values ####################################
     let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
     public_vals[40] = AbstractInterval::from_i64(2013265921 - 8);
     public_vals[41] = AbstractInterval::zero();
     public_vals[44] = AbstractInterval::one();
     let refinment_target_indicies_pv: Vec<usize> = vec![];
-
-    let a = eval_constraints(
-        &AbstractTrace::new(base_abs_main_trace_data.clone()),
-        Some(&public_vals),
-        &constraints,
-        prime,
-    );
-    println!("##########: {:?}", a);
 
     // ######################## Solve ############################################
     quick_api(
