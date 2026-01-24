@@ -13,7 +13,7 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, registe
 
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::ui::UiState;
+use latticevm::ui::{save_repr_if_unique, UiState};
 use latticevm::utils::create_or_clear_dir;
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
@@ -46,21 +46,7 @@ fn final_check(
         trace.data[0][3],
     );
 
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+    save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
 const fn make_col_map() -> AddSubCols<usize> {
@@ -80,7 +66,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
+    let max_iteration = 10000000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -89,10 +75,7 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air: AddSubChip<KoalaBear> = AddSubChip::default();
     let air_name = "AddSub";
-    let colmap = make_col_map();
-    println!("output: {:?}", colmap.values[0].add_operation.value);
-    println!("operand_1: {:?}", colmap.values[0].operand_1);
-    println!("operand_2: {:?}", colmap.values[0].operand_2);
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip<KoalaBear>>(
@@ -100,15 +83,7 @@ fn main() -> Result<(), io::Error> {
             NUM_ADD_SUB_COLS,
             prime,
         );
-    println!("General: {:?}", general_lookup_info);
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-
     refinable_cols.extend(&[0, 1, 2, 3]);
-
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
