@@ -224,12 +224,45 @@ pub fn word_sub(a: &Word, b: &Word) -> AbstractInterval {
     }
 }
 
+pub fn word_addu(b: &Word, c: &Word) -> AbstractInterval {
+    let b = word_to_unsigned(b);
+    let c = word_to_unsigned(c);
+
+    // exact calculation
+    if b.is_singleton() && c.is_singleton() {
+        let res = (b.lo + c.lo).rem_euclid(WORD_BOUND);
+        return AbstractInterval { lo: res, hi: res };
+    }
+
+    // surely not overflow
+    if b.hi + c.hi < WORD_BOUND {
+        return AbstractInterval {
+            lo: b.lo + c.lo,
+            hi: b.hi + c.hi,
+        };
+    }
+
+    // surely overflow
+    if b.lo + c.lo >= WORD_BOUND {
+        let lo = b.lo + c.lo - WORD_BOUND;
+        let hi = b.hi + c.hi - WORD_BOUND;
+
+        return AbstractInterval {
+            lo: lo.max(0).min(WORD_BOUND - 1),
+            hi: hi.max(0).min(WORD_BOUND - 1),
+        };
+    }
+
+    // maybe overflow
+    full_word()
+}
+
 pub fn word_subu(b: &Word, c: &Word) -> AbstractInterval {
     let b = word_to_unsigned(b);
     let c = word_to_unsigned(c);
 
     // exact calculation
-    if b.lo == b.hi && c.lo == c.hi {
+    if b.is_singleton() && c.is_singleton() {
         let res = (b.lo - c.lo).rem_euclid(WORD_BOUND);
         return AbstractInterval { lo: res, hi: res };
     }
@@ -370,7 +403,7 @@ pub fn word_and(a: &Word, b: &Word) -> AbstractInterval {
     // However, the lower bound is tricky. For a simple interval, we know:
     // 0 <= (a & b) <= min(a.hi, b.hi)
     // A tighter bound exists but requires bit-by-bit analysis.
-    if a.lo == a.hi && b.lo == b.hi {
+    if a.is_singleton() && b.is_singleton() {
         let res = a.lo & b.lo;
         AbstractInterval { lo: res, hi: res }
     } else {
@@ -386,7 +419,7 @@ pub fn word_or(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    if a.lo == a.hi && b.lo == b.hi {
+    if a.is_singleton() && b.is_singleton() {
         let res = a.lo | b.lo;
         AbstractInterval { lo: res, hi: res }
     } else {
@@ -404,7 +437,7 @@ pub fn word_xor(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    if a.lo == a.hi && b.lo == b.hi {
+    if a.is_singleton() && b.is_singleton() {
         let res = a.lo ^ b.lo;
         AbstractInterval { lo: res, hi: res }
     } else {
@@ -427,15 +460,15 @@ pub fn word_eq(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    // 確実に等しい
-    if a.lo == a.hi && b.lo == b.hi && a.lo == b.lo {
+    // definitely equal
+    if a.is_singleton() && b.is_singleton() && a.lo == b.lo {
         AbstractInterval::one()
     }
-    // 確実に異なる
+    // definitely not equal
     else if a.hi < b.lo || b.hi < a.lo {
         AbstractInterval::zero()
     }
-    // 不確実
+    // unsure
     else {
         AbstractInterval::bool()
     }
