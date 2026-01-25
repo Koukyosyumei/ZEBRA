@@ -54,16 +54,41 @@ const fn make_col_map() -> MemoryChipCols<usize> {
     unsafe { transmute::<[usize; NUM_MEMORY_CHIP_COLS], MemoryChipCols<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
+pub fn target_program_load(opcode: Opcode, pc_start: u32, pc_base: u32) -> Program {
     let instructions = vec![
         Instruction::new(Opcode::ADD, 29, 0, 0x12348765, false, true),
         Instruction::new(Opcode::SW, 29, 0, 0x27654320, false, true),
-        Instruction::new(Opcode::LB, 29, 0, 0x27654320, false, true),
+        Instruction::new(opcode, 29, 0, 0x27654320, false, true),
     ];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn target_program_store(opcode: Opcode, pc_start: u32, pc_base: u32) -> Program {
+    let instructions = vec![
+        Instruction::new(Opcode::ADD, 29, 0, 0x12348765, false, true),
+        Instruction::new(opcode, 29, 0, 0x27654320, false, true),
+    ];
+    Program::new(instructions, pc_start, pc_base)
+}
+
+pub fn get_opcode_addsub(target_opcode: &str) -> (Opcode, bool) {
+    match target_opcode {
+        "LB" => (Opcode::LB, true),
+        "LBU" => (Opcode::LBU, true),
+        "LH" => (Opcode::LH, true),
+        "LHU" => (Opcode::LHU, true),
+        "LW" => (Opcode::LW, true),
+        "SB" => (Opcode::SB, false),
+        "SH" => (Opcode::SH, false),
+        "SW" => (Opcode::SW, false),
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "LHU";
+    let (opcode, is_load) = get_opcode_addsub(target_opcode);
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -71,9 +96,9 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     let max_iteration = 10000;
-    let min_row_id = 1;
-    let max_row_id = 1;
-    let num_extracted_rows = 2;
+    let min_row_id = if is_load { 1 } else { 0 };
+    let max_row_id = if is_load { 1 } else { 0 };
+    let num_extracted_rows = if is_load { 2 } else { 1 };
     let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
@@ -91,7 +116,11 @@ fn main() -> Result<(), io::Error> {
         0, 1, 24, 25, 26, 27, 32, 33, 55, 64, 65, 66, 67, 72, 73, 77, 78, 79, 80, 81, 82, 86, 87,
         88, 89, 90, 91,
     ];
-    semantic_inputs.extend(&[28, 29, 30, 31]);
+    if is_load {
+        semantic_inputs.extend(&[28, 29, 30, 31]);
+    } else {
+        semantic_inputs.extend(&[68, 69, 70, 71]);
+    }
     refinable_cols.retain(|c| !semantic_inputs.contains(c));
     refinable_cols.extend(&[83, 84, 85, 92, 93, 94]);
 
@@ -103,7 +132,11 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = 1;
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = if is_load {
+        target_program_load(opcode, 4, 4)
+    } else {
+        target_program_store(opcode, 4, 4)
+    };
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 

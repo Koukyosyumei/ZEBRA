@@ -141,7 +141,7 @@ where
 
                 let tmps = vec![
                     (Opcode::ADD as u8, WordOp::Add),
-                    (Opcode::SUB as u8, WordOp::Sub),
+                    (Opcode::SUB as u8, WordOp::SubU),
                     (Opcode::MUL as u8, WordOp::Mul),
                     (Opcode::MULH as u8, WordOp::MulH),
                     (Opcode::MULHU as u8, WordOp::MulHU),
