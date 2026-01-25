@@ -15,7 +15,9 @@ use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::{generate_alu_final_checker, UiState};
+use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
@@ -26,33 +28,18 @@ use latticevm_ziren::utils::{
 // ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
+    _num_trial: usize,
+    _prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "pc: {}, next_pc: [{}], next_next_pc[0]: [{}]",
+        "pc: {}, next_pc: [{}], next_next_pc: [{}]",
         trace.data[0][0],
-        trace_fmt_with_idxs(trace, &[1, 2, 3, 4]),
-        trace_fmt_with_idxs(trace, &[23, 24, 25, 26]),
+        trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
+        trace_fmt_with_idxs(trace, 0, &[23, 24, 25, 26]),
     );
-
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+    save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
 const fn make_col_map() -> BranchColumns<usize> {
@@ -60,12 +47,26 @@ const fn make_col_map() -> BranchColumns<usize> {
     unsafe { transmute::<[usize; NUM_BRANCH_COLS], BranchColumns<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::BEQ, 3, 0, 12, true, true)];
+pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "BEQ" => Opcode::BEQ,
+        "BGEZ" => Opcode::BGEZ,
+        "BGTZ" => Opcode::BGTZ,
+        "BLEZ" => Opcode::BLEZ,
+        "BLTZ" => Opcode::BLTZ,
+        "BNE" => Opcode::BNE,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "BGTZ";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -81,40 +82,21 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = BranchChip::default();
     let air_name = "Branch";
-    let colmap = make_col_map();
-    println!("map: {:?}", colmap);
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
     refinable_cols.extend(&[23, 24, 25, 26]);
-    range_types.insert(23, RangeType::U8);
-    range_types.insert(24, RangeType::U8);
-    range_types.insert(25, RangeType::U8);
-    range_types.insert(26, RangeType::U8);
-
-    range_types.insert(19, RangeType::U8);
-    range_types.insert(20, RangeType::U8);
-    range_types.insert(21, RangeType::U8);
-    range_types.insert(22, RangeType::U8);
-
-    range_types.insert(59, RangeType::Bool);
-    range_types.insert(60, RangeType::Bool);
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
-    for t in &tv_constraints {
-        println!("--- {}", t);
-    }
-    // 19 20 21 22 59 60 61
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = 1; //refinable_cols.len() - 3;
+    let minimum_num_taregt_cols = 3; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 0, 12);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
