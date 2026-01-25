@@ -34,7 +34,8 @@ fn final_check(
     let mut string_representation = String::new();
     for i in 0..trace.data.len() {
         let row_string_representation = format!(
-            "prev_value: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nop_a_access: {}\nmem_access: [{}]",
+            "clk: {}\nprev_value: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nop_a_access: {}\nmem_access: [{}]",
+            trace.data[i][1],
             trace_fmt_with_idxs(trace, i, &[24, 25, 26, 27]),
             trace_fmt_with_idxs(trace, i, &[77, 78, 79, 80]),
             trace_fmt_with_idxs(trace, i, &[86, 87, 88, 89]),
