@@ -15,8 +15,9 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, registe
 
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
-use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::{create_or_clear_dir, trace_fmt_with_idxs};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_pico::lookup::get_symbolic_lookup_constraints;
@@ -27,78 +28,25 @@ use latticevm_pico::utils::{
 // ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
+    _num_trial: usize,
+    _prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let prev_state = format!(
-        "prev_value: [{}, {}, {}, {}], prev_chunk: {}, prev_clk: {}",
-        trace.data[1][24],
-        trace.data[1][25],
-        trace.data[1][26],
-        trace.data[1][27],
-        trace.data[1][32],
-        trace.data[1][33]
-    );
-    let op_b_access = format!(
-        "value: [{}, {}, {}, {}], prev_chunk: {}, prev_clk: {}",
-        trace.data[1][77],
-        trace.data[1][78],
-        trace.data[1][79],
-        trace.data[1][80],
-        trace.data[1][81],
-        trace.data[1][82]
-    );
-    let op_c_access = format!(
-        "value: [{}, {}, {}, {}], prev_chunk: {}, prev_clk: {}",
-        trace.data[1][86],
-        trace.data[1][87],
-        trace.data[1][88],
-        trace.data[1][89],
-        trace.data[1][90],
-        trace.data[1][91]
-    );
-    let op_a_access = format!(
-        "prev_value: [{}, {}, {}, {}], value: [{}, {}, {}, {}], prev_chunk: {}, prev_clk: {}",
-        trace.data[1][64],
-        trace.data[1][65],
-        trace.data[1][66],
-        trace.data[1][67],
-        trace.data[1][68],
-        trace.data[1][69],
-        trace.data[1][70],
-        trace.data[1][71],
-        trace.data[1][72],
-        trace.data[1][73],
-    );
     let string_representation = format!(
-        "prev state: {}\nop_b_access: {}\nop_c_access: {}\nop_a_access: {}\nmem_access: [{}, {}, {}, {}]",
-        prev_state,
-        op_b_access,
-        op_c_access,
-        op_a_access,
-        trace.data[1][28],
-        trace.data[1][29],
-        trace.data[1][30],
-        trace.data[1][31],
+        "prev_value: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nop_a_access: {}\nmem_access: [{}]",
+        trace_fmt_with_idxs(trace, &[24, 25, 26, 27]),
+        trace_fmt_with_idxs(trace, &[77, 78, 79, 80]),
+        trace_fmt_with_idxs(trace, &[86, 87, 88, 89]),
+        format!(
+            "prev_value: [{}], value: [{}]",
+            trace_fmt_with_idxs(trace, &[64, 65, 66, 67]),
+            trace_fmt_with_idxs(trace, &[68, 69, 70, 71])
+        ),
+        trace_fmt_with_idxs(trace, &[28, 29, 30, 31]),
     );
 
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+    save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
 const fn make_col_map() -> MemoryChipCols<usize> {
@@ -106,16 +54,41 @@ const fn make_col_map() -> MemoryChipCols<usize> {
     unsafe { transmute::<[usize; NUM_MEMORY_CHIP_COLS], MemoryChipCols<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
+pub fn target_program_load(opcode: Opcode, pc_start: u32, pc_base: u32) -> Program {
     let instructions = vec![
         Instruction::new(Opcode::ADD, 29, 0, 0x12348765, false, true),
         Instruction::new(Opcode::SW, 29, 0, 0x27654320, false, true),
-        Instruction::new(Opcode::LW, 29, 0, 0x27654320, false, true),
+        Instruction::new(opcode, 29, 0, 0x27654320, false, true),
     ];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn target_program_store(opcode: Opcode, pc_start: u32, pc_base: u32) -> Program {
+    let instructions = vec![
+        Instruction::new(Opcode::ADD, 29, 0, 0x12348765, false, true),
+        Instruction::new(opcode, 29, 0, 0x27654320, false, true),
+    ];
+    Program::new(instructions, pc_start, pc_base)
+}
+
+pub fn get_opcode_addsub(target_opcode: &str) -> (Opcode, bool) {
+    match target_opcode {
+        "LB" => (Opcode::LB, true),
+        "LBU" => (Opcode::LBU, true),
+        "LH" => (Opcode::LH, true),
+        "LHU" => (Opcode::LHU, true),
+        "LW" => (Opcode::LW, true),
+        "SB" => (Opcode::SB, false),
+        "SH" => (Opcode::SH, false),
+        "SW" => (Opcode::SW, false),
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "SW";
+    let (opcode, is_load) = get_opcode_addsub(target_opcode);
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -123,19 +96,15 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     let max_iteration = 10000;
-    let min_row_id = 1;
-    let max_row_id = 1;
-    let num_extracted_rows = 2;
+    let min_row_id = if is_load { 1 } else { 0 };
+    let max_row_id = if is_load { 1 } else { 0 };
+    let num_extracted_rows = if is_load { 2 } else { 1 };
     let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
     let air: MemoryReadWriteChip<KoalaBear> = MemoryReadWriteChip::default();
     let air_name = "MemoryReadWrite";
-    let colmap = make_col_map();
-    println!("{:?}\n", colmap);
-    println!("output: {:?}", colmap.values[0].instruction.op_a_access);
-    println!("operand_1: {:?}", colmap.values[0].instruction.op_b_access);
-    println!("operand_2: {:?}", colmap.values[0].instruction.op_c_access);
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MemoryReadWriteChip<KoalaBear>>(
@@ -147,39 +116,29 @@ fn main() -> Result<(), io::Error> {
         0, 1, 24, 25, 26, 27, 32, 33, 55, 64, 65, 66, 67, 72, 73, 77, 78, 79, 80, 81, 82, 86, 87,
         88, 89, 90, 91,
     ];
-    semantic_inputs.extend(&[28, 29, 30, 31]);
+    if is_load {
+        semantic_inputs.extend(&[28, 29, 30, 31]);
+    } else {
+        semantic_inputs.extend(&[68, 69, 70, 71]);
+    }
     refinable_cols.retain(|c| !semantic_inputs.contains(c));
     refinable_cols.extend(&[83, 84, 85, 92, 93, 94]);
-
-    println!("General: {:?}", general_lookup_info);
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-
-    //refinable_cols.extend(&[0, 1, 2, 3]);
-
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = 1; //refinable_cols.len();
+    let minimum_num_taregt_cols = 1;
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = if is_load {
+        target_program_load(opcode, 4, 4)
+    } else {
+        target_program_store(opcode, 4, 4)
+    };
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
-
-    println!("");
-    for row in &base_abs_main_trace_data {
-        for v in row {
-            print!("{}, ", v);
-        }
-        println!("\n----------------------------");
-    }
 
     // ######################## Solve ############################################
     quick_api(
