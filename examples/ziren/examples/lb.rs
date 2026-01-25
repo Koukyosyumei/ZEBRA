@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 use std::mem::transmute;
 
@@ -15,7 +14,7 @@ use zkm_core_machine::MemoryInstructionsChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
@@ -119,7 +118,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "MemoryInstrs";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
+    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MemoryInstructionsChip>(
             &air,
             NUM_MEMORY_INSTRUCTIONS_COLUMNS,
