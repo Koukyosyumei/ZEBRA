@@ -20,7 +20,7 @@ use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 // ############## Final Check Function ##############################
@@ -32,22 +32,10 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "pc: {}, next_pc[0]: {}, next_pc[1]: {}, next_pc[2]: {}, next_pc[3]: {}, next_next_pc[0]: {}, next_next_pc[1]: {}, next_next_pc[2]: {}, next_next_pc[3]: {}, is_beq: {}, is_bne: {}, is_bltz: {}, is_blez: {}, is_bgtz: {}, is_bgez: {}",
+        "pc: {}, next_pc: [{}], next_next_pc[0]: [{}]",
         trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][23],
-        trace.data[0][24],
-        trace.data[0][25],
-        trace.data[0][26],
-        trace.data[0][53],
-        trace.data[0][54],
-        trace.data[0][55],
-        trace.data[0][56],
-        trace.data[0][57],
-        trace.data[0][58],
+        trace_fmt_with_idxs(trace, &[1, 2, 3, 4]),
+        trace_fmt_with_idxs(trace, &[23, 24, 25, 26]),
     );
 
     if !known_reprt.contains(&string_representation) {
@@ -123,7 +111,7 @@ fn main() -> Result<(), io::Error> {
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = refinable_cols.len() - 3;
+    let minimum_num_taregt_cols = 1; //refinable_cols.len() - 3;
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4);

@@ -71,9 +71,9 @@ pub const fn indices_arr<const N: usize>() -> [usize; N] {
     indices_arr
 }
 
-pub fn trace_fmt_with_idxs(trace: &AbstractTrace, idxs: &[usize]) -> String {
+pub fn trace_fmt_with_idxs(trace: &AbstractTrace, i: usize, idxs: &[usize]) -> String {
     idxs.iter()
-        .map(|&i| trace.data[0][i].to_string())
+        .map(|&j| trace.data[i][j].to_string())
         .collect::<Vec<_>>()
         .join(", ")
 }

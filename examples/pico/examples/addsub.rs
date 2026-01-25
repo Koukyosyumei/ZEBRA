@@ -25,18 +25,18 @@ use latticevm_pico::utils::{
 fn canonical_repr_add(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, &[7, 8, 9, 10]),
-        trace_fmt_with_idxs(trace, &[11, 12, 13, 14]),
-        trace_fmt_with_idxs(trace, &[0, 1, 2, 3]),
+        trace_fmt_with_idxs(trace, 0, &[7, 8, 9, 10]),
+        trace_fmt_with_idxs(trace, 0, &[11, 12, 13, 14]),
+        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
     )
 }
 
 fn canonical_repr_sub(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, &[0, 1, 2, 3]),
-        trace_fmt_with_idxs(trace, &[11, 12, 13, 14]),
-        trace_fmt_with_idxs(trace, &[7, 8, 9, 10]),
+        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
+        trace_fmt_with_idxs(trace, 0, &[11, 12, 13, 14]),
+        trace_fmt_with_idxs(trace, 0, &[7, 8, 9, 10]),
     )
 }
 

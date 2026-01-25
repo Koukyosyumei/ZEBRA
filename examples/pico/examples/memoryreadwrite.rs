@@ -31,18 +31,23 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let string_representation = format!(
-        "prev_value: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nop_a_access: {}\nmem_access: [{}]",
-        trace_fmt_with_idxs(trace, &[24, 25, 26, 27]),
-        trace_fmt_with_idxs(trace, &[77, 78, 79, 80]),
-        trace_fmt_with_idxs(trace, &[86, 87, 88, 89]),
-        format!(
-            "prev_value: [{}], value: [{}]",
-            trace_fmt_with_idxs(trace, &[64, 65, 66, 67]),
-            trace_fmt_with_idxs(trace, &[68, 69, 70, 71])
-        ),
-        trace_fmt_with_idxs(trace, &[28, 29, 30, 31]),
-    );
+    let mut string_representation = String::new();
+    for i in 0..trace.data.len() {
+        let row_string_representation = format!(
+            "prev_value: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nop_a_access: {}\nmem_access: [{}]",
+            trace_fmt_with_idxs(trace, i, &[24, 25, 26, 27]),
+            trace_fmt_with_idxs(trace, i, &[77, 78, 79, 80]),
+            trace_fmt_with_idxs(trace, i, &[86, 87, 88, 89]),
+            format!(
+                "prev_value: [{}], value: [{}]",
+                trace_fmt_with_idxs(trace, i, &[64, 65, 66, 67]),
+                trace_fmt_with_idxs(trace, i, &[68, 69, 70, 71])
+            ),
+            trace_fmt_with_idxs(trace, i, &[28, 29, 30, 31]),
+        );
+        string_representation.push_str(&row_string_representation);
+        string_representation.push_str("\n--------------\n");
+    }
 
     save_repr_if_unique(&string_representation, known_reprt, ui);
 }
@@ -84,7 +89,7 @@ pub fn get_opcode_addsub(target_opcode: &str) -> (Opcode, bool) {
 }
 
 fn main() -> Result<(), io::Error> {
-    let target_opcode = "SW";
+    let target_opcode = "LB";
     let (opcode, is_load) = get_opcode_addsub(target_opcode);
 
     create_or_clear_dir("voutput")?;
