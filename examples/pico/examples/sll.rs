@@ -27,8 +27,8 @@ const fn make_col_map() -> ShiftLeftCols<usize> {
     unsafe { transmute::<[usize; NUM_SLL_COLS], ShiftLeftCols<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::SLL, 1, 2, 3, true, true)];
+pub fn target_program(pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
+    let instructions = vec![Instruction::new(Opcode::SLL, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -48,21 +48,12 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air: SLLChip<KoalaBear> = SLLChip::default();
     let air_name = "ShiftLeft";
-    let colmap = make_col_map();
-    println!("output: {:?}", colmap.values[0].a);
-    println!("operand_1: {:?}", colmap.values[0].b);
-    println!("operand_2: {:?}", colmap.values[0].c);
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, SLLChip<KoalaBear>>(&air, NUM_SLL_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
-
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
@@ -72,7 +63,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(4, 4, 1, 2);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
