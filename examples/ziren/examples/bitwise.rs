@@ -24,15 +24,26 @@ use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::AND, 1, 2, 3, true, true)];
+pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
+    let instructions = vec![Instruction::new(opcode, 1, 2, 3, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "AND" => Opcode::AND,
+        "OR" => Opcode::OR,
+        "XOR" => Opcode::XOR,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "AND";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -54,9 +65,6 @@ fn main() -> Result<(), io::Error> {
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
 
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
-
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
         pv_pos_constraints: vec![],
@@ -65,7 +73,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
