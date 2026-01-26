@@ -1,21 +1,18 @@
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 use std::mem::transmute;
 
-use itertools::Itertools;
 
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::control_flow::BranchColumns;
 use zkm_core_machine::misc::MovCondCols;
 use zkm_core_machine::misc::NUM_MOV_COND_COLS;
 use zkm_core_machine::MovCondChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
@@ -57,7 +54,7 @@ pub fn target_program(
     y: u32,
     z: u32,
 ) -> Program {
-    let mut instructions = vec![
+    let instructions = vec![
         Instruction::new(Opcode::ADD, 1, 0, x, false, true),
         Instruction::new(Opcode::ADD, 2, 0, y, false, true),
         Instruction::new(Opcode::ADD, 3, 0, z, false, true),
@@ -95,7 +92,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "MovCond";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
+    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MovCondChip>(&air, NUM_MOV_COND_COLS, prime);
     refinable_cols.extend(&[2, 3, 4, 5]);
 
