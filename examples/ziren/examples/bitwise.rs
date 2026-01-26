@@ -1,27 +1,18 @@
-use std::collections::HashSet;
-use std::fs;
 use std::io;
-use std::mem::transmute;
 
-use itertools::Itertools;
 
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::alu::NUM_ADD_SUB_COLS;
 use zkm_core_machine::alu::NUM_BITWISE_COLS;
-use zkm_core_machine::control_flow::BranchColumns;
-use zkm_core_machine::memory::MemoryLocalChip;
-use zkm_core_machine::AddSubChip;
 use zkm_core_machine::BitwiseChip;
-use zkm_core_machine::BranchChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::ui::{generate_alu_final_checker, UiState};
-use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::ui::generate_alu_final_checker;
+use latticevm::utils::create_or_clear_dir;
+use latticevm::symbolic::LatticeVMConstraints;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -60,7 +51,7 @@ fn main() -> Result<(), io::Error> {
     let air = BitwiseChip::default();
     let air_name = "Bitwise";
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
+    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BitwiseChip>(&air, NUM_BITWISE_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
