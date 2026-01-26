@@ -76,8 +76,7 @@ use latticevm_ziren::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col};
 use latticevm_ziren::pv_constraints::get_pv_constraints;
 use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
 use latticevm_ziren::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 const fn make_col_map() -> ShiftLeftCols<usize> {
@@ -102,26 +101,16 @@ fn main() -> Result<(), io::Error> {
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air = ShiftLeft::default();
     let air_name = "ShiftLeft";
-    let colmap = make_col_map();
-    println!("a: {:?}", colmap.a);
-    println!("b: {:?}", colmap.b);
-    println!("c: {:?}", colmap.c);
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, ShiftLeft>(&air, NUM_SHIFT_LEFT_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
-
-    for t in &tv_constraints {
-        println!("{}", t);
-    }
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
@@ -141,8 +130,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],
