@@ -60,15 +60,33 @@ const fn make_col_map() -> JumpColumns<usize> {
     unsafe { transmute::<[usize; NUM_JUMP_COLS], JumpColumns<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32, y: u32) -> Program {
+pub fn target_program(
+    opcode: Opcode,
+    pc_start: u32,
+    pc_base: u32,
+    x: u8,
+    y: u32,
+    z: u32,
+) -> Program {
     let instructions = vec![
-        Instruction::new(Opcode::ADD, 1, 0, y, false, true),
-        Instruction::new(Opcode::Jump, 0, 1, 0, false, true),
+        Instruction::new(Opcode::ADD, x, 0, y, false, true),
+        Instruction::new(opcode, 0, z, 0, false, true),
     ];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "Jump" => Opcode::Jump,
+        "Jumpi" => Opcode::Jumpi,
+        "JumpDirect" => Opcode::JumpDirect,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "Jump";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -89,31 +107,26 @@ fn main() -> Result<(), io::Error> {
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
     refinable_cols.extend(&[19, 20, 21, 22, 37, 38, 39, 40]); // output
-
-    for t in &tv_constraints {
-        println!("{}", t);
-    }
+    range_types.insert(19, RangeType::U8);
+    range_types.insert(20, RangeType::U8);
+    range_types.insert(21, RangeType::U8);
+    range_types.insert(22, RangeType::U7);
+    range_types.insert(37, RangeType::U8);
+    range_types.insert(38, RangeType::U8);
+    range_types.insert(39, RangeType::U8);
+    range_types.insert(40, RangeType::U7);
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints[..6].to_vec(),
+        air_constraints: tv_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
     let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4, 32);
+    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 1, 32, 1);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
-
-    for row in &base_abs_main_trace_data {
-        for v in row {
-            print!("{}, ", v);
-        }
-        println!("");
-    }
-    println!("{:?}", refinable_cols);
-    println!("{}", tv_constraints[5]);
 
     // ######################## Solve ############################################
     quick_api(

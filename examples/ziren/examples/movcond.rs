@@ -15,14 +15,15 @@ use zkm_core_machine::MovCondChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
-use latticevm::solver::RangeType;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
-use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::trace_fmt_with_idxs;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 // ############## Final Check Function ##############################
@@ -34,40 +35,13 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "op_a_value: [{}, {}, {}, {}], prev_a_value: [{}, {}, {}, {}], op_b_value: [{}, {}, {}, {}], op_c_value: [{}, {}, {}, {}]",
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
-        trace.data[0][12],
-        trace.data[0][13],
-        trace.data[0][14],
-        trace.data[0][15],
-        trace.data[0][16],
-        trace.data[0][17],
+        "op_a_value: [{}], prev_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
+        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
+        trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+        trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
     );
-
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+    save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
 const fn make_col_map() -> MovCondCols<usize> {
@@ -75,48 +49,55 @@ const fn make_col_map() -> MovCondCols<usize> {
     unsafe { transmute::<[usize; NUM_MOV_COND_COLS], MovCondCols<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::MEQ, 1, 2, 3, true, true)];
+pub fn target_program(
+    opcode: Opcode,
+    pc_start: u32,
+    pc_base: u32,
+    x: u32,
+    y: u32,
+    z: u32,
+) -> Program {
+    let mut instructions = vec![
+        Instruction::new(Opcode::ADD, 1, 0, x, false, true),
+        Instruction::new(Opcode::ADD, 2, 0, y, false, true),
+        Instruction::new(Opcode::ADD, 3, 0, z, false, true),
+        Instruction::new(opcode, 3, 1, 2, true, true),
+    ];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "MEQ" => Opcode::MEQ,
+        "MNE" => Opcode::MNE,
+        "WSBH" => Opcode::WSBH,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "WSBH";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 10000000;
+    let max_iteration = 1000000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air = MovCondChip::default();
     let air_name = "MovCond";
-    let colmap = make_col_map();
-    println!("op_a_value: {:?}", colmap.op_a_value);
-    println!("prev_a_value: {:?}", colmap.prev_a_value);
-    println!("op_b_value: {:?}", colmap.op_b_value);
-    println!("op_c_value: {:?}", colmap.op_c_value);
-    println!("c_eq_0: {:?}", colmap.c_eq_0);
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MovCondChip>(&air, NUM_MOV_COND_COLS, prime);
-    refinable_cols.extend(&[2, 3, 4, 5]); // output
-                                          //refinable_cols.extend(&[10, 14]); // input
-                                          //range_types.insert(6, RangeType::U4);
-                                          //range_types.insert(10, RangeType::U4);
-                                          //range_types.insert(14, RangeType::U4);
-    for t in &tv_constraints {
-        println!("---- {}", t);
-    }
-
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
+    refinable_cols.extend(&[2, 3, 4, 5]);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
@@ -124,10 +105,9 @@ fn main() -> Result<(), io::Error> {
         pv_neg_constraints: vec![],
     };
     let minimum_num_taregt_cols = refinable_cols.len();
-    println!("{}", minimum_num_taregt_cols);
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 11, 12, 13);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
@@ -137,8 +117,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],

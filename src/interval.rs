@@ -234,8 +234,8 @@ fn div_floor_i64(x: i64, k: i64) -> i64 {
 impl AbstractInterval {
     pub fn top(prime: u32) -> Self {
         Self {
-            lo: -(prime as i64) / 2,
-            hi: (prime as i64) / 2,
+            lo: 0,                  //-(prime as i64) / 2,
+            hi: (prime - 1) as i64, //(prime as i64) / 2,
         }
     }
 
@@ -344,8 +344,9 @@ impl AbstractInterval {
 
     pub fn ltu(&self, rhs: Self) -> AbstractInterval {
         if self.lo < 0 {
-            //panic!("LTU for negative region is not supported.");
+            //panic!("LTU for negative region is not supported. {}", self);
             return AbstractInterval::from_i64(123456);
+            //return AbstractInterval::bool();
         }
 
         // returns zero when self < rhs
