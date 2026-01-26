@@ -34,10 +34,13 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "pc: {}, next_pc: [{}], next_next_pc: [{}]",
+        "pc: {}, next_pc: [{}], next_next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
         trace.data[0][0],
         trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
         trace_fmt_with_idxs(trace, 0, &[23, 24, 25, 26]),
+        trace_fmt_with_idxs(trace, 0, &[41, 42, 43, 44]),
+        trace_fmt_with_idxs(trace, 0, &[45, 46, 47, 48]),
+        trace_fmt_with_idxs(trace, 0, &[49, 50, 51, 52]),
     );
     save_repr_if_unique(&string_representation, known_reprt, ui);
 }
@@ -47,8 +50,19 @@ const fn make_col_map() -> BranchColumns<usize> {
     unsafe { transmute::<[usize; NUM_BRANCH_COLS], BranchColumns<usize>>(indices_arr) }
 }
 
-pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
-    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
+pub fn target_program(
+    opcode: Opcode,
+    pc_start: u32,
+    pc_base: u32,
+    x: u32,
+    y: u32,
+    z: u32,
+) -> Program {
+    let instructions = vec![
+        Instruction::new(Opcode::ADD, 1, 0, x, true, true),
+        Instruction::new(Opcode::ADD, 2, 0, y, true, true),
+        Instruction::new(opcode, 1, 2, z, true, true),
+    ];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -96,7 +110,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = 3; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 0, 12);
+    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 3, 4, 12);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
