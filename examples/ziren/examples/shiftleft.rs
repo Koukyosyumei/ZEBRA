@@ -57,18 +57,13 @@ use zkm_stark::ZKMCoreOpts;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 use latticevm::quick::quick_api;
-use latticevm::smt::expr_to_smt;
-use latticevm::solver::RangeType;
-use latticevm::symbolic::eval_constraints;
-use latticevm::symbolic::LatticeVMSymbolicEntry;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::symbolic::LatticeVMSymbolicVal;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::ui::generate_alu_final_checker;
+use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
-use latticevm::utils::create_or_clear_dir;
-use latticevm::{
-    interval::AbstractInterval, solver::run_solver, symbolic::gather_boolean_variables,
-    symbolic::AbstractTrace, symbolic::LatticeVMConstraints,
-};
+use latticevm::utils::trace_fmt_with_idxs;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
+use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::executor::run_ziren_program;
 use latticevm_ziren::lookup::get_symbolic_lookup_constraints;
