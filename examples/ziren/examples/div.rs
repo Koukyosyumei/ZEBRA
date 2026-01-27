@@ -14,15 +14,17 @@ use zkm_core_machine::AddSubChip;
 use zkm_core_machine::DivRemChip;
 use zkm_stark::MachineProver;
 
+use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
-use latticevm::solver::RangeType;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
+use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 // ############## Final Check Function ##############################
@@ -34,36 +36,13 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
-        trace.data[0][12],
-        trace.data[0][13],
+        "input0: [{}], input1: [{}], output: [{}]",
+        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
+        trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
     );
 
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+    save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
 const fn make_col_map() -> DivRemCols<usize> {
@@ -72,7 +51,7 @@ const fn make_col_map() -> DivRemCols<usize> {
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::DIV, 1, 2, 3, true, true)];
+    let instructions = vec![Instruction::new(Opcode::DIV, 1, 8, 3, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -83,12 +62,11 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
+    let max_iteration = 100000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air = DivRemChip::default();
@@ -126,8 +104,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],

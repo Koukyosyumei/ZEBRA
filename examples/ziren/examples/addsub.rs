@@ -27,18 +27,18 @@ use latticevm_ziren::utils::{
 fn canonical_repr_add(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, &[9, 10, 11, 12]),
-        trace_fmt_with_idxs(trace, &[13, 14, 15, 16]),
-        trace_fmt_with_idxs(trace, &[2, 3, 4, 5]),
+        trace_fmt_with_idxs(trace, 0, &[9, 10, 11, 12]),
+        trace_fmt_with_idxs(trace, 0, &[13, 14, 15, 16]),
+        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
     )
 }
 
 fn canonical_repr_sub(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, &[2, 3, 4, 5]),
-        trace_fmt_with_idxs(trace, &[13, 14, 15, 16]),
-        trace_fmt_with_idxs(trace, &[9, 10, 11, 12]),
+        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+        trace_fmt_with_idxs(trace, 0, &[13, 14, 15, 16]),
+        trace_fmt_with_idxs(trace, 0, &[9, 10, 11, 12]),
     )
 }
 
