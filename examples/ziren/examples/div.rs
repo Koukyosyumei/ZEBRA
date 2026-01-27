@@ -1,7 +1,5 @@
 use core::mem::transmute;
-use itertools::Itertools;
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -9,14 +7,11 @@ use p3_koala_bear::KoalaBear;
 use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::DivRemCols;
 use zkm_core_machine::alu::NUM_DIVREM_COLS;
-use zkm_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
-use zkm_core_machine::AddSubChip;
 use zkm_core_machine::DivRemChip;
 use zkm_stark::MachineProver;
 
-use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
@@ -106,7 +101,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "DivRem";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
+    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
     refinable_cols.extend(&[10, 11, 12, 13, 14, 15, 16, 17]); // output
 
