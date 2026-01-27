@@ -27,22 +27,43 @@ use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let string_representation = format!(
+fn canonical_repr_div(trace: &AbstractTrace) -> String {
+    format!(
         "input0: [{}], input1: [{}], output: [{}]",
         trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
         trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
         trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
-    );
+    )
+}
 
-    save_repr_if_unique(&string_representation, known_reprt, ui);
+fn canonical_repr_rem(trace: &AbstractTrace) -> String {
+    format!(
+        "input0: [{}], input1: [{}], output: [{}]",
+        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
+        trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
+    )
+}
+
+// ############## Final Check Function ##############################
+fn final_check_div(
+    trace: &AbstractTrace,
+    _num_trial: usize,
+    _prime: u32,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    save_repr_if_unique(&canonical_repr_div(trace), known_reprt, ui);
+}
+
+fn final_check_rem(
+    trace: &AbstractTrace,
+    _num_trial: usize,
+    _prime: u32,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    save_repr_if_unique(&canonical_repr_rem(trace), known_reprt, ui);
 }
 
 const fn make_col_map() -> DivRemCols<usize> {
@@ -50,12 +71,24 @@ const fn make_col_map() -> DivRemCols<usize> {
     unsafe { transmute::<[usize; NUM_DIVREM_COLS], DivRemCols<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::DIV, 1, 8, 3, true, true)];
+pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "DIV" => Opcode::DIV,
+        "DIVU" => Opcode::DIVU,
+        "MOD" => Opcode::MOD,
+        "MODU" => Opcode::MODU,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "MOD";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -71,20 +104,11 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = DivRemChip::default();
     let air_name = "DivRem";
-    let colmap = make_col_map();
-    println!("quotient: {:?}", colmap.quotient);
-    println!("remainder: {:?}", colmap.remainder);
-    println!("b: {:?}", colmap.b);
-    println!("c: {:?}", colmap.c);
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
     refinable_cols.extend(&[10, 11, 12, 13, 14, 15, 16, 17]); // output
-                                                              //refinable_cols.extend(&[9, 13]); // input
-    ///range_types.insert(9, RangeType::U4);
-    //range_types.insert(13, RangeType::U4);
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
@@ -94,7 +118,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = 3; // refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 13, 3);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
@@ -114,7 +138,13 @@ fn main() -> Result<(), io::Error> {
         program.instructions.len(),
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
-        final_check,
+        if target_opcode == "DIV" || target_opcode == "DIVU" {
+            final_check_div
+        } else if target_opcode == "MOD" || target_opcode == "MODU" {
+            final_check_rem
+        } else {
+            panic!("unsupported instruction")
+        },
         prime,
         seed,
     )
