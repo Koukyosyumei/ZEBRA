@@ -16,9 +16,7 @@ use latticevm::symbolic::gather_vars;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
 use latticevm::utils::GeneralLookupInfo;
-use latticevm::{
-    interval::AbstractInterval, symbolic::gather_boolean_variables,
-};
+use latticevm::{interval::AbstractInterval, symbolic::gather_boolean_variables};
 
 use crate::executor::run_pico_program;
 use crate::lookup::get_symbolic_lookup_constraints;
@@ -141,14 +139,4 @@ where
         range_types,
         general_lookup_info,
     )
-}
-
-pub const fn indices_arr<const N: usize>() -> [usize; N] {
-    let mut indices_arr = [0; N];
-    let mut i = 0;
-    while i < N {
-        indices_arr[i] = i;
-        i += 1;
-    }
-    indices_arr
 }
