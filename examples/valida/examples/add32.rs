@@ -72,15 +72,6 @@ fn main() -> Result<(), io::Error> {
         );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
-    refinable_cols.extend(&[0, 4]);
-    range_types.insert(0, RangeType::U4);
-    range_types.insert(4, RangeType::U4);
-
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),

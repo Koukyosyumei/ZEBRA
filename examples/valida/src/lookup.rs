@@ -94,6 +94,7 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
                                 &[a0.clone(), a1.clone(), a2.clone(), a3.clone()],
                                 &[b0.clone(), b1.clone(), b2.clone(), b3.clone()],
                                 &[c0.clone(), c1.clone(), c2.clone(), c3.clone()],
+                                &[a0.clone(), a1.clone(), a2.clone(), a3.clone()], // dummy
                                 &t.1,
                             );
                             let impl_constraint =
