@@ -123,13 +123,14 @@ fn main() -> Result<(), io::Error> {
         pv_neg_constraints,
     };
     let minimum_num_taregt_cols = 1; //refinable_cols.len();
+    println!("{:?}", refinable_cols);
+    println!("{:?}", general_lookup_info);
 
     // ######################## Program Initialization ###########################
     let program = target_program(2013265921 - 8, 2013265921 - 8);
     let mut base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
-    let pad_ref_data = base_abs_main_trace_data[base_abs_main_trace_data.len() - 1].clone();
     let adjust_pc_program = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
 
     // ######################## Public Values ####################################
