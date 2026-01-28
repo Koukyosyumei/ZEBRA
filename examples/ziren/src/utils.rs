@@ -180,6 +180,9 @@ where
         let multiplicities = cv(&s.multiplicity);
 
         match s.kind {
+            LookupKind::Program => {
+                general_lookup_info.pc_table_is_real = multiplicities.clone();
+            }
             LookupKind::Instruction => {
                 let opcode = cv(&s.values[6]);
                 let a = [
