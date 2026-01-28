@@ -16,15 +16,28 @@ use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::state::AbstractState;
 use latticevm::ui::UiState;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::pv_constraints::get_pv_constraints;
-use latticevm_ziren::state::ziren_abstract_trace_to_abstract_state;
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
+
+pub fn ziren_abstract_trace_to_abstract_state(
+    abstract_row: &Vec<AbstractInterval>,
+    prime: u32,
+) -> AbstractState {
+    AbstractState {
+        clk: abstract_row[1].clone()
+            + abstract_row[2].clone() * AbstractInterval::from_i64(2_usize.pow(16) as i64),
+        pc: abstract_row[5].clone(),
+        is_done: abstract_row[5].clone().is_zero(prime),
+        memory_ops: Vec::new(),
+    }
+}
 
 // ############## Final Check Function ##############################
 fn final_check(
