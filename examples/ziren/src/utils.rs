@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use itertools::Itertools;
 
 use p3_air::Air;
 use p3_uni_stark::SymbolicAirBuilder;
@@ -13,11 +12,9 @@ use zkm_stark::MachineProver;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
-use latticevm::symbolic::gather_vars;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
 use latticevm::utils::GeneralLookupInfo;
-use latticevm::{interval::AbstractInterval, symbolic::gather_boolean_variables};
+use latticevm::interval::AbstractInterval;
 
 use crate::executor::run_ziren_program;
 use crate::lookup::get_symbolic_lookup_constraints;
