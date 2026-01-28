@@ -1,24 +1,73 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::io;
 
+use p3_air::{Air, BaseAir};
+use p3_field::PrimeField32;
+use p3_uni_stark::{get_symbolic_constraints, SymbolicAirBuilder, SymbolicExpression};
 
-use p3_air::Air;
-use p3_uni_stark::SymbolicAirBuilder;
-use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
+use zkm_core_executor::{ExecutionState, Executor, Program};
+use zkm_core_machine::mips::MipsAir;
+use zkm_core_machine::utils::{trace_checkpoint, ZKMCoreProverError};
+use zkm_stark::koala_bear_poseidon2::KoalaBearPoseidon2;
+use zkm_stark::{CpuProver, LookupBuilder, MachineProver, ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS};
 
-use zkm_core_executor::Program;
-use zkm_stark::LookupBuilder;
-use zkm_stark::MachineProver;
-use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
-
+use latticevm::interval::AbstractInterval;
 use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::utils::GeneralLookupInfo;
-use latticevm::interval::AbstractInterval;
 
-use crate::executor::run_ziren_program;
 use crate::lookup::get_symbolic_lookup_constraints;
 use crate::p3_to_tv::convert_p3_expr;
+
+pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
+    // # Execute the Target Program
+    let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
+    let (checkpoint, done) = runtime.execute_state(false).unwrap();
+
+    let mut checkpoint_file = tempfile::tempfile()
+        .map_err(ZKMCoreProverError::IoError)
+        .unwrap();
+    checkpoint
+        .save(&mut checkpoint_file)
+        .map_err(ZKMCoreProverError::IoError)
+        .unwrap();
+
+    type SC = KoalaBearPoseidon2;
+    let config = KoalaBearPoseidon2::new();
+    let machine = MipsAir::machine(config);
+    let prover = CpuProver::new(machine);
+
+    let mut reader = io::BufReader::new(checkpoint_file);
+    let execution_state: ExecutionState =
+        bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
+    let (records, report) = trace_checkpoint::<SC>(
+        program.clone(),
+        execution_state,
+        ZKMCoreOpts::default(),
+        None,
+    );
+    let mut main_traces = records
+        .iter()
+        .map(|record| prover.generate_traces(record))
+        .collect::<Vec<_>>();
+
+    let mut true_abs_traces = vec![];
+    for mt in &mut main_traces[0] {
+        let nrows = mt.1.values.len() / mt.1.width;
+        let mut rows = vec![];
+        for i in 0..nrows {
+            let row = mt.1.row_mut(i);
+            rows.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .collect(),
+            );
+        }
+        true_abs_traces.push((mt.0.clone(), rows));
+    }
+
+    true_abs_traces
+}
 
 pub fn get_program_str(program: &Program) -> String {
     program
