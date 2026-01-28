@@ -10,6 +10,10 @@ pub enum WordOp {
     MulH,
     MulHU,
     MulHS,
+    MulTL,
+    MulTH,
+    MulTUL,
+    MulTUH,
     And,
     Or,
     Xor,
@@ -45,9 +49,11 @@ pub fn get_alu_constraint(
     a: &[LatticeVMSymbolicExpr; 4],
     b: &[LatticeVMSymbolicExpr; 4],
     c: &[LatticeVMSymbolicExpr; 4],
+    hi: &[LatticeVMSymbolicExpr; 4],
     op: &WordOp,
 ) -> LatticeVMSymbolicExpr {
     let a_word = reconstruct_symbolic_word(a, 0);
+    let hi_word = reconstruct_symbolic_word(hi, 0);
 
     match op {
         WordOp::Add => LatticeVMSymbolicExpr::Sub(
@@ -95,6 +101,34 @@ pub fn get_alu_constraint(
         WordOp::MulHS => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
             Box::new(LatticeVMSymbolicExpr::WordMulhs(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::MulTL => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordMultl(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::MulTH => LatticeVMSymbolicExpr::Sub(
+            Box::new(hi_word),
+            Box::new(LatticeVMSymbolicExpr::WordMulth(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::MulTUL => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordMultul(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::MulTUH => LatticeVMSymbolicExpr::Sub(
+            Box::new(hi_word),
+            Box::new(LatticeVMSymbolicExpr::WordMultuh(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
@@ -224,12 +258,45 @@ pub fn word_sub(a: &Word, b: &Word) -> AbstractInterval {
     }
 }
 
+pub fn word_addu(b: &Word, c: &Word) -> AbstractInterval {
+    let b = word_to_unsigned(b);
+    let c = word_to_unsigned(c);
+
+    // exact calculation
+    if b.is_singleton() && c.is_singleton() {
+        let res = (b.lo + c.lo).rem_euclid(WORD_BOUND);
+        return AbstractInterval { lo: res, hi: res };
+    }
+
+    // surely not overflow
+    if b.hi + c.hi < WORD_BOUND {
+        return AbstractInterval {
+            lo: b.lo + c.lo,
+            hi: b.hi + c.hi,
+        };
+    }
+
+    // surely overflow
+    if b.lo + c.lo >= WORD_BOUND {
+        let lo = b.lo + c.lo - WORD_BOUND;
+        let hi = b.hi + c.hi - WORD_BOUND;
+
+        return AbstractInterval {
+            lo: lo.max(0).min(WORD_BOUND - 1),
+            hi: hi.max(0).min(WORD_BOUND - 1),
+        };
+    }
+
+    // maybe overflow
+    full_word()
+}
+
 pub fn word_subu(b: &Word, c: &Word) -> AbstractInterval {
     let b = word_to_unsigned(b);
     let c = word_to_unsigned(c);
 
     // exact calculation
-    if b.lo == b.hi && c.lo == c.hi {
+    if b.is_singleton() && c.is_singleton() {
         let res = (b.lo - c.lo).rem_euclid(WORD_BOUND);
         return AbstractInterval { lo: res, hi: res };
     }
@@ -297,6 +364,53 @@ pub fn word_mulhs(a: &Word, b: &Word) -> AbstractInterval {
     let hi = candidates.iter().max().unwrap() >> WORD_BITS;
 
     AbstractInterval { lo, hi }
+}
+
+pub fn word_mult(a: &Word, b: &Word) -> (AbstractInterval, AbstractInterval) {
+    let a = word_to_unsigned(a).to_signed(WORD_BITS);
+    let b = word_to_unsigned(b).to_signed(WORD_BITS);
+
+    let candidates = [
+        a.lo as i128 * b.lo as i128,
+        a.lo as i128 * b.hi as i128,
+        a.hi as i128 * b.lo as i128,
+        a.hi as i128 * b.hi as i128,
+    ];
+
+    let min = *candidates.iter().min().unwrap();
+    let max = *candidates.iter().max().unwrap();
+
+    let lo = AbstractInterval {
+        lo: (min & ((1i128 << WORD_BITS) - 1)) as i64,
+        hi: (max & ((1i128 << WORD_BITS) - 1)) as i64,
+    };
+
+    let hi = AbstractInterval {
+        lo: (min >> WORD_BITS) as i64,
+        hi: (max >> WORD_BITS) as i64,
+    };
+
+    (lo, hi)
+}
+
+pub fn word_multu(a: &Word, b: &Word) -> (AbstractInterval, AbstractInterval) {
+    let a = word_to_unsigned(a);
+    let b = word_to_unsigned(b);
+
+    let lo_prod = a.lo as i128 * b.lo as i128;
+    let hi_prod = a.hi as i128 * b.hi as i128;
+
+    let lo = AbstractInterval {
+        lo: (lo_prod & ((1i128 << WORD_BITS) - 1)) as i64,
+        hi: (hi_prod & ((1i128 << WORD_BITS) - 1)) as i64,
+    };
+
+    let hi = AbstractInterval {
+        lo: (lo_prod >> WORD_BITS) as i64,
+        hi: (hi_prod >> WORD_BITS) as i64,
+    };
+
+    (lo, hi)
 }
 
 pub fn word_div(a: &Word, b: &Word) -> AbstractInterval {
@@ -370,7 +484,7 @@ pub fn word_and(a: &Word, b: &Word) -> AbstractInterval {
     // However, the lower bound is tricky. For a simple interval, we know:
     // 0 <= (a & b) <= min(a.hi, b.hi)
     // A tighter bound exists but requires bit-by-bit analysis.
-    if a.lo == a.hi && b.lo == b.hi {
+    if a.is_singleton() && b.is_singleton() {
         let res = a.lo & b.lo;
         AbstractInterval { lo: res, hi: res }
     } else {
@@ -386,7 +500,7 @@ pub fn word_or(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    if a.lo == a.hi && b.lo == b.hi {
+    if a.is_singleton() && b.is_singleton() {
         let res = a.lo | b.lo;
         AbstractInterval { lo: res, hi: res }
     } else {
@@ -404,7 +518,7 @@ pub fn word_xor(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    if a.lo == a.hi && b.lo == b.hi {
+    if a.is_singleton() && b.is_singleton() {
         let res = a.lo ^ b.lo;
         AbstractInterval { lo: res, hi: res }
     } else {
@@ -427,15 +541,15 @@ pub fn word_eq(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    // 確実に等しい
-    if a.lo == a.hi && b.lo == b.hi && a.lo == b.lo {
+    // definitely equal
+    if a.is_singleton() && b.is_singleton() && a.lo == b.lo {
         AbstractInterval::one()
     }
-    // 確実に異なる
+    // definitely not equal
     else if a.hi < b.lo || b.hi < a.lo {
         AbstractInterval::zero()
     }
-    // 不確実
+    // unsure
     else {
         AbstractInterval::bool()
     }

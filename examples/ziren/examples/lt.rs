@@ -1,9 +1,5 @@
 use core::mem::transmute;
-use std::collections::HashSet;
-use std::fs;
 use std::io;
-
-use itertools::Itertools;
 
 use p3_koala_bear::KoalaBear;
 
@@ -14,106 +10,67 @@ use zkm_core_machine::LtChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
-use latticevm::solver::RangeType;
-use latticevm::ui::UiState;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::LatticeVMConstraints;
+use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::utils::indices_arr;
 
-use latticevm_ziren::utils::extract_constraints_and_range;
 use latticevm_ziren::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
-    generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
-
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let string_representation = format!(
-        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
-        trace.data[0][12],
-        trace.data[0][13],
-        trace.data[0][14],
-        trace.data[0][15],
-    );
-
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
-}
 
 const fn make_col_map() -> LtCols<usize> {
     let indices_arr = indices_arr::<{ NUM_LT_COLS }>();
     unsafe { transmute::<[usize; NUM_LT_COLS], LtCols<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::SLT, 1, 2, 3, true, true)];
+pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "SLT" => Opcode::SLT,
+        "SLTU" => Opcode::SLTU,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "SLT";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000;
+    let max_iteration = 10000000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air = LtChip::default();
     let air_name = "Lt";
-    let colmap = make_col_map();
-    println!("a: {:?}", colmap.a);
-    println!("b: {:?}", colmap.b);
-    println!("c: {:?}", colmap.c);
+    let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
+    let (tv_constraints, refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, LtChip>(&air, NUM_LT_COLS, prime);
-    refinable_cols.extend(&[4]);
-    range_types.insert(4, RangeType::U8);
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
+    let final_check = generate_alu_final_checker(general_lookup_info.clone());
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints: tv_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = 2; //refinable_cols.len();
+    let minimum_num_taregt_cols = 3; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, x, y);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
@@ -123,8 +80,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],

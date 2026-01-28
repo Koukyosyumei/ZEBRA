@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fs};
 
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -7,6 +7,7 @@ use ratatui::{
     Frame,
 };
 
+use crate::interval::MayBeFlag;
 use crate::{symbolic::AbstractTrace, utils::GeneralLookupInfo};
 
 pub struct UiState {
@@ -143,5 +144,74 @@ pub fn generate_alu_final_checker(
             )
             .unwrap();
         }
+    }
+}
+
+pub fn pad_dummy_rows_with_last_dummy(
+    general_lookup_info: GeneralLookupInfo,
+) -> impl Fn(&mut AbstractTrace, u32) + Clone {
+    move |main_trace: &mut AbstractTrace, prime: u32| {
+        let num_steps = main_trace.data.len();
+
+        if general_lookup_info
+            .pc_table_is_real
+            .eval(
+                &main_trace.data[num_steps - 1],
+                None,
+                None,
+                num_steps - 1 == 0,
+                false,
+                true,
+                prime,
+            )
+            .is_zero(prime)
+            == MayBeFlag::True
+        {
+            let pad_ref_data = main_trace.data[num_steps - 1].clone();
+            for i in 0..num_steps {
+                if general_lookup_info
+                    .pc_table_is_real
+                    .eval(
+                        &main_trace.data[i],
+                        if i + 1 < num_steps {
+                            Some(&main_trace.data[i + 1])
+                        } else {
+                            None
+                        },
+                        None,
+                        i == 0,
+                        i < num_steps - 1,
+                        i == num_steps - 1,
+                        prime,
+                    )
+                    .is_zero(prime)
+                    == MayBeFlag::True
+                {
+                    main_trace.data[i] = pad_ref_data.clone();
+                }
+            }
+        }
+    }
+}
+
+pub fn save_repr_if_unique(
+    string_representation: &String,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    if !known_reprt.contains(string_representation) {
+        known_reprt.insert(string_representation.clone());
+        ui.recovered = string_representation.clone();
+
+        fs::write(
+            format!("voutput/{}_states.txt", known_reprt.len()),
+            ui.recovered.clone(),
+        )
+        .unwrap();
+        fs::write(
+            format!("voutput/{}_assignments.txt", known_reprt.len()),
+            ui.logs.clone(),
+        )
+        .unwrap();
     }
 }

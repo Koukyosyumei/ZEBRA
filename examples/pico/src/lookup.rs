@@ -2,26 +2,19 @@ use std::collections::HashSet;
 
 use crate::p3_to_tv::convert_p3_virtual_pair_col;
 use p3_air::Air;
-use p3_air::AirBuilder;
 use p3_air::PairCol;
 use p3_air::VirtualPairCol;
 use p3_field::PrimeField32;
-use p3_koala_bear::KoalaBear;
-use p3_uni_stark::{SymbolicExpression, SymbolicVariable};
 
 use pico_vm::compiler::riscv::opcode::Opcode;
-use pico_vm::machine::builder::{ChipBuilder, ChipLookupBuilder, LookupBuilder};
 use pico_vm::machine::folder::SymbolicConstraintFolder;
 use pico_vm::machine::lookup::LookupType;
 
 use latticevm::alu::get_alu_constraint;
 use latticevm::alu::WordOp;
-use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::utils::GeneralLookupInfo;
-
-use crate::p3_to_tv::convert_p3_expr;
 
 pub fn add_single_var_col_if_possible<F: PrimeField32>(
     b: &VirtualPairCol<F>,
@@ -84,19 +77,19 @@ where
                     }
                 }
 
-                let opcode = &r.values[0];
-                let a0 = &r.values[1];
-                let a1 = &r.values[2];
-                let a2 = &r.values[3];
-                let a3 = &r.values[4];
-                let b0 = &r.values[5];
-                let b1 = &r.values[6];
-                let b2 = &r.values[7];
-                let b3 = &r.values[8];
-                let c0 = &r.values[9];
-                let c1 = &r.values[10];
-                let c2 = &r.values[11];
-                let c3 = &r.values[12];
+                let _opcode = &r.values[0];
+                let _a0 = &r.values[1];
+                let _a1 = &r.values[2];
+                let _a2 = &r.values[3];
+                let _a3 = &r.values[4];
+                let _b0 = &r.values[5];
+                let _b1 = &r.values[6];
+                let _b2 = &r.values[7];
+                let _b3 = &r.values[8];
+                let _c0 = &r.values[9];
+                let _c1 = &r.values[10];
+                let _c2 = &r.values[11];
+                let _c3 = &r.values[12];
 
                 for i in 1..13 {
                     add_single_var_col_if_possible(&r.values[i], u8_cols);
@@ -120,12 +113,6 @@ where
                         &mut general_lookup_info.alu_input2,
                     );
                 }
-
-                /*
-                println!("receive opcode: {:?}", opcode);
-                println!("receive a: {:?} {:?} {:?} {:?}", a0, a1, a2, a3);
-                println!("receive b: {:?} {:?} {:?} {:?}", b0, b1, b2, b3);
-                println!("receive c: {:?} {:?} {:?} {:?}", c0, c1, c2, c3);*/
             }
             _ => {}
         }
@@ -154,7 +141,7 @@ where
 
                 let tmps = vec![
                     (Opcode::ADD as u8, WordOp::Add),
-                    (Opcode::SUB as u8, WordOp::Sub),
+                    (Opcode::SUB as u8, WordOp::SubU),
                     (Opcode::MUL as u8, WordOp::Mul),
                     (Opcode::MULH as u8, WordOp::MulH),
                     (Opcode::MULHU as u8, WordOp::MulHU),

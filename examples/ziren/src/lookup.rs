@@ -151,11 +151,19 @@ where
                 let c1 = convert_p3_virtual_pair_col(&s.values[16]);
                 let c2 = convert_p3_virtual_pair_col(&s.values[17]);
                 let c3 = convert_p3_virtual_pair_col(&s.values[18]);
+                let hi0 = convert_p3_virtual_pair_col(&s.values[19]);
+                let hi1 = convert_p3_virtual_pair_col(&s.values[20]);
+                let hi2 = convert_p3_virtual_pair_col(&s.values[21]);
+                let hi3 = convert_p3_virtual_pair_col(&s.values[22]);
 
                 let tmps = vec![
                     (Opcode::ADD as u8, WordOp::Add),
                     (Opcode::SUB as u8, WordOp::SubU),
                     (Opcode::MUL as u8, WordOp::Mul),
+                    (Opcode::MULT as u8, WordOp::MulTL),
+                    (Opcode::MULT as u8, WordOp::MulTH),
+                    (Opcode::MULTU as u8, WordOp::MulTUL),
+                    (Opcode::MULTU as u8, WordOp::MulTUH),
                     (Opcode::SLT as u8, WordOp::SLt),
                     (Opcode::AND as u8, WordOp::And),
                     (Opcode::OR as u8, WordOp::Or),
@@ -167,6 +175,7 @@ where
                         &[a0.clone(), a1.clone(), a2.clone(), a3.clone()],
                         &[b0.clone(), b1.clone(), b2.clone(), b3.clone()],
                         &[c0.clone(), c1.clone(), c2.clone(), c3.clone()],
+                        &[hi0.clone(), hi1.clone(), hi2.clone(), hi3.clone()],
                         &t.1,
                     );
                     let impl_constraint =

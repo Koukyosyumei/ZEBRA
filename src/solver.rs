@@ -1,11 +1,9 @@
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
 use std::i32;
-use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode};
 use itertools::Itertools;

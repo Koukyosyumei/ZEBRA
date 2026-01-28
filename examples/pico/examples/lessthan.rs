@@ -6,8 +6,8 @@ use std::io;
 
 use p3_koala_bear::KoalaBear;
 
-use pico_vm::chips::chips::alu::divrem::columns::{DivRemCols, NUM_DIVREM_COLS};
-use pico_vm::chips::chips::alu::divrem::DivRemChip;
+use pico_vm::chips::chips::alu::lt::LtChip;
+use pico_vm::chips::chips::alu::lt::{LtCols, NUM_LT_COLS};
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, register::Register};
 
@@ -22,64 +22,58 @@ use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
 };
 
-const fn make_col_map() -> DivRemCols<usize> {
-    let indices_arr = indices_arr::<{ NUM_DIVREM_COLS }>();
-    unsafe { transmute::<[usize; NUM_DIVREM_COLS], DivRemCols<usize>>(indices_arr) }
+const fn make_col_map() -> LtCols<usize> {
+    let indices_arr = indices_arr::<{ NUM_LT_COLS }>();
+    unsafe { transmute::<[usize; NUM_LT_COLS], LtCols<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::REMU, 1, 13, 3, true, true)];
+pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "SLT" => Opcode::SLT,
+        "SLTU" => Opcode::SLTU,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "SLT";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
+    let max_iteration = 100000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
-    let air: DivRemChip<KoalaBear> = DivRemChip::default();
-    let air_name = "DivRem";
-    let colmap = make_col_map();
-    println!("output: {:?}", colmap.values[0].a);
-    println!("operand_1: {:?}", colmap.values[0].b);
-    println!("operand_2: {:?}", colmap.values[0].c);
+    let air: LtChip<KoalaBear> = LtChip::default();
+    let air_name = "LessThan";
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, DivRemChip<KoalaBear>>(
-            &air,
-            NUM_DIVREM_COLS,
-            prime,
-        );
-    println!("General: {:?}", general_lookup_info);
-
+        extract_constraints_and_range::<KoalaBear, LtChip<KoalaBear>>(&air, NUM_LT_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
-
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = 2;
+    let minimum_num_taregt_cols = 1; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 

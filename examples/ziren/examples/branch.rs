@@ -14,58 +14,35 @@ use zkm_core_machine::BranchChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
-use latticevm::solver::RangeType;
-use latticevm::ui::UiState;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::ui::save_repr_if_unique;
+use latticevm::ui::{generate_alu_final_checker, UiState};
+use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 // ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
+    _num_trial: usize,
+    _prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "pc: {}, next_pc[0]: {}, next_pc[1]: {}, next_pc[2]: {}, next_pc[3]: {}, next_next_pc[0]: {}, next_next_pc[1]: {}, next_next_pc[2]: {}, next_next_pc[3]: {}, is_beq: {}, is_bne: {}, is_bltz: {}, is_blez: {}, is_bgtz: {}, is_bgez: {}",
+        "pc: {}, next_pc: [{}], next_next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
         trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][23],
-        trace.data[0][24],
-        trace.data[0][25],
-        trace.data[0][26],
-        trace.data[0][53],
-        trace.data[0][54],
-        trace.data[0][55],
-        trace.data[0][56],
-        trace.data[0][57],
-        trace.data[0][58],
+        trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
+        trace_fmt_with_idxs(trace, 0, &[23, 24, 25, 26]),
+        trace_fmt_with_idxs(trace, 0, &[41, 42, 43, 44]),
+        trace_fmt_with_idxs(trace, 0, &[45, 46, 47, 48]),
+        trace_fmt_with_idxs(trace, 0, &[49, 50, 51, 52]),
     );
-
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+    save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
 const fn make_col_map() -> BranchColumns<usize> {
@@ -73,50 +50,67 @@ const fn make_col_map() -> BranchColumns<usize> {
     unsafe { transmute::<[usize; NUM_BRANCH_COLS], BranchColumns<usize>>(indices_arr) }
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::BLTZ, 3, 0, 12, true, true)];
+pub fn target_program(
+    opcode: Opcode,
+    pc_start: u32,
+    pc_base: u32,
+    x: u32,
+    y: u32,
+    z: u32,
+) -> Program {
+    let instructions = vec![
+        Instruction::new(Opcode::ADD, 1, 0, x, true, true),
+        Instruction::new(Opcode::ADD, 2, 0, y, true, true),
+        Instruction::new(opcode, 1, 2, z, true, true),
+    ];
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+    match target_opcode {
+        "BEQ" => Opcode::BEQ,
+        "BGEZ" => Opcode::BGEZ,
+        "BGTZ" => Opcode::BGTZ,
+        "BLEZ" => Opcode::BLEZ,
+        "BLTZ" => Opcode::BLTZ,
+        "BNE" => Opcode::BNE,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "BEQ";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000;
+    let max_iteration = 1000000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract CPU Constraints ##########################
     let air = BranchChip::default();
     let air_name = "Branch";
-    let colmap = make_col_map();
-    println!("map: {:?}", colmap);
+    let _colmap = make_col_map();
 
     let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
     refinable_cols.extend(&[23, 24, 25, 26]);
-    range_types.insert(23, RangeType::U8);
-    range_types.insert(24, RangeType::U8);
-    range_types.insert(25, RangeType::U8);
-    range_types.insert(26, RangeType::U8);
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = 4; //refinable_cols.len();
+    let minimum_num_taregt_cols = 3; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(4, 4);
+    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 3, 4, 12);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
@@ -126,8 +120,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],

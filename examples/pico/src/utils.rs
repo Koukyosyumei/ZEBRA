@@ -4,15 +4,11 @@ use std::collections::HashSet;
 use itertools::Itertools;
 
 use p3_air::Air;
-use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::SymbolicExpression;
 
 use pico_vm::chips::chips::public_values::columns::NUM_PUBLIC_VALUES_COLS;
-use pico_vm::compiler::riscv::opcode::Opcode;
 use pico_vm::compiler::riscv::program::Program;
-use pico_vm::machine::builder::{ChipBuilder, ChipLookupBuilder, LookupBuilder};
 use pico_vm::machine::folder::SymbolicConstraintFolder;
-use pico_vm::machine::lookup::LookupType;
 use pico_vm::machine::utils::get_symbolic_constraints;
 
 use latticevm::solver::RangeType;
@@ -20,9 +16,7 @@ use latticevm::symbolic::gather_vars;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
 use latticevm::utils::GeneralLookupInfo;
-use latticevm::{
-    interval::AbstractInterval, symbolic::gather_boolean_variables, symbolic::AbstractTrace,
-};
+use latticevm::{interval::AbstractInterval, symbolic::gather_boolean_variables};
 
 use crate::executor::run_pico_program;
 use crate::lookup::get_symbolic_lookup_constraints;
@@ -127,7 +121,7 @@ where
     for t in &tv_constraints {
         gather_vars(0, t, &mut used_vars);
     }
-    let mut used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
+    let used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
     refinable_cols.retain(|c| used_var_ids.contains(c));
 
     let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
@@ -145,14 +139,4 @@ where
         range_types,
         general_lookup_info,
     )
-}
-
-pub const fn indices_arr<const N: usize>() -> [usize; N] {
-    let mut indices_arr = [0; N];
-    let mut i = 0;
-    while i < N {
-        indices_arr[i] = i;
-        i += 1;
-    }
-    indices_arr
 }
