@@ -20,7 +20,7 @@ use latticevm::alu::{get_alu_constraint, WordOp};
 use latticevm::interval::AbstractInterval;
 use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
 use latticevm::symbolic::{
-    gather_boolean_variables, gather_vars, make_impl_constraint, AbstractTrace,
+    make_impl_constraint, AbstractTrace,
     LatticeVMSymbolicExpr as LVSExpr,
 };
 use latticevm::utils::GeneralLookupInfo;
