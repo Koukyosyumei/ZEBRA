@@ -1,12 +1,12 @@
-use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_baby_bear::BabyBear;
 
 use valida_alu_u32::bitwise::columns::COL_MAP;
 use valida_alu_u32::bitwise::columns::NUM_BITWISE_COLS;
+use valida_alu_u32::bitwise::And32Instruction;
 use valida_alu_u32::bitwise::Bitwise32Chip;
+use valida_alu_u32::bitwise::Or32Instruction;
 use valida_alu_u32::bitwise::Xor32Instruction;
 use valida_basic_api::BasicMachine;
 use valida_cpu::Imm32Instruction;
@@ -25,7 +25,7 @@ use latticevm_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
 
-fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
+fn get_target_program<Val: StarkField>(opcode: u32, a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
 
     let mut program = vec![];
@@ -35,7 +35,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Xor32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: opcode,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
@@ -47,7 +47,18 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
     program
 }
 
+pub fn get_opcode_addsub<Val: StarkField>(target_opcode: &str) -> u32 {
+    match target_opcode {
+        "AND" => <And32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+        "OR" => <Or32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+        "XOR" => <Xor32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "AND";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -76,12 +87,6 @@ fn main() -> Result<(), io::Error> {
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
 
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
-
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
         pv_pos_constraints: vec![],
@@ -90,7 +95,8 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>(3, 4);
+    let program =
+        get_target_program::<BabyBear>(get_opcode_addsub::<BabyBear>(target_opcode), 3, 4);
     let program_str = program
         .iter()
         .map(|inst| format!("{}\n", inst))
