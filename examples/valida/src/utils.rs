@@ -338,7 +338,9 @@ where
     )
 }
 
-pub fn make_pc_adjuster(program: Vec<InstructionWord<i32>>) -> impl Fn(&mut AbstractTrace, u32) {
+pub fn make_pc_adjuster(
+    program: Vec<InstructionWord<i32>>,
+) -> impl Fn(&mut AbstractTrace, u32) + Clone {
     move |main_trace: &mut AbstractTrace, prime: u32| {
         for row in &mut main_trace.data {
             if row[1].is_singleton() {

@@ -23,6 +23,7 @@ use latticevm::quick::quick_api;
 use latticevm::solver::{
     dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
 };
+use latticevm::state::AbstractState;
 use latticevm::state::MemoryOp;
 use latticevm::state::MemoryOpKind;
 use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
@@ -148,17 +149,15 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     let max_iteration = 3000;
-    let min_row_id = 2;
-    let max_row_id = 7;
+    let min_row_id = 0;
+    let max_row_id = 5;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
-    //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract Add Constraints ##########################
     // Columns reserved for program counters / instructions
     let program_cols = (3..8).collect::<Vec<_>>();
 
-    println!("MEM AIR MAP");
+    println!("CPU AIR MAP");
     println!("  {:?}", CPU_COL_MAP);
 
     let air = CpuChip::default();
@@ -171,12 +170,6 @@ fn main() -> Result<(), io::Error> {
             &machine, &air, num_col, prime,
         );
     refinable_cols.retain(|x| !program_cols.contains(x));
-
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let mut public_vals = vec![AbstractInterval::zero(); 3];
     public_vals[0] = AbstractInterval::from_i64(0);
