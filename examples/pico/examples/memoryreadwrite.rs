@@ -20,7 +20,7 @@ use latticevm::utils::{create_or_clear_dir, trace_fmt_with_idxs};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_pico::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 // ############## Final Check Function ##############################
