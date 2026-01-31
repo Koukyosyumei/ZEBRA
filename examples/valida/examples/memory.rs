@@ -2,27 +2,21 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io;
 
-
 use p3_baby_bear::BabyBear;
 use p3_field::{AbstractField, Field};
-//use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
 
 use valida_alu_u32::sub::Sub32Instruction;
 use valida_basic_api::BasicMachine;
 use valida_cpu::Imm32Instruction;
 use valida_cpu::StopInstruction;
-use valida_machine::{
-    Instruction, InstructionWord, Operands, StarkField,
-};
+use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_memory::columns::{MEM_COL_MAP, NUM_MEM_COLS};
 use valida_memory::MemoryChip;
 use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::interval::{AbstractInterval, MayBeFlag};
 use latticevm::quick::quick_api;
-use latticevm::solver::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn,
-};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
