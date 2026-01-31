@@ -312,6 +312,7 @@ pub fn extract_constraints_and_range<M, SC, C>(
     prime: u32,
 ) -> (
     Vec<LVSExpr>,
+    Vec<LVSExpr>,
     Vec<usize>,
     HashMap<usize, RangeType>,
     GeneralLookupInfo,
@@ -368,12 +369,13 @@ where
         &multiplicities,
         &received_vars_from_cpu,
         &mut tv_constraints,
-        lookup_symbolic_constraints,
+        &lookup_symbolic_constraints,
         prime,
     );
 
     (
         tv_constraints,
+        lookup_symbolic_constraints,
         refinable_cols,
         range_types,
         general_lookup_info,

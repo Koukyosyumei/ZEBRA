@@ -1,7 +1,6 @@
 use core::mem::transmute;
 use std::io;
 
-
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
@@ -12,9 +11,9 @@ use zkm_stark::MachineProver;
 
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::symbolic::LatticeVMConstraints;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -48,13 +47,14 @@ fn main() -> Result<(), io::Error> {
     let air_name = "ShiftLeft";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, ShiftLeft>(&air, NUM_SHIFT_LEFT_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };

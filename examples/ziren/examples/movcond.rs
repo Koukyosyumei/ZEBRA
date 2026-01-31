@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::io;
 use std::mem::transmute;
 
-
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
@@ -92,12 +91,13 @@ fn main() -> Result<(), io::Error> {
     let air_name = "MovCond";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MovCondChip>(&air, NUM_MOV_COND_COLS, prime);
     refinable_cols.extend(&[2, 3, 4, 5]);
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };

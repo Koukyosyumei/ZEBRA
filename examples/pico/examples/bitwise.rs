@@ -57,7 +57,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Bitwise";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BitwiseChip<KoalaBear>>(
             &air,
             NUM_BITWISE_COLS,
@@ -67,7 +67,8 @@ fn main() -> Result<(), io::Error> {
     refinable_cols.extend(&general_lookup_info.alu_output);
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };

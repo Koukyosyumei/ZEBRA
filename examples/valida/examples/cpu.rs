@@ -184,7 +184,7 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 0;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
@@ -203,7 +203,8 @@ fn main() -> Result<(), io::Error> {
     //let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };

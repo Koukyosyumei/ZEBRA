@@ -58,19 +58,20 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Lt";
     let _colmap = make_col_map();
 
-    let (tv_constraints, refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, LtChip>(&air, NUM_LT_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints,
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
     let minimum_num_taregt_cols = 3; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, x, y);
+    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 2, 3);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 

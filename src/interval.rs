@@ -327,6 +327,22 @@ impl AbstractInterval {
         }
     }
 
+    pub fn is_strict_zero(&self) -> MayBeFlag {
+        if self.is_singleton() {
+            if self.lo == 0 {
+                return MayBeFlag::True;
+            } else {
+                return MayBeFlag::False;
+            }
+        } else {
+            if self.lo <= 0 && 0 <= self.hi {
+                return MayBeFlag::MayBe;
+            } else {
+                return MayBeFlag::False;
+            }
+        }
+    }
+
     pub fn is_non_zero(&self, p: u32) -> MayBeFlag {
         if self.is_singleton() {
             if self.lo % (p as i64) != 0 {
@@ -413,9 +429,7 @@ impl AbstractInterval {
         if self.lo >= 0 && self.hi < m {
             self.clone()
         } else if self.lo == self.hi {
-            if m == 0 {
-                println!("############### {:?}", m);
-            }
+            if m == 0 {}
             // let v = self.lo.rem_euclid(m);
             let v = self.lo % m;
             Self { lo: v, hi: v }

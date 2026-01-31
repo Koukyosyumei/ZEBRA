@@ -611,7 +611,7 @@ pub fn prepare_constraints_and_range_type(
     multiplicities: &HashSet<usize>,
     received_vars_from_cpu: &HashSet<usize>,
     tv_constraints: &mut Vec<LatticeVMSymbolicExpr>,
-    lookup_symbolic_constraints: Vec<LatticeVMSymbolicExpr>,
+    lookup_symbolic_constraints: &Vec<LatticeVMSymbolicExpr>,
     prime: u32,
 ) -> (Vec<usize>, HashMap<usize, RangeType>) {
     let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
@@ -646,10 +646,13 @@ pub fn prepare_constraints_and_range_type(
         }
     }
     *tv_constraints = new_tv_constraints;
-    tv_constraints.extend(lookup_symbolic_constraints);
+    //tv_constraints.extend(lookup_symbolic_constraints);
 
     let mut used_vars = HashSet::new();
     for t in tv_constraints.iter() {
+        gather_vars(0, t, &mut used_vars);
+    }
+    for t in lookup_symbolic_constraints.iter() {
         gather_vars(0, t, &mut used_vars);
     }
     let used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();

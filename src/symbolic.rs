@@ -1884,20 +1884,21 @@ impl AbstractTrace {
     }
 }
 
-pub fn eval_air_constraints(
+pub fn eval_base_constraints(
     trace: &AbstractTrace,
     public_vals: Option<&[AbstractInterval]>,
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
-) -> (MayBeFlag, i32, HashSet<(usize, usize)>) {
+    is_strict: bool,
+    potential: &mut i32,
+    memo: &mut HashSet<(usize, usize)>,
+) -> MayBeFlag {
     let num_steps = trace.data.len();
     let mut is_all_true = true;
-    let mut potential = 0;
-    let mut memo = HashSet::<(usize, usize)>::new();
     for i in 0..num_steps {
         for tc in constraints {
-            let flag = tc
-                .eval(
+            let flag = if is_strict {
+                tc.eval(
                     &trace.data[i],
                     if i + 1 < num_steps {
                         Some(&trace.data[i + 1])
@@ -1910,30 +1911,47 @@ pub fn eval_air_constraints(
                     i == num_steps - 1,
                     prime,
                 )
-                .is_zero(prime);
+                .is_strict_zero()
+            } else {
+                tc.eval(
+                    &trace.data[i],
+                    if i + 1 < num_steps {
+                        Some(&trace.data[i + 1])
+                    } else {
+                        None
+                    },
+                    public_vals,
+                    i == 0,
+                    i < num_steps - 1,
+                    i == num_steps - 1,
+                    prime,
+                )
+                .is_zero(prime)
+            };
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    return (MayBeFlag::False, 0, memo);
+                    return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {
-                    gather_vars(i, tc, &mut memo);
+                    gather_vars(i, tc, memo);
                     is_all_true = false;
-                    potential += 1;
+                    *potential += 1;
                 }
             }
         }
     }
     if is_all_true {
-        (MayBeFlag::True, 0, memo)
+        MayBeFlag::True
     } else {
-        (MayBeFlag::MayBe, potential, memo)
+        MayBeFlag::MayBe
     }
 }
 
 #[derive(Clone)]
 pub struct LatticeVMConstraints {
     pub air_constraints: Vec<LatticeVMSymbolicExpr>,
+    pub lookup_constraints: Vec<LatticeVMSymbolicExpr>,
     pub pv_pos_constraints: Vec<LatticeVMSymbolicExpr>,
     pub pv_neg_constraints: Vec<LatticeVMSymbolicExpr>,
 }
@@ -1945,9 +1963,33 @@ pub fn eval_constraints(
     prime: u32,
 ) -> (MayBeFlag, i32, HashSet<(usize, usize)>) {
     let mut is_all_true = true;
+    let mut potential = 0;
+    let mut memo = HashSet::<(usize, usize)>::new();
 
-    let (air_flag, mut potential, memo) =
-        eval_air_constraints(trace, public_vals, &constraints.air_constraints, prime);
+    let air_flag = eval_base_constraints(
+        trace,
+        public_vals,
+        &constraints.air_constraints,
+        prime,
+        false,
+        &mut potential,
+        &mut memo,
+    );
+    match air_flag {
+        MayBeFlag::True => {}
+        MayBeFlag::False => return (MayBeFlag::False, 0, memo),
+        MayBeFlag::MayBe => is_all_true = false,
+    }
+    let air_flag = eval_base_constraints(
+        trace,
+        public_vals,
+        &constraints.lookup_constraints,
+        prime,
+        true,
+        &mut potential,
+        &mut memo,
+    );
+
     match air_flag {
         MayBeFlag::True => {}
         MayBeFlag::False => return (MayBeFlag::False, 0, memo),
@@ -2137,12 +2179,8 @@ mod tests {
         ]];
         let trace = AbstractTrace::new(trace_data);
         let a_eval = a.eval(&trace.data[0], None, None, false, false, false, prime);
-        println!("{}", a);
-        println!("{}", a_eval);
 
         let b_eval = b.eval(&trace.data[0], None, None, false, false, false, prime);
-        println!("{}", b);
-        println!("{}", b_eval);
 
         //assert!(false);
     }

@@ -99,14 +99,15 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Cpu";
     println!("{:?}", CPU_COL_MAP);
 
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, prime);
     refinable_cols.retain(|x| !program_cols.contains(x));
     refinable_cols.push(65);
 
     let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints,
         pv_neg_constraints,
     };

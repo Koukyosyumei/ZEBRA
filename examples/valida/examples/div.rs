@@ -16,7 +16,6 @@ use valida_opcodes::BYTES_PER_INSTR;
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::symbolic::eval_air_constraints;
 use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
@@ -91,20 +90,15 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 6;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
     refinable_cols.extend(&[8, 9, 10, 11]);
 
-    let mut i: u32 = 0;
-    for t in &tv_constraints {
-        println!("#{} {}", i, t);
-        i += 1;
-    }
-
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
@@ -119,6 +113,8 @@ fn main() -> Result<(), io::Error> {
 
     let mut base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
+
+    /*
     let aux = vec![
         12, 0, 0, 0, 4, 0, 0, 0, 3, 0, 0, 60, 10, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 1, 0,
     ];
@@ -129,7 +125,7 @@ fn main() -> Result<(), io::Error> {
     let con = vec![constraints.air_constraints[45].clone()];
     println!("-------- {}", con[0]);
     let result = eval_air_constraints(&at, None, &con, prime);
-    println!("$$$$$$$$$$$$$$$ {:?}", result.0);
+    println!("$$$$$$$$$$$$$$$ {:?}", result.0);*/
 
     /*
         pub fn eval_air_constraints(

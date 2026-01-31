@@ -95,8 +95,13 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", colmap.add_operation);
     println!("{:?}", colmap.op_a_not_0);
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
-        extract_constraints_and_range::<BabyBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
+    let (
+        air_constraints,
+        lookup_constraints,
+        mut refinable_cols,
+        mut range_types,
+        general_lookup_info,
+    ) = extract_constraints_and_range::<BabyBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&[1, 2, 3, 4]); // output
     println!("{:?}", refinable_cols);
     println!("{:?}", range_types);
@@ -106,7 +111,8 @@ fn main() -> Result<(), io::Error> {
     }
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };

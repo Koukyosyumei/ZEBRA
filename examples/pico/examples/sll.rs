@@ -50,13 +50,19 @@ fn main() -> Result<(), io::Error> {
     let air_name = "ShiftLeft";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, SLLChip<KoalaBear>>(&air, NUM_SLL_COLS, prime);
+    let (
+        air_constraints,
+        lookup_constraints,
+        mut refinable_cols,
+        mut range_types,
+        general_lookup_info,
+    ) = extract_constraints_and_range::<KoalaBear, SLLChip<KoalaBear>>(&air, NUM_SLL_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
