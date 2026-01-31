@@ -63,7 +63,7 @@ fn main() -> Result<(), io::Error> {
         air_constraints,
         lookup_constraints,
         mut refinable_cols,
-        mut range_types,
+        range_types,
         general_lookup_info,
     ) = extract_constraints_and_range::<KoalaBear, MulChip<KoalaBear>>(&air, NUM_MUL_COLS, prime);
 
