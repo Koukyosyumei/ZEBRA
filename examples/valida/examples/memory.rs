@@ -153,7 +153,6 @@ fn final_check(
                     is_consistent_flag = false;
                     string_representation.push_str("crash\n");
                     break_point = i;
-                    //break;
                 }
             }
         }
