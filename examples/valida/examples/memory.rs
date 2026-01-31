@@ -199,8 +199,8 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     let max_iteration = 10000;
-    let min_row_id = 0;
-    let max_row_id = 4;
+    let min_row_id = 1;
+    let max_row_id = 1;
     let num_extracted_rows = 1;
     let seed = 41;
 
