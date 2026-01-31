@@ -19,10 +19,7 @@ use valida_program::{MachineWithProgramROM, ProgramTableType};
 use latticevm::alu::{get_alu_constraint, WordOp};
 use latticevm::interval::AbstractInterval;
 use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
-use latticevm::symbolic::{
-    make_impl_constraint, AbstractTrace,
-    LatticeVMSymbolicExpr as LVSExpr,
-};
+use latticevm::symbolic::{make_impl_constraint, AbstractTrace, LatticeVMSymbolicExpr as LVSExpr};
 use latticevm::utils::GeneralLookupInfo;
 
 use crate::config::{get_machine_config, prover_options};

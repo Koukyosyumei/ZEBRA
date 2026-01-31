@@ -13,11 +13,17 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
+use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::symbolic::eval_air_constraints;
+use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
+use latticevm::ui::save_repr_if_unique;
+use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::trace_fmt_with_idxs;
 
 use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::{
@@ -32,36 +38,13 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
+        "input0: [{}], input1: [{}], output: [{}]",
+        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
+        trace_fmt_with_idxs(trace, 0, &[4, 5, 6, 7]),
+        trace_fmt_with_idxs(trace, 0, &[8, 9, 10, 11]),
     );
 
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+    save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
@@ -93,7 +76,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 1000;
+    let max_iteration = 100000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -112,20 +95,20 @@ fn main() -> Result<(), io::Error> {
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
-    //refinable_cols.extend(&[8, 9, 10, 11]);
+    refinable_cols.extend(&[8, 9, 10, 11]);
 
+    let mut i: u32 = 0;
     for t in &tv_constraints {
-        println!("#### {}", t);
+        println!("#{} {}", i, t);
+        i += 1;
     }
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints: tv_constraints.clone(),
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = 1; //refinable_cols.len();
+    let minimum_num_taregt_cols = 3; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>(12, 4);
@@ -136,7 +119,26 @@ fn main() -> Result<(), io::Error> {
 
     let mut base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
-    //base_abs_main_trace_data[0][4] = AbstractInterval::from_i64(255);
+    let aux = vec![
+        12, 0, 0, 0, 4, 0, 0, 0, 3, 0, 0, 60, 10, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 1, 0,
+    ];
+    for i in 0..aux.len() {
+        base_abs_main_trace_data[0][i] = AbstractInterval::from_i64(aux[i]);
+    }
+    let at = AbstractTrace::new(base_abs_main_trace_data.clone());
+    let con = vec![constraints.air_constraints[45].clone()];
+    println!("-------- {}", con[0]);
+    let result = eval_air_constraints(&at, None, &con, prime);
+    println!("$$$$$$$$$$$$$$$ {:?}", result.0);
+
+    /*
+        pub fn eval_air_constraints(
+        trace: &AbstractTrace,
+        public_vals: Option<&[AbstractInterval]>,
+        constraints: &[LatticeVMSymbolicExpr],
+        prime: u32,
+    ) -> (MayBeFlag, i32, HashSet<(usize, usize)>) {
+         */
 
     // ######################## Solve ############################################
     quick_api(
