@@ -26,12 +26,14 @@ use latticevm::solver::{
 use latticevm::state::MemoryOp;
 use latticevm::state::MemoryOpKind;
 use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
+use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program, make_pc_adjuster,
+    refine_pc_interval,
 };
 
 fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
@@ -109,27 +111,7 @@ fn final_check(
         }
     }
 
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-
-        output.push_str(&format!("Trial ID: {}\n\n", num_trial));
-        output.push_str("Malicious States:\n");
-        output.push_str(&string_representation);
-        output.push_str("-----------------\n\n");
-
-        ui.recovered = output;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+    save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
 fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
@@ -235,8 +217,8 @@ fn main() -> Result<(), io::Error> {
         min_row_id,
         max_row_id,
         program.len(),
-        dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
+        refine_pc_interval,
+        adjust_pc_program,
         final_check,
         prime,
         seed,
