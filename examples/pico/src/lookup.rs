@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::p3_to_tv::convert_p3_virtual_pair_col;
+use crate::p3_to_tv::convert_p3_virtual_pair_col as cv;
 use p3_air::Air;
 use p3_air::PairCol;
 use p3_air::VirtualPairCol;
@@ -13,7 +13,7 @@ use pico_vm::machine::lookup::LookupType;
 use latticevm::alu::get_alu_constraint;
 use latticevm::alu::WordOp;
 use latticevm::symbolic::make_impl_constraint;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
+use latticevm::symbolic::LatticeVMSymbolicExpr as LVSExpr;
 use latticevm::utils::GeneralLookupInfo;
 
 pub fn add_single_var_col_if_possible<F: PrimeField32>(
@@ -41,7 +41,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     num_public_values: usize,
     u8_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,
-    lookup_constraints: &mut Vec<LatticeVMSymbolicExpr>,
+    lookup_constraints: &mut Vec<LVSExpr>,
     received_vars_from_cpu: &mut HashSet<usize>,
     prime: u32,
 ) -> GeneralLookupInfo
@@ -65,9 +65,7 @@ where
 
     for r in &receives {
         match r.kind {
-            LookupType::Memory => {
-                println!("RRRRRRRRRR: {:?}", r);
-            }
+            LookupType::Memory => {}
             LookupType::Alu => {
                 for rv in &r.values {
                     for c in &rv.column_weights {
@@ -76,20 +74,6 @@ where
                         }
                     }
                 }
-
-                let _opcode = &r.values[0];
-                let _a0 = &r.values[1];
-                let _a1 = &r.values[2];
-                let _a2 = &r.values[3];
-                let _a3 = &r.values[4];
-                let _b0 = &r.values[5];
-                let _b1 = &r.values[6];
-                let _b2 = &r.values[7];
-                let _b3 = &r.values[8];
-                let _c0 = &r.values[9];
-                let _c1 = &r.values[10];
-                let _c2 = &r.values[11];
-                let _c3 = &r.values[12];
 
                 for i in 1..13 {
                     add_single_var_col_if_possible(&r.values[i], u8_cols);
@@ -120,24 +104,28 @@ where
 
     for s in &sends {
         match s.kind {
-            LookupType::Memory => {
-                println!("SSSSSSSSSSSSS: {:?}", s);
-            }
+            LookupType::Memory => {}
             LookupType::Alu => {
-                let multiplicities = convert_p3_virtual_pair_col(&s.mult);
-                let opcode = convert_p3_virtual_pair_col(&s.values[0]);
-                let a0 = convert_p3_virtual_pair_col(&s.values[1]);
-                let a1 = convert_p3_virtual_pair_col(&s.values[2]);
-                let a2 = convert_p3_virtual_pair_col(&s.values[3]);
-                let a3 = convert_p3_virtual_pair_col(&s.values[4]);
-                let b0 = convert_p3_virtual_pair_col(&s.values[5]);
-                let b1 = convert_p3_virtual_pair_col(&s.values[6]);
-                let b2 = convert_p3_virtual_pair_col(&s.values[7]);
-                let b3 = convert_p3_virtual_pair_col(&s.values[8]);
-                let c0 = convert_p3_virtual_pair_col(&s.values[9]);
-                let c1 = convert_p3_virtual_pair_col(&s.values[10]);
-                let c2 = convert_p3_virtual_pair_col(&s.values[11]);
-                let c3 = convert_p3_virtual_pair_col(&s.values[12]);
+                let multiplicities = cv(&s.mult);
+                let opcode = cv(&s.values[0]);
+                let a = [
+                    cv(&s.values[1]),
+                    cv(&s.values[2]),
+                    cv(&s.values[3]),
+                    cv(&s.values[4]),
+                ];
+                let b = [
+                    cv(&s.values[5]),
+                    cv(&s.values[6]),
+                    cv(&s.values[7]),
+                    cv(&s.values[8]),
+                ];
+                let c = [
+                    cv(&s.values[9]),
+                    cv(&s.values[10]),
+                    cv(&s.values[11]),
+                    cv(&s.values[12]),
+                ];
 
                 let tmps = vec![
                     (Opcode::ADD as u8, WordOp::Add),
@@ -152,18 +140,12 @@ where
                     (Opcode::SRL as u8, WordOp::SRL),
                 ];
                 for t in tmps {
-                    let alu_constraint = get_alu_constraint(
-                        &[a0.clone(), a1.clone(), a2.clone(), a3.clone()],
-                        &[b0.clone(), b1.clone(), b2.clone(), b3.clone()],
-                        &[c0.clone(), c1.clone(), c2.clone(), c3.clone()],
-                        &[a0.clone(), a1.clone(), a2.clone(), a3.clone()],
-                        &t.1,
-                    );
+                    let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
                     let impl_constraint =
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
 
                     if let Some(impl_constraint) = impl_constraint {
-                        lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                        lookup_constraints.push(LVSExpr::Mul(
                             Box::new(multiplicities.clone()),
                             Box::new(impl_constraint),
                         ));
@@ -188,53 +170,36 @@ where
                     }
                 }
 
-                /*
-                println!("send: opcode: {:?}", opcode);
-                println!("send: a: {:?} {:?} {:?} {:?}", a1, a2, b, c);
-                */
-
-                let a1_expr = convert_p3_virtual_pair_col(&a1);
-                let b_expr = convert_p3_virtual_pair_col(&b);
-                let c_expr = convert_p3_virtual_pair_col(&c);
-                let opcode_condition = convert_p3_virtual_pair_col(&opcode);
+                let a1_expr = cv(&a1);
+                let b_e = cv(&b);
+                let c_e = cv(&c);
+                let opcode_condition = cv(&opcode);
 
                 let ops = [
                     (
                         0,
-                        LatticeVMSymbolicExpr::And(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
-                        ),
+                        LVSExpr::And(Box::new(b_e.clone()), Box::new(c_e.clone())),
                     ),
-                    (
-                        1,
-                        LatticeVMSymbolicExpr::Or(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
-                        ),
-                    ),
+                    (1, LVSExpr::Or(Box::new(b_e.clone()), Box::new(c_e.clone()))),
                     (
                         2,
-                        LatticeVMSymbolicExpr::Xor(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
-                        ),
+                        LVSExpr::Xor(Box::new(b_e.clone()), Box::new(c_e.clone())),
                     ),
                     (
                         5,
-                        LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
+                        LVSExpr::Flip(Box::new(LVSExpr::Lt(
+                            Box::new(b_e.clone()),
+                            Box::new(c_e.clone()),
                         ))), // lt(b, c) on abstractinterval returns 0 when b < c
                     ),
-                    (6, LatticeVMSymbolicExpr::Msb(Box::new(b_expr.clone()))),
+                    (6, LVSExpr::Msb(Box::new(b_e.clone()))),
                 ];
 
                 for (opcode, op_expr) in ops {
                     let el_constraint = make_impl_constraint(
                         opcode,
                         &opcode_condition,
-                        LatticeVMSymbolicExpr::Sub(Box::new(a1_expr.clone()), Box::new(op_expr)),
+                        LVSExpr::Sub(Box::new(a1_expr.clone()), Box::new(op_expr)),
                         prime,
                     );
                     if let Some(el_constraint) = el_constraint {
