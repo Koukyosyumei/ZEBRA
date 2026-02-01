@@ -101,7 +101,9 @@ fn final_check(
 
     let mut recovered_states = vec![];
     for row in &trace.data {
-        recovered_states.push(valida_abstract_trace_to_abstract_state(row, prime));
+        if let MayBeFlag::False = row[58].is_zero(prime) {
+            recovered_states.push(valida_abstract_trace_to_abstract_state(row, prime));
+        }
     }
 
     let mut string_representation = String::new();
