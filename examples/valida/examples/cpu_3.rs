@@ -153,10 +153,11 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 3000000;
+    let max_iteration = 10000;
     let min_row_id = 2;
     let max_row_id = 5;
     let seed = 41;
+    let base_pc = 0;
 
     // ######################## Extract Add Constraints ##########################
     // Columns reserved for program counters / instructions
@@ -183,8 +184,8 @@ fn main() -> Result<(), io::Error> {
     range_types.insert(18, RangeType::Bool);
     println!("len of refinable_cols: {}", refinable_cols.len());
     println!("{:?}", range_types);
-    refinable_cols.clear();
-    refinable_cols.extend(&[0, 1, 18, 58]);
+    //refinable_cols.clear();
+    //refinable_cols.extend(&[0, 1, 18, 58]);
 
     let mut public_vals = vec![AbstractInterval::zero(); 3];
     public_vals[0] = AbstractInterval::from_i64(0);
@@ -202,14 +203,33 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>();
+    range_types.insert(
+        1,
+        RangeType::Any(base_pc, base_pc + (program.len() as i64) - 1),
+    );
     let program_str = program
         .iter()
         .map(|inst| format!("{}\n", inst))
         .collect::<String>();
 
     let base_abs_main_trace_data =
-        generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
+        generate_bootstrap_trace_from_program(&program, chip_idx, base_pc as u32, 0x1000);
     let adjust_pc_program = make_pc_adjuster(program.clone());
+
+    let mut rs: HashSet<usize> = HashSet::new();
+    for i in 0..base_abs_main_trace_data.len() {
+        for j in 0..base_abs_main_trace_data[i].len() {
+            if base_abs_main_trace_data[i][j].as_canonical_u32(prime) != 0 {
+                rs.insert(j);
+            }
+        }
+    }
+    refinable_cols.clear();
+    for j in rs.iter() {
+        refinable_cols.push(*j);
+    }
+    refinable_cols.retain(|x| !((30 <= *x) && (*x <= 47)));
+    println!("------- {:?}", refinable_cols);
 
     /*
     let mut bb = base_abs_main_trace_data.clone();
@@ -240,7 +260,7 @@ fn main() -> Result<(), io::Error> {
         min_row_id,
         max_row_id,
         program.len(),
-        refine_pc_interval,
+        dummy_program_counter_refine_fn,
         adjust_pc_program,
         final_check,
         prime,

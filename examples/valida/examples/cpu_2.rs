@@ -21,7 +21,7 @@ use valida_opcodes::BYTES_PER_INSTR;
 use latticevm::interval::{AbstractInterval, MayBeFlag};
 use latticevm::quick::quick_api;
 use latticevm::solver::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
+    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver, RangeType,
 };
 use latticevm::state::AbstractState;
 use latticevm::state::MemoryOp;
@@ -101,7 +101,9 @@ fn final_check(
 
     let mut recovered_states = vec![];
     for row in &trace.data {
-        recovered_states.push(valida_abstract_trace_to_abstract_state(row, prime));
+        if let MayBeFlag::False = row[58].is_zero(prime) {
+            recovered_states.push(valida_abstract_trace_to_abstract_state(row, prime));
+        }
     }
 
     let mut string_representation = String::new();
@@ -140,10 +142,11 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 3000000;
+    let max_iteration = 100000;
     let min_row_id = 0;
     let max_row_id = 1;
     let seed = 41;
+    let base_pc = 0;
 
     // ######################## Extract Add Constraints ##########################
     // Columns reserved for program counters / instructions
@@ -157,14 +160,16 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 0;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
-        extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime,
-        );
+    let (
+        air_constraints,
+        lookup_constraints,
+        mut refinable_cols,
+        mut range_types,
+        general_lookup_info,
+    ) = extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
+        &machine, &air, num_col, prime,
+    );
     refinable_cols.retain(|x| !program_cols.contains(x));
-    println!("len of refinable_cols: {}", refinable_cols.len());
-    refinable_cols.clear();
-    refinable_cols.extend(&[0, 1, 58]);
 
     let mut public_vals = vec![AbstractInterval::zero(); 3];
     public_vals[0] = AbstractInterval::from_i64(0);
@@ -182,14 +187,32 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>();
+    range_types.insert(
+        1,
+        RangeType::Any(base_pc, base_pc + (program.len() as i64) - 1),
+    );
     let program_str = program
         .iter()
         .map(|inst| format!("{}\n", inst))
         .collect::<String>();
 
     let base_abs_main_trace_data =
-        generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
-    //let adjust_pc_program = make_pc_adjuster(program.clone());
+        generate_bootstrap_trace_from_program(&program, chip_idx, base_pc as u32, 0x1000);
+    let adjust_pc_program = make_pc_adjuster(program.clone());
+
+    let mut rs: HashSet<usize> = HashSet::new();
+    for i in 0..base_abs_main_trace_data.len() {
+        for j in 0..base_abs_main_trace_data[i].len() {
+            if base_abs_main_trace_data[i][j].as_canonical_u32(prime) != 0 {
+                rs.insert(j);
+            }
+        }
+    }
+    refinable_cols.clear();
+    for j in rs.iter() {
+        refinable_cols.push(*j);
+    }
+    println!("------- {:?}", refinable_cols);
 
     // ######################## Solve ############################################
     quick_api(
@@ -205,8 +228,8 @@ fn main() -> Result<(), io::Error> {
         min_row_id,
         max_row_id,
         program.len(),
-        refine_pc_interval,
-        dummy_adjust_pc_program,
+        dummy_program_counter_refine_fn,
+        adjust_pc_program,
         final_check,
         prime,
         seed,
