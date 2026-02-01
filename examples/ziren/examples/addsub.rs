@@ -131,12 +131,14 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &constants,
         &neg_constants,
+        &range_types,
         1,
         NUM_ADD_SUB_COLS,
         0,
         prime,
     );
     println!("{}", smt_str);
+    println!("rr: {:?}", range_types);
 
     // ######################## Solve ############################################
     quick_api(

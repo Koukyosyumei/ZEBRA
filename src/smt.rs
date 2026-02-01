@@ -1,6 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::interval::AbstractInterval;
+use crate::solver::RangeType;
 use crate::symbolic::LatticeVMConstraints;
 use crate::symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr};
 
@@ -163,6 +164,7 @@ pub fn expr_to_smt_bv(
     constraints: &LatticeVMConstraints,
     constants: &Vec<(usize, usize, AbstractInterval)>,
     neg_constants: &Vec<(usize, usize, AbstractInterval)>,
+    range_types: &HashMap<usize, RangeType>,
     n_rows: usize,
     n_cols: usize,
     n_pvs: usize,
@@ -314,6 +316,15 @@ pub fn expr_to_smt_bv(
             j,
             v.as_canonical_u32(prime)
         ));
+    }
+
+    // ranges
+    for (j, k) in range_types {
+        if let RangeType::U8 = k {
+            for i in 0..n_rows {
+                smt.push_str(&format!("(assert (bvule trace_{}_{} #x000000ff))\n", i, j,));
+            }
+        }
     }
 
     smt.push_str("(check-sat)\n(get-model)\n");
