@@ -21,7 +21,7 @@ use valida_opcodes::BYTES_PER_INSTR;
 use latticevm::interval::{AbstractInterval, MayBeFlag};
 use latticevm::quick::quick_api;
 use latticevm::solver::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
+    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver, RangeType,
 };
 use latticevm::state::AbstractState;
 use latticevm::state::MemoryOp;
@@ -140,10 +140,11 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 3000000;
+    let max_iteration = 30000000;
     let min_row_id = 0;
     let max_row_id = 1;
     let seed = 41;
+    let base_pc = 0;
 
     // ######################## Extract Add Constraints ##########################
     // Columns reserved for program counters / instructions
@@ -157,11 +158,17 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 0;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
-        extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime,
-        );
+    let (
+        air_constraints,
+        lookup_constraints,
+        mut refinable_cols,
+        mut range_types,
+        general_lookup_info,
+    ) = extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
+        &machine, &air, num_col, prime,
+    );
     refinable_cols.retain(|x| !program_cols.contains(x));
+
     println!("len of refinable_cols: {}", refinable_cols.len());
     refinable_cols.clear();
     refinable_cols.extend(&[0, 1, 58]);
@@ -182,6 +189,10 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>();
+    range_types.insert(
+        1,
+        RangeType::Any(base_pc, base_pc + (program.len() as i64) - 1),
+    );
     let program_str = program
         .iter()
         .map(|inst| format!("{}\n", inst))
@@ -205,7 +216,7 @@ fn main() -> Result<(), io::Error> {
         min_row_id,
         max_row_id,
         program.len(),
-        refine_pc_interval,
+        dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
         prime,
