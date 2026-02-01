@@ -4,10 +4,8 @@ use p3_baby_bear::BabyBear;
 use p3_challenger::DuplexChallenger;
 use p3_commit::ExtensionMmcs;
 use p3_dft::Radix2Bowers;
-use p3_field::extension::BinomialExtensionField;
-use p3_field::Field;
-use p3_fri::FriConfig;
-use p3_fri::{TwoAdicFriPcs, TwoAdicFriPcsConfig};
+use p3_field::{extension::BinomialExtensionField, Field};
+use p3_fri::{FriConfig, TwoAdicFriPcs, TwoAdicFriPcsConfig};
 use p3_keccak::Keccak256Hash;
 use p3_mds::coset_mds::CosetMds;
 use p3_merkle_tree::FieldMerkleTreeMmcs;
@@ -15,8 +13,7 @@ use p3_poseidon::Poseidon;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
 
 use valida_basic_api::BasicMachine;
-use valida_machine::StarkConfigImpl;
-use valida_machine::{Machine, ProverOptions};
+use valida_machine::{Machine, ProverOptions, StarkConfigImpl};
 
 pub type Val = BabyBear;
 pub type Challenge = BinomialExtensionField<Val, 5>;
