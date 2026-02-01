@@ -142,7 +142,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 30000000;
+    let max_iteration = 100000;
     let min_row_id = 0;
     let max_row_id = 1;
     let seed = 41;
@@ -172,8 +172,8 @@ fn main() -> Result<(), io::Error> {
     refinable_cols.retain(|x| !program_cols.contains(x));
 
     println!("len of refinable_cols: {}", refinable_cols.len());
-    refinable_cols.clear();
-    refinable_cols.extend(&[0, 1, 58]);
+    //refinable_cols.clear();
+    //refinable_cols.extend(&[0, 1, 58]);
 
     let mut public_vals = vec![AbstractInterval::zero(); 3];
     public_vals[0] = AbstractInterval::from_i64(0);
@@ -202,7 +202,21 @@ fn main() -> Result<(), io::Error> {
 
     let base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
-    //let adjust_pc_program = make_pc_adjuster(program.clone());
+    let adjust_pc_program = make_pc_adjuster(program.clone());
+
+    let mut rs: HashSet<usize> = HashSet::new();
+    for i in 0..base_abs_main_trace_data.len() {
+        for j in 0..base_abs_main_trace_data[i].len() {
+            if base_abs_main_trace_data[i][j].as_canonical_u32(prime) != 0 {
+                rs.insert(j);
+            }
+        }
+    }
+    refinable_cols.clear();
+    for j in rs.iter() {
+        refinable_cols.push(*j);
+    }
+    println!("------- {:?}", refinable_cols);
 
     // ######################## Solve ############################################
     quick_api(
@@ -219,7 +233,7 @@ fn main() -> Result<(), io::Error> {
         max_row_id,
         program.len(),
         dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
+        adjust_pc_program,
         final_check,
         prime,
         seed,
