@@ -113,23 +113,25 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Cpu";
     println!("{:?}", CPU_COL_MAP);
 
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, prime);
     refinable_cols.retain(|x| !program_cols.contains(x));
     let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints,
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints,
         pv_neg_constraints,
     };
     let minimum_num_taregt_cols = 1; //refinable_cols.len();
+    println!("{:?}", refinable_cols);
+    println!("{:?}", general_lookup_info);
 
     // ######################## Program Initialization ###########################
     let program = target_program(2013265921 - 8, 2013265921 - 8);
     let mut base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
-    let pad_ref_data = base_abs_main_trace_data[base_abs_main_trace_data.len() - 1].clone();
     let adjust_pc_program = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
 
     // ######################## Public Values ####################################

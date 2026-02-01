@@ -4,10 +4,11 @@ use std::io;
 
 use p3_baby_bear::BabyBear;
 
-use valida_alu_u32::bitwise::columns::COL_MAP;
-use valida_alu_u32::bitwise::columns::NUM_BITWISE_COLS;
-use valida_alu_u32::bitwise::Bitwise32Chip;
-use valida_alu_u32::bitwise::Xor32Instruction;
+use valida_alu_u32::com::columns::COM_COL_MAP;
+use valida_alu_u32::com::columns::NUM_COM_COLS;
+use valida_alu_u32::com::Com32Chip;
+use valida_alu_u32::com::Eq32Instruction;
+use valida_alu_u32::com::Ne32Instruction;
 use valida_basic_api::BasicMachine;
 use valida_cpu::Imm32Instruction;
 use valida_cpu::StopInstruction;
@@ -16,16 +17,38 @@ use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
+use latticevm::ui::save_repr_if_unique;
+use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::trace_fmt_with_idxs;
 
 use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
 
-fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
+// ############## Final Check Function ##############################
+fn final_check(
+    trace: &AbstractTrace,
+    num_trial: usize,
+    prime: u32,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    let string_representation = format!(
+        "input0: [{}], input1: [{}], output: [{}, 0, 0, 0]",
+        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
+        trace_fmt_with_idxs(trace, 0, &[4, 5, 6, 7]),
+        trace.data[0][11],
+    );
+
+    save_repr_if_unique(&string_representation, known_reprt, ui);
+}
+
+fn get_target_program<Val: StarkField>(opcode: u32, a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
 
     let mut program = vec![];
@@ -35,7 +58,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             operands: Operands([-4, a, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Xor32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: opcode,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
@@ -47,7 +70,17 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
     program
 }
 
+pub fn get_opcode_addsub<Val: StarkField>(target_opcode: &str) -> u32 {
+    match target_opcode {
+        "EQ" => <Eq32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+        "NE" => <Ne32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
+    let target_opcode = "NE";
+
     create_or_clear_dir("voutput")?;
 
     // ######################## Prime and Column Settings ########################
@@ -61,36 +94,31 @@ fn main() -> Result<(), io::Error> {
     let seed = 41;
 
     // ######################## Extract Add Constraints ##########################
-    println!("Bitwise AIR MAP");
-    println!("  {:?}", COL_MAP);
+    println!("COM AIR MAP");
+    println!("  {:?}", COM_COL_MAP);
 
-    let air = Bitwise32Chip::default();
-    let num_col = NUM_BITWISE_COLS;
-    let chip_idx = 10;
+    let air = Com32Chip::default();
+    let num_col = NUM_COM_COLS;
+    let chip_idx = 9;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
-    let final_check = generate_alu_final_checker(general_lookup_info.clone());
-    refinable_cols.extend(&general_lookup_info.alu_output);
-
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
+    refinable_cols.extend(&[11]);
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = refinable_cols.len();
+    let minimum_num_taregt_cols = 1; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>(3, 4);
+    let program =
+        get_target_program::<BabyBear>(get_opcode_addsub::<BabyBear>(target_opcode), 3, 4);
     let program_str = program
         .iter()
         .map(|inst| format!("{}\n", inst))

@@ -1,4 +1,3 @@
-
 use rand::thread_rng;
 
 use p3_baby_bear::BabyBear;
@@ -14,16 +13,10 @@ use p3_mds::coset_mds::CosetMds;
 use p3_merkle_tree::FieldMerkleTreeMmcs;
 use p3_poseidon::Poseidon;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
-//use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
 
 use valida_basic_api::BasicMachine;
 use valida_machine::StarkConfigImpl;
-use valida_machine::{
-    Machine,
-    ProverOptions,
-};
-
-
+use valida_machine::{Machine, ProverOptions};
 
 pub type Val = BabyBear;
 pub type Challenge = BinomialExtensionField<Val, 5>;
@@ -62,12 +55,7 @@ pub fn get_machine_config() -> MyConfig {
     config
 }
 
-/// Returns the prover options used in all the tests as well as the a vector for
-/// `show_preprocessed`, bool for `show_preprocessed_dims` and vector for
-/// `show_public_verifier`.
 pub fn prover_options() -> (ProverOptions, Vec<bool>, bool, Vec<bool>) {
-    // Have each trace print once: only shown if the test fails anyway.
-    // skip preprocessed, which includes some long traces
     let show_preprocessed = vec![false; BasicMachine::<Val>::NUM_CHIPS];
     let show_public_prover = vec![false; BasicMachine::<Val>::NUM_CHIPS];
     let show_main = vec![false; BasicMachine::<Val>::NUM_CHIPS];

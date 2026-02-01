@@ -104,8 +104,13 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Jump";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
+    let (
+        air_constraints,
+        lookup_constraints,
+        mut refinable_cols,
+        mut range_types,
+        general_lookup_info,
+    ) = extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
     refinable_cols.extend(&[19, 20, 21, 22, 37, 38, 39, 40]); // output
     range_types.insert(19, RangeType::U8);
     range_types.insert(20, RangeType::U8);
@@ -117,7 +122,8 @@ fn main() -> Result<(), io::Error> {
     range_types.insert(40, RangeType::U7);
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints,
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };

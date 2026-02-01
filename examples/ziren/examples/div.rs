@@ -101,12 +101,13 @@ fn main() -> Result<(), io::Error> {
     let air_name = "DivRem";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
     refinable_cols.extend(&[10, 11, 12, 13, 14, 15, 16, 17]); // output
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };

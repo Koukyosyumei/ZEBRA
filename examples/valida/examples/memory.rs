@@ -1,111 +1,30 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fs;
-use std::rc::Rc;
-use std::time;
-use std::{io, thread, time::Duration};
-
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use rand::rngs::StdRng;
-use rand::thread_rng;
-use rand::SeedableRng;
-use ratatui::{
-    backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
-    widgets::{Block, Borders, Paragraph},
-    Terminal,
-};
+use std::io;
 
 use p3_baby_bear::BabyBear;
-use p3_challenger::DuplexChallenger;
-use p3_commit::ExtensionMmcs;
-use p3_dft::Radix2Bowers;
-use p3_field::extension::BinomialExtensionField;
-use p3_field::{AbstractField, Field, PrimeField32, TwoAdicField};
-use p3_fri::FriConfig;
-use p3_fri::{TwoAdicFriPcs, TwoAdicFriPcsConfig};
-use p3_keccak::Keccak256Hash;
-use p3_matrix::dense::RowMajorMatrix;
-use p3_matrix::Matrix;
-use p3_mds::coset_mds::CosetMds;
-use p3_merkle_tree::FieldMerkleTreeMmcs;
-use p3_poseidon::Poseidon;
-use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
-//use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
+use p3_field::{AbstractField, Field};
 
-use valida_alu_u32::add::columns::ADD_COL_MAP;
-use valida_alu_u32::add::Add32Chip;
-use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction, MachineWithAdd32Chip};
-use valida_alu_u32::bitwise::columns::COL_MAP;
-use valida_alu_u32::bitwise::Bitwise32Chip;
-use valida_alu_u32::com::columns::COM_COL_MAP;
-use valida_alu_u32::com::Com32Chip;
-use valida_alu_u32::com::Eq32Instruction;
-use valida_alu_u32::com::Ne32Instruction;
-use valida_alu_u32::mul::Mul32Chip;
-use valida_alu_u32::sub::columns::NUM_SUB_COLS;
-use valida_alu_u32::sub::columns::SUB_COL_MAP;
-use valida_alu_u32::sub::Sub32Chip;
 use valida_alu_u32::sub::Sub32Instruction;
 use valida_basic_api::BasicMachine;
-use valida_basic_api::BasicMachineMetrics;
-use valida_basic_api::ValidaRuntime;
-use valida_cpu::BneInstruction;
 use valida_cpu::Imm32Instruction;
-use valida_cpu::MachineWithRegisters;
 use valida_cpu::StopInstruction;
-use valida_cpu::{
-    columns::{CPU_COL_MAP, NUM_CPU_COLS},
-    CpuChip,
-};
-use valida_machine::symbolic::symbolic_builder::{
-    get_symbolic_constraints, get_symbolic_lookups, SymbolicAirBuilder,
-};
-use valida_machine::symbolic::symbolic_expression::SymbolicExpression;
-use valida_machine::Chip;
-use valida_machine::ChipWithPersistence;
-use valida_machine::StarkConfig;
-use valida_machine::StarkConfigImpl;
-use valida_machine::{
-    check_constraints::display_interaction, Instruction, InstructionWord, Machine, MachineProof,
-    MachineRuntime, MemoryBackendTrait, MultiSegmentMachineProof, Operands, ProgramROM,
-    ProverOptions, SegmentMachine, StarkField, ValidaMemoryBackend, Word,
-};
-use valida_memory::columns::{MemoryCols, MEM_COL_MAP, NUM_MEM_COLS};
+use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
+use valida_memory::columns::{MEM_COL_MAP, NUM_MEM_COLS};
 use valida_memory::MemoryChip;
 use valida_opcodes::BYTES_PER_INSTR;
-use valida_program::MachineWithProgramROM;
-use valida_program::ProgramTableType;
 
-use latticevm::interval::AbstractInterval;
-use latticevm::interval::MayBeFlag;
+use latticevm::interval::{AbstractInterval, MayBeFlag};
 use latticevm::quick::quick_api;
-use latticevm::solver::run_solver;
-use latticevm::solver::RangeType;
-use latticevm::symbolic::eval_air_constraints;
-use latticevm::symbolic::eval_constraints;
-use latticevm::symbolic::gather_boolean_variables;
-use latticevm::symbolic::AbstractTrace;
-use latticevm::symbolic::LatticeVMConstraints;
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
+use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
-use latticevm_valida::alu_constraints::get_alu_constraint;
-use latticevm_valida::alu_tables::{derive_add_table, derive_com_table, derive_sub_table};
-use latticevm_valida::config::{get_machine_config, prover_options, MyConfig};
-use latticevm_valida::p3_to_tv::get_converted_symbolicconstraints;
-use latticevm_valida::state::valida_abstract_trace_to_abstract_state;
-use latticevm_valida::utils::dummy_adjust_pc_program;
-use latticevm_valida::utils::dummy_program_counter_refine_fn;
-use latticevm_valida::utils::dummy_table_deriver;
-use latticevm_valida::utils::extract_constraints_and_range;
+use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::{
-    generate_bootstrap_trace_from_program, make_pc_adjuster, refine_pc_interval,
+    extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
 
 fn program_counter_refine_fn(
@@ -136,7 +55,7 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let string_representation = ui.logs.clone();
+    let mut string_representation = String::new();
 
     let num_row = trace.data.len();
     let def_interval = AbstractInterval::zero();
@@ -149,20 +68,20 @@ fn final_check(
         let value = reconstruct_word(&trace.data[i], 4);
         let is_read = trace.data[i][14].clone() + trace.data[i][15].clone();
         let is_write = &trace.data[i][16];
+        string_representation.push_str(&format!(
+            "addr: {}, value: {}, is_read: {}, is_write: {}\n",
+            addr, value, is_read, is_write
+        ));
 
         if is_read.is_zero(prime) != MayBeFlag::True {
             for a in addr.lo..(addr.hi + 1) {
                 let prev_value = memory.get(&a).unwrap_or(&def_interval);
                 if (value.clone() - prev_value.clone()).is_zero(prime) != MayBeFlag::True {
                     is_consistent_flag = false;
+                    string_representation.push_str("crash\n");
                     break_point = i;
-                    break;
                 }
             }
-        }
-
-        if !is_consistent_flag {
-            break;
         }
 
         if is_write.is_zero(prime) != MayBeFlag::True {
@@ -172,24 +91,8 @@ fn final_check(
         }
     }
 
-    if !is_consistent_flag && !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_{}_states.txt", known_reprt.len(), break_point),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!(
-                "voutput/{}_{}_assignments.txt",
-                known_reprt.len(),
-                break_point
-            ),
-            ui.logs.clone(),
-        )
-        .unwrap();
+    if !is_consistent_flag {
+        save_repr_if_unique(&string_representation, known_reprt, ui);
     }
 }
 
@@ -222,13 +125,11 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 3000;
-    let min_row_id = 3;
-    let max_row_id = 4;
+    let max_iteration = 10000;
+    let min_row_id = 1;
+    let max_row_id = 1;
     let num_extracted_rows = 1;
     let seed = 41;
-    let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
-    //let aux_tg_fns: Vec<_> = vec![dummy_table_deriver];
 
     // ######################## Extract Add Constraints ##########################
     println!("MEM AIR MAP");
@@ -239,23 +140,18 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 2;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (tv_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (air_constraints, lookup_constraints, refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
 
-    for t in &tv_constraints {
-        println!("#### {}", t);
-    }
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
-
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };
-    let minimum_num_taregt_cols = 4; //refinable_cols.len();
+    let minimum_num_taregt_cols = 1; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>(3, 4);
@@ -273,8 +169,6 @@ fn main() -> Result<(), io::Error> {
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
-        &aux_tg_fns,
         &vec![],
         &base_abs_main_trace_data,
         vec![],

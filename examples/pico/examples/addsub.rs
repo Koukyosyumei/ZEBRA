@@ -14,12 +14,13 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, registe
 use latticevm::quick::quick_api;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::ui::{save_repr_if_unique, UiState};
+use latticevm::utils::indices_arr;
 use latticevm::utils::{create_or_clear_dir, trace_fmt_with_idxs};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_pico::lookup::get_symbolic_lookup_constraints;
 use latticevm_pico::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str, indices_arr,
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
 fn canonical_repr_add(trace: &AbstractTrace) -> String {
@@ -99,16 +100,22 @@ fn main() -> Result<(), io::Error> {
     let air_name = "AddSub";
     let _colmap = make_col_map();
 
-    let (tv_constraints, mut refinable_cols, mut range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, AddSubChip<KoalaBear>>(
-            &air,
-            NUM_ADD_SUB_COLS,
-            prime,
-        );
+    let (
+        air_constraints,
+        lookup_constraints,
+        mut refinable_cols,
+        mut range_types,
+        general_lookup_info,
+    ) = extract_constraints_and_range::<KoalaBear, AddSubChip<KoalaBear>>(
+        &air,
+        NUM_ADD_SUB_COLS,
+        prime,
+    );
     refinable_cols.extend(&[0, 1, 2, 3]);
 
     let constraints = LatticeVMConstraints {
-        air_constraints: tv_constraints.clone(),
+        air_constraints,
+        lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
     };

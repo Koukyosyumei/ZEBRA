@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::i32;
+use std::mem::swap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -14,7 +15,8 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crate::symbolic::{
     apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
-    detect_conditional_var_sub_var_constraints, is_boolean_constraint,
+    detect_conditional_var_sub_var_constraints, gather_boolean_variables, gather_vars,
+    is_boolean_constraint, is_iszero_operator, is_koalabear_word_range,
     refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
     AbirConstraint, LatticeVMSymbolicExpr,
 };
@@ -601,6 +603,71 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
             }
         }
     }
+}
+
+pub fn prepare_constraints_and_range_type(
+    num_cols: usize,
+    u8_cols: &Vec<usize>,
+    multiplicities: &HashSet<usize>,
+    received_vars_from_cpu: &HashSet<usize>,
+    tv_constraints: &mut Vec<LatticeVMSymbolicExpr>,
+    lookup_symbolic_constraints: &Vec<LatticeVMSymbolicExpr>,
+    prime: u32,
+) -> (Vec<usize>, HashMap<usize, RangeType>) {
+    let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
+    refinable_cols.retain(|c| !multiplicities.contains(c));
+    refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
+
+    let mut new_tv_constraints = Vec::new();
+    let mut is_in_koalabear_word_range_check = false;
+    let mut is_in_iszero_operator = false;
+    for t in tv_constraints.iter() {
+        if let Some(exprs) = is_iszero_operator(t, prime) {
+            if is_in_iszero_operator {
+                is_in_iszero_operator = false;
+            } else {
+                new_tv_constraints.push(exprs[0].clone());
+                new_tv_constraints.push(exprs[1].clone());
+                is_in_iszero_operator = true;
+            }
+        } else {
+            if let Some(expr) = is_koalabear_word_range(t, prime) {
+                if is_in_koalabear_word_range_check {
+                    is_in_koalabear_word_range_check = false;
+                } else {
+                    new_tv_constraints.push(expr);
+                    is_in_koalabear_word_range_check = true;
+                }
+            } else {
+                if (!is_in_koalabear_word_range_check) && (!is_in_iszero_operator) {
+                    new_tv_constraints.push(t.clone());
+                }
+            }
+        }
+    }
+    *tv_constraints = new_tv_constraints;
+    //tv_constraints.extend(lookup_symbolic_constraints);
+
+    let mut used_vars = HashSet::new();
+    for t in tv_constraints.iter() {
+        gather_vars(0, t, &mut used_vars);
+    }
+    for t in lookup_symbolic_constraints.iter() {
+        gather_vars(0, t, &mut used_vars);
+    }
+    let used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
+    refinable_cols.retain(|c| used_var_ids.contains(c));
+
+    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
+    let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
+        .iter()
+        .map(|k| (*k, RangeType::Bool))
+        .collect();
+    for c in u8_cols {
+        range_types.insert(*c, RangeType::U8);
+    }
+
+    (refinable_cols, range_types)
 }
 
 pub fn dummy_program_counter_refine_fn(

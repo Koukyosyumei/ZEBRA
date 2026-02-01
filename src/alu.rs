@@ -701,6 +701,16 @@ mod tests {
     }
 
     #[test]
+    fn test_mul_no_overflow2() {
+        use crate::alu::{word_mul, Word};
+        let a: Word = [byte(3), byte(0), byte(0), byte(60)];
+        let b: Word = [byte(4), byte(0), byte(0), byte(0)];
+
+        let r = word_mul(&a, &b);
+        assert_eq!(r, ai(4026531852, 4026531852));
+    }
+
+    #[test]
     fn test_mul_overflow_full() {
         use crate::alu::{word_mul, Word};
         let a: Word = [byte(255), byte(255), byte(255), byte(255)];

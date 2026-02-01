@@ -1,78 +1,224 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use p3_air::{Air, VirtualPairCol};
 use p3_baby_bear::BabyBear;
-use p3_field::{AbstractField, PrimeField32};
+use p3_field::{AbstractField, Field, PrimeField32};
 use p3_matrix::Matrix;
 
-use valida_basic_api::BasicMachine;
-use valida_basic_api::BasicMachineMetrics;
-use valida_basic_api::ValidaRuntime;
+use valida_basic_api::{BasicMachine, BasicMachineMetrics, ValidaRuntime};
 use valida_cpu::MachineWithRegisters;
-use valida_machine::symbolic::symbolic_builder::get_symbolic_constraints;
-use valida_machine::{InstructionWord, ProgramROM, SegmentMachine};
-use valida_program::MachineWithProgramROM;
-use valida_program::ProgramTableType;
+use valida_machine::{
+    symbolic::symbolic_builder::{get_symbolic_constraints, SymbolicAirBuilder},
+    BusArgument, ChipWithPersistence, InstructionWord, InteractionType, Machine, ProgramROM,
+    SegmentMachine, StarkConfig, ValidaAirBuilder,
+};
+use valida_opcodes::Opcode;
+use valida_program::{MachineWithProgramROM, ProgramTableType};
 
-use valida_machine::{ChipWithPersistence, Machine, StarkConfig, ValidaAirBuilder};
-
+use latticevm::alu::{get_alu_constraint, WordOp};
 use latticevm::interval::AbstractInterval;
-use latticevm::solver::RangeType;
-use latticevm::symbolic::gather_boolean_variables;
-use latticevm::symbolic::gather_vars;
-use latticevm::symbolic::AbstractTrace;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
+use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
+use latticevm::symbolic::{make_impl_constraint, AbstractTrace, LatticeVMSymbolicExpr as LVSExpr};
 use latticevm::utils::GeneralLookupInfo;
 
 use crate::config::{get_machine_config, prover_options};
-use crate::lookup::get_lookup_interactions;
-use crate::p3_to_tv::convert_p3_expr;
+use crate::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col as cv};
 
-pub fn make_pc_adjuster(program: Vec<InstructionWord<i32>>) -> impl Fn(&mut AbstractTrace, u32) {
-    move |main_trace: &mut AbstractTrace, prime: u32| {
-        for row in &mut main_trace.data {
-            if row[1].is_singleton() {
-                let pc = row[1].as_canonical_u32(prime) as usize;
-                if pc < program.len() {
-                    let instr = program[pc];
-                    row[3] = AbstractInterval::from_i64(instr.opcode.into());
-                    row[4] = AbstractInterval::from_i64(instr.operands.0[0].into());
-                    row[5] = AbstractInterval::from_i64(instr.operands.0[1].into());
-                    row[6] = AbstractInterval::from_i64(instr.operands.0[2].into());
-                    row[7] = AbstractInterval::from_i64(instr.operands.0[3].into());
-                    row[8] = AbstractInterval::from_i64(instr.operands.0[4].into());
-
-                    if row[3].as_canonical_u32(prime) == 8 {
-                        for i in 4..57 {
-                            row[i] = AbstractInterval::zero();
-                        }
-                        row[24] = AbstractInterval::from_i64(1);
-                    }
-                }
-            } else {
-                row[3] = AbstractInterval::i4();
-                row[4] = AbstractInterval::i4();
-                row[5] = AbstractInterval::i4();
-                row[6] = AbstractInterval::i4();
-                row[7] = AbstractInterval::i4();
-                row[8] = AbstractInterval::i4();
-            }
+pub fn try_add_single_var_col<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+    if !b.column_weights.is_empty() {
+        if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
+            u8_cols.push(col_idx);
         }
     }
 }
 
-pub fn refine_pc_interval(
-    abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
-    program_len: usize,
-    i: usize,
-    j: usize,
-) {
-    if j == 1 {
-        abs_main_trace_data[i][j] = AbstractInterval {
-            lo: 0,
-            hi: (program_len - 1) as i64,
-        };
+pub fn inspect_lookup_interactions<M, C, SC, AB>(
+    chip: &C,
+    builder: &mut AB,
+    range_u8_cols: &mut Vec<usize>,
+    pc_cols: &mut Vec<Vec<usize>>,
+    counter_cols: &mut Vec<usize>,
+    lookup_constraints: &mut Vec<LVSExpr>,
+    prime: u32,
+) where
+    M: Machine<SC::Val>,
+    C: ChipWithPersistence<M, SC> + Air<AB>,
+    SC: StarkConfig,
+    AB: ValidaAirBuilder<Machine = M, F = SC::Val, EF = SC::Challenge>,
+{
+    let machine = builder.machine();
+    let ephemeral_interactions = chip.ephemeral_interactions(machine);
+
+    for (e_interaction, interaction_type) in &ephemeral_interactions {
+        match interaction_type {
+            InteractionType::LocalSend => {}
+            InteractionType::LocalReceive => {}
+            InteractionType::GlobalSend => match e_interaction.argument_index {
+                BusArgument::Local(_) => {}
+                BusArgument::Global(id) => {
+                    if id == 0 {
+                        let opcode = cv(&e_interaction.fields[0]);
+                        let b = [
+                            cv(&e_interaction.fields[1]),
+                            cv(&e_interaction.fields[2]),
+                            cv(&e_interaction.fields[3]),
+                            cv(&e_interaction.fields[4]),
+                        ];
+                        let c = [
+                            cv(&e_interaction.fields[5]),
+                            cv(&e_interaction.fields[6]),
+                            cv(&e_interaction.fields[7]),
+                            cv(&e_interaction.fields[8]),
+                        ];
+                        let a = [
+                            cv(&e_interaction.fields[9]),
+                            cv(&e_interaction.fields[10]),
+                            cv(&e_interaction.fields[11]),
+                            cv(&e_interaction.fields[12]),
+                        ];
+
+                        let multiplicities = cv(&e_interaction.count);
+
+                        let tmps = vec![
+                            (Opcode::ADD32 as u8, WordOp::Add),
+                            (Opcode::SUB32 as u8, WordOp::Sub),
+                            (Opcode::MUL32 as u8, WordOp::Mul),
+                            (Opcode::LT32 as u8, WordOp::Lt),
+                            (Opcode::SLT32 as u8, WordOp::SLt),
+                            (Opcode::MULHU32 as u8, WordOp::MulHU),
+                            (Opcode::MULHS32 as u8, WordOp::MulHS),
+                            (Opcode::EQ32 as u8, WordOp::Eq),
+                            (Opcode::NE32 as u8, WordOp::NEq),
+                            (Opcode::DIV32 as u8, WordOp::Div),
+                            (Opcode::SDIV32 as u8, WordOp::SDiv),
+                        ];
+
+                        for t in tmps {
+                            let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
+                            let impl_constraint =
+                                make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+
+                            if let Some(impl_constraint) = impl_constraint {
+                                for i in 1..13 {
+                                    try_add_single_var_col(&e_interaction.fields[i], range_u8_cols);
+                                }
+                                lookup_constraints.push(LVSExpr::Mul(
+                                    Box::new(multiplicities.clone()),
+                                    Box::new(impl_constraint),
+                                ));
+                            }
+                        }
+                    }
+
+                    // Lookup with Range8
+                    if id == 5 {
+                        for pair in &e_interaction.fields {
+                            if pair.constant.is_zero() {
+                                for (col, _weight) in &pair.column_weights {
+                                    match col {
+                                        p3_air::PairCol::Preprocessed(_) => {}
+                                        p3_air::PairCol::Public(_) => {}
+                                        p3_air::PairCol::Main(col_idx) => {
+                                            range_u8_cols.push(col_idx.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Lookup with other byte instructions
+                    if id == 3 {
+                        let opcode_condition = cv(&e_interaction.fields[0]);
+                        let input = cv(&e_interaction.fields[1]);
+                        let output = cv(&e_interaction.fields[2]);
+                        let multiplicities = cv(&e_interaction.count);
+
+                        let ops = [(1, LVSExpr::Msb(Box::new(input.clone())))];
+                        for (opcode, op_expr) in ops {
+                            let el_constraint = make_impl_constraint(
+                                opcode,
+                                &opcode_condition,
+                                LVSExpr::Sub(Box::new(output.clone()), Box::new(op_expr)),
+                                prime,
+                            );
+                            if let Some(el_constraint) = el_constraint {
+                                lookup_constraints.push(LVSExpr::Mul(
+                                    Box::new(multiplicities.clone()),
+                                    Box::new(el_constraint),
+                                ));
+                            }
+                        }
+                    }
+
+                    for (col, _weight) in &e_interaction.count.column_weights {
+                        if let p3_air::PairCol::Main(col_idx) = col {
+                            counter_cols.push(*col_idx);
+                        }
+                    }
+                }
+                BusArgument::Persistent(_) => {}
+            },
+            InteractionType::GlobalReceive => match e_interaction.argument_index {
+                BusArgument::Local(_) => {}
+                BusArgument::Global(id) => {
+                    // Lookup with CPU
+                    if id == 0 {
+                        for pair in e_interaction.fields.iter() {
+                            let mut sub_cols = Vec::new();
+                            for (col, _weight) in &pair.column_weights {
+                                if let p3_air::PairCol::Main(col_idx) = col {
+                                    sub_cols.push(*col_idx);
+                                }
+                            }
+                            pc_cols.push(sub_cols);
+                        }
+                        for (col, _weight) in &e_interaction.count.column_weights {
+                            if let p3_air::PairCol::Main(col_idx) = col {
+                                counter_cols.push(*col_idx);
+                            }
+                        }
+                    }
+                }
+                BusArgument::Persistent(_) => {}
+            },
+            InteractionType::PersistentSend => {}
+            InteractionType::PersistentReceive => {}
+        }
     }
+}
+
+pub fn get_lookup_interactions<M, SC, C>(
+    machine: &M,
+    chip: &C,
+    range_u8_cols: &mut Vec<usize>,
+    pc_cols: &mut Vec<Vec<usize>>,
+    counter_cols: &mut Vec<usize>,
+    lookup_constraints: &mut Vec<LVSExpr>,
+    prime: u32,
+) where
+    M: Machine<SC::Val>,
+    SC: StarkConfig,
+    C: ChipWithPersistence<M, SC>,
+{
+    let mut builder = SymbolicAirBuilder::new(
+        machine,
+        chip.main_width(),
+        chip.preprocessed_width(),
+        chip.public_width(),
+        chip.permutation_width(machine),
+    );
+
+    inspect_lookup_interactions(
+        chip,
+        &mut builder,
+        range_u8_cols,
+        pc_cols,
+        counter_cols,
+        lookup_constraints,
+        prime,
+    );
 }
 
 pub fn generate_bootstrap_trace_from_program(
@@ -121,7 +267,8 @@ pub fn extract_constraints_and_range<M, SC, C>(
     num_cols: usize,
     prime: u32,
 ) -> (
-    Vec<LatticeVMSymbolicExpr>,
+    Vec<LVSExpr>,
+    Vec<LVSExpr>,
     Vec<usize>,
     HashMap<usize, RangeType>,
     GeneralLookupInfo,
@@ -169,30 +316,70 @@ where
         .iter()
         .map(|sc| convert_p3_expr::<SC::Val>(&sc))
         .collect::<Vec<_>>();
-    tv_constraints.extend(lookup_symbolic_constraints);
-
-    let mut used_vars = HashSet::new();
-    for t in &tv_constraints {
-        gather_vars(0, t, &mut used_vars);
-    }
-    let used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
-    refinable_cols.retain(|c| used_var_ids.contains(c));
-
     let multiplicities: HashSet<_> = multiplicities.iter().map(|v| *v).collect();
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
+    let received_vars_from_cpu: HashSet<_> = received_vars_from_cpu.iter().map(|v| *v).collect();
 
-    let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
-        .iter()
-        .map(|k| (*k, RangeType::Bool))
-        .collect();
-    for c in &u8_cols {
-        range_types.insert(*c, RangeType::U8);
-    }
+    let (refinable_cols, range_types) = prepare_constraints_and_range_type(
+        num_cols,
+        &u8_cols,
+        &multiplicities,
+        &received_vars_from_cpu,
+        &mut tv_constraints,
+        &lookup_symbolic_constraints,
+        prime,
+    );
 
     (
         tv_constraints,
+        lookup_symbolic_constraints,
         refinable_cols,
         range_types,
         general_lookup_info,
     )
+}
+
+pub fn make_pc_adjuster(
+    program: Vec<InstructionWord<i32>>,
+) -> impl Fn(&mut AbstractTrace, u32) + Clone {
+    move |main_trace: &mut AbstractTrace, prime: u32| {
+        for row in &mut main_trace.data {
+            if row[1].is_singleton() {
+                let pc = row[1].as_canonical_u32(prime) as usize;
+                if pc < program.len() {
+                    let instr = program[pc];
+                    row[3] = AbstractInterval::from_i64(instr.opcode.into());
+                    row[4] = AbstractInterval::from_i64(instr.operands.0[0].into());
+                    row[5] = AbstractInterval::from_i64(instr.operands.0[1].into());
+                    row[6] = AbstractInterval::from_i64(instr.operands.0[2].into());
+                    row[7] = AbstractInterval::from_i64(instr.operands.0[3].into());
+                    row[8] = AbstractInterval::from_i64(instr.operands.0[4].into());
+
+                    if row[3].as_canonical_u32(prime) == 8 {
+                        for i in 4..57 {
+                            row[i] = AbstractInterval::zero();
+                        }
+                        row[24] = AbstractInterval::from_i64(1);
+                    }
+                }
+            } else {
+                for i in 3..9 {
+                    row[i] = AbstractInterval::i4();
+                }
+            }
+        }
+    }
+}
+
+pub fn refine_pc_interval(
+    abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
+    program_len: usize,
+    i: usize,
+    j: usize,
+) {
+    if j == 1 {
+        abs_main_trace_data[i][j] = AbstractInterval {
+            lo: 0,
+            hi: (program_len - 1) as i64,
+        };
+    }
 }

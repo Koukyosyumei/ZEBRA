@@ -1,27 +1,97 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::io;
 
-use itertools::Itertools;
+use p3_air::{Air, BaseAir, PairCol, VirtualPairCol};
+use p3_field::PrimeField32;
+use p3_uni_stark::{get_symbolic_constraints, SymbolicAirBuilder, SymbolicExpression};
 
-use p3_air::Air;
-use p3_uni_stark::SymbolicAirBuilder;
-use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
+use zkm_core_executor::{ExecutionState, Executor, Opcode, Program};
+use zkm_core_machine::mips::MipsAir;
+use zkm_core_machine::utils::{trace_checkpoint, ZKMCoreProverError};
+use zkm_stark::koala_bear_poseidon2::KoalaBearPoseidon2;
+use zkm_stark::{
+    CpuProver, LookupBuilder, LookupKind, MachineProver, ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS,
+};
 
-use zkm_core_executor::Program;
-use zkm_stark::LookupBuilder;
-use zkm_stark::MachineProver;
-use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
-
-use latticevm::solver::RangeType;
-use latticevm::symbolic::gather_vars;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
+use latticevm::alu::{get_alu_constraint, WordOp};
+use latticevm::interval::AbstractInterval;
+use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
+use latticevm::symbolic::{
+    make_impl_constraint, LatticeVMSymbolicEntry, LatticeVMSymbolicExpr as LVSExpr,
+    LatticeVMSymbolicVal,
+};
 use latticevm::utils::GeneralLookupInfo;
-use latticevm::{interval::AbstractInterval, symbolic::gather_boolean_variables};
 
-use crate::executor::run_ziren_program;
-use crate::lookup::get_symbolic_lookup_constraints;
-use crate::p3_to_tv::convert_p3_expr;
+use crate::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col as cv};
+
+pub fn get_pv_constraints() -> (Vec<LVSExpr>, Vec<LVSExpr>) {
+    let pv_pos_constraints = vec![LVSExpr::Sub(
+        Box::new(LVSExpr::Variable(LatticeVMSymbolicVal {
+            entry: LatticeVMSymbolicEntry::Public,
+            index: 41,
+        })),
+        Box::new(LVSExpr::Constant(AbstractInterval { lo: 0, hi: 0 })),
+    )];
+    let pv_neg_constraints = vec![LVSExpr::Sub(
+        Box::new(LVSExpr::Variable(LatticeVMSymbolicVal {
+            entry: LatticeVMSymbolicEntry::Public,
+            index: 40,
+        })),
+        Box::new(LVSExpr::Constant(AbstractInterval { lo: 0, hi: 0 })),
+    )];
+
+    (pv_pos_constraints, pv_neg_constraints)
+}
+
+pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
+    // # Execute the Target Program
+    let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
+    let (checkpoint, done) = runtime.execute_state(false).unwrap();
+
+    let mut checkpoint_file = tempfile::tempfile()
+        .map_err(ZKMCoreProverError::IoError)
+        .unwrap();
+    checkpoint
+        .save(&mut checkpoint_file)
+        .map_err(ZKMCoreProverError::IoError)
+        .unwrap();
+
+    type SC = KoalaBearPoseidon2;
+    let config = KoalaBearPoseidon2::new();
+    let machine = MipsAir::machine(config);
+    let prover = CpuProver::new(machine);
+
+    let mut reader = io::BufReader::new(checkpoint_file);
+    let execution_state: ExecutionState =
+        bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
+    let (records, report) = trace_checkpoint::<SC>(
+        program.clone(),
+        execution_state,
+        ZKMCoreOpts::default(),
+        None,
+    );
+    let mut main_traces = records
+        .iter()
+        .map(|record| prover.generate_traces(record))
+        .collect::<Vec<_>>();
+
+    let mut true_abs_traces = vec![];
+    for mt in &mut main_traces[0] {
+        let nrows = mt.1.values.len() / mt.1.width;
+        let mut rows = vec![];
+        for i in 0..nrows {
+            let row = mt.1.row_mut(i);
+            rows.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .collect(),
+            );
+        }
+        true_abs_traces.push((mt.0.clone(), rows));
+    }
+
+    true_abs_traces
+}
 
 pub fn get_program_str(program: &Program) -> String {
     program
@@ -47,12 +117,179 @@ pub fn generate_abstract_trace(
     base_abs_main_trace_data
 }
 
+pub fn try_add_single_var_col<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+    if !b.column_weights.is_empty() {
+        if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
+            u8_cols.push(col_idx);
+        }
+    }
+}
+
+pub fn get_symbolic_lookup_constraints<F, A>(
+    air: &A,
+    preprocessed_width: usize,
+    num_public_values: usize,
+    u8_cols: &mut Vec<usize>,
+    multiplicities: &mut HashSet<usize>,
+    lookup_constraints: &mut Vec<LVSExpr>,
+    received_vars_from_cpu: &mut HashSet<usize>,
+    prime: u32,
+) -> GeneralLookupInfo
+where
+    F: p3_field::PrimeField32,
+    A: Air<LookupBuilder<F>>,
+{
+    let mut general_lookup_info = GeneralLookupInfo::default();
+    let mut builder = LookupBuilder::new(preprocessed_width, air.width());
+    air.eval(&mut builder);
+    let (sends, receives) = builder.lookups();
+
+    for r in &receives {
+        for (w, _) in &r.multiplicity.column_weights {
+            if let p3_air::PairCol::Main(col_idx) = w {
+                multiplicities.insert(*col_idx);
+            }
+        }
+    }
+
+    for r in &receives {
+        match r.kind {
+            LookupKind::Instruction => {
+                for rv in &r.values {
+                    for c in &rv.column_weights {
+                        if let PairCol::Main(index) = c.0 {
+                            received_vars_from_cpu.insert(index);
+                        }
+                    }
+                }
+                for i in 7..11 {
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.alu_output);
+                }
+                for i in 11..15 {
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.alu_input1);
+                }
+                for i in 15..19 {
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.alu_input2);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    for s in &sends {
+        let multiplicities = cv(&s.multiplicity);
+
+        match s.kind {
+            LookupKind::Program => {
+                general_lookup_info.pc_table_is_real = multiplicities.clone();
+            }
+            LookupKind::Instruction => {
+                let opcode = cv(&s.values[6]);
+                let a = [
+                    cv(&s.values[7]),
+                    cv(&s.values[8]),
+                    cv(&s.values[9]),
+                    cv(&s.values[10]),
+                ];
+                let b = [
+                    cv(&s.values[11]),
+                    cv(&s.values[12]),
+                    cv(&s.values[13]),
+                    cv(&s.values[14]),
+                ];
+                let c = [
+                    cv(&s.values[15]),
+                    cv(&s.values[16]),
+                    cv(&s.values[17]),
+                    cv(&s.values[18]),
+                ];
+                let hi = [
+                    cv(&s.values[19]),
+                    cv(&s.values[20]),
+                    cv(&s.values[21]),
+                    cv(&s.values[22]),
+                ];
+
+                for t in [
+                    (Opcode::ADD as u8, WordOp::Add),
+                    (Opcode::SUB as u8, WordOp::SubU),
+                    (Opcode::MUL as u8, WordOp::Mul),
+                    (Opcode::MULT as u8, WordOp::MulTL),
+                    (Opcode::MULT as u8, WordOp::MulTH),
+                    (Opcode::MULTU as u8, WordOp::MulTUL),
+                    (Opcode::MULTU as u8, WordOp::MulTUH),
+                    (Opcode::SLT as u8, WordOp::SLt),
+                    (Opcode::AND as u8, WordOp::And),
+                    (Opcode::OR as u8, WordOp::Or),
+                    (Opcode::XOR as u8, WordOp::Xor),
+                    (Opcode::SRL as u8, WordOp::SRL),
+                ] {
+                    let alu_constraint = get_alu_constraint(&a, &b, &c, &hi, &t.1);
+                    let impl_constraint =
+                        make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+
+                    if let Some(impl_constraint) = impl_constraint {
+                        for i in 7..19 {
+                            try_add_single_var_col(&s.values[i], u8_cols);
+                        }
+                        lookup_constraints.push(LVSExpr::Mul(
+                            Box::new(multiplicities.clone()),
+                            Box::new(impl_constraint),
+                        ));
+                    }
+                }
+            }
+            LookupKind::Byte => {
+                let s_opcode = &s.values[0];
+                let a1 = &s.values[1];
+                let a2 = &s.values[2];
+                let b = &s.values[3];
+                let c = &s.values[4];
+
+                // Range U8
+                try_add_single_var_col(&b, u8_cols);
+                try_add_single_var_col(&c, u8_cols);
+                try_add_single_var_col(&a1, u8_cols);
+
+                let ops = [
+                    (0, LVSExpr::And(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (1, LVSExpr::Or(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (2, LVSExpr::Xor(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (
+                        6,
+                        LVSExpr::Flip(Box::new(LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c))))),
+                    ),
+                ];
+
+                for (opcode, op_expr) in ops {
+                    let el_constraint = make_impl_constraint(
+                        opcode,
+                        &cv(&s_opcode),
+                        LVSExpr::Sub(Box::new(cv(&a1)), Box::new(op_expr)),
+                        prime,
+                    );
+                    if let Some(el_constraint) = el_constraint {
+                        lookup_constraints.push(LVSExpr::Mul(
+                            Box::new(multiplicities.clone()),
+                            Box::new(el_constraint),
+                        ));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    general_lookup_info
+}
+
 pub fn extract_constraints_and_range<F, A>(
     air: &A,
     num_cols: usize,
     prime: u32,
 ) -> (
-    Vec<LatticeVMSymbolicExpr>,
+    Vec<LVSExpr>,
+    Vec<LVSExpr>,
     Vec<usize>,
     HashMap<usize, RangeType>,
     GeneralLookupInfo,
@@ -79,64 +316,24 @@ where
         prime,
     );
 
-    let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
-    refinable_cols.retain(|c| !multiplicities.contains(c));
-    refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
-
     let mut tv_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<F>(&sc))
         .collect::<Vec<_>>();
 
-    let mut new_tv_constraints = Vec::new();
-    let mut is_in_koalabear_word_range_check = false;
-    let mut is_in_iszero_operator = false;
-    for t in &tv_constraints {
-        if let Some(exprs) = is_iszero_operator(t, prime) {
-            if is_in_iszero_operator {
-                is_in_iszero_operator = false;
-            } else {
-                new_tv_constraints.push(exprs[0].clone());
-                new_tv_constraints.push(exprs[1].clone());
-                is_in_iszero_operator = true;
-            }
-        } else {
-            if let Some(expr) = is_koalabear_word_range(t, prime) {
-                if is_in_koalabear_word_range_check {
-                    is_in_koalabear_word_range_check = false;
-                } else {
-                    new_tv_constraints.push(expr);
-                    is_in_koalabear_word_range_check = true;
-                }
-            } else {
-                if (!is_in_koalabear_word_range_check) && (!is_in_iszero_operator) {
-                    new_tv_constraints.push(t.clone());
-                }
-            }
-        }
-    }
-    tv_constraints = new_tv_constraints;
-
-    tv_constraints.extend(lookup_symbolic_constraints);
-
-    let mut used_vars = HashSet::new();
-    for t in &tv_constraints {
-        gather_vars(0, t, &mut used_vars);
-    }
-    let used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
-    refinable_cols.retain(|c| used_var_ids.contains(c));
-
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
-    let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
-        .iter()
-        .map(|k| (*k, RangeType::Bool))
-        .collect();
-    for c in &u8_cols {
-        range_types.insert(*c, RangeType::U8);
-    }
+    let (refinable_cols, range_types) = prepare_constraints_and_range_type(
+        num_cols,
+        &u8_cols,
+        &multiplicities,
+        &received_vars_from_cpu,
+        &mut tv_constraints,
+        &lookup_symbolic_constraints,
+        prime,
+    );
 
     (
         tv_constraints,
+        lookup_symbolic_constraints,
         refinable_cols,
         range_types,
         general_lookup_info,
