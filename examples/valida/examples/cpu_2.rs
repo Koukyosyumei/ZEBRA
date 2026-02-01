@@ -171,10 +171,6 @@ fn main() -> Result<(), io::Error> {
     );
     refinable_cols.retain(|x| !program_cols.contains(x));
 
-    println!("len of refinable_cols: {}", refinable_cols.len());
-    //refinable_cols.clear();
-    //refinable_cols.extend(&[0, 1, 58]);
-
     let mut public_vals = vec![AbstractInterval::zero(); 3];
     public_vals[0] = AbstractInterval::from_i64(0);
     public_vals[1] = AbstractInterval::from_i64(4096);
@@ -201,7 +197,7 @@ fn main() -> Result<(), io::Error> {
         .collect::<String>();
 
     let base_abs_main_trace_data =
-        generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
+        generate_bootstrap_trace_from_program(&program, chip_idx, base_pc as u32, 0x1000);
     let adjust_pc_program = make_pc_adjuster(program.clone());
 
     let mut rs: HashSet<usize> = HashSet::new();
