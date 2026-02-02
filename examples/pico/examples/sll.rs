@@ -11,7 +11,9 @@ use pico_vm::chips::chips::alu::sll::{ShiftLeftCols, NUM_SLL_COLS};
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, register::Register};
 
+use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
+use latticevm::smt::expr_to_smt_bv;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::ui::{generate_alu_final_checker, UiState};
 use latticevm::utils::create_or_clear_dir;
@@ -73,6 +75,29 @@ fn main() -> Result<(), io::Error> {
     let program = target_program(4, 4, 1, 2);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+
+    let mut constants: Vec<(usize, usize, AbstractInterval)> = vec![];
+    let mut neg_constants: Vec<(usize, usize, AbstractInterval)> = vec![];
+    for j in 0..NUM_SLL_COLS {
+        if !refinable_cols.contains(&j) {
+            constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
+        }
+    }
+    for j in general_lookup_info.alu_output {
+        neg_constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
+    }
+    let smt_str = expr_to_smt_bv(
+        &constraints,
+        &constants,
+        &neg_constants,
+        &range_types,
+        1,
+        NUM_SLL_COLS,
+        0,
+        prime,
+    );
+    println!("{}", smt_str);
+    println!("rr: {:?}", range_types);
 
     // ######################## Solve ############################################
     quick_api(
