@@ -116,6 +116,60 @@ pub fn expr_to_smt_bv(
                     helper(a, row_id, n_rows, n_pvs, vars),
                 )
             }
+            LatticeVMSymbolicExpr::WordAdd(a_vec, b_vec) => {
+                let mut a_val = helper(&a_vec[0], row_id, n_rows, n_pvs, vars);
+                let mut factor = 1;
+                for w in a_vec.iter().skip(1) {
+                    factor *= 256;
+                    a_val = format!(
+                        "(bvadd {} (bvmul {} #x{:08x}))",
+                        a_val,
+                        helper(w, row_id, n_rows, n_pvs, vars),
+                        factor
+                    );
+                }
+
+                let mut b_val = helper(&b_vec[0], row_id, n_rows, n_pvs, vars);
+                let mut factor = 1;
+                for w in b_vec.iter().skip(1) {
+                    factor *= 256;
+                    b_val = format!(
+                        "(bvadd {} (bvmul {} #x{:08x}))",
+                        b_val,
+                        helper(w, row_id, n_rows, n_pvs, vars),
+                        factor
+                    );
+                }
+
+                format!("(bvadd {} {})", a_val, b_val)
+            }
+            LatticeVMSymbolicExpr::WordSLt(a_vec, b_vec) => {
+                let mut a_val = helper(&a_vec[0], row_id, n_rows, n_pvs, vars);
+                let mut factor = 1;
+                for w in a_vec.iter().skip(1) {
+                    factor *= 256;
+                    a_val = format!(
+                        "(bvadd {} (bvmul {} #x{:08x}))",
+                        a_val,
+                        helper(w, row_id, n_rows, n_pvs, vars),
+                        factor
+                    );
+                }
+
+                let mut b_val = helper(&b_vec[0], row_id, n_rows, n_pvs, vars);
+                let mut factor = 1;
+                for w in b_vec.iter().skip(1) {
+                    factor *= 256;
+                    b_val = format!(
+                        "(bvadd {} (bvmul {} #x{:08x}))",
+                        b_val,
+                        helper(w, row_id, n_rows, n_pvs, vars),
+                        factor
+                    );
+                }
+
+                format!("(ite (bvslt {} {}) #x00000000 #x00000001)", a_val, b_val,)
+            }
             LatticeVMSymbolicExpr::WordSrl(a_vec, b_vec) => {
                 let mut a_val = helper(&a_vec[0], row_id, n_rows, n_pvs, vars);
                 let mut factor = 1;
@@ -216,13 +270,17 @@ pub fn expr_to_smt_bv(
         ));
     }
 
-    for (i, j, v) in neg_constants {
-        smt.push_str(&format!(
-            "(assert (not (= trace_{}_{} #x{:08x})))\n",
-            i,
-            j,
-            v.as_canonical_u32(prime)
-        ));
+    if !neg_constants.is_empty() {
+        smt.push_str("(assert (not (and\n");
+        for (i, j, v) in neg_constants {
+            smt.push_str(&format!(
+                "  (= trace_{}_{} #x{:08x})\n",
+                i,
+                j,
+                v.as_canonical_u32(prime)
+            ));
+        }
+        smt.push_str(")))\n");
     }
 
     // ranges

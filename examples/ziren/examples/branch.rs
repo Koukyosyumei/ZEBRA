@@ -13,8 +13,13 @@ use zkm_core_machine::control_flow::NUM_BRANCH_COLS;
 use zkm_core_machine::BranchChip;
 use zkm_stark::MachineProver;
 
+use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
+use latticevm::smt::expr_to_smt_bv;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::symbolic::LatticeVMSymbolicEntry;
+use latticevm::symbolic::LatticeVMSymbolicExpr;
+use latticevm::symbolic::LatticeVMSymbolicVal;
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::{generate_alu_final_checker, UiState};
 use latticevm::utils::trace_fmt_with_idxs;
@@ -107,18 +112,51 @@ fn main() -> Result<(), io::Error> {
     ) = extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
     refinable_cols.extend(&[23, 24, 25, 26]);
 
+    let nc = vec![LatticeVMSymbolicExpr::Sub(
+        Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+            entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+            index: 1,
+        })),
+        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+            16,
+        ))),
+    )];
+
     let constraints = LatticeVMConstraints {
         air_constraints,
         lookup_constraints,
         pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
+        pv_neg_constraints: nc,
     };
-    let minimum_num_taregt_cols = 3; //refinable_cols.len();
+    let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 3, 4, 12);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+
+    let mut constants: Vec<(usize, usize, AbstractInterval)> = vec![];
+    let mut neg_constants: Vec<(usize, usize, AbstractInterval)> = vec![];
+    for j in 0..NUM_BRANCH_COLS {
+        if !refinable_cols.contains(&j) {
+            constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
+        }
+    }
+    for j in vec![23, 24, 25, 26] {
+        neg_constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
+    }
+    let smt_str = expr_to_smt_bv(
+        &constraints,
+        &constants,
+        &neg_constants,
+        &range_types,
+        1,
+        NUM_BRANCH_COLS,
+        0,
+        prime,
+    );
+    println!("{}", smt_str);
+    println!("rr: {:?}", range_types);
 
     // ######################## Solve ############################################
     quick_api(
