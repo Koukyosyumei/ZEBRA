@@ -134,6 +134,7 @@ where
                     (Opcode::MULH as u8, WordOp::MulH),
                     (Opcode::MULHU as u8, WordOp::MulHU),
                     (Opcode::SLT as u8, WordOp::SLt),
+                    (Opcode::SLTU as u8, WordOp::SLt),
                     (Opcode::AND as u8, WordOp::And),
                     (Opcode::OR as u8, WordOp::Or),
                     (Opcode::XOR as u8, WordOp::Xor),

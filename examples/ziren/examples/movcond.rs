@@ -10,7 +10,10 @@ use zkm_core_machine::misc::NUM_MOV_COND_COLS;
 use zkm_core_machine::MovCondChip;
 use zkm_stark::MachineProver;
 
+use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
+use latticevm::smt::expr_to_smt;
+use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
@@ -72,7 +75,7 @@ pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
 }
 
 fn main() -> Result<(), io::Error> {
-    let target_opcode = "WSBH";
+    let target_opcode = "MEQ";
 
     create_or_clear_dir("voutput")?;
 
@@ -91,9 +94,19 @@ fn main() -> Result<(), io::Error> {
     let air_name = "MovCond";
     let _colmap = make_col_map();
 
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, MovCondChip>(&air, NUM_MOV_COND_COLS, prime);
+    let (
+        air_constraints,
+        lookup_constraints,
+        mut refinable_cols,
+        mut range_types,
+        general_lookup_info,
+    ) = extract_constraints_and_range::<KoalaBear, MovCondChip>(&air, NUM_MOV_COND_COLS, prime);
     refinable_cols.extend(&[2, 3, 4, 5]);
+    range_types.insert(2, RangeType::U8);
+    range_types.insert(3, RangeType::U8);
+    range_types.insert(4, RangeType::U8);
+    range_types.insert(5, RangeType::U8);
+    println!("{:?}", range_types);
 
     let constraints = LatticeVMConstraints {
         air_constraints,
@@ -107,6 +120,30 @@ fn main() -> Result<(), io::Error> {
     let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 11, 12, 13);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+
+    let mut constants: Vec<(usize, usize, AbstractInterval)> = vec![];
+    let mut neg_constants: Vec<(usize, usize, AbstractInterval)> = vec![];
+    for j in 0..NUM_MOV_COND_COLS {
+        if !refinable_cols.contains(&j) {
+            constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
+        }
+    }
+    for j in 2..6 {
+        neg_constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
+    }
+
+    let smt_str = expr_to_smt(
+        &constraints,
+        &constants,
+        &neg_constants,
+        &range_types,
+        1,
+        NUM_MOV_COND_COLS,
+        0,
+        prime,
+    );
+    println!("{}", smt_str);
+    println!("rr: {:?}", range_types);
 
     // ######################## Solve ############################################
     quick_api(

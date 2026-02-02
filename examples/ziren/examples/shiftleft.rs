@@ -9,7 +9,10 @@ use zkm_core_machine::alu::NUM_SHIFT_LEFT_COLS;
 use zkm_core_machine::ShiftLeft;
 use zkm_stark::MachineProver;
 
+use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
+use latticevm::smt::expr_to_smt;
+use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
@@ -36,7 +39,7 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
+    let max_iteration = 1000000000;
     let min_row_id = 0;
     let max_row_id = 0;
     let num_extracted_rows = 1;
@@ -47,10 +50,19 @@ fn main() -> Result<(), io::Error> {
     let air_name = "ShiftLeft";
     let _colmap = make_col_map();
 
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, ShiftLeft>(&air, NUM_SHIFT_LEFT_COLS, prime);
+    let (
+        air_constraints,
+        lookup_constraints,
+        mut refinable_cols,
+        mut range_types,
+        general_lookup_info,
+    ) = extract_constraints_and_range::<KoalaBear, ShiftLeft>(&air, NUM_SHIFT_LEFT_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     refinable_cols.extend(&general_lookup_info.alu_output);
+    range_types.insert(2, RangeType::U8);
+    range_types.insert(3, RangeType::U8);
+    range_types.insert(4, RangeType::U8);
+    range_types.insert(5, RangeType::U8);
 
     let constraints = LatticeVMConstraints {
         air_constraints,
@@ -64,6 +76,31 @@ fn main() -> Result<(), io::Error> {
     let program = target_program(4, 4);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+
+    let mut constants: Vec<(usize, usize, AbstractInterval)> = vec![];
+    let mut neg_constants: Vec<(usize, usize, AbstractInterval)> = vec![];
+    for j in 0..NUM_SHIFT_LEFT_COLS {
+        if !refinable_cols.contains(&j) {
+            constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
+        }
+    }
+    for j in &general_lookup_info.alu_output {
+        neg_constants.push((0, *j, base_abs_main_trace_data[0][*j].clone()));
+    }
+
+    let smt_str = expr_to_smt(
+        &constraints,
+        &constants,
+        &neg_constants,
+        &range_types,
+        1,
+        NUM_SHIFT_LEFT_COLS,
+        0,
+        prime,
+    );
+    println!("{}", smt_str);
+    println!("rr: {:?}", range_types);
+    println!("rr: {:?}", general_lookup_info);
 
     // ######################## Solve ############################################
     quick_api(

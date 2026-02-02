@@ -1932,6 +1932,7 @@ pub fn eval_base_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
+                    println!("j: {}", j);
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {
@@ -1982,6 +1983,7 @@ pub fn eval_constraints(
         MayBeFlag::False => return (MayBeFlag::False, 0, memo),
         MayBeFlag::MayBe => is_all_true = false,
     }
+    println!("6666666666");
     let air_flag = eval_base_constraints(
         trace,
         public_vals,
