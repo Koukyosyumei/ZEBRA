@@ -12,7 +12,7 @@ use zkm_stark::MachineProver;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
-use latticevm::smt::expr_to_smt_bv;
+use latticevm::smt::expr_to_smt;
 use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
@@ -132,7 +132,7 @@ fn main() -> Result<(), io::Error> {
         neg_constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
     }
 
-    let smt_str = expr_to_smt_bv(
+    let smt_str = expr_to_smt(
         &constraints,
         &constants,
         &neg_constants,
