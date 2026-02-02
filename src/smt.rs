@@ -151,7 +151,7 @@ pub fn expr_to_smt(
         smt.push_str("(assert (not (and\n");
         for (i, j, v) in neg_constants {
             smt.push_str(&format!(
-                "  (= trace_{}_{} {})\n",
+                "  (= (mod (- trace_{}_{} {}) {prime}) 0)\n",
                 i,
                 j,
                 v.as_canonical_u32(prime)
@@ -165,6 +165,7 @@ pub fn expr_to_smt(
         if let RangeType::U8 = k {
             for i in 0..n_rows {
                 smt.push_str(&format!("(assert (<= trace_{}_{} 255))\n", i, j,));
+                smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j,));
             }
         }
     }
