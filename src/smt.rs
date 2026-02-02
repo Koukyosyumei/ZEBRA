@@ -89,6 +89,15 @@ pub fn expr_to_smt_bv(
                 // Two's complement negation
                 format!("(bvneg {})", helper(a, row_id, n_rows, n_pvs, vars))
             }
+            LatticeVMSymbolicExpr::Msb(a) => {
+                format!(
+                    "((_ zero_extend {}) ((_ extract {} {}) {}))",
+                    32 - 1,
+                    32 - 1,
+                    32 - 1,
+                    helper(a, row_id, n_rows, n_pvs, vars),
+                )
+            }
             LatticeVMSymbolicExpr::WhenNonZero(a, b) => {
                 format!(
                     "(ite (= {} #x00000000) #x00000000 {})",
