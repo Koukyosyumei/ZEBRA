@@ -91,10 +91,9 @@ pub fn expr_to_smt_bv(
             }
             LatticeVMSymbolicExpr::Add(a, b) => {
                 format!(
-                    "(bvurem (bvadd {} {}) {})",
+                    "(bvadd {} {})",
                     helper(a, row_id, n_rows, n_pvs, vars, prime),
                     helper(b, row_id, n_rows, n_pvs, vars, prime),
-                    prime_hex
                 )
             }
             LatticeVMSymbolicExpr::Sub(a, b) => {
