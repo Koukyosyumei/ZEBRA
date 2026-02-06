@@ -83,7 +83,6 @@ fn main() -> Result<(), io::Error> {
     for j in &general_lookup_info.alu_output {
         neg_constants.push((0, *j, base_abs_main_trace_data[0][*j].clone()));
     }
-    /*
     let smt_str = expr_to_smt_bv(
         &constraints,
         &constants,
@@ -96,7 +95,6 @@ fn main() -> Result<(), io::Error> {
     );
     println!("{}", smt_str);
     println!("rr: {:?}", range_types);
-    */
 
     // ######################## Solve ############################################
     quick_api(
