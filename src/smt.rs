@@ -215,30 +215,8 @@ pub fn expr_to_smt_bv(
                 )
             }
             LatticeVMSymbolicExpr::WordAdd(a_vec, b_vec) => {
-                let mut a_val = helper(&a_vec[0], row_id, n_rows, n_pvs, vars, prime);
-                let mut factor = 1;
-                for w in a_vec.iter().skip(1) {
-                    factor *= 256;
-                    a_val = format!(
-                        "(bvadd {} (bvmul {} #x{:08x}))",
-                        a_val,
-                        helper(w, row_id, n_rows, n_pvs, vars, prime),
-                        factor
-                    );
-                }
-
-                let mut b_val = helper(&b_vec[0], row_id, n_rows, n_pvs, vars, prime);
-                let mut factor = 1;
-                for w in b_vec.iter().skip(1) {
-                    factor *= 256;
-                    b_val = format!(
-                        "(bvadd {} (bvmul {} #x{:08x}))",
-                        b_val,
-                        helper(w, row_id, n_rows, n_pvs, vars, prime),
-                        factor
-                    );
-                }
-
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
                 format!("(bvadd {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordSubU(a_vec, b_vec) => {
@@ -247,104 +225,36 @@ pub fn expr_to_smt_bv(
                 format!("(bvsub {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordMulhs(a_vec, b_vec) => {
-                let a = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
-
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
                 format!(
                     "((_ extract 63 32) \
             (bvmul ((_ sign_extend 32) {}) ((_ sign_extend 32) {})))",
-                    a, b
+                    a_val, b_val
                 )
             }
             LatticeVMSymbolicExpr::WordMulhu(a_vec, b_vec) => {
-                let a = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
-
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
                 format!(
                     "((_ extract 63 32) \
             (bvmul ((_ zero_extend 32) {}) ((_ zero_extend 32) {})))",
-                    a, b
+                    a_val, b_val
                 )
             }
             LatticeVMSymbolicExpr::WordMul(a_vec, b_vec) => {
-                let mut a_val = helper(&a_vec[0], row_id, n_rows, n_pvs, vars, prime);
-                let mut factor = 1;
-                for w in a_vec.iter().skip(1) {
-                    factor *= 256;
-                    a_val = format!(
-                        "(bvadd {} (bvmul {} #x{:08x}))",
-                        a_val,
-                        helper(w, row_id, n_rows, n_pvs, vars, prime),
-                        factor
-                    );
-                }
-
-                let mut b_val = helper(&b_vec[0], row_id, n_rows, n_pvs, vars, prime);
-                let mut factor = 1;
-                for w in b_vec.iter().skip(1) {
-                    factor *= 256;
-                    b_val = format!(
-                        "(bvadd {} (bvmul {} #x{:08x}))",
-                        b_val,
-                        helper(w, row_id, n_rows, n_pvs, vars, prime),
-                        factor
-                    );
-                }
-
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
                 format!("(bvmul {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordSLt(a_vec, b_vec) => {
-                let mut a_val = helper(&a_vec[0], row_id, n_rows, n_pvs, vars, prime);
-                let mut factor = 1;
-                for w in a_vec.iter().skip(1) {
-                    factor *= 256;
-                    a_val = format!(
-                        "(bvadd {} (bvmul {} #x{:08x}))",
-                        a_val,
-                        helper(w, row_id, n_rows, n_pvs, vars, prime),
-                        factor
-                    );
-                }
-
-                let mut b_val = helper(&b_vec[0], row_id, n_rows, n_pvs, vars, prime);
-                let mut factor = 1;
-                for w in b_vec.iter().skip(1) {
-                    factor *= 256;
-                    b_val = format!(
-                        "(bvadd {} (bvmul {} #x{:08x}))",
-                        b_val,
-                        helper(w, row_id, n_rows, n_pvs, vars, prime),
-                        factor
-                    );
-                }
-
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
                 format!("(ite (bvslt {} {}) {} {})", a_val, b_val, zero_hex, one_hex)
             }
             LatticeVMSymbolicExpr::WordSrl(a_vec, b_vec) => {
-                let mut a_val = helper(&a_vec[0], row_id, n_rows, n_pvs, vars, prime);
-                let mut factor = 1;
-                for w in a_vec.iter().skip(1) {
-                    factor *= 256;
-                    a_val = format!(
-                        "(bvadd {} (bvmul {} #x{:08x}))",
-                        a_val,
-                        helper(w, row_id, n_rows, n_pvs, vars, prime),
-                        factor
-                    );
-                }
-
-                let mut b_val = helper(&b_vec[0], row_id, n_rows, n_pvs, vars, prime);
-                let mut factor = 1;
-                for w in b_vec.iter().skip(1) {
-                    factor *= 256;
-                    b_val = format!(
-                        "(bvadd {} (bvmul {} #x{:08x}))",
-                        b_val,
-                        helper(w, row_id, n_rows, n_pvs, vars, prime),
-                        factor
-                    );
-                }
-
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
                 format!("(bvlshr {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordAnd(a_vec, b_vec) => {
