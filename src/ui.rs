@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::interval::MayBeFlag;
+use crate::{interval::MayBeFlag, utils::trace_fmt_with_idxs};
 use crate::{symbolic::AbstractTrace, utils::GeneralLookupInfo};
 
 pub struct UiState {
@@ -95,6 +95,28 @@ impl UiState {
     }
 }
 
+pub fn save_repr_if_unique(
+    string_representation: &String,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    if !known_reprt.contains(string_representation) {
+        known_reprt.insert(string_representation.clone());
+        ui.recovered = string_representation.clone();
+
+        fs::write(
+            format!("voutput/{}_states.txt", known_reprt.len()),
+            ui.recovered.clone(),
+        )
+        .unwrap();
+        fs::write(
+            format!("voutput/{}_assignments.txt", known_reprt.len()),
+            ui.logs.clone(),
+        )
+        .unwrap();
+    }
+}
+
 pub fn generate_alu_final_checker(
     general_lookup_info: GeneralLookupInfo,
 ) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone {
@@ -106,44 +128,13 @@ pub fn generate_alu_final_checker(
         let i1 = &general_lookup_info.alu_input1;
         let i2 = &general_lookup_info.alu_input2;
         let o = &general_lookup_info.alu_output;
-
-        debug_assert!(i1.len() == 4);
-        debug_assert!(i2.len() == 4);
-        debug_assert!(o.len() == 4);
-
-        let row = &trace.data[0];
-
         let string_representation = format!(
-            "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-            row[i1[0]],
-            row[i1[1]],
-            row[i1[2]],
-            row[i1[3]],
-            row[i2[0]],
-            row[i2[1]],
-            row[i2[2]],
-            row[i2[3]],
-            row[o[0]],
-            row[o[1]],
-            row[o[2]],
-            row[o[3]],
+            "input0: [{}], input1: [{}], output: [{}]",
+            trace_fmt_with_idxs(trace, 0, &[i1[0], i1[1], i1[2], i1[3]]),
+            trace_fmt_with_idxs(trace, 0, &[i2[0], i2[1], i2[2], i2[3]]),
+            trace_fmt_with_idxs(trace, 0, &[o[0], o[1], o[2], o[3]]),
         );
-
-        if known_reprt.insert(string_representation.clone()) {
-            ui.recovered = string_representation;
-
-            std::fs::write(
-                format!("voutput/{}_states.txt", known_reprt.len()),
-                ui.recovered.clone(),
-            )
-            .unwrap();
-
-            std::fs::write(
-                format!("voutput/{}_assignments.txt", known_reprt.len()),
-                ui.logs.clone(),
-            )
-            .unwrap();
-        }
+        save_repr_if_unique(&string_representation, known_reprt, ui);
     }
 }
 
@@ -191,27 +182,5 @@ pub fn pad_dummy_rows_with_last_dummy(
                 }
             }
         }
-    }
-}
-
-pub fn save_repr_if_unique(
-    string_representation: &String,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    if !known_reprt.contains(string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation.clone();
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
     }
 }
