@@ -119,6 +119,7 @@ fn main() -> Result<(), io::Error> {
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
+    // ######################## Generating SMT Formulas ##########################
     let mut constants: Vec<(usize, usize, AbstractInterval)> = vec![];
     let mut neg_constants: Vec<(usize, usize, AbstractInterval)> = vec![];
     for j in 0..NUM_ADD_SUB_COLS {
