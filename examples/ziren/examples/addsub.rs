@@ -13,6 +13,9 @@ use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
 use latticevm::smt::expr_to_smt_bv;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::LatticeVMSymbolicEntry;
+use latticevm::symbolic::LatticeVMSymbolicExpr;
+use latticevm::symbolic::LatticeVMSymbolicVal;
 use latticevm::ui::{save_repr_if_unique, UiState};
 use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
@@ -102,17 +105,20 @@ fn main() -> Result<(), io::Error> {
         vec![2, 3, 4, 5]
     } else if target_opcode == "SUB" {
         vec![9, 10, 11, 12]
+    } else {
+        panic!("unsupported instruction")
     };
 
     let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&output_columns.clone());
 
-    let constraints = LatticeVMConstraints {
+    let mut constraints = LatticeVMConstraints {
         air_constraints,
         lookup_constraints,
         pv_pos_constraints: vec![],
         pv_neg_constraints: vec![],
+        blocking_constraints: vec![],
     };
     let minimum_num_taregt_cols = refinable_cols.len();
 
@@ -120,6 +126,24 @@ fn main() -> Result<(), io::Error> {
     let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+
+    // ######################## Blocking Closures ################################
+    let mut bc = vec![];
+    for i in &output_columns {
+        bc.push((
+            0,
+            LatticeVMSymbolicExpr::Sub(
+                Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                    entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                    index: *i,
+                })),
+                Box::new(LatticeVMSymbolicExpr::Constant(
+                    base_abs_main_trace_data[0][*i].clone(),
+                )),
+            ),
+        ));
+    }
+    constraints.blocking_constraints = bc.clone();
 
     // ######################## Generating SMT Formula ##########################
     let constants: Vec<_> = (0..NUM_ADD_SUB_COLS)
