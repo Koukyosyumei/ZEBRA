@@ -71,6 +71,24 @@ pub fn expr_to_smt_bv(
                     zero_hex
                 }
             }
+            LatticeVMSymbolicExpr::WhenNonZero(a, b) => {
+                format!(
+                    "(ite (= {} {}) {} {})",
+                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    zero_hex,
+                    zero_hex,
+                    helper(b, row_id, n_rows, n_pvs, vars, prime)
+                )
+            }
+            LatticeVMSymbolicExpr::WhenZero(a, b) => {
+                format!(
+                    "(ite (= {} {}) {} {})",
+                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    zero_hex,
+                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                    zero_hex
+                )
+            }
             LatticeVMSymbolicExpr::Constant(AbstractInterval { lo, hi: _ }) => {
                 format!("#x{:08x}", lo)
             }
@@ -148,24 +166,6 @@ pub fn expr_to_smt_bv(
                     32 - 1,
                     32 - 1,
                     helper(a, row_id, n_rows, n_pvs, vars, prime),
-                )
-            }
-            LatticeVMSymbolicExpr::WhenNonZero(a, b) => {
-                format!(
-                    "(ite (= {} {}) {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    zero_hex,
-                    zero_hex,
-                    helper(b, row_id, n_rows, n_pvs, vars, prime)
-                )
-            }
-            LatticeVMSymbolicExpr::WhenZero(a, b) => {
-                format!(
-                    "(ite (= {} {}) {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    zero_hex,
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                    zero_hex
                 )
             }
             LatticeVMSymbolicExpr::Lt(a, b) => {
