@@ -43,6 +43,8 @@ pub fn expr_to_smt(
             acc
         }
 
+        let mut rec = |e| helper(e, row_id, n_rows, n_pvs, vars);
+
         match expr {
             LatticeVMSymbolicExpr::IsFirstRow => {
                 if row_id == 0 {
@@ -85,74 +87,38 @@ pub fn expr_to_smt(
                 vars.insert(name.clone());
                 name
             }
-            LatticeVMSymbolicExpr::Add(a, b) => {
-                format!(
-                    "(+ {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars),
-                    helper(b, row_id, n_rows, n_pvs, vars)
-                )
-            }
-            LatticeVMSymbolicExpr::Sub(a, b) => {
-                format!(
-                    "(- {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars),
-                    helper(b, row_id, n_rows, n_pvs, vars)
-                )
-            }
-            LatticeVMSymbolicExpr::Mul(a, b) => {
-                format!(
-                    "(* {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars),
-                    helper(b, row_id, n_rows, n_pvs, vars)
-                )
-            }
-            LatticeVMSymbolicExpr::Lt(a, b) => {
-                format!(
-                    "(ite (< {} {}) 0 1)",
-                    helper(a, row_id, n_rows, n_pvs, vars),
-                    helper(b, row_id, n_rows, n_pvs, vars),
-                )
-            }
-            LatticeVMSymbolicExpr::Flip(a) => {
-                format!("(ite (= {} 0) 1 0)", helper(a, row_id, n_rows, n_pvs, vars),)
-            }
-            LatticeVMSymbolicExpr::And(a, b) => {
-                format!(
-                    "(bitwise_and {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars),
-                    helper(b, row_id, n_rows, n_pvs, vars)
-                )
-            }
-            LatticeVMSymbolicExpr::Or(a, b) => {
-                format!(
-                    "(bitwise_or {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars),
-                    helper(b, row_id, n_rows, n_pvs, vars)
-                )
-            }
-            LatticeVMSymbolicExpr::Xor(a, b) => {
-                format!(
-                    "(bitwise_xor {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars),
-                    helper(b, row_id, n_rows, n_pvs, vars)
-                )
-            }
-            LatticeVMSymbolicExpr::Neg(a) => {
-                format!("(- {})", helper(a, row_id, n_rows, n_pvs, vars))
-            }
             LatticeVMSymbolicExpr::WhenNonZero(a, b) => {
-                format!(
-                    "(ite (= {} 0) 0 {})",
-                    helper(a, row_id, n_rows, n_pvs, vars),
-                    helper(b, row_id, n_rows, n_pvs, vars)
-                )
+                format!("(ite (= {} 0) 0 {})", rec(a), rec(b))
             }
             LatticeVMSymbolicExpr::WhenZero(a, b) => {
-                format!(
-                    "(ite (= {} 0) {} 0)",
-                    helper(a, row_id, n_rows, n_pvs, vars),
-                    helper(b, row_id, n_rows, n_pvs, vars)
-                )
+                format!("(ite (= {} 0) {} 0)", rec(a), rec(b))
+            }
+            LatticeVMSymbolicExpr::Add(a, b) => {
+                format!("(+ {} {})", rec(a), rec(b))
+            }
+            LatticeVMSymbolicExpr::Sub(a, b) => {
+                format!("(- {} {})", rec(a), rec(b))
+            }
+            LatticeVMSymbolicExpr::Mul(a, b) => {
+                format!("(* {} {})", rec(a), rec(b))
+            }
+            LatticeVMSymbolicExpr::Lt(a, b) => {
+                format!("(ite (< {} {}) 0 1)", rec(a), rec(b),)
+            }
+            LatticeVMSymbolicExpr::Flip(a) => {
+                format!("(ite (= {} 0) 1 0)", rec(a),)
+            }
+            LatticeVMSymbolicExpr::And(a, b) => {
+                format!("(bitwise_and {} {})", rec(a), rec(b))
+            }
+            LatticeVMSymbolicExpr::Or(a, b) => {
+                format!("(bitwise_or {} {})", rec(a), rec(b))
+            }
+            LatticeVMSymbolicExpr::Xor(a, b) => {
+                format!("(bitwise_xor {} {})", rec(a), rec(b))
+            }
+            LatticeVMSymbolicExpr::Neg(a) => {
+                format!("(- {})", rec(a))
             }
             LatticeVMSymbolicExpr::WordAnd(a_vec, b_vec) => {
                 let a_val = reduce_word(a_vec, row_id, n_rows, n_pvs, vars);
