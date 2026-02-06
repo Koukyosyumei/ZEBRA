@@ -129,6 +129,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Blocking Closures ################################
     let mut bc = vec![];
+    /*
     for i in &output_columns {
         bc.push((
             0,
@@ -142,8 +143,11 @@ fn main() -> Result<(), io::Error> {
                 )),
             ),
         ));
-    }
+    }*/
     constraints.blocking_constraints = bc.clone();
+    for b in &constraints.blocking_constraints {
+        println!("  {}", b.1);
+    }
 
     // ######################## Generating SMT Formula ##########################
     let constants: Vec<_> = (0..NUM_ADD_SUB_COLS)

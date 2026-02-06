@@ -1999,7 +1999,7 @@ pub fn eval_constraints(
             }
         }
     }
-    if blocking_is_all {
+    if !constraints.blocking_constraints.is_empty() && blocking_is_all {
         return (MayBeFlag::False, 0, memo);
     }
 
