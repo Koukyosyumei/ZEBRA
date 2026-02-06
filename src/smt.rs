@@ -242,6 +242,36 @@ pub fn expr_to_smt_bv(
                     a_val, b_val
                 )
             }
+            // 符号付き乗算の低位32ビット (bvmulは下位ビットに関しては符号の有無を問わない)
+            LatticeVMSymbolicExpr::WordMultl(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!("(bvmul {} {})", a_val, b_val)
+            }
+            // 符号付き乗算の高位32ビット (WordMulhs と同じ挙動)
+            LatticeVMSymbolicExpr::WordMulth(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!(
+                    "((_ extract 63 32) (bvmul ((_ sign_extend 32) {}) ((_ sign_extend 32) {})))",
+                    a_val, b_val
+                )
+            }
+            // 符号なし乗算の低位32ビット
+            LatticeVMSymbolicExpr::WordMultul(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!("(bvmul {} {})", a_val, b_val)
+            }
+            // 符号なし乗算の高位32ビット (WordMulhu と同じ挙動)
+            LatticeVMSymbolicExpr::WordMultuh(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!(
+                    "((_ extract 63 32) (bvmul ((_ zero_extend 32) {}) ((_ zero_extend 32) {})))",
+                    a_val, b_val
+                )
+            }
             LatticeVMSymbolicExpr::WordMul(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
@@ -317,16 +347,36 @@ pub fn expr_to_smt_bv(
                 }
                 acc
             }
-            LatticeVMSymbolicExpr::WordSub(_, _) => todo!(),
-            LatticeVMSymbolicExpr::WordMultl(_, _) => todo!(),
-            LatticeVMSymbolicExpr::WordMulth(_, _) => todo!(),
-            LatticeVMSymbolicExpr::WordMultul(_, _) => todo!(),
-            LatticeVMSymbolicExpr::WordMultuh(_, _) => todo!(),
-            LatticeVMSymbolicExpr::WordDiv(_, _) => todo!(),
-            LatticeVMSymbolicExpr::WordSDiv(_, _) => todo!(),
-            LatticeVMSymbolicExpr::WordLt(_, _) => todo!(),
-            LatticeVMSymbolicExpr::WordEq(_, _) => todo!(),
-            LatticeVMSymbolicExpr::WordNEq(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordSub(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!("(bvsub {} {})", a_val, b_val)
+            }
+            LatticeVMSymbolicExpr::WordDiv(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!("(bvudiv {} {})", a_val, b_val)
+            }
+            LatticeVMSymbolicExpr::WordSDiv(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!("(bvsdiv {} {})", a_val, b_val)
+            }
+            LatticeVMSymbolicExpr::WordLt(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!("(ite (bvult {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
+            }
+            LatticeVMSymbolicExpr::WordEq(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!("(ite (= {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
+            }
+            LatticeVMSymbolicExpr::WordNEq(a_vec, b_vec) => {
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                format!("(ite (= {} {}) {} {})", a_val, b_val, zero_hex, one_hex)
+            }
         }
     }
 
