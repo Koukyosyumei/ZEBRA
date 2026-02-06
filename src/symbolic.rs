@@ -1991,10 +1991,7 @@ pub fn eval_constraints(
 
         match flag {
             MayBeFlag::True => {}
-            MayBeFlag::False => {
-                blocking_is_all = false;
-            }
-            MayBeFlag::MayBe => {
+            MayBeFlag::False | MayBeFlag::MayBe => {
                 blocking_is_all = false;
             }
         }
