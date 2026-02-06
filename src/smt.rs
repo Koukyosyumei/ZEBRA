@@ -15,6 +15,29 @@ pub fn expr_to_smt_bv(
     n_pvs: usize,
     prime: u32, // 32-bit prime
 ) -> String {
+    fn word_to_bv32(
+        vec: &[Box<LatticeVMSymbolicExpr>],
+        row_id: usize,
+        n_rows: usize,
+        n_pvs: usize,
+        vars: &mut HashSet<String>,
+        prime: u32,
+    ) -> String {
+        let mut acc = helper(&vec[0], row_id, n_rows, n_pvs, vars, prime);
+        let mut factor: u32 = 1;
+
+        for w in vec.iter().skip(1) {
+            factor = factor.wrapping_mul(256);
+            acc = format!(
+                "(bvadd {} (bvmul {} #x{:08x}))",
+                acc,
+                helper(w, row_id, n_rows, n_pvs, vars, prime),
+                factor
+            );
+        }
+        acc
+    }
+
     fn helper(
         expr: &LatticeVMSymbolicExpr,
         row_id: usize,
@@ -25,29 +48,7 @@ pub fn expr_to_smt_bv(
     ) -> String {
         let zero_hex = format!("#x{:08x}", 0);
         let one_hex = format!("#x{:08x}", 1);
-
-        fn word_to_bv32(
-            vec: &[Box<LatticeVMSymbolicExpr>],
-            row_id: usize,
-            n_rows: usize,
-            n_pvs: usize,
-            vars: &mut HashSet<String>,
-            prime: u32,
-        ) -> String {
-            let mut acc = helper(&vec[0], row_id, n_rows, n_pvs, vars, prime);
-            let mut factor: u32 = 1;
-
-            for w in vec.iter().skip(1) {
-                factor = factor.wrapping_mul(256);
-                acc = format!(
-                    "(bvadd {} (bvmul {} #x{:08x}))",
-                    acc,
-                    helper(w, row_id, n_rows, n_pvs, vars, prime),
-                    factor
-                );
-            }
-            acc
-        }
+        let mut rec = |e| helper(e, row_id, n_rows, n_pvs, vars, prime);
 
         match expr {
             LatticeVMSymbolicExpr::IsFirstRow => {
@@ -72,22 +73,10 @@ pub fn expr_to_smt_bv(
                 }
             }
             LatticeVMSymbolicExpr::WhenNonZero(a, b) => {
-                format!(
-                    "(ite (= {} {}) {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    zero_hex,
-                    zero_hex,
-                    helper(b, row_id, n_rows, n_pvs, vars, prime)
-                )
+                format!("(ite (= {} {}) {} {})", rec(a), zero_hex, zero_hex, rec(b))
             }
             LatticeVMSymbolicExpr::WhenZero(a, b) => {
-                format!(
-                    "(ite (= {} {}) {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    zero_hex,
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                    zero_hex
-                )
+                format!("(ite (= {} {}) {} {})", rec(a), zero_hex, rec(b), zero_hex)
             }
             LatticeVMSymbolicExpr::Constant(AbstractInterval { lo, hi: _ }) => {
                 format!("#x{:08x}", lo)
@@ -109,41 +98,25 @@ pub fn expr_to_smt_bv(
                 name
             }
             LatticeVMSymbolicExpr::Add(a, b) => {
-                format!(
-                    "(ff_add {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                )
+                format!("(ff_add {} {})", rec(a), rec(b),)
             }
             LatticeVMSymbolicExpr::Sub(a, b) => {
-                format!(
-                    "(ff_sub {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                )
+                format!("(ff_sub {} {})", rec(a), rec(b),)
             }
             LatticeVMSymbolicExpr::Mul(a, b) => {
-                format!(
-                    "(ff_mul {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                )
+                format!("(ff_mul {} {})", rec(a), rec(b),)
             }
             LatticeVMSymbolicExpr::MulLo(a, b) => {
                 // low 32 bits of 32x32 multiplication
-                format!(
-                    "((_ extract 31 0) (bvmul {} {}))",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                )
+                format!("((_ extract 31 0) (bvmul {} {}))", rec(a), rec(b),)
             }
             LatticeVMSymbolicExpr::MulHiSS(a, b) => {
                 // signed * signed, high 32 bits
                 format!(
                     "((_ extract 63 32) \
           (bvmul ((_ sign_extend 32) {}) ((_ sign_extend 32) {})))",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                    rec(a),
+                    rec(b),
                 )
             }
             LatticeVMSymbolicExpr::MulHiUU(a, b) => {
@@ -151,13 +124,13 @@ pub fn expr_to_smt_bv(
                 format!(
                     "((_ extract 63 32) \
           (bvmul ((_ zero_extend 32) {}) ((_ zero_extend 32) {})))",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                    rec(a),
+                    rec(b),
                 )
             }
             LatticeVMSymbolicExpr::Neg(a) => {
                 // Two's complement negation
-                format!("(bvneg {})", helper(a, row_id, n_rows, n_pvs, vars, prime))
+                format!("(bvneg {})", rec(a))
             }
             LatticeVMSymbolicExpr::Msb(a) => {
                 format!(
@@ -165,54 +138,32 @@ pub fn expr_to_smt_bv(
                     32 - 1,
                     32 - 1,
                     32 - 1,
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    rec(a),
                 )
             }
             LatticeVMSymbolicExpr::Lt(a, b) => {
                 format!(
                     "(ite (bvult {} {}) {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                    rec(a),
+                    rec(b),
                     zero_hex,
                     one_hex
                 )
             }
             LatticeVMSymbolicExpr::Flip(a) => {
-                format!(
-                    "(ite (= {} {}) {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    zero_hex,
-                    one_hex,
-                    zero_hex
-                )
+                format!("(ite (= {} {}) {} {})", rec(a), zero_hex, one_hex, zero_hex)
             }
             LatticeVMSymbolicExpr::And(a, b) => {
-                format!(
-                    "(bvand {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                )
+                format!("(bvand {} {})", rec(a), rec(b),)
             }
             LatticeVMSymbolicExpr::Or(a, b) => {
-                format!(
-                    "(bvor {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                )
+                format!("(bvor {} {})", rec(a), rec(b),)
             }
             LatticeVMSymbolicExpr::Xor(a, b) => {
-                format!(
-                    "(bvxor {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                )
+                format!("(bvxor {} {})", rec(a), rec(b),)
             }
             LatticeVMSymbolicExpr::SRL(a, b) => {
-                format!(
-                    "(bvlshr {} {})",
-                    helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime),
-                )
+                format!("(bvlshr {} {})", rec(a), rec(b),)
             }
             LatticeVMSymbolicExpr::WordAdd(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
@@ -290,8 +241,8 @@ pub fn expr_to_smt_bv(
             LatticeVMSymbolicExpr::WordAnd(a_vec, b_vec) => {
                 let mut res = vec![];
                 for (a, b) in a_vec.iter().zip(b_vec.iter()) {
-                    let a_bv = helper(a, row_id, n_rows, n_pvs, vars, prime);
-                    let b_bv = helper(b, row_id, n_rows, n_pvs, vars, prime);
+                    let a_bv = rec(a);
+                    let b_bv = rec(b);
                     res.push(format!("(bvand {} {})", a_bv, b_bv));
                 }
 
@@ -312,8 +263,8 @@ pub fn expr_to_smt_bv(
 
                 let mut res = vec![];
                 for (a, b) in a_vec.iter().zip(b_vec.iter()) {
-                    let a_bv = helper(a, row_id, n_rows, n_pvs, vars, prime);
-                    let b_bv = helper(b, row_id, n_rows, n_pvs, vars, prime);
+                    let a_bv = rec(a);
+                    let b_bv = rec(b);
                     res.push(format!("(bvor {} {})", a_bv, b_bv));
                 }
 
@@ -334,8 +285,8 @@ pub fn expr_to_smt_bv(
 
                 let mut res = vec![];
                 for (a, b) in a_vec.iter().zip(b_vec.iter()) {
-                    let a_bv = helper(a, row_id, n_rows, n_pvs, vars, prime);
-                    let b_bv = helper(b, row_id, n_rows, n_pvs, vars, prime);
+                    let a_bv = rec(a);
+                    let b_bv = rec(b);
                     res.push(format!("(bvxor {} {})", a_bv, b_bv));
                 }
 
