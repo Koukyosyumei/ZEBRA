@@ -11,7 +11,7 @@ use zkm_stark::MachineProver;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
-use latticevm::smt::expr_to_smt;
+use latticevm::smt::expr_to_smt_bv;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::{save_repr_if_unique, UiState};
 use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
@@ -100,7 +100,11 @@ fn main() -> Result<(), io::Error> {
 
     let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
-    refinable_cols.extend(&[2, 3, 4, 5]); // output
+    if target_opcode == "ADD" {
+        refinable_cols.extend(&[2, 3, 4, 5]);
+    } else if target_opcode == "SUB" {
+        refinable_cols.extend(&[9, 10, 11, 12]);
+    }
 
     let constraints = LatticeVMConstraints {
         air_constraints,
@@ -115,6 +119,7 @@ fn main() -> Result<(), io::Error> {
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
+    // ######################## Generating SMT Formulas ##########################
     let mut constants: Vec<(usize, usize, AbstractInterval)> = vec![];
     let mut neg_constants: Vec<(usize, usize, AbstractInterval)> = vec![];
     for j in 0..NUM_ADD_SUB_COLS {
@@ -127,7 +132,7 @@ fn main() -> Result<(), io::Error> {
             neg_constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
         }
     }
-    let smt_str = expr_to_smt(
+    let smt_str = expr_to_smt_bv(
         &constraints,
         &constants,
         &neg_constants,
