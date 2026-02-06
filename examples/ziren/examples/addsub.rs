@@ -102,6 +102,27 @@ fn main() -> Result<(), io::Error> {
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&[2, 3, 4, 5]); // output
 
+    /*
+    ((curr[17] + curr[18]) * ((((curr[12] + curr[16]) - curr[5]) + curr[8]) * ((((curr[12] + curr[16]) - curr[5]) + curr[8]) - 256)))
+    ((curr[17] + curr[18]) * (curr[6] * (((curr[9] + curr[13]) - curr[2]) - 256)))
+    ((curr[17] + curr[18]) * (curr[7] * ((((curr[10] + curr[14]) - curr[3]) + curr[6]) - 256)))
+    ((curr[17] + curr[18]) * (curr[8] * ((((curr[11] + curr[15]) - curr[4]) + curr[7]) - 256)))
+    ((curr[17] + curr[18]) * ((curr[6] - 1) * ((curr[9] + curr[13]) - curr[2])))
+    ((curr[17] + curr[18]) * ((curr[7] - 1) * (((curr[10] + curr[14]) - curr[3]) + curr[6])))
+    ((curr[17] + curr[18]) * ((curr[8] - 1) * (((curr[11] + curr[15]) - curr[4]) + curr[7])))
+    ((curr[17] + curr[18]) * (curr[6] * (curr[6] - 1)))
+    ((curr[17] + curr[18]) * (curr[7] * (curr[7] - 1)))
+    ((curr[17] + curr[18]) * (curr[8] * (curr[8] - 1)))
+    ((curr[17] + curr[18]) * ((curr[17] + curr[18]) * ((curr[17] + curr[18]) - 1)))
+    (curr[17] * (curr[17] - 1))
+    (curr[18] * (curr[18] - 1))
+    ((curr[17] + curr[18]) * ((curr[17] + curr[18]) - 1))
+    */
+
+    for a in &air_constraints {
+        println!("{}", a);
+    }
+
     let constraints = LatticeVMConstraints {
         air_constraints,
         lookup_constraints,

@@ -23,7 +23,9 @@ pub fn expr_to_smt_bv(
         vars: &mut HashSet<String>,
         prime: u32,
     ) -> String {
-        let prime_hex = format!("#x{:016x}", prime);
+        let prime_hex = format!("#x{:08x}", prime);
+        let zero_hex = format!("#x{:08x}", 0);
+        let one_hex = format!("#x{:08x}", 1);
 
         fn word_to_bv32(
             vec: &[Box<LatticeVMSymbolicExpr>],
@@ -39,7 +41,7 @@ pub fn expr_to_smt_bv(
             for w in vec.iter().skip(1) {
                 factor = factor.wrapping_mul(256);
                 acc = format!(
-                    "(bvadd {} (bvmul {} #x{:016x}))",
+                    "(bvadd {} (bvmul {} #x{:08x}))",
                     acc,
                     helper(w, row_id, n_rows, n_pvs, vars, prime),
                     factor
@@ -51,27 +53,27 @@ pub fn expr_to_smt_bv(
         match expr {
             LatticeVMSymbolicExpr::IsFirstRow => {
                 if row_id == 0 {
-                    "#x1".to_string()
+                    one_hex
                 } else {
-                    "#x0".to_string()
+                    zero_hex
                 }
             }
             LatticeVMSymbolicExpr::IsTransition => {
                 if row_id < n_rows - 1 {
-                    "#x1".to_string()
+                    one_hex
                 } else {
-                    "#x0".to_string()
+                    zero_hex
                 }
             }
             LatticeVMSymbolicExpr::IsLastRow => {
                 if row_id == n_rows - 1 {
-                    "#x1".to_string()
+                    one_hex
                 } else {
-                    "#x0".to_string()
+                    zero_hex
                 }
             }
             LatticeVMSymbolicExpr::Constant(AbstractInterval { lo, hi: _ }) => {
-                format!("#x{:016x}", lo)
+                format!("#x{:08x}", lo)
             }
             LatticeVMSymbolicExpr::Variable(v) => {
                 let (ty, base_row) = match v.entry {
@@ -91,26 +93,23 @@ pub fn expr_to_smt_bv(
             }
             LatticeVMSymbolicExpr::Add(a, b) => {
                 format!(
-                    "(bvadd {} {})",
+                    "(ff_add {} {})",
                     helper(a, row_id, n_rows, n_pvs, vars, prime),
                     helper(b, row_id, n_rows, n_pvs, vars, prime),
                 )
             }
             LatticeVMSymbolicExpr::Sub(a, b) => {
                 format!(
-                    "(bvurem (bvsub (bvadd {} {}) {}) {})",
+                    "(ff_sub {} {})",
                     helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    prime_hex,
                     helper(b, row_id, n_rows, n_pvs, vars, prime),
-                    prime_hex,
                 )
             }
             LatticeVMSymbolicExpr::Mul(a, b) => {
                 format!(
-                    "(bvurem (bvmul {} {}) {})",
+                    "(ff_mul {} {})",
                     helper(a, row_id, n_rows, n_pvs, vars, prime),
                     helper(b, row_id, n_rows, n_pvs, vars, prime),
-                    prime_hex
                 )
             }
             LatticeVMSymbolicExpr::Neg(a) => {
@@ -128,29 +127,38 @@ pub fn expr_to_smt_bv(
             }
             LatticeVMSymbolicExpr::WhenNonZero(a, b) => {
                 format!(
-                    "(ite (= {} #x0000000000000000) #x0000000000000000 {})",
+                    "(ite (= {} {}) {} {})",
                     helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    zero_hex,
+                    zero_hex,
                     helper(b, row_id, n_rows, n_pvs, vars, prime)
                 )
             }
             LatticeVMSymbolicExpr::WhenZero(a, b) => {
                 format!(
-                    "(ite (= {} #x0000000000000000) {} #x0000000000000000)",
+                    "(ite (= {} {}) {} {})",
                     helper(a, row_id, n_rows, n_pvs, vars, prime),
-                    helper(b, row_id, n_rows, n_pvs, vars, prime)
+                    zero_hex,
+                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                    zero_hex
                 )
             }
             LatticeVMSymbolicExpr::Lt(a, b) => {
                 format!(
-                    "(ite (bvult {} {}) #x0000000000000000 #x0000000000000001)",
+                    "(ite (bvult {} {}) {} {})",
                     helper(a, row_id, n_rows, n_pvs, vars, prime),
                     helper(b, row_id, n_rows, n_pvs, vars, prime),
+                    zero_hex,
+                    one_hex
                 )
             }
             LatticeVMSymbolicExpr::Flip(a) => {
                 format!(
-                    "(ite (= {} #x0000000000000000) #x0000000000000001 #x0000000000000000)",
+                    "(ite (= {} {}) {} {})",
                     helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    zero_hex,
+                    one_hex,
+                    zero_hex
                 )
             }
             LatticeVMSymbolicExpr::WordAdd(a_vec, b_vec) => {
@@ -159,7 +167,7 @@ pub fn expr_to_smt_bv(
                 for w in a_vec.iter().skip(1) {
                     factor *= 256;
                     a_val = format!(
-                        "(bvadd {} (bvmul {} #x{:016x}))",
+                        "(bvadd {} (bvmul {} #x{:08x}))",
                         a_val,
                         helper(w, row_id, n_rows, n_pvs, vars, prime),
                         factor
@@ -171,7 +179,7 @@ pub fn expr_to_smt_bv(
                 for w in b_vec.iter().skip(1) {
                     factor *= 256;
                     b_val = format!(
-                        "(bvadd {} (bvmul {} #x{:016x}))",
+                        "(bvadd {} (bvmul {} #x{:08x}))",
                         b_val,
                         helper(w, row_id, n_rows, n_pvs, vars, prime),
                         factor
@@ -211,7 +219,7 @@ pub fn expr_to_smt_bv(
                 for w in a_vec.iter().skip(1) {
                     factor *= 256;
                     a_val = format!(
-                        "(bvadd {} (bvmul {} #x{:016x}))",
+                        "(bvadd {} (bvmul {} #x{:08x}))",
                         a_val,
                         helper(w, row_id, n_rows, n_pvs, vars, prime),
                         factor
@@ -223,7 +231,7 @@ pub fn expr_to_smt_bv(
                 for w in b_vec.iter().skip(1) {
                     factor *= 256;
                     b_val = format!(
-                        "(bvadd {} (bvmul {} #x{:016x}))",
+                        "(bvadd {} (bvmul {} #x{:08x}))",
                         b_val,
                         helper(w, row_id, n_rows, n_pvs, vars, prime),
                         factor
@@ -238,7 +246,7 @@ pub fn expr_to_smt_bv(
                 for w in a_vec.iter().skip(1) {
                     factor *= 256;
                     a_val = format!(
-                        "(bvadd {} (bvmul {} #x{:016x}))",
+                        "(bvadd {} (bvmul {} #x{:08x}))",
                         a_val,
                         helper(w, row_id, n_rows, n_pvs, vars, prime),
                         factor
@@ -250,17 +258,14 @@ pub fn expr_to_smt_bv(
                 for w in b_vec.iter().skip(1) {
                     factor *= 256;
                     b_val = format!(
-                        "(bvadd {} (bvmul {} #x{:016x}))",
+                        "(bvadd {} (bvmul {} #x{:08x}))",
                         b_val,
                         helper(w, row_id, n_rows, n_pvs, vars, prime),
                         factor
                     );
                 }
 
-                format!(
-                    "(ite (bvslt {} {}) #x0000000000000000 #x0000000000000001)",
-                    a_val, b_val,
-                )
+                format!("(ite (bvslt {} {}) {} {})", a_val, b_val, zero_hex, one_hex)
             }
             LatticeVMSymbolicExpr::WordSrl(a_vec, b_vec) => {
                 let mut a_val = helper(&a_vec[0], row_id, n_rows, n_pvs, vars, prime);
@@ -268,7 +273,7 @@ pub fn expr_to_smt_bv(
                 for w in a_vec.iter().skip(1) {
                     factor *= 256;
                     a_val = format!(
-                        "(bvadd {} (bvmul {} #x{:016x}))",
+                        "(bvadd {} (bvmul {} #x{:08x}))",
                         a_val,
                         helper(w, row_id, n_rows, n_pvs, vars, prime),
                         factor
@@ -280,7 +285,7 @@ pub fn expr_to_smt_bv(
                 for w in b_vec.iter().skip(1) {
                     factor *= 256;
                     b_val = format!(
-                        "(bvadd {} (bvmul {} #x{:016x}))",
+                        "(bvadd {} (bvmul {} #x{:08x}))",
                         b_val,
                         helper(w, row_id, n_rows, n_pvs, vars, prime),
                         factor
@@ -303,7 +308,7 @@ pub fn expr_to_smt_bv(
                 let mut factor: u32 = 1;
                 for limb in res.iter().skip(1) {
                     factor = factor.wrapping_mul(256);
-                    acc = format!("(bvadd {} (bvmul {} #x{:016x}))", acc, limb, factor);
+                    acc = format!("(bvadd {} (bvmul {} #x{:08x}))", acc, limb, factor);
                 }
                 acc
             }
@@ -327,7 +332,7 @@ pub fn expr_to_smt_bv(
                 let mut factor: u32 = 1;
                 for limb in res.iter().skip(1) {
                     factor = factor.wrapping_mul(256);
-                    acc = format!("(bvadd {} (bvmul {} #x{:016x}))", acc, limb, factor);
+                    acc = format!("(bvadd {} (bvmul {} #x{:08x}))", acc, limb, factor);
                 }
                 acc
             }
@@ -351,7 +356,7 @@ pub fn expr_to_smt_bv(
                 let mut factor: u32 = 1;
                 for limb in res.iter().skip(1) {
                     factor = factor.wrapping_mul(256);
-                    acc = format!("(bvadd {} (bvmul {} #x{:016x}))", acc, limb, factor);
+                    acc = format!("(bvadd {} (bvmul {} #x{:08x}))", acc, limb, factor);
                 }
                 acc
             }
@@ -359,11 +364,41 @@ pub fn expr_to_smt_bv(
         }
     }
 
-    let prime_hex = format!("#x{:016x}", prime);
+    let prime_hex = format!("#x{:08x}", prime);
+    let zero_hex = format!("#x{:08x}", 0);
+    let one_hex = format!("#x{:08x}", 1);
 
     let mut vars = HashSet::new();
     let mut smt = String::new();
     smt.push_str("(set-logic QF_BV)\n");
+    smt.push_str(&format!("(define-fun P () (_ BitVec 32) {})\n", prime_hex));
+    smt.push_str(
+        ";; finite field addition: (a + b) mod p
+(define-fun ff_add ((a (_ BitVec 32)) (b (_ BitVec 32))) (_ BitVec 32)
+  ((_ extract 31 0)
+    (bvurem
+      (bvadd ((_ zero_extend 1) a)
+             ((_ zero_extend 1) b))
+      ((_ zero_extend 1) P))))
+
+;; finite field subtraction: (a - b) mod p
+(define-fun ff_sub ((a (_ BitVec 32)) (b (_ BitVec 32))) (_ BitVec 32)
+  ((_ extract 31 0)
+    (bvurem
+      (bvadd
+        ((_ zero_extend 1) a)
+        (bvsub ((_ zero_extend 1) P)
+               ((_ zero_extend 1) b)))
+      ((_ zero_extend 1) P))))
+
+;; finite field multiplication: (a * b) mod p
+(define-fun ff_mul ((a (_ BitVec 32)) (b (_ BitVec 32))) (_ BitVec 32)
+  ((_ extract 31 0)
+    (bvurem
+      (bvmul ((_ zero_extend 32) a)
+             ((_ zero_extend 32) b))
+      ((_ zero_extend 32) P))))\n",
+    );
 
     // Declare all trace variables as 32-bit bitvectors
     for i in 0..(n_rows + 1) {
@@ -377,51 +412,42 @@ pub fn expr_to_smt_bv(
         vars.insert(name.clone());
     }
     for v in &vars {
-        smt.push_str(&format!("(declare-fun {} () (_ BitVec 64))\n", v));
+        smt.push_str(&format!("(declare-fun {} () (_ BitVec 32))\n", v));
     }
 
     // Add modular constraints using bvurem
     for expr in &constraints.air_constraints {
         for i in 0..n_rows {
             let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime);
-            smt.push_str(&format!(
-                "(assert (= (bvurem {} {}) #x0000000000000000))\n",
-                body, prime_hex
-            ));
+            smt.push_str(&format!("(assert (= {} {}))\n", body, zero_hex));
         }
     }
 
     for expr in &constraints.lookup_constraints {
         for i in 0..n_rows {
             let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime);
-            smt.push_str(&format!("(assert (= {} #x0000000000000000))\n", body));
+            smt.push_str(&format!("(assert (= {} {}))\n", body, zero_hex));
         }
     }
 
     for expr in &constraints.pv_pos_constraints {
         for i in 0..n_rows {
             let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime);
-            smt.push_str(&format!(
-                "(assert (= (bvurem {} {}) #x0000000000000000))\n",
-                body, prime_hex
-            ));
+            smt.push_str(&format!("(assert (= {} {}))\n", body, zero_hex));
         }
     }
 
     for expr in &constraints.pv_neg_constraints {
         for i in 0..n_rows {
             let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime);
-            smt.push_str(&format!(
-                "(assert (not (= (bvurem {} {}) #x0000000000000000)))\n",
-                body, prime_hex
-            ));
+            smt.push_str(&format!("(assert (not (= {} {})))\n", body, zero_hex));
         }
     }
 
     // Constants
     for (i, j, v) in constants {
         smt.push_str(&format!(
-            "(assert (= trace_{}_{} #x{:016x}))\n",
+            "(assert (= trace_{}_{} #x{:08x}))\n",
             i,
             j,
             v.as_canonical_u32(prime)
@@ -432,7 +458,7 @@ pub fn expr_to_smt_bv(
         smt.push_str("(assert (not (and\n");
         for (i, j, v) in neg_constants {
             smt.push_str(&format!(
-                "  (= trace_{}_{} #x{:016x})\n",
+                "  (= trace_{}_{} #x{:08x})\n",
                 i,
                 j,
                 v.as_canonical_u32(prime)
@@ -445,10 +471,7 @@ pub fn expr_to_smt_bv(
     for (j, k) in range_types {
         if let RangeType::U8 = k {
             for i in 0..n_rows {
-                smt.push_str(&format!(
-                    "(assert (bvule trace_{}_{} #x00000000000000ff))\n",
-                    i, j,
-                ));
+                smt.push_str(&format!("(assert (bvule trace_{}_{} #x000000ff))\n", i, j,));
             }
         }
     }
