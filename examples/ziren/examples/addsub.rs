@@ -98,13 +98,15 @@ fn main() -> Result<(), io::Error> {
     let air_name = "AddSub";
     let _colmap = make_col_map();
 
+    let output_columns = if target_opcode == "ADD" {
+        vec![2, 3, 4, 5]
+    } else if target_opcode == "SUB" {
+        vec![9, 10, 11, 12]
+    };
+
     let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
-    if target_opcode == "ADD" {
-        refinable_cols.extend(&[2, 3, 4, 5]);
-    } else if target_opcode == "SUB" {
-        refinable_cols.extend(&[9, 10, 11, 12]);
-    }
+    refinable_cols.extend(&output_columns.clone());
 
     let constraints = LatticeVMConstraints {
         air_constraints,
@@ -119,19 +121,15 @@ fn main() -> Result<(), io::Error> {
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
-    // ######################## Generating SMT Formulas ##########################
-    let mut constants: Vec<(usize, usize, AbstractInterval)> = vec![];
-    let mut neg_constants: Vec<(usize, usize, AbstractInterval)> = vec![];
-    for j in 0..NUM_ADD_SUB_COLS {
-        if !refinable_cols.contains(&j) {
-            constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
-        }
-    }
-    for j in 0..NUM_ADD_SUB_COLS {
-        if refinable_cols.contains(&j) {
-            neg_constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
-        }
-    }
+    // ######################## Generating SMT Formula ##########################
+    let constants: Vec<_> = (0..NUM_ADD_SUB_COLS)
+        .filter(|j| !refinable_cols.contains(j))
+        .map(|j| (0, j, base_abs_main_trace_data[0][j].clone()))
+        .collect();
+    let neg_constants: Vec<_> = output_columns
+        .iter()
+        .map(|&j| (0, j, base_abs_main_trace_data[0][j].clone()))
+        .collect();
     let smt_str = expr_to_smt_bv(
         &constraints,
         &constants,
@@ -142,8 +140,6 @@ fn main() -> Result<(), io::Error> {
         0,
         prime,
     );
-    println!("{}", smt_str);
-    println!("rr: {:?}", range_types);
 
     // ######################## Solve ############################################
     quick_api(
