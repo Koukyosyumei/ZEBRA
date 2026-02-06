@@ -1932,7 +1932,6 @@ pub fn eval_base_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    println!("j: {}", j);
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {
@@ -1957,6 +1956,7 @@ pub struct LatticeVMConstraints {
     pub lookup_constraints: Vec<LatticeVMSymbolicExpr>,
     pub pv_pos_constraints: Vec<LatticeVMSymbolicExpr>,
     pub pv_neg_constraints: Vec<LatticeVMSymbolicExpr>,
+    pub blocking_constraints: Vec<(usize, LatticeVMSymbolicExpr)>,
 }
 
 pub fn eval_constraints(
@@ -1969,6 +1969,41 @@ pub fn eval_constraints(
     let mut potential = 0;
     let mut memo = HashSet::<(usize, usize)>::new();
 
+    // ########## Check Blocking Constraints ###########
+    let num_steps = trace.data.len();
+    let mut blocking_is_all = true;
+    for (i, bc) in &constraints.blocking_constraints {
+        let flag = bc
+            .eval(
+                &trace.data[*i],
+                if *i + 1 < num_steps {
+                    Some(&trace.data[i + 1])
+                } else {
+                    None
+                },
+                public_vals,
+                *i == 0,
+                *i < num_steps - 1,
+                *i == num_steps - 1,
+                prime,
+            )
+            .is_zero(prime);
+
+        match flag {
+            MayBeFlag::True => {}
+            MayBeFlag::False => {
+                blocking_is_all = false;
+            }
+            MayBeFlag::MayBe => {
+                blocking_is_all = false;
+            }
+        }
+    }
+    if blocking_is_all {
+        return (MayBeFlag::False, 0, memo);
+    }
+
+    // ########## Check AIR Constraints ###########
     let air_flag = eval_base_constraints(
         trace,
         public_vals,
@@ -1983,7 +2018,8 @@ pub fn eval_constraints(
         MayBeFlag::False => return (MayBeFlag::False, 0, memo),
         MayBeFlag::MayBe => is_all_true = false,
     }
-    println!("6666666666");
+
+    // ########## Check Lookup Constraints ###########
     let air_flag = eval_base_constraints(
         trace,
         public_vals,
@@ -1993,13 +2029,13 @@ pub fn eval_constraints(
         &mut potential,
         &mut memo,
     );
-
     match air_flag {
         MayBeFlag::True => {}
         MayBeFlag::False => return (MayBeFlag::False, 0, memo),
         MayBeFlag::MayBe => is_all_true = false,
     }
 
+    // ########## Check Public-Positive Constraints ###########
     for pp in &constraints.pv_pos_constraints {
         let flag = pp
             .eval(
@@ -2024,6 +2060,7 @@ pub fn eval_constraints(
         }
     }
 
+    // ########## Check Public-Negative Constraints ###########
     for pn in &constraints.pv_neg_constraints {
         let flag = pn
             .eval(
