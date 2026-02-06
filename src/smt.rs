@@ -23,7 +23,6 @@ pub fn expr_to_smt_bv(
         vars: &mut HashSet<String>,
         prime: u32,
     ) -> String {
-        let prime_hex = format!("#x{:08x}", prime);
         let zero_hex = format!("#x{:08x}", 0);
         let one_hex = format!("#x{:08x}", 1);
 
@@ -112,6 +111,32 @@ pub fn expr_to_smt_bv(
                     helper(b, row_id, n_rows, n_pvs, vars, prime),
                 )
             }
+            LatticeVMSymbolicExpr::MulLo(a, b) => {
+                // low 32 bits of 32x32 multiplication
+                format!(
+                    "((_ extract 31 0) (bvmul {} {}))",
+                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                )
+            }
+            LatticeVMSymbolicExpr::MulHiSS(a, b) => {
+                // signed * signed, high 32 bits
+                format!(
+                    "((_ extract 63 32) \
+          (bvmul ((_ sign_extend 32) {}) ((_ sign_extend 32) {})))",
+                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                )
+            }
+            LatticeVMSymbolicExpr::MulHiUU(a, b) => {
+                // unsigned * unsigned, high 32 bits
+                format!(
+                    "((_ extract 63 32) \
+          (bvmul ((_ zero_extend 32) {}) ((_ zero_extend 32) {})))",
+                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                )
+            }
             LatticeVMSymbolicExpr::Neg(a) => {
                 // Two's complement negation
                 format!("(bvneg {})", helper(a, row_id, n_rows, n_pvs, vars, prime))
@@ -159,6 +184,34 @@ pub fn expr_to_smt_bv(
                     zero_hex,
                     one_hex,
                     zero_hex
+                )
+            }
+            LatticeVMSymbolicExpr::And(a, b) => {
+                format!(
+                    "(bvand {} {})",
+                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                )
+            }
+            LatticeVMSymbolicExpr::Or(a, b) => {
+                format!(
+                    "(bvor {} {})",
+                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                )
+            }
+            LatticeVMSymbolicExpr::Xor(a, b) => {
+                format!(
+                    "(bvxor {} {})",
+                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    helper(b, row_id, n_rows, n_pvs, vars, prime),
+                )
+            }
+            LatticeVMSymbolicExpr::SRL(a, b) => {
+                format!(
+                    "(bvlshr {} {})",
+                    helper(a, row_id, n_rows, n_pvs, vars, prime),
+                    helper(b, row_id, n_rows, n_pvs, vars, prime),
                 )
             }
             LatticeVMSymbolicExpr::WordAdd(a_vec, b_vec) => {
@@ -302,8 +355,6 @@ pub fn expr_to_smt_bv(
                     res.push(format!("(bvand {} {})", a_bv, b_bv));
                 }
 
-                // ここで Vec<String> を返すか、再度 little-endian を 32bit word に畳むかは用途次第
-                // WordAdd と同じく 32bit に畳むなら：
                 let mut acc = res[0].clone();
                 let mut factor: u32 = 1;
                 for limb in res.iter().skip(1) {
@@ -326,8 +377,6 @@ pub fn expr_to_smt_bv(
                     res.push(format!("(bvor {} {})", a_bv, b_bv));
                 }
 
-                // ここで Vec<String> を返すか、再度 little-endian を 32bit word に畳むかは用途次第
-                // WordAdd と同じく 32bit に畳むなら：
                 let mut acc = res[0].clone();
                 let mut factor: u32 = 1;
                 for limb in res.iter().skip(1) {
@@ -350,8 +399,6 @@ pub fn expr_to_smt_bv(
                     res.push(format!("(bvxor {} {})", a_bv, b_bv));
                 }
 
-                // ここで Vec<String> を返すか、再度 little-endian を 32bit word に畳むかは用途次第
-                // WordAdd と同じく 32bit に畳むなら：
                 let mut acc = res[0].clone();
                 let mut factor: u32 = 1;
                 for limb in res.iter().skip(1) {
@@ -360,13 +407,22 @@ pub fn expr_to_smt_bv(
                 }
                 acc
             }
-            other => todo!("{:?} is not implemented", other),
+            LatticeVMSymbolicExpr::WordSub(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordMultl(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordMulth(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordMultul(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordMultuh(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordDiv(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordSDiv(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordLt(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordEq(_, _) => todo!(),
+            LatticeVMSymbolicExpr::WordNEq(_, _) => todo!(),
         }
     }
 
     let prime_hex = format!("#x{:08x}", prime);
     let zero_hex = format!("#x{:08x}", 0);
-    let one_hex = format!("#x{:08x}", 1);
+    let _one_hex = format!("#x{:08x}", 1);
 
     let mut vars = HashSet::new();
     let mut smt = String::new();
