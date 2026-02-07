@@ -9,17 +9,11 @@ use zkm_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
 use zkm_core_machine::AddSubChip;
 use zkm_stark::MachineProver;
 
-use latticevm::interval::AbstractInterval;
 use latticevm::quick::ConstraintInfo;
 use latticevm::quick::ProgramInfo;
 use latticevm::quick::SearchConfig;
-use latticevm::quick::{experiment_harness, quick_api};
-use latticevm::smt::expr_to_smt_bv;
+use latticevm::quick::experiment_harness;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::add_blocking_constraint;
-use latticevm::symbolic::LatticeVMSymbolicEntry;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::symbolic::LatticeVMSymbolicVal;
 use latticevm::ui::{save_repr_if_unique, UiState};
 use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
