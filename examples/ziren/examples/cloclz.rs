@@ -96,7 +96,7 @@ fn main() -> Result<(), io::Error> {
     constraint_info.output_columns = output_columns.clone();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode(opcode_str), 4, 4, 0, 0);
+    let program = target_program(get_opcode(opcode_str), 4, 4, 3, 4);
 
     // ######################## Set Info ##########################################
     let program_info = ProgramInfo {
@@ -114,7 +114,7 @@ fn main() -> Result<(), io::Error> {
         &search_config,
         &base_abs_main_trace_data,
         vec![],
-        &vec![],
+        &vec![0],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
