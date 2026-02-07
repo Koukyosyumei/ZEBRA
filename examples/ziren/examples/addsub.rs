@@ -139,7 +139,7 @@ fn main() -> Result<(), io::Error> {
     let canonical_repr = if target_opcode == "ADD" {
         canonical_repr_add
     } else if target_opcode == "SUB" {
-        canonical_repr_add
+        canonical_repr_sub
     } else {
         panic!("unsupported instruction")
     };
