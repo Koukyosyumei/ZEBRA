@@ -17,26 +17,26 @@ use crate::ui::UiState;
 use crate::{interval::AbstractInterval, symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 pub struct ProgramInfo {
-    program_str: String,
-    program_len: usize,
+    pub program_str: String,
+    pub program_len: usize,
 }
 
 pub struct ConstraintInfo {
-    constraints: LatticeVMConstraints,
-    num_total_columns: usize,
-    num_pv_columns: usize,
-    output_columns: Vec<usize>,
-    refinable_cols: Vec<usize>,
-    range_types: HashMap<usize, RangeType>,
-    prime: u32,
+    pub constraints: LatticeVMConstraints,
+    pub num_total_columns: usize,
+    pub num_pv_columns: usize,
+    pub output_columns: Vec<usize>,
+    pub refinable_cols: Vec<usize>,
+    pub range_types: HashMap<usize, RangeType>,
+    pub prime: u32,
 }
 
 pub struct SearchConfig {
-    max_expansions: usize,
-    minimum_num_taregt_cols: usize,
-    min_row_id: usize,
-    max_row_id: usize,
-    seed: u64,
+    pub max_expansions: usize,
+    pub minimum_num_taregt_cols: usize,
+    pub min_row_id: usize,
+    pub max_row_id: usize,
+    pub seed: u64,
 }
 
 pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
