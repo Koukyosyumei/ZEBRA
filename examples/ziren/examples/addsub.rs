@@ -69,6 +69,22 @@ fn main() -> Result<(), io::Error> {
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
+    // ######################## Canonicalization ##################################
+    let canonical_repr = if target_opcode == "ADD" {
+        canonical_repr_add
+    } else if target_opcode == "SUB" {
+        canonical_repr_sub
+    } else {
+        panic!("unsupported instruction")
+    };
+    let final_check = |trace: &AbstractTrace,
+                       _num_trial: usize,
+                       _prime: u32,
+                       known_reprt: &mut HashSet<String>,
+                       ui: &mut UiState| {
+        save_repr_if_unique(&canonical_repr(trace), known_reprt, ui);
+    };
+
     // ######################## Solver Parameters ###############################
     let max_iteration = 100000000;
     let min_row_id = 0;
@@ -92,6 +108,7 @@ fn main() -> Result<(), io::Error> {
     let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&output_columns.clone());
+    let minimum_num_taregt_cols = refinable_cols.len();
 
     let mut constraints = LatticeVMConstraints {
         air_constraints,
@@ -100,7 +117,6 @@ fn main() -> Result<(), io::Error> {
         pv_neg_constraints: vec![],
         blocking_constraints: vec![],
     };
-    let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
@@ -129,34 +145,18 @@ fn main() -> Result<(), io::Error> {
         &constants,
         &neg_constants,
         &range_types,
-        1,
+        max_row_id - min_row_id + 1,
         NUM_ADD_SUB_COLS,
         0,
         prime,
     );
 
     // ######################## Solve ############################################
-    let canonical_repr = if target_opcode == "ADD" {
-        canonical_repr_add
-    } else if target_opcode == "SUB" {
-        canonical_repr_sub
-    } else {
-        panic!("unsupported instruction")
-    };
-    let final_check = |trace: &AbstractTrace,
-                       _num_trial: usize,
-                       _prime: u32,
-                       known_reprt: &mut HashSet<String>,
-                       ui: &mut UiState| {
-        save_repr_if_unique(&canonical_repr(trace), known_reprt, ui);
-    };
-
     quick_api(
         get_program_str(&program),
         &constraints,
         &refinable_cols,
         &range_types,
-        &vec![],
         &base_abs_main_trace_data,
         vec![],
         max_iteration,
