@@ -32,11 +32,23 @@ pub struct ConstraintInfo {
 }
 
 pub struct SearchConfig {
-    pub max_expansions: usize,
     pub minimum_num_taregt_cols: usize,
+    pub max_expansions: usize,
     pub min_row_id: usize,
     pub max_row_id: usize,
     pub seed: u64,
+}
+
+impl SearchConfig {
+    pub fn new(minimum_num_taregt_cols: usize) -> Self {
+        SearchConfig {
+            minimum_num_taregt_cols,
+            max_expansions: 1000000000,
+            min_row_id: 0,
+            max_row_id: 0,
+            seed: 41,
+        }
+    }
 }
 
 pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(

@@ -1959,6 +1959,21 @@ pub struct LatticeVMConstraints {
     pub blocking_constraints: Vec<(usize, LatticeVMSymbolicExpr)>,
 }
 
+impl LatticeVMConstraints {
+    pub fn new(
+        air_constraints: Vec<LatticeVMSymbolicExpr>,
+        lookup_constraints: Vec<LatticeVMSymbolicExpr>,
+    ) -> Self {
+        LatticeVMConstraints {
+            air_constraints,
+            lookup_constraints,
+            pv_pos_constraints: vec![],
+            pv_neg_constraints: vec![],
+            blocking_constraints: vec![],
+        }
+    }
+}
+
 pub fn eval_constraints(
     trace: &AbstractTrace,
     public_vals: Option<&[AbstractInterval]>,

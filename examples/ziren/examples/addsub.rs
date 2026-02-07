@@ -28,7 +28,7 @@ use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn canonical_repr_add(trace: &AbstractTrace) -> String {
+fn cr_add(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
         trace_fmt_with_idxs(trace, 0, &[9, 10, 11, 12]),
@@ -37,7 +37,7 @@ fn canonical_repr_add(trace: &AbstractTrace) -> String {
     )
 }
 
-fn canonical_repr_sub(trace: &AbstractTrace) -> String {
+fn cr_sub(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
         trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
@@ -56,8 +56,8 @@ pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u3
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
-    match target_opcode {
+pub fn get_opcode_addsub(opcode_str: &str) -> Opcode {
+    match opcode_str {
         "ADD" => Opcode::ADD,
         "SUB" => Opcode::SUB,
         _ => panic!("unsupported instruction"),
@@ -65,7 +65,7 @@ pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
 }
 
 fn main() -> Result<(), io::Error> {
-    let target_opcode = "ADD";
+    let opcode_str = "ADD";
 
     create_or_clear_dir("voutput")?;
 
@@ -73,20 +73,11 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Canonicalization ##################################
-    let canonical_repr = if target_opcode == "ADD" {
-        canonical_repr_add
-    } else if target_opcode == "SUB" {
-        canonical_repr_sub
-    } else {
-        panic!("unsupported instruction")
-    };
-    let final_check = |trace: &AbstractTrace,
-                       _num_trial: usize,
-                       _prime: u32,
-                       known_reprt: &mut HashSet<String>,
-                       ui: &mut UiState| {
-        save_repr_if_unique(&canonical_repr(trace), known_reprt, ui);
-    };
+    let cr = if opcode_str == "ADD" { cr_add } else { cr_sub };
+    let final_check =
+        |at: &AbstractTrace, _n: usize, _p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
+            save_repr_if_unique(&cr(at), kr, ui);
+        };
 
     // ######################## Solver Parameters ###############################
     let num_extracted_rows = 1;
@@ -96,34 +87,18 @@ fn main() -> Result<(), io::Error> {
     let air_name = "AddSub";
     let _colmap = make_col_map();
 
-    let output_columns = if target_opcode == "ADD" {
+    let output_columns = if opcode_str == "ADD" {
         vec![2, 3, 4, 5]
-    } else if target_opcode == "SUB" {
-        vec![9, 10, 11, 12]
     } else {
-        panic!("unsupported instruction")
+        vec![9, 10, 11, 12]
     };
 
     let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&output_columns.clone());
 
-    let search_config = SearchConfig {
-        minimum_num_taregt_cols: refinable_cols.len(),
-        max_expansions: 100000000,
-        min_row_id: 0,
-        max_row_id: 0,
-        seed: 41,
-    };
-
-    let constraints = LatticeVMConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-        blocking_constraints: vec![],
-    };
-
+    let search_config = SearchConfig::new(refinable_cols.len());
+    let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
     let mut constraint_info = ConstraintInfo {
         constraints: constraints,
         num_total_columns: NUM_ADD_SUB_COLS,
@@ -135,7 +110,7 @@ fn main() -> Result<(), io::Error> {
     };
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
+    let program = target_program(get_opcode_addsub(&to), 4, 4, 2, 3);
     let program_info = ProgramInfo {
         program_str: get_program_str(&program),
         program_len: program.instructions.len(),
