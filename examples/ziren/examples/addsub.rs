@@ -95,7 +95,7 @@ fn main() -> Result<(), io::Error> {
     refinable_cols.extend(&output_columns.clone());
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode(&to), 4, 4, 2, 3);
+    let program = target_program(get_opcode(&opcode_str), 4, 4, 2, 3);
     let program_info = ProgramInfo {
         program_str: get_program_str(&program),
         program_len: program.instructions.len(),
