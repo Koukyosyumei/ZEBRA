@@ -71,8 +71,8 @@ pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u3
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode(target_opcode: &str) -> Opcode {
-    match target_opcode {
+pub fn get_opcode(opcode_str: &str) -> Opcode {
+    match opcode_str {
         "DIV" => Opcode::DIV,
         "DIVU" => Opcode::DIVU,
         "MOD" => Opcode::MOD,
@@ -82,7 +82,7 @@ pub fn get_opcode(target_opcode: &str) -> Opcode {
 }
 
 fn main() -> Result<(), io::Error> {
-    let target_opcode = "MOD";
+    let opcode_str = "MOD";
 
     create_or_clear_dir("voutput")?;
 
@@ -114,7 +114,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = 3; // refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode(&target_opcode), 4, 4, 13, 3);
+    let program = target_program(get_opcode(&opcode_str), 4, 4, 13, 3);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
@@ -134,9 +134,9 @@ fn main() -> Result<(), io::Error> {
         program.instructions.len(),
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
-        if target_opcode == "DIV" || target_opcode == "DIVU" {
+        if opcode_str == "DIV" || opcode_str == "DIVU" {
             final_check_div
-        } else if target_opcode == "MOD" || target_opcode == "MODU" {
+        } else if opcode_str == "MOD" || opcode_str == "MODU" {
             final_check_rem
         } else {
             panic!("unsupported instruction")

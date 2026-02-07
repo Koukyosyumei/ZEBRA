@@ -64,8 +64,8 @@ pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u3
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode(target_opcode: &str) -> Opcode {
-    match target_opcode {
+pub fn get_opcode(opcode_str: &str) -> Opcode {
+    match opcode_str {
         "CLO" => Opcode::CLO,
         "CLZ" => Opcode::CLZ,
         _ => panic!("unsupported instruction"),
@@ -73,7 +73,7 @@ pub fn get_opcode(target_opcode: &str) -> Opcode {
 }
 
 fn main() -> Result<(), io::Error> {
-    let target_opcode = "CLZ";
+    let opcode_str = "CLZ";
 
     create_or_clear_dir("voutput")?;
 
@@ -127,7 +127,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode(&target_opcode), 4, 4, 0, 0);
+    let program = target_program(get_opcode(&opcode_str), 4, 4, 0, 0);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
