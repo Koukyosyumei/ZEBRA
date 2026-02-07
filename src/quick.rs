@@ -45,6 +45,7 @@ pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramF
     search_config: &SearchConfig,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
+    blocked_rows: &Vec<usize>,
     program_counter_refine_fn: ProgramCounterRefinFn,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
@@ -55,12 +56,14 @@ where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
     // ######################## Blocking Closures ################################
-    add_blocking_constraint(
-        &constraint_info.output_columns,
-        &mut constraint_info.constraints,
-        &base_abs_main_trace_data,
-        0,
-    );
+    for i in blocked_rows {
+        add_blocking_constraint(
+            &constraint_info.output_columns,
+            &mut constraint_info.constraints,
+            &base_abs_main_trace_data,
+            *i,
+        );
+    }
 
     // ######################## Generating SMT Formula ##########################
     let constants: Vec<_> = (0..constraint_info.num_total_columns)
