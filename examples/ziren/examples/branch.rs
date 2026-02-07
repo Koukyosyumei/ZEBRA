@@ -15,6 +15,7 @@ use zkm_stark::MachineProver;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
+use latticevm::quick::{experiment_harness, ProgramInfo, SearchConfig};
 use latticevm::smt::expr_to_smt_bv;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::symbolic::LatticeVMSymbolicEntry;
@@ -91,91 +92,42 @@ fn main() -> Result<(), io::Error> {
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 1000000000;
-    let min_row_id = 0;
-    let max_row_id = 0;
-    let num_extracted_rows = 1;
-    let seed = 41;
-
     // ######################## Extract CPU Constraints ##########################
     let air = BranchChip::default();
     let air_name = "Branch";
     let _colmap = make_col_map();
 
-    let (
-        air_constraints,
-        lookup_constraints,
-        mut refinable_cols,
-        mut range_types,
-        general_lookup_info,
-    ) = extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
-    refinable_cols.extend(&[23, 24, 25, 26]);
+    let (mut constraint_info, general_lookup_info) =
+        extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
+    let output_columns = vec![23, 24, 25, 26];
 
-    let nc = vec![LatticeVMSymbolicExpr::Sub(
-        Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
-            entry: LatticeVMSymbolicEntry::Main { is_curr: true },
-            index: 1,
-        })),
-        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-            16,
-        ))),
-    )];
-
-    let constraints = LatticeVMConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: nc,
-    };
-    let minimum_num_taregt_cols = refinable_cols.len();
+    constraint_info
+        .refinable_cols
+        .extend(&output_columns.clone());
+    constraint_info.output_columns = output_columns.clone();
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode(opcode_str), 4, 4, 3, 4, 12);
-    let base_abs_main_trace_data =
-        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
-    let mut constants: Vec<(usize, usize, AbstractInterval)> = vec![];
-    let mut neg_constants: Vec<(usize, usize, AbstractInterval)> = vec![];
-    for j in 0..NUM_BRANCH_COLS {
-        if !refinable_cols.contains(&j) {
-            constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
-        }
-    }
-    for j in vec![23, 24, 25, 26] {
-        neg_constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
-    }
-    let smt_str = expr_to_smt_bv(
-        &constraints,
-        &constants,
-        &neg_constants,
-        &range_types,
-        1,
-        NUM_BRANCH_COLS,
-        0,
-        prime,
-    );
-    println!("{}", smt_str);
-    println!("rr: {:?}", range_types);
+    // ######################## Set Info ##########################################
+    let program_info = ProgramInfo {
+        program_str: get_program_str(&program),
+        program_len: program.instructions.len(),
+    };
+    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+    let search_config = SearchConfig::new(constraint_info.refinable_cols.len());
+    // search_config.minimum_num_taregt_cols = 3;
 
     // ######################## Solve ############################################
-    quick_api(
-        get_program_str(&program),
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &vec![],
+    experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         vec![],
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.instructions.len(),
+        &vec![0],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-        prime,
-        seed,
     )
 }
