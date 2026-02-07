@@ -9,13 +9,8 @@ use zkm_core_machine::alu::NUM_SHIFT_LEFT_COLS;
 use zkm_core_machine::ShiftLeft;
 use zkm_stark::MachineProver;
 
-use latticevm::interval::AbstractInterval;
-use latticevm::quick::quick_api;
 use latticevm::quick::{experiment_harness, ProgramInfo, SearchConfig};
-use latticevm::smt::expr_to_smt;
-use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
