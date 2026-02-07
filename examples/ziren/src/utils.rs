@@ -15,10 +15,11 @@ use zkm_stark::{
 
 use latticevm::alu::{get_alu_constraint, WordOp};
 use latticevm::interval::AbstractInterval;
+use latticevm::quick::ConstraintInfo;
 use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
 use latticevm::symbolic::{
-    make_impl_constraint, LatticeVMSymbolicEntry, LatticeVMSymbolicExpr as LVSExpr,
-    LatticeVMSymbolicVal,
+    make_impl_constraint, LatticeVMConstraints, LatticeVMSymbolicEntry,
+    LatticeVMSymbolicExpr as LVSExpr, LatticeVMSymbolicVal,
 };
 use latticevm::utils::GeneralLookupInfo;
 
@@ -287,20 +288,14 @@ pub fn extract_constraints_and_range<F, A>(
     air: &A,
     num_cols: usize,
     prime: u32,
-) -> (
-    Vec<LVSExpr>,
-    Vec<LVSExpr>,
-    Vec<usize>,
-    HashMap<usize, RangeType>,
-    GeneralLookupInfo,
-)
+) -> (ConstraintInfo, GeneralLookupInfo)
 where
     F: p3_field::PrimeField32,
     A: Air<LookupBuilder<F>> + Air<SymbolicAirBuilder<F>>,
 {
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
-    let mut lookup_symbolic_constraints = Vec::new();
+    let mut lookup_constraints = Vec::new();
     let mut received_vars_from_cpu = HashSet::new();
 
     let symbolic_constraints: Vec<SymbolicExpression<F>> =
@@ -311,12 +306,12 @@ where
         ZKM_PROOF_NUM_PV_ELTS,
         &mut u8_cols,
         &mut multiplicities,
-        &mut lookup_symbolic_constraints,
+        &mut lookup_constraints,
         &mut received_vars_from_cpu,
         prime,
     );
 
-    let mut tv_constraints = symbolic_constraints
+    let mut air_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<F>(&sc))
         .collect::<Vec<_>>();
@@ -326,16 +321,21 @@ where
         &u8_cols,
         &multiplicities,
         &received_vars_from_cpu,
-        &mut tv_constraints,
-        &lookup_symbolic_constraints,
+        &mut air_constraints,
+        &lookup_constraints,
         prime,
     );
 
-    (
-        tv_constraints,
-        lookup_symbolic_constraints,
-        refinable_cols,
-        range_types,
-        general_lookup_info,
-    )
+    let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
+    let constraint_info = ConstraintInfo {
+        constraints: constraints,
+        num_total_columns: num_cols,
+        num_pv_columns: 0,
+        output_columns: vec![],
+        refinable_cols: refinable_cols,
+        range_types: range_types,
+        prime: prime,
+    };
+
+    (constraint_info, general_lookup_info)
 }
