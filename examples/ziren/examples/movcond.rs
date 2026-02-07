@@ -13,11 +13,11 @@ use zkm_stark::MachineProver;
 use latticevm::quick::{experiment_harness, ProgramInfo, SearchConfig};
 use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::symbolic::AbstractTrace;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -107,7 +107,6 @@ fn main() -> Result<(), io::Error> {
     };
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
     let search_config = SearchConfig::new(constraint_info.refinable_cols.len());
-    // search_config.minimum_num_taregt_cols = 4;
 
     // ######################## Solve ############################################
     experiment_harness(
