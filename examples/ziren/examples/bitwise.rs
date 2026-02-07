@@ -7,11 +7,8 @@ use zkm_core_machine::alu::NUM_BITWISE_COLS;
 use zkm_core_machine::BitwiseChip;
 use zkm_stark::MachineProver;
 
-use latticevm::interval::AbstractInterval;
-use latticevm::quick::{experiment_harness, quick_api, ProgramInfo, SearchConfig};
-use latticevm::smt::expr_to_smt_bv;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, make_init_val};
-use latticevm::symbolic::{eval_constraints, AbstractTrace, LatticeVMConstraints};
+use latticevm::quick::{experiment_harness, ProgramInfo, SearchConfig};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
 
