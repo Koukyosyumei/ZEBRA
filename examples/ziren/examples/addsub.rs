@@ -10,7 +10,10 @@ use zkm_core_machine::AddSubChip;
 use zkm_stark::MachineProver;
 
 use latticevm::interval::AbstractInterval;
-use latticevm::quick::quick_api;
+use latticevm::quick::ConstraintInfo;
+use latticevm::quick::ProgramInfo;
+use latticevm::quick::SearchConfig;
+use latticevm::quick::{experiment_harness, quick_api};
 use latticevm::smt::expr_to_smt_bv;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::symbolic::add_blocking_constraint;
@@ -86,11 +89,7 @@ fn main() -> Result<(), io::Error> {
     };
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
-    let min_row_id = 0;
-    let max_row_id = 0;
     let num_extracted_rows = 1;
-    let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
@@ -108,9 +107,16 @@ fn main() -> Result<(), io::Error> {
     let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&output_columns.clone());
-    let minimum_num_taregt_cols = refinable_cols.len();
 
-    let mut constraints = LatticeVMConstraints {
+    let search_config = SearchConfig {
+        minimum_num_taregt_cols: refinable_cols.len(),
+        max_expansions: 100000000,
+        min_row_id: 0,
+        max_row_id: 0,
+        seed: 41,
+    };
+
+    let constraints = LatticeVMConstraints {
         air_constraints,
         lookup_constraints,
         pv_pos_constraints: vec![],
@@ -118,56 +124,37 @@ fn main() -> Result<(), io::Error> {
         blocking_constraints: vec![],
     };
 
+    let mut constraint_info = ConstraintInfo {
+        constraints: constraints,
+        num_total_columns: NUM_ADD_SUB_COLS,
+        num_pv_columns: 0,
+        output_columns: output_columns.clone(),
+        refinable_cols: refinable_cols,
+        range_types: range_types,
+        prime: prime,
+    };
+
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
+    let program_info = ProgramInfo {
+        program_str: get_program_str(&program),
+        program_len: program.instructions.len(),
+    };
+
+    // ###########################################################################
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
-    // ######################## Blocking Closures ################################
-    add_blocking_constraint(
-        &output_columns,
-        &mut constraints,
-        &base_abs_main_trace_data,
-        0,
-    );
-
-    // ######################## Generating SMT Formula ##########################
-    let constants: Vec<_> = (0..NUM_ADD_SUB_COLS)
-        .filter(|j| !refinable_cols.contains(j))
-        .map(|j| (0, j, base_abs_main_trace_data[0][j].clone()))
-        .collect();
-    let neg_constants: Vec<_> = output_columns
-        .iter()
-        .map(|&j| (0, j, base_abs_main_trace_data[0][j].clone()))
-        .collect();
-    let smt_str = expr_to_smt_bv(
-        &constraints,
-        &constants,
-        &neg_constants,
-        &range_types,
-        max_row_id - min_row_id + 1,
-        NUM_ADD_SUB_COLS,
-        0,
-        prime,
-    );
-
     // ######################## Solve ############################################
-    quick_api(
-        get_program_str(&program),
-        &constraints,
-        &refinable_cols,
-        &range_types,
+    experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         vec![],
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.instructions.len(),
+        &vec![],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-        prime,
-        seed,
     )
 }
