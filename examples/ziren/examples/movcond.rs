@@ -10,17 +10,14 @@ use zkm_core_machine::misc::NUM_MOV_COND_COLS;
 use zkm_core_machine::MovCondChip;
 use zkm_stark::MachineProver;
 
-use latticevm::interval::AbstractInterval;
-use latticevm::quick::quick_api;
 use latticevm::quick::{experiment_harness, ProgramInfo, SearchConfig};
-use latticevm::smt::expr_to_smt;
 use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::symbolic::AbstractTrace;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -109,7 +106,7 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-    let mut search_config = SearchConfig::new(constraint_info.refinable_cols.len());
+    let search_config = SearchConfig::new(constraint_info.refinable_cols.len());
     // search_config.minimum_num_taregt_cols = 4;
 
     // ######################## Solve ############################################
