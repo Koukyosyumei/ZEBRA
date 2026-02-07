@@ -2157,6 +2157,28 @@ pub fn make_impl_constraint(
     }
 }
 
+pub fn add_blocking_constraint(
+    output_columns: &[usize],
+    constraints: &mut LatticeVMConstraints,
+    base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
+    i: usize,
+) {
+    for j in output_columns {
+        constraints.blocking_constraints.push((
+            i,
+            LatticeVMSymbolicExpr::Sub(
+                Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                    entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                    index: *j,
+                })),
+                Box::new(LatticeVMSymbolicExpr::Constant(
+                    base_abs_main_trace_data[i][*j].clone(),
+                )),
+            ),
+        ));
+    }
+}
+
 mod tests {
     #[test]
     fn test_eval_complex_constraints() {

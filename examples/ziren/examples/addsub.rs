@@ -13,6 +13,7 @@ use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
 use latticevm::smt::expr_to_smt_bv;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::add_blocking_constraint;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
@@ -128,22 +129,12 @@ fn main() -> Result<(), io::Error> {
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
     // ######################## Blocking Closures ################################
-    let mut bc = vec![];
-    for i in &output_columns {
-        bc.push((
-            0,
-            LatticeVMSymbolicExpr::Sub(
-                Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
-                    entry: LatticeVMSymbolicEntry::Main { is_curr: true },
-                    index: *i,
-                })),
-                Box::new(LatticeVMSymbolicExpr::Constant(
-                    base_abs_main_trace_data[0][*i].clone(),
-                )),
-            ),
-        ));
-    }
-    constraints.blocking_constraints = bc.clone();
+    add_blocking_constraint(
+        &output_columns,
+        &mut constraints,
+        &base_abs_main_trace_data,
+        0,
+    );
 
     // ######################## Generating SMT Formula ##########################
     let constants: Vec<_> = (0..NUM_ADD_SUB_COLS)
