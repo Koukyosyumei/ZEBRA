@@ -56,7 +56,7 @@ pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u3
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode_addsub(opcode_str: &str) -> Opcode {
+pub fn get_opcode(opcode_str: &str) -> Opcode {
     match opcode_str {
         "ADD" => Opcode::ADD,
         "SUB" => Opcode::SUB,
@@ -79,9 +79,6 @@ fn main() -> Result<(), io::Error> {
             save_repr_if_unique(&cr(at), kr, ui);
         };
 
-    // ######################## Solver Parameters ###############################
-    let num_extracted_rows = 1;
-
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
     let air_name = "AddSub";
@@ -97,6 +94,14 @@ fn main() -> Result<(), io::Error> {
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     refinable_cols.extend(&output_columns.clone());
 
+    // ######################## Program Initialization ###########################
+    let program = target_program(get_opcode(&to), 4, 4, 2, 3);
+    let program_info = ProgramInfo {
+        program_str: get_program_str(&program),
+        program_len: program.instructions.len(),
+    };
+
+    // ######################## Search Config ####################################
     let search_config = SearchConfig::new(refinable_cols.len());
     let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
     let mut constraint_info = ConstraintInfo {
@@ -109,16 +114,8 @@ fn main() -> Result<(), io::Error> {
         prime: prime,
     };
 
-    // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(&to), 4, 4, 2, 3);
-    let program_info = ProgramInfo {
-        program_str: get_program_str(&program),
-        program_len: program.instructions.len(),
-    };
-
     // ###########################################################################
-    let base_abs_main_trace_data =
-        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
     // ######################## Solve ############################################
     experiment_harness(

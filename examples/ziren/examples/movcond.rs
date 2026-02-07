@@ -65,7 +65,7 @@ pub fn target_program(
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
+pub fn get_opcode(target_opcode: &str) -> Opcode {
     match target_opcode {
         "MEQ" => Opcode::MEQ,
         "MNE" => Opcode::MNE,
@@ -117,7 +117,7 @@ fn main() -> Result<(), io::Error> {
     let minimum_num_taregt_cols = refinable_cols.len();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(target_opcode), 4, 4, 11, 12, 13);
+    let program = target_program(get_opcode(target_opcode), 4, 4, 11, 12, 13);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 

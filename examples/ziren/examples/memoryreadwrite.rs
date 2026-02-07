@@ -80,7 +80,7 @@ pub fn target_program_store(opcode: Opcode, pc_start: u32, pc_base: u32) -> Prog
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode_addsub(target_opcode: &str) -> (Opcode, bool) {
+pub fn get_opcode(target_opcode: &str) -> (Opcode, bool) {
     match target_opcode {
         "LB" => (Opcode::LB, true),
         "LBU" => (Opcode::LBU, true),
@@ -99,7 +99,7 @@ pub fn get_opcode_addsub(target_opcode: &str) -> (Opcode, bool) {
 
 fn main() -> Result<(), io::Error> {
     let target_opcode = "SC";
-    let (opcode, is_load) = get_opcode_addsub(target_opcode);
+    let (opcode, is_load) = get_opcode(target_opcode);
 
     create_or_clear_dir("voutput")?;
 
