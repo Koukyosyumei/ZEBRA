@@ -43,27 +43,6 @@ fn canonical_repr_sub(trace: &AbstractTrace) -> String {
     )
 }
 
-// ############## Final Check Function ##############################
-fn final_check_add(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    save_repr_if_unique(&canonical_repr_add(trace), known_reprt, ui);
-}
-
-fn final_check_sub(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    save_repr_if_unique(&canonical_repr_sub(trace), known_reprt, ui);
-}
-
 const fn make_col_map() -> AddSubCols<usize> {
     let indices_arr = indices_arr::<{ NUM_ADD_SUB_COLS }>();
     unsafe { transmute::<[usize; NUM_ADD_SUB_COLS], AddSubCols<usize>>(indices_arr) }
@@ -157,6 +136,21 @@ fn main() -> Result<(), io::Error> {
     );
 
     // ######################## Solve ############################################
+    let canonical_repr = if target_opcode == "ADD" {
+        canonical_repr_add
+    } else if target_opcode == "SUB" {
+        canonical_repr_add
+    } else {
+        panic!("unsupported instruction")
+    };
+    let final_check = |trace: &AbstractTrace,
+                       _num_trial: usize,
+                       _prime: u32,
+                       known_reprt: &mut HashSet<String>,
+                       ui: &mut UiState| {
+        save_repr_if_unique(&canonical_repr(trace), known_reprt, ui);
+    };
+
     quick_api(
         get_program_str(&program),
         &constraints,
@@ -172,13 +166,7 @@ fn main() -> Result<(), io::Error> {
         program.instructions.len(),
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
-        if target_opcode == "ADD" {
-            final_check_add
-        } else if target_opcode == "SUB" {
-            final_check_sub
-        } else {
-            panic!("unsupported instruction")
-        },
+        final_check,
         prime,
         seed,
     )
