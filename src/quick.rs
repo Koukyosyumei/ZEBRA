@@ -20,7 +20,6 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
     refinable_cols: &Vec<usize>,
     range_types: &HashMap<usize, RangeType>,
-    refinable_cols_pv: &Vec<usize>,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     max_expansions: usize,
@@ -49,14 +48,12 @@ where
 
     // ######################## Run Solver ######################################
     let mut known_solution = HashSet::<String>::new();
-    let mut logs = Vec::new();
     let start_time = time::Instant::now();
 
     run_parallel_solver(
         constraints,
         &refinable_cols,
         range_types,
-        &refinable_cols_pv,
         base_abs_main_trace_data,
         public_vals,
         max_expansions,
@@ -70,7 +67,6 @@ where
         prime,
         seed,
         &mut known_solution,
-        &mut logs,
         &mut ui,
         &mut terminal,
     );
