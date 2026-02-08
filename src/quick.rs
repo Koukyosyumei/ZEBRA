@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::io;
 use std::path::PathBuf;
 use std::time;
+use std::{fs, io};
 
 use clap::Parser;
 use crossterm::{
@@ -55,10 +55,18 @@ impl Default for SearchConfig {
     }
 }
 
+fn load_config(path: &std::path::Path) -> anyhow::Result<SearchConfig> {
+    let text = fs::read_to_string(path)?;
+    let cfg: SearchConfig = serde_yaml::from_str(&text)?;
+    Ok(cfg)
+}
+
 #[derive(Parser, Debug)]
-struct Args {
+pub struct Args {
     #[arg(long)]
     config: PathBuf,
+    ouptput: PathBuf,
+    method: String,
 }
 
 pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
