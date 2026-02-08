@@ -55,7 +55,7 @@ impl Default for SearchConfig {
     }
 }
 
-fn load_config(path: &std::path::Path) -> anyhow::Result<SearchConfig> {
+pub fn load_config(path: &std::path::Path) -> anyhow::Result<SearchConfig> {
     let text = fs::read_to_string(path)?;
     let cfg: SearchConfig = serde_yaml::from_str(&text)?;
     Ok(cfg)
@@ -67,6 +67,7 @@ pub struct Args {
     config: PathBuf,
     ouptput: PathBuf,
     method: String,
+    opcode_str: String,
 }
 
 pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
