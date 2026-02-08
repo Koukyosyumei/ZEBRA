@@ -122,7 +122,7 @@ where
         constraint_info.num_pv_columns,
         constraint_info.prime,
     );
-    let smt_file_path = "smt_query.smt2";
+    let smt_file_path = "voutput/smt_query.smt2";
     let mut file = File::create(smt_file_path).expect("Failed to create SMT file");
     file.write_all(smt_str.as_bytes())
         .expect("Failed to write SMT string to file");
