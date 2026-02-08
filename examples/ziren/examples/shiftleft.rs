@@ -1,11 +1,9 @@
 use clap::Parser;
 use core::mem::transmute;
+use p3_koala_bear::KoalaBear;
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::mem::transmute;
-
-use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::ShiftLeftCols;
@@ -13,7 +11,7 @@ use zkm_core_machine::alu::NUM_SHIFT_LEFT_COLS;
 use zkm_core_machine::ShiftLeft;
 use zkm_stark::MachineProver;
 
-use latticevm::quick::{experiment_harness, ProgramInfo, SearchConfig};
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
@@ -35,15 +33,12 @@ pub fn target_program(pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
+    let args = Args::parse();
+    let _opcode_str = args.opcode_str;
+    let mut search_config = load_config(&args.config).unwrap();
+
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
-
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 1000000000;
-    let min_row_id = 0;
-    let max_row_id = 0;
-    let num_extracted_rows = 1;
-    let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
     let air = ShiftLeft::default();
@@ -68,10 +63,12 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-    let search_config = SearchConfig::new(constraint_info.refinable_cols.len());
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+    }
 
     // ######################## Solve ############################################
-    experiment_harness(
+    let result = experiment_harness(
         &program_info,
         &mut constraint_info,
         &search_config,
@@ -81,5 +78,9 @@ fn main() -> Result<(), io::Error> {
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-    )
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }
