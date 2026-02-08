@@ -1,14 +1,16 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io;
+use std::path::PathBuf;
 use std::time;
 
+use clap::Parser;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
+use serde::Deserialize;
 
 use crate::smt::expr_to_smt_bv;
 use crate::solver::{run_parallel_solver, RangeType};
@@ -31,6 +33,8 @@ pub struct ConstraintInfo {
     pub prime: u32,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct SearchConfig {
     pub minimum_num_taregt_cols: usize,
     pub max_expansions: usize,
@@ -39,16 +43,22 @@ pub struct SearchConfig {
     pub seed: u64,
 }
 
-impl SearchConfig {
-    pub fn new(minimum_num_taregt_cols: usize) -> Self {
+impl Default for SearchConfig {
+    fn default() -> Self {
         SearchConfig {
-            minimum_num_taregt_cols,
+            minimum_num_taregt_cols: 0,
             max_expansions: 1000000000,
             min_row_id: 0,
             max_row_id: 0,
             seed: 41,
         }
     }
+}
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(long)]
+    config: PathBuf,
 }
 
 pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
