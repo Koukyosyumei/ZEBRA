@@ -170,7 +170,7 @@ where
         } else if stdout.contains("sat") {
             1
         } else {
-            panic!()
+            panic!("error: {}", stdout)
         };
 
         Ok(VerificationResult {
