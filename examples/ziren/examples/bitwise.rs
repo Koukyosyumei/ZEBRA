@@ -67,7 +67,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     // ######################## Solve ############################################
-    experiment_harness(
+    let result = experiment_harness(
         &program_info,
         &mut constraint_info,
         &search_config,
@@ -77,5 +77,10 @@ fn main() -> Result<(), io::Error> {
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-    )
+        &args.method,
+    );
+
+    println!("{:?}", result);
+
+    Ok(())
 }

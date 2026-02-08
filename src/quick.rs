@@ -76,6 +76,12 @@ pub struct Args {
     pub opcode_str: String,
 }
 
+#[derive(Debug)]
+pub struct VerificationResult {
+    pub num_solutions: usize,
+    pub execution_time: std::time::Duration,
+}
+
 pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     program_info: &ProgramInfo,
     constraint_info: &mut ConstraintInfo,
@@ -86,7 +92,8 @@ pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramF
     program_counter_refine_fn: ProgramCounterRefinFn,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
-) -> Result<(), io::Error>
+    verification_method: &String,
+) -> Result<VerificationResult, io::Error>
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -102,57 +109,75 @@ where
         );
     }
 
-    // ######################## Generating SMT Formula ##########################
-    let constants: Vec<_> = (0..constraint_info.num_total_columns)
-        .filter(|j| !constraint_info.refinable_cols.contains(j))
-        .map(|j| (0, j, base_abs_main_trace_data[0][j].clone()))
-        .collect();
-    let neg_constants: Vec<_> = constraint_info
-        .output_columns
-        .iter()
-        .map(|&j| (0, j, base_abs_main_trace_data[0][j].clone()))
-        .collect();
-    let smt_str = expr_to_smt_bv(
-        &constraint_info.constraints,
-        &constants,
-        &neg_constants,
-        &constraint_info.range_types,
-        search_config.max_row_id - search_config.min_row_id + 1,
-        constraint_info.num_total_columns,
-        constraint_info.num_pv_columns,
-        constraint_info.prime,
-    );
-    let smt_file_path = "voutput/smt_query.smt2";
-    let mut file = File::create(smt_file_path).expect("Failed to create SMT file");
-    file.write_all(smt_str.as_bytes())
-        .expect("Failed to write SMT string to file");
-    let output = Command::new("z3")
-        .arg("-smt2")
-        .arg(smt_file_path)
-        .output()
-        .expect("Failed to execute Z3");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    println!("Z3 output:\n{}", stdout);
-
     // ######################## Solve ############################################
-    quick_api(
-        program_info.program_str.clone(),
-        program_info.program_len,
-        &constraint_info.constraints,
-        &constraint_info.refinable_cols,
-        &constraint_info.range_types,
-        constraint_info.prime,
-        &base_abs_main_trace_data,
-        public_vals,
-        search_config.max_expansions,
-        search_config.minimum_num_taregt_cols,
-        search_config.min_row_id,
-        search_config.max_row_id,
-        search_config.seed,
-        program_counter_refine_fn,
-        align_pc_to_program,
-        final_check,
-    )
+    if verification_method == "bb" {
+        quick_api(
+            program_info.program_str.clone(),
+            program_info.program_len,
+            &constraint_info.constraints,
+            &constraint_info.refinable_cols,
+            &constraint_info.range_types,
+            constraint_info.prime,
+            &base_abs_main_trace_data,
+            public_vals,
+            search_config.max_expansions,
+            search_config.minimum_num_taregt_cols,
+            search_config.min_row_id,
+            search_config.max_row_id,
+            search_config.seed,
+            program_counter_refine_fn,
+            align_pc_to_program,
+            final_check,
+        )
+    } else {
+        // ######################## Generating SMT Formula ##########################
+        let constants: Vec<_> = (0..constraint_info.num_total_columns)
+            .filter(|j| !constraint_info.refinable_cols.contains(j))
+            .map(|j| (0, j, base_abs_main_trace_data[0][j].clone()))
+            .collect();
+        let neg_constants: Vec<_> = constraint_info
+            .output_columns
+            .iter()
+            .map(|&j| (0, j, base_abs_main_trace_data[0][j].clone()))
+            .collect();
+        let smt_str = expr_to_smt_bv(
+            &constraint_info.constraints,
+            &constants,
+            &neg_constants,
+            &constraint_info.range_types,
+            search_config.max_row_id - search_config.min_row_id + 1,
+            constraint_info.num_total_columns,
+            constraint_info.num_pv_columns,
+            constraint_info.prime,
+        );
+        let smt_file_path = "voutput/smt_query.smt2";
+        let mut file = File::create(smt_file_path).expect("Failed to create SMT file");
+        file.write_all(smt_str.as_bytes())
+            .expect("Failed to write SMT string to file");
+
+        // ######################### Query SMT solver ###############################
+        let start_time = time::Instant::now();
+        let output = Command::new(verification_method)
+            .arg("-smt2")
+            .arg(smt_file_path)
+            .output()
+            .expect("Failed to execute Z3");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        // ######################### Check the solutions ############################
+        let num_solutions = if stdout.contains("unsat") {
+            0
+        } else if stdout.contains("sat") {
+            1
+        } else {
+            panic!()
+        };
+
+        Ok(VerificationResult {
+            num_solutions,
+            execution_time: start_time.elapsed(),
+        })
+    }
 }
 
 pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
@@ -172,7 +197,7 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     program_counter_refine_fn: ProgramCounterRefinFn,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
-) -> Result<(), io::Error>
+) -> Result<VerificationResult, io::Error>
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -219,8 +244,8 @@ where
     )?;
     terminal.show_cursor()?;
 
-    eprintln!("Execution Time    : {:?}", start_time.elapsed());
-    eprintln!("#Unique Solution  : {}", known_solution.len());
-
-    Ok(())
+    Ok(VerificationResult {
+        num_solutions: known_solution.len(),
+        execution_time: start_time.elapsed(),
+    })
 }
