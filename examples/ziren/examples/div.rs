@@ -9,16 +9,15 @@ use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::DivRemCols;
 use zkm_core_machine::alu::NUM_DIVREM_COLS;
 use zkm_core_machine::DivRemChip;
-use zkm_stark::MachineProver;
 
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::symbolic::AbstractTrace;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -40,27 +39,6 @@ fn canonical_repr_rem(trace: &AbstractTrace) -> String {
         trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
         trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
     )
-}
-
-// ############## Final Check Function ##############################
-fn final_check_div(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    save_repr_if_unique(&canonical_repr_div(trace), known_reprt, ui);
-}
-
-fn final_check_rem(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    save_repr_if_unique(&canonical_repr_rem(trace), known_reprt, ui);
 }
 
 const fn make_col_map() -> DivRemCols<usize> {
@@ -114,7 +92,7 @@ fn main() -> Result<(), io::Error> {
     let air = DivRemChip::default();
     let air_name = "DivRem";
     let _colmap = make_col_map();
-    let (mut constraint_info, general_lookup_info) =
+    let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
     constraint_info
         .refinable_cols
