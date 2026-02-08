@@ -1099,12 +1099,7 @@ pub fn is_koalabear_word_range(
                             let cond = reconstruct_symbolic_word(&word_expr, 0);
                             return Some(LatticeVMSymbolicExpr::WhenNonZero(
                                 lhs.clone(),
-                                Box::new(LatticeVMSymbolicExpr::Lt(
-                                    Box::new(cond),
-                                    Box::new(LatticeVMSymbolicExpr::Constant(
-                                        AbstractInterval::from_i64(2130706433),
-                                    )),
-                                )),
+                                Box::new(LatticeVMSymbolicExpr::KoalaBearRange(Box::new(cond))),
                             ));
                         }
                     }
