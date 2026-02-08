@@ -31,8 +31,8 @@ use latticevm_ziren::utils::{
 
 fn final_check(
     trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
+    _num_trial: usize,
+    _prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
