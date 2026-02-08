@@ -9,9 +9,8 @@ use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::control_flow::JumpColumns;
 use zkm_core_machine::control_flow::NUM_JUMP_COLS;
 use zkm_core_machine::JumpChip;
-use zkm_stark::MachineProver;
 
-use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo, SearchConfig};
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::save_repr_if_unique;
@@ -26,8 +25,8 @@ use latticevm_ziren::utils::{
 // ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
+    _num_trial: usize,
+    _prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
@@ -87,7 +86,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Jump";
     let _colmap = make_col_map();
 
-    let (mut constraint_info, general_lookup_info) =
+    let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
     let output_columns = vec![19, 20, 21, 22, 37, 38, 39, 40];
 
@@ -104,7 +103,6 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode(&opcode_str), 4, 4, 1, 32, 1);
-    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
     // ######################## Set Info ##########################################
     let program_info = ProgramInfo {
@@ -115,12 +113,6 @@ fn main() -> Result<(), io::Error> {
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
-
-    /*
-    8, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    8, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 51, 0, 192, 1598034269, 32, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-     */
 
     // ######################## Solve ############################################
     let result = experiment_harness(
