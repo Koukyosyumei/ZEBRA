@@ -745,6 +745,11 @@ pub fn expr_to_smt_bv(
                 smt.push_str(&format!("(assert (bvule trace_{}_{} #x000000ff))\n", i, j,));
             }
         }
+        if let RangeType::U7 = k {
+            for i in 0..n_rows {
+                smt.push_str(&format!("(assert (bvule trace_{}_{} #x0000007f))\n", i, j,));
+            }
+        }
     }
 
     smt.push_str("(check-sat)\n(get-model)\n");

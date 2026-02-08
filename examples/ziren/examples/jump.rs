@@ -1,7 +1,7 @@
+use clap::Parser;
+use core::mem::transmute;
 use std::collections::HashSet;
 use std::io;
-use std::mem::transmute;
-
 
 use p3_koala_bear::KoalaBear;
 
@@ -11,13 +11,13 @@ use zkm_core_machine::control_flow::NUM_JUMP_COLS;
 use zkm_core_machine::JumpChip;
 use zkm_stark::MachineProver;
 
-use latticevm::quick::{experiment_harness, ProgramInfo, SearchConfig};
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo, SearchConfig};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::symbolic::AbstractTrace;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -73,9 +73,11 @@ pub fn get_opcode(opcode_str: &str) -> Opcode {
 }
 
 fn main() -> Result<(), io::Error> {
-    let opcode_str = "Jump";
-
     create_or_clear_dir("voutput")?;
+
+    let args = Args::parse();
+    let opcode_str = args.opcode_str;
+    let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
@@ -101,7 +103,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode(opcode_str), 4, 4, 1, 32, 1);
+    let program = target_program(get_opcode(&opcode_str), 4, 4, 1, 32, 1);
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
     // ######################## Set Info ##########################################
@@ -110,10 +112,18 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-    let search_config = SearchConfig::new(constraint_info.refinable_cols.len());
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+    }
+
+    /*
+    8, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+    8, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 51, 0, 192, 1598034269, 32, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+     */
 
     // ######################## Solve ############################################
-    experiment_harness(
+    let result = experiment_harness(
         &program_info,
         &mut constraint_info,
         &search_config,
@@ -123,5 +133,9 @@ fn main() -> Result<(), io::Error> {
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-    )
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }
