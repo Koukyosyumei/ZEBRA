@@ -1240,7 +1240,7 @@ pub fn eval_base_constraints(
     let num_steps = trace.data.len();
     let mut is_all_true = true;
     for i in 0..num_steps {
-        let mut j = 0;
+        let mut _j = 0;
         for tc in constraints {
             let flag = if is_strict {
                 tc.eval(
@@ -1276,7 +1276,7 @@ pub fn eval_base_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    println!("{}", j);
+                    println!("{}", _j);
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {
@@ -1285,7 +1285,7 @@ pub fn eval_base_constraints(
                     *potential += 1;
                 }
             }
-            j += 1;
+            _j += 1;
         }
     }
     if is_all_true {

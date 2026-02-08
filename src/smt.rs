@@ -535,7 +535,7 @@ pub fn expr_to_smt_bv(
             LatticeVMSymbolicExpr::WordSLt(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
-                format!("(ite (bvslt {} {}) {} {})", a_val, b_val, zero_hex, one_hex)
+                format!("(ite (bvslt {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
             }
             LatticeVMSymbolicExpr::WordSrl(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);

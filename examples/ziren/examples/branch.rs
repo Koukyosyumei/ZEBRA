@@ -120,13 +120,13 @@ fn main() -> Result<(), io::Error> {
     };
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
     }
 
     let a = vec![
-        12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 127, 29, 0, 0, 127, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 12, 0, 0, 0, 0, 1, 0, 0, 0,
-        0, 1, 1, 0,
+        12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 20, 155, 0, 20, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0,
+        1, 0, 0, 1,
     ];
     /*
     let a = vec![
@@ -139,7 +139,8 @@ fn main() -> Result<(), io::Error> {
     let at = AbstractTrace::new(ai);
     let re = eval_constraints(&at, None, &constraint_info.constraints, prime);
     println!("{:?}", re);
-    println!("{}", constraint_info.constraints.air_constraints[8]);
+    println!("{}", constraint_info.constraints.air_constraints[1]);
+    println!("{}", constraint_info.constraints.lookup_constraints[1]);
 
     /*
         pub fn eval_constraints(
@@ -151,9 +152,9 @@ fn main() -> Result<(), io::Error> {
          */
 
     /**
-     * 12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 127, 29, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 12, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0
+     * [12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, ]
      *
-     * 12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 12, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1,
+     * [12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 20, 155, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1]
      */
     // ######################## Solve ############################################
     let result = experiment_harness(
