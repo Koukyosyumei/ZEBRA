@@ -79,7 +79,6 @@ fn main() -> Result<(), io::Error> {
         final_check,
         &args.method,
     );
-
     println!("{:?}", result);
 
     Ok(())
