@@ -1,7 +1,5 @@
 use clap::Parser;
 use core::mem::transmute;
-use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -10,11 +8,9 @@ use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::LtCols;
 use zkm_core_machine::alu::NUM_LT_COLS;
 use zkm_core_machine::LtChip;
-use zkm_stark::MachineProver;
 
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::utils::indices_arr;
