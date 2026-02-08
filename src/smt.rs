@@ -729,7 +729,7 @@ pub fn expr_to_smt_bv(
         smt.push_str("(assert (not (and\n");
         for (i, j, v) in neg_constants {
             smt.push_str(&format!(
-                "  (= trace_{}_{} #x{:08x})\n",
+                "  (= (bvurem trace_{}_{} P) #x{:08x})\n",
                 i,
                 j,
                 v.as_canonical_u32(prime)

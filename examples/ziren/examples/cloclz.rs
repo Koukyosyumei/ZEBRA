@@ -75,9 +75,10 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CloClzChip>(&air, NUM_CLOCLZ_COLS, prime);
     let output_columns = vec![2, 3, 4, 5];
+    /*
     for i in &output_columns {
         constraint_info.range_types.insert(*i, RangeType::U8);
-    }
+    }*/
 
     constraint_info
         .refinable_cols
