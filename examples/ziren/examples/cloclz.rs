@@ -3,7 +3,6 @@ use core::mem::transmute;
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::mem::transmute;
 
 use itertools::Itertools;
 
@@ -24,7 +23,7 @@ use zkm_stark::MachineProver;
 
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::quick_api;
-use latticevm::quick::{experiment_harness, ProgramInfo, SearchConfig};
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo, SearchConfig};
 use latticevm::smt::expr_to_smt;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::symbolic::LatticeVMSymbolicEntry;
@@ -76,9 +75,11 @@ pub fn get_opcode(opcode_str: &str) -> Opcode {
 }
 
 fn main() -> Result<(), io::Error> {
-    let opcode_str = "CLZ";
-
     create_or_clear_dir("voutput")?;
+
+    let args = Args::parse();
+    let opcode_str = args.opcode_str;
+    let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
@@ -91,6 +92,9 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CloClzChip>(&air, NUM_CLOCLZ_COLS, prime);
     let output_columns = vec![2, 3, 4, 5];
+    for i in &output_columns {
+        constraint_info.range_types.insert(*i, RangeType::U8);
+    }
 
     constraint_info
         .refinable_cols
@@ -98,7 +102,7 @@ fn main() -> Result<(), io::Error> {
     constraint_info.output_columns = output_columns.clone();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode(opcode_str), 4, 4, 3, 4);
+    let program = target_program(get_opcode(&opcode_str), 4, 4, 3, 4);
 
     // ######################## Set Info ##########################################
     let program_info = ProgramInfo {
@@ -106,19 +110,24 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-    let search_config = SearchConfig::new(constraint_info.refinable_cols.len());
-    // search_config.minimum_num_taregt_cols = 3;
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+    }
 
     // ######################## Solve ############################################
-    experiment_harness(
+    let result = experiment_harness(
         &program_info,
         &mut constraint_info,
         &search_config,
         &base_abs_main_trace_data,
         vec![],
-        &vec![0],
+        &vec![],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-    )
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }
