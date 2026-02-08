@@ -1,5 +1,8 @@
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 use std::time;
 use std::{fs, io};
 
@@ -109,7 +112,7 @@ where
         .iter()
         .map(|&j| (0, j, base_abs_main_trace_data[0][j].clone()))
         .collect();
-    let _smt_str = expr_to_smt_bv(
+    let smt_str = expr_to_smt_bv(
         &constraint_info.constraints,
         &constants,
         &neg_constants,
@@ -119,6 +122,17 @@ where
         constraint_info.num_pv_columns,
         constraint_info.prime,
     );
+    let smt_file_path = "smt_query.smt2";
+    let mut file = File::create(smt_file_path).expect("Failed to create SMT file");
+    file.write_all(smt_str.as_bytes())
+        .expect("Failed to write SMT string to file");
+    let output = Command::new("z3")
+        .arg("-smt2")
+        .arg(smt_file_path)
+        .output()
+        .expect("Failed to execute Z3");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    println!("Z3 output:\n{}", stdout);
 
     // ######################## Solve ############################################
     quick_api(
