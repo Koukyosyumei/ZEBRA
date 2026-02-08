@@ -1,3 +1,6 @@
+use clap::Parser;
+use core::mem::transmute;
+use std::collections::HashSet;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -7,7 +10,7 @@ use zkm_core_machine::alu::NUM_BITWISE_COLS;
 use zkm_core_machine::BitwiseChip;
 use zkm_stark::MachineProver;
 
-use latticevm::quick::{experiment_harness, ProgramInfo, SearchConfig};
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
@@ -31,9 +34,11 @@ pub fn get_opcode(opcode_str: &str) -> Opcode {
 }
 
 fn main() -> Result<(), io::Error> {
-    let opcode_str = "AND";
-
     create_or_clear_dir("voutput")?;
+
+    let args = Args::parse();
+    let opcode_str = args.opcode_str;
+    let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
@@ -60,7 +65,9 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-    let search_config = SearchConfig::new(constraint_info.refinable_cols.len());
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+    }
 
     // ######################## Solve ############################################
     experiment_harness(
