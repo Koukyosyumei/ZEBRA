@@ -1,3 +1,4 @@
+use clap::Parser;
 use core::mem::transmute;
 use std::collections::HashSet;
 use std::io;
@@ -62,7 +63,7 @@ fn main() -> Result<(), io::Error> {
 
     let args = Args::parse();
     let opcode_str = args.opcode_str;
-    let mut search_config = load_config(&args.config)?;
+    let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
@@ -101,7 +102,7 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-    if search_config == 0 {
+    if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 

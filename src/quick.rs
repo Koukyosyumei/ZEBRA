@@ -64,10 +64,13 @@ pub fn load_config(path: &std::path::Path) -> anyhow::Result<SearchConfig> {
 #[derive(Parser, Debug)]
 pub struct Args {
     #[arg(long)]
-    config: PathBuf,
-    ouptput: PathBuf,
-    method: String,
-    opcode_str: String,
+    pub config: PathBuf,
+    #[arg(long, default_value = "output.yaml")]
+    pub ouptput: PathBuf,
+    #[arg(long, default_value = "bb")]
+    pub method: String,
+    #[arg(long, default_value = "none")]
+    pub opcode_str: String,
 }
 
 pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
