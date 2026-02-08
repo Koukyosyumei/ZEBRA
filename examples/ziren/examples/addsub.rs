@@ -11,12 +11,12 @@ use zkm_core_machine::AddSubChip;
 use zkm_stark::MachineProver;
 
 use latticevm::quick::{
-    experiment_harness, load_config, Args, ConstraintInfo, ProgramInfo, SearchConfig,
+    experiment_harness, load_config, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::{save_repr_if_unique, UiState};
 use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::symbolic::AbstractTrace;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
