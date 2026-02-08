@@ -20,7 +20,7 @@ use latticevm_ziren::utils::{
 };
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
-    let instructions = vec![Instruction::new(opcode, 1, 2, 3, true, true)];
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
