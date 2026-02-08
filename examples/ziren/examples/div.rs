@@ -1,7 +1,6 @@
 use clap::Parser;
 use core::mem::transmute;
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -12,8 +11,6 @@ use zkm_core_machine::alu::NUM_DIVREM_COLS;
 use zkm_core_machine::DivRemChip;
 use zkm_stark::MachineProver;
 
-use latticevm::quick::quick_api;
-use latticevm::quick::SearchConfig;
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
@@ -21,7 +18,7 @@ use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::symbolic::AbstractTrace;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
