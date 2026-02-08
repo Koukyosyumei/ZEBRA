@@ -158,10 +158,9 @@ where
         // ######################### Query SMT solver ###############################
         let start_time = time::Instant::now();
         let output = Command::new(verification_method)
-            .arg("-smt2")
             .arg(smt_file_path)
             .output()
-            .expect("Failed to execute Z3");
+            .expect("Failed to execute SMT solver");
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         // ######################### Check the solutions ############################
