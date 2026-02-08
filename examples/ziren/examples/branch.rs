@@ -19,6 +19,7 @@ use latticevm::quick::quick_api;
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo, SearchConfig};
 use latticevm::smt::expr_to_smt_bv;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::symbolic::eval_constraints;
 use latticevm::symbolic::LatticeVMSymbolicEntry;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::symbolic::LatticeVMSymbolicVal;
@@ -122,6 +123,38 @@ fn main() -> Result<(), io::Error> {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
+    let a = vec![
+        12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 127, 29, 0, 0, 127, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 12, 0, 0, 0, 0, 1, 0, 0, 0,
+        0, 1, 1, 0,
+    ];
+    /*
+    let a = vec![
+        12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 28, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 12, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+        1, 0, 1,
+    ];*/
+    let mut ai = vec![];
+    ai.push(a.iter().map(|x| AbstractInterval::from_i64(*x)).collect());
+    let at = AbstractTrace::new(ai);
+    let re = eval_constraints(&at, None, &constraint_info.constraints, prime);
+    println!("{:?}", re);
+    println!("{}", constraint_info.constraints.air_constraints[8]);
+
+    /*
+        pub fn eval_constraints(
+        trace: &AbstractTrace,
+        public_vals: Option<&[AbstractInterval]>,
+        constraints: &LatticeVMConstraints,
+        prime: u32,
+    )
+         */
+
+    /**
+     * 12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 127, 29, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 12, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0
+     *
+     * 12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 12, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1,
+     */
     // ######################## Solve ############################################
     let result = experiment_harness(
         &program_info,
