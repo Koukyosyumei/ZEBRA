@@ -137,8 +137,9 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-    // let mut search_config = SearchConfig::new(constraint_info.refinable_cols.len());
-    search_config.minimum_num_taregt_cols = 3;
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+    }
 
     // ######################## Solve ############################################
     let result = experiment_harness(
