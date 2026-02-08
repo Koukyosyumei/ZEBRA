@@ -1,39 +1,22 @@
 use clap::Parser;
 use core::mem::transmute;
 use std::collections::HashSet;
-use std::fs;
 use std::io;
-
-use itertools::Itertools;
 
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::CloClzCols;
-use zkm_core_machine::alu::NUM_ADD_SUB_COLS;
-use zkm_core_machine::alu::NUM_BITWISE_COLS;
 use zkm_core_machine::alu::NUM_CLOCLZ_COLS;
-use zkm_core_machine::control_flow::BranchColumns;
-use zkm_core_machine::memory::MemoryLocalChip;
-use zkm_core_machine::AddSubChip;
-use zkm_core_machine::BitwiseChip;
-use zkm_core_machine::BranchChip;
 use zkm_core_machine::CloClzChip;
-use zkm_stark::MachineProver;
 
-use latticevm::interval::AbstractInterval;
-use latticevm::quick::quick_api;
-use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo, SearchConfig};
-use latticevm::smt::expr_to_smt;
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::symbolic::LatticeVMSymbolicEntry;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::symbolic::LatticeVMSymbolicVal;
+use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -89,7 +72,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "CloClz";
     let _colmap = make_col_map();
 
-    let (mut constraint_info, general_lookup_info) =
+    let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CloClzChip>(&air, NUM_CLOCLZ_COLS, prime);
     let output_columns = vec![2, 3, 4, 5];
     for i in &output_columns {
