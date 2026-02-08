@@ -330,7 +330,7 @@ where
                     lock.pop()
                 };
 
-                let (node, pot) = match task {
+                let (node, _pot) = match task {
                     Some(x) => x,
                     None => {
                         // Termination Logic: Am I the last one and is queue empty?

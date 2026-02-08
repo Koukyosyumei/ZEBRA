@@ -8,15 +8,12 @@ use p3_koala_bear::KoalaBear;
 use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
 use zkm_core_machine::AddSubChip;
-use zkm_stark::MachineProver;
 
-use latticevm::quick::{
-    experiment_harness, load_config, Args, ProgramInfo,
-};
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::{save_repr_if_unique, UiState};
 use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
-use latticevm::symbolic::AbstractTrace;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -46,7 +43,7 @@ const fn make_col_map() -> AddSubCols<usize> {
 }
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
-    let instructions = vec![Instruction::new(opcode, 1, 2, 3, true, true)];
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -86,7 +83,7 @@ fn main() -> Result<(), io::Error> {
         vec![9, 10, 11, 12]
     };
 
-    let (mut constraint_info, general_lookup_info) =
+    let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
     constraint_info
         .refinable_cols

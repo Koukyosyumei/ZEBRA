@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::io;
 
-use p3_air::{Air, BaseAir, PairCol, VirtualPairCol};
+use p3_air::{Air, PairCol, VirtualPairCol};
 use p3_field::PrimeField32;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicAirBuilder, SymbolicExpression};
 
@@ -47,7 +47,7 @@ pub fn get_pv_constraints() -> (Vec<LVSExpr>, Vec<LVSExpr>) {
 pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
-    let (checkpoint, done) = runtime.execute_state(false).unwrap();
+    let (checkpoint, _done) = runtime.execute_state(false).unwrap();
 
     let mut checkpoint_file = tempfile::tempfile()
         .map_err(ZKMCoreProverError::IoError)
@@ -65,7 +65,7 @@ pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInte
     let mut reader = io::BufReader::new(checkpoint_file);
     let execution_state: ExecutionState =
         bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
-    let (records, report) = trace_checkpoint::<SC>(
+    let (records, _report) = trace_checkpoint::<SC>(
         program.clone(),
         execution_state,
         ZKMCoreOpts::default(),
@@ -129,7 +129,7 @@ pub fn try_add_single_var_col<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &
 pub fn get_symbolic_lookup_constraints<F, A>(
     air: &A,
     preprocessed_width: usize,
-    num_public_values: usize,
+    _num_public_values: usize,
     u8_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,
     lookup_constraints: &mut Vec<LVSExpr>,
@@ -243,7 +243,7 @@ where
             LookupKind::Byte => {
                 let s_opcode = &s.values[0];
                 let a1 = &s.values[1];
-                let a2 = &s.values[2];
+                let _a2 = &s.values[2];
                 let b = &s.values[3];
                 let c = &s.values[4];
 
