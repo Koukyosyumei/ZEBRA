@@ -84,13 +84,13 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode(&opcode_str), 4, 4, 3, 4);
+    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
     // ######################## Set Info ##########################################
     let program_info = ProgramInfo {
         program_str: get_program_str(&program),
         program_len: program.instructions.len(),
     };
-    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }

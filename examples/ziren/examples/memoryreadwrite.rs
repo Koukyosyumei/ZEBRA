@@ -140,6 +140,8 @@ fn main() -> Result<(), io::Error> {
     } else {
         target_program_store(opcode, 4, 4)
     };
+    let base_abs_main_trace_data =
+        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
     // ######################## Set Info ##########################################
     let program_info = ProgramInfo {
@@ -148,8 +150,6 @@ fn main() -> Result<(), io::Error> {
     };
 
     let num_extracted_rows = if is_load { 2 } else { 1 };
-    let base_abs_main_trace_data =
-        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
     search_config.max_expansions = 1000000000000;
     search_config.min_row_id = if is_load { 1 } else { 0 };
     search_config.max_row_id = if is_load { 1 } else { 0 };
