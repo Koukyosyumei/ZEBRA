@@ -7,20 +7,22 @@ use p3_field::PrimeField32;
 use p3_koala_bear::KoalaBear;
 use p3_uni_stark::SymbolicExpression;
 
-use pico_vm::chips::chips::public_values::columns::NUM_PUBLIC_VALUES_COLS;
-use pico_vm::compiler::riscv::program::Program;
-use pico_vm::configs::config::StarkGenericConfig;
-use pico_vm::emulator::opts::EmulatorOpts;
-use pico_vm::emulator::riscv::emulator::RiscvEmulator;
-use pico_vm::instances::chiptype::riscv_chiptype::RiscvChipType;
-use pico_vm::instances::configs::embed_kb_bn254_poseidon2::KoalaBearBn254Poseidon2;
-use pico_vm::instances::machine::riscv::RiscvMachine;
-use pico_vm::iter::PicoIterator;
-use pico_vm::machine::chip::ChipBehavior;
-use pico_vm::machine::folder::SymbolicConstraintFolder;
-use pico_vm::machine::machine::MachineBehavior;
-use pico_vm::machine::utils::get_symbolic_constraints;
-use pico_vm::primitives::consts::RISCV_NUM_PVS;
+use pico_vm::{
+    chips::chips::public_values::columns::NUM_PUBLIC_VALUES_COLS,
+    compiler::riscv::program::Program,
+    configs::config::StarkGenericConfig,
+    emulator::opts::EmulatorOpts,
+    emulator::riscv::emulator::RiscvEmulator,
+    instances::chiptype::riscv_chiptype::RiscvChipType,
+    instances::configs::embed_kb_bn254_poseidon2::KoalaBearBn254Poseidon2,
+    instances::machine::riscv::RiscvMachine,
+    iter::PicoIterator,
+    machine::{
+        chip::ChipBehavior, folder::SymbolicConstraintFolder, machine::MachineBehavior,
+        utils::get_symbolic_constraints,
+    },
+    primitives::consts::RISCV_NUM_PVS,
+};
 
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::ConstraintInfo;
