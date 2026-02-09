@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use p3_air::Air;
-use p3_air::BaseAir;
 use p3_field::PrimeField32;
 use p3_koala_bear::KoalaBear;
 use p3_uni_stark::SymbolicExpression;
@@ -13,9 +12,10 @@ use pico_vm::{
     configs::config::StarkGenericConfig,
     emulator::opts::EmulatorOpts,
     emulator::riscv::emulator::RiscvEmulator,
-    instances::chiptype::riscv_chiptype::RiscvChipType,
-    instances::configs::embed_kb_bn254_poseidon2::KoalaBearBn254Poseidon2,
-    instances::machine::riscv::RiscvMachine,
+    instances::{
+        chiptype::riscv_chiptype::RiscvChipType,
+        configs::embed_kb_bn254_poseidon2::KoalaBearBn254Poseidon2, machine::riscv::RiscvMachine,
+    },
     iter::PicoIterator,
     machine::{
         chip::ChipBehavior, folder::SymbolicConstraintFolder, machine::MachineBehavior,
