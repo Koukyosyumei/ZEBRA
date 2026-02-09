@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::collections::HashSet;
 
 use p3_air::{Air, VirtualPairCol};
@@ -19,7 +18,7 @@ use valida_program::{MachineWithProgramROM, ProgramTableType};
 use latticevm::alu::{get_alu_constraint, WordOp};
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::ConstraintInfo;
-use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
+use latticevm::solver::prepare_constraints_and_range_type;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::symbolic::{make_impl_constraint, AbstractTrace, LatticeVMSymbolicExpr as LVSExpr};
 use latticevm::utils::GeneralLookupInfo;
