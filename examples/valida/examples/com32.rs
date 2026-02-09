@@ -1,3 +1,4 @@
+use clap::Parser;
 use std::collections::HashSet;
 use std::fs;
 use std::io;
@@ -15,7 +16,7 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::quick::quick_api;
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
