@@ -23,7 +23,7 @@ use latticevm_valida::utils::{
 };
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
-    let bytes_per_instr = BYTES_PER_INSTR as i32;
+    let _bytes_per_instr = BYTES_PER_INSTR as i32;
 
     let mut program = vec![];
     program.extend([

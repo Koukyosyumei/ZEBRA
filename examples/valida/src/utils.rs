@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use p3_air::{Air, VirtualPairCol};
 use p3_baby_bear::BabyBear;
-use p3_field::{AbstractField, Field, PrimeField32};
+use p3_field::{Field, PrimeField32};
 use p3_matrix::Matrix;
 
 use valida_basic_api::{BasicMachine, BasicMachineMetrics, ValidaRuntime};
