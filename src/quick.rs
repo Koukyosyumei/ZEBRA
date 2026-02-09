@@ -145,7 +145,7 @@ where
             &constants,
             &neg_constants,
             &constraint_info.range_types,
-            search_config.max_row_id - search_config.min_row_id + 1,
+            base_abs_main_trace_data.len(),
             constraint_info.num_total_columns,
             constraint_info.num_pv_columns,
             constraint_info.prime,
