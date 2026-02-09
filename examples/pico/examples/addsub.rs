@@ -1,7 +1,6 @@
+use clap::Parser;
 use core::mem::transmute;
-use itertools::Itertools;
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -23,7 +22,7 @@ use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn canonical_repr_add(trace: &AbstractTrace) -> String {
+fn cr_add(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
         trace_fmt_with_idxs(trace, 0, &[7, 8, 9, 10]),
@@ -32,34 +31,13 @@ fn canonical_repr_add(trace: &AbstractTrace) -> String {
     )
 }
 
-fn canonical_repr_sub(trace: &AbstractTrace) -> String {
+fn cr_sub(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
         trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
         trace_fmt_with_idxs(trace, 0, &[11, 12, 13, 14]),
         trace_fmt_with_idxs(trace, 0, &[7, 8, 9, 10]),
     )
-}
-
-// ############## Final Check Function ##############################
-fn final_check_add(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    save_repr_if_unique(&canonical_repr_add(trace), known_reprt, ui);
-}
-
-fn final_check_sub(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    save_repr_if_unique(&canonical_repr_sub(trace), known_reprt, ui);
 }
 
 const fn make_col_map() -> AddSubCols<usize> {
@@ -90,6 +68,13 @@ fn main() -> Result<(), io::Error> {
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
+    // ######################## Canonicalization ##################################
+    let cr = if opcode_str == "ADD" { cr_add } else { cr_sub };
+    let final_check =
+        |at: &AbstractTrace, _n: usize, _p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
+            save_repr_if_unique(&cr(at), kr, ui);
+        };
+
     // ######################## Extract CPU Constraints ##########################
     let air: AddSubChip<KoalaBear> = AddSubChip::default();
     let air_name = "AddSub";
@@ -111,7 +96,7 @@ fn main() -> Result<(), io::Error> {
     constraint_info.output_columns = output_columns.clone();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
+    let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, 2, 3);
     let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
     // ######################## Set Info ##########################################
@@ -124,29 +109,19 @@ fn main() -> Result<(), io::Error> {
     }
 
     // ######################## Solve ############################################
-    quick_api(
-        get_program_str(&program),
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &vec![],
+    let result = experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         vec![],
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.instructions.len(),
+        &vec![], // vec![0],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
-        if target_opcode == "ADD" {
-            final_check_add
-        } else if target_opcode == "SUB" {
-            final_check_sub
-        } else {
-            panic!("unsupported instruction")
-        },
-        prime,
-        seed,
-    )
+        final_check,
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }
