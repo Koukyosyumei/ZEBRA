@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::collections::HashSet;
 
 use p3_air::Air;
@@ -12,9 +11,7 @@ use pico_vm::machine::utils::get_symbolic_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::ConstraintInfo;
 use latticevm::solver::prepare_constraints_and_range_type;
-use latticevm::solver::RangeType;
 use latticevm::symbolic::LatticeVMConstraints;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::utils::GeneralLookupInfo;
 
 use crate::executor::run_pico_program;

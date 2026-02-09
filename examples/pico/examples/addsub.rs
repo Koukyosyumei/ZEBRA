@@ -8,16 +8,15 @@ use p3_koala_bear::KoalaBear;
 use pico_vm::chips::chips::alu::add_sub::columns::{AddSubCols, NUM_ADD_SUB_COLS};
 use pico_vm::chips::chips::alu::add_sub::AddSubChip;
 use pico_vm::compiler::riscv::program::Program;
-use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, register::Register};
+use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::{save_repr_if_unique, UiState};
 use latticevm::utils::indices_arr;
 use latticevm::utils::{create_or_clear_dir, trace_fmt_with_idxs};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::symbolic::AbstractTrace;
 
-use latticevm_pico::lookup::get_symbolic_lookup_constraints;
 use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
