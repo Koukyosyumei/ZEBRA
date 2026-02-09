@@ -1,8 +1,5 @@
 use clap::Parser;
 use core::mem::transmute;
-use itertools::Itertools;
-use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -10,16 +7,13 @@ use p3_koala_bear::KoalaBear;
 use pico_vm::chips::chips::alu::sll::SLLChip;
 use pico_vm::chips::chips::alu::sll::{ShiftLeftCols, NUM_SLL_COLS};
 use pico_vm::compiler::riscv::program::Program;
-use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, register::Register};
+use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::interval::AbstractInterval;
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
-use latticevm::smt::expr_to_smt_bv;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::ui::{generate_alu_final_checker, UiState};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::utils::indices_arr;
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
