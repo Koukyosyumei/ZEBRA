@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::i32;
-use std::mem::swap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -66,13 +65,13 @@ pub enum SolverMsg {
         unsat: usize,
         queue_len: usize,
     },
-    SolutionFound(AbstractTrace, AbstractTrace, usize),
+    SolutionFound(AbstractTrace, usize),
     Finished,
 }
 
 /// The outcome of processing a single node
 enum NodeProcessingResult {
-    Success(AbstractTrace, AbstractTrace),
+    Success(AbstractTrace),
     Pruned, // Unsatisfiable
     Refined(Vec<(SearchNode, Potential)>),
 }
@@ -85,20 +84,17 @@ pub type Potential = (i32, i32);
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct SearchNode {
     main_trace: AbstractTrace,
-    public_trace: AbstractTrace,
     depth: usize,
 }
 
 fn process_single_node(
     head: SearchNode,
-    potential: Potential,
+    public_trace: AbstractTrace,
     constraints: &LatticeVMConstraints,
-    range_types: &HashMap<usize, RangeType>,
     prime: u32,
     rng: &mut StdRng,
     align_pc_to_program: &impl Fn(&mut AbstractTrace, u32),
     refinment_target_indicies_main: &Vec<usize>,
-    refinement_plan_pv: &Vec<usize>,
     bool_target_indices: &[usize],
     min_row_id: usize,
     max_row_id: usize,
@@ -107,7 +103,6 @@ fn process_single_node(
     abir_constraints: &[AbirConstraint],
 ) -> NodeProcessingResult {
     let mut main_trace = head.main_trace;
-    let public_trace = head.public_trace;
 
     // 1. Initial Refinements (ABIR, Conditional, etc.)
     // (Omitted for brevity, but same as your original solve() logic)
@@ -153,37 +148,15 @@ fn process_single_node(
         }
     };
 
-    let (refined_public_candidates, _) = refine_trace(
-        &public_trace,
-        &refinement_plan_pv.to_vec(),
-        0,
-        0,
-        prime,
-        rng,
-    );
-
     // produce children as pairs (main_candidate, public_candidate)
     let mut children = vec![];
-    match (refined_main_candidates, refined_public_candidates) {
-        (Some(main_cands), Some(pub_cands)) => {
-            // combine every pair
-            for pub_c in pub_cands {
-                for main_c in &main_cands {
-                    children.push((main_c.clone(), pub_c.clone()));
-                }
-            }
-        }
-        (Some(main_cands), None) => {
+    match refined_main_candidates {
+        Some(main_cands) => {
             for main_c in main_cands {
-                children.push((main_c.clone(), public_trace.clone()));
+                children.push(main_c.clone());
             }
         }
-        (None, Some(pub_cands)) => {
-            for pub_c in pub_cands {
-                children.push((main_trace.clone(), pub_c.clone()));
-            }
-        }
-        (None, None) => {
+        None => {
             // No refinements produced → continue to next queue entry
             return NodeProcessingResult::Pruned;
         }
@@ -197,18 +170,17 @@ fn process_single_node(
 
     let mut results = Vec::new();
     for mut kid_trace in children {
-        align_pc_to_program(&mut kid_trace.0, prime);
+        align_pc_to_program(&mut kid_trace, prime);
         let (res, pot, _) =
-            eval_constraints(&kid_trace.0, Some(&kid_trace.1.data[0]), constraints, prime);
+            eval_constraints(&kid_trace, Some(&public_trace.data[0]), constraints, prime);
 
         match res {
-            MayBeFlag::True => return NodeProcessingResult::Success(kid_trace.0, kid_trace.1),
+            MayBeFlag::True => return NodeProcessingResult::Success(kid_trace),
             MayBeFlag::False => {}
             MayBeFlag::MayBe => {
                 results.push((
                     SearchNode {
-                        main_trace: kid_trace.0,
-                        public_trace: kid_trace.1,
+                        main_trace: kid_trace,
                         depth: head.depth + 1,
                     },
                     (-pot, (head.depth as i32 + 1)),
@@ -227,9 +199,9 @@ fn process_single_node(
 // Return type: (Did we find a solution?, Did user request global exit?)
 pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     initial_node: &mut SearchNode,
+    public_trace: AbstractTrace,
     constraints: Arc<LatticeVMConstraints>,
-    refinement_plan: Arc<Vec<usize>>, // Specific to this subset
-    refinement_plan_pv: Arc<Vec<usize>>,
+    refinable_cols: Arc<Vec<usize>>, // Specific to this subset
     range_types: Arc<HashMap<usize, RangeType>>,
     align_pc_to_program: AlignPcToProgramFn,
     min_row_id: usize,
@@ -261,7 +233,7 @@ where
                     } else {
                         Some(&initial_node.main_trace.data[i + 1])
                     },
-                    Some(&initial_node.public_trace.data[0]),
+                    Some(&public_trace.data[0]),
                     i == 0,
                     i <= initial_node.main_trace.data.len() - 2,
                     i == initial_node.main_trace.data.len() - 1,
@@ -278,7 +250,7 @@ where
 
     // --- 1. PREP CONSTRAINTS ---
     // (Do this calculation once per subset)
-    let mut bool_target_indices: Vec<usize> = refinement_plan
+    let mut bool_target_indices: Vec<usize> = refinable_cols
         .iter()
         .copied()
         .filter(|idx| matches!(range_types.get(idx), Some(RangeType::Bool)))
@@ -324,12 +296,11 @@ where
         let un = unsat.clone();
         let sd = shutdown.clone();
         let tx = tx.clone();
+        let pv = public_trace.clone();
 
         // Clone Arc data
         let c_cons = constraints.clone();
-        let c_rt = range_types.clone();
-        let c_rp = refinement_plan.clone();
-        let c_rp_pv = refinement_plan_pv.clone();
+        let c_rp = refinable_cols.clone();
         let c_bool = bool_target_indices.clone();
         let c_cvsc = conditional_var_sub_const_constraints.clone();
         let c_cvsv = conditional_var_sub_var_constraints.clone();
@@ -359,7 +330,7 @@ where
                     lock.pop()
                 };
 
-                let (node, pot) = match task {
+                let (node, _pot) = match task {
                     Some(x) => x,
                     None => {
                         // Termination Logic: Am I the last one and is queue empty?
@@ -380,14 +351,25 @@ where
 
                 // PROCESS
                 let result = process_single_node(
-                    node, pot, &c_cons, &c_rt, prime, &mut rng, &c_align, &c_rp, &c_rp_pv, &c_bool,
-                    min_row_id, max_row_id, &c_cvsc, &c_cvsv, &c_abir,
+                    node,
+                    pv.clone(),
+                    &c_cons,
+                    prime,
+                    &mut rng,
+                    &c_align,
+                    &c_rp,
+                    &c_bool,
+                    min_row_id,
+                    max_row_id,
+                    &c_cvsc,
+                    &c_cvsv,
+                    &c_abir,
                 );
 
                 match result {
-                    NodeProcessingResult::Success(trace, pv) => {
+                    NodeProcessingResult::Success(trace) => {
                         //sd.store(true, Ordering::Relaxed);
-                        let _ = tx.send(SolverMsg::SolutionFound(trace, pv, my_global_id));
+                        let _ = tx.send(SolverMsg::SolutionFound(trace, my_global_id));
                     }
                     NodeProcessingResult::Pruned => {
                         un.fetch_add(1, Ordering::Relaxed);
@@ -438,16 +420,19 @@ where
                     // ここでは最新状態で上書きし続ける
                     ui.status = format!(
                         "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
-                        refinement_plan, trials, unsat, queue_len
+                        refinable_cols, trials, unsat, queue_len
                     );
                 }
-                SolverMsg::SolutionFound(trace, pv, trials) => {
-                    ui.logs = format!("Trial ID: {}\n\n#Main\n{}\n#PV\n{}", trials, trace, pv);
+                SolverMsg::SolutionFound(trace, trials) => {
+                    ui.logs = format!(
+                        "Trial ID: {}\n\n#Main\n{}\n#PV\n{}",
+                        trials, trace, public_trace
+                    );
                     final_check(&trace, trials, prime, known_solution, ui);
                     solution_found = true;
                 }
                 SolverMsg::Finished => {
-                    // ui.status = format!("Subset: {:?}\nFinished", refinement_plan);
+                    // ui.status = format!("Subset: {:?}\nFinished", refinable_cols);
                     // Workers exhausted this subset
                     // subset_finished = true;
                 }
@@ -515,9 +500,8 @@ where
 
 pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
-    refinement_plan: &Vec<usize>, // Full plan
+    refinable_cols: &Vec<usize>, // Full plan
     range_types: &HashMap<usize, RangeType>,
-    refinement_plan_pv: &Vec<usize>,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     max_expansions: usize,
@@ -531,7 +515,6 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     prime: u32,
     seed: u64,
     known_solution: &mut HashSet<String>,
-    logs_num_solution: &mut Vec<(usize, usize)>,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
 ) where
@@ -542,14 +525,13 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     // Arc wrappers for constant data shared across all subsets
     let shared_constraints = Arc::new(constraints.clone());
     let shared_range_types = Arc::new(range_types.clone());
-    let shared_pv_plan = Arc::new(refinement_plan_pv.clone());
     let global_count = Arc::new(AtomicUsize::new(0));
 
     let mut rng = StdRng::seed_from_u64(seed);
 
     // --- OUTER LOOP: Subset Sizes ---
-    'outer: for k in minimum_num_taregt_cols..(refinement_plan.len() + 1) {
-        let mut column_subsets: Vec<_> = refinement_plan.iter().combinations(k).collect();
+    'outer: for k in minimum_num_taregt_cols..(refinable_cols.len() + 1) {
+        let mut column_subsets: Vec<_> = refinable_cols.iter().combinations(k).collect();
         column_subsets.shuffle(&mut rng);
 
         // --- MIDDLE LOOP: Specific Subsets ---
@@ -567,17 +549,17 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
 
             let mut initial_node = SearchNode {
                 main_trace: AbstractTrace::new(abs_main_trace_data),
-                public_trace: AbstractTrace::new(vec![public_vals.clone()]),
                 depth: 0,
             };
+            let public_trace = AbstractTrace::new(vec![public_vals.clone()]);
 
             // 2. RUN SOLVER for THIS subset
             // We pass ownership of subset_indices wrapped in Arc
             let (_found, quit) = parallel_solve(
                 &mut initial_node,
+                public_trace,
                 shared_constraints.clone(),
                 Arc::new(subset_indices), // Subset specific plan
-                shared_pv_plan.clone(),
                 shared_range_types.clone(),
                 align_pc_to_program.clone(),
                 min_row_id,

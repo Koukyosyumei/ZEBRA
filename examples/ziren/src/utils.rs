@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::io;
 
-use p3_air::{Air, BaseAir, PairCol, VirtualPairCol};
+use p3_air::{Air, PairCol, VirtualPairCol};
 use p3_field::PrimeField32;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicAirBuilder, SymbolicExpression};
 
@@ -15,10 +15,11 @@ use zkm_stark::{
 
 use latticevm::alu::{get_alu_constraint, WordOp};
 use latticevm::interval::AbstractInterval;
-use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
+use latticevm::quick::ConstraintInfo;
+use latticevm::solver::prepare_constraints_and_range_type;
 use latticevm::symbolic::{
-    make_impl_constraint, LatticeVMSymbolicEntry, LatticeVMSymbolicExpr as LVSExpr,
-    LatticeVMSymbolicVal,
+    make_impl_constraint, LatticeVMConstraints, LatticeVMSymbolicEntry,
+    LatticeVMSymbolicExpr as LVSExpr, LatticeVMSymbolicVal,
 };
 use latticevm::utils::GeneralLookupInfo;
 
@@ -46,7 +47,7 @@ pub fn get_pv_constraints() -> (Vec<LVSExpr>, Vec<LVSExpr>) {
 pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
-    let (checkpoint, done) = runtime.execute_state(false).unwrap();
+    let (checkpoint, _done) = runtime.execute_state(false).unwrap();
 
     let mut checkpoint_file = tempfile::tempfile()
         .map_err(ZKMCoreProverError::IoError)
@@ -64,7 +65,7 @@ pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInte
     let mut reader = io::BufReader::new(checkpoint_file);
     let execution_state: ExecutionState =
         bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
-    let (records, report) = trace_checkpoint::<SC>(
+    let (records, _report) = trace_checkpoint::<SC>(
         program.clone(),
         execution_state,
         ZKMCoreOpts::default(),
@@ -128,7 +129,7 @@ pub fn try_add_single_var_col<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &
 pub fn get_symbolic_lookup_constraints<F, A>(
     air: &A,
     preprocessed_width: usize,
-    num_public_values: usize,
+    _num_public_values: usize,
     u8_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,
     lookup_constraints: &mut Vec<LVSExpr>,
@@ -242,7 +243,7 @@ where
             LookupKind::Byte => {
                 let s_opcode = &s.values[0];
                 let a1 = &s.values[1];
-                let a2 = &s.values[2];
+                let _a2 = &s.values[2];
                 let b = &s.values[3];
                 let c = &s.values[4];
 
@@ -287,20 +288,14 @@ pub fn extract_constraints_and_range<F, A>(
     air: &A,
     num_cols: usize,
     prime: u32,
-) -> (
-    Vec<LVSExpr>,
-    Vec<LVSExpr>,
-    Vec<usize>,
-    HashMap<usize, RangeType>,
-    GeneralLookupInfo,
-)
+) -> (ConstraintInfo, GeneralLookupInfo)
 where
     F: p3_field::PrimeField32,
     A: Air<LookupBuilder<F>> + Air<SymbolicAirBuilder<F>>,
 {
     let mut u8_cols = vec![];
     let mut multiplicities = HashSet::new();
-    let mut lookup_symbolic_constraints = Vec::new();
+    let mut lookup_constraints = Vec::new();
     let mut received_vars_from_cpu = HashSet::new();
 
     let symbolic_constraints: Vec<SymbolicExpression<F>> =
@@ -311,12 +306,12 @@ where
         ZKM_PROOF_NUM_PV_ELTS,
         &mut u8_cols,
         &mut multiplicities,
-        &mut lookup_symbolic_constraints,
+        &mut lookup_constraints,
         &mut received_vars_from_cpu,
         prime,
     );
 
-    let mut tv_constraints = symbolic_constraints
+    let mut air_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<F>(&sc))
         .collect::<Vec<_>>();
@@ -326,16 +321,21 @@ where
         &u8_cols,
         &multiplicities,
         &received_vars_from_cpu,
-        &mut tv_constraints,
-        &lookup_symbolic_constraints,
+        &mut air_constraints,
+        &lookup_constraints,
         prime,
     );
 
-    (
-        tv_constraints,
-        lookup_symbolic_constraints,
-        refinable_cols,
-        range_types,
-        general_lookup_info,
-    )
+    let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
+    let constraint_info = ConstraintInfo {
+        constraints: constraints,
+        num_total_columns: num_cols,
+        num_pv_columns: 0,
+        output_columns: vec![],
+        refinable_cols: refinable_cols,
+        range_types: range_types,
+        prime: prime,
+    };
+
+    (constraint_info, general_lookup_info)
 }

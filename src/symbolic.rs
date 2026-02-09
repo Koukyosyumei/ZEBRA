@@ -6,7 +6,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use serde::Serialize;
 
 use rand::rngs::StdRng;
-use rand::seq::{IndexedRandom, SliceRandom};
+use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::alu::{
@@ -59,6 +59,8 @@ pub enum LatticeVMSymbolicExpr {
     IsFirstRow,
     IsTransition,
     IsLastRow,
+    WhenNonZero(Box<Self>, Box<Self>),
+    WhenZero(Box<Self>, Box<Self>),
     Constant(AbstractInterval),
     Variable(LatticeVMSymbolicVal),
     Add(Box<Self>, Box<Self>),
@@ -73,10 +75,9 @@ pub enum LatticeVMSymbolicExpr {
     SRL(Box<Self>, Box<Self>),
     Lt(Box<Self>, Box<Self>),
     Msb(Box<Self>),
-    WhenNonZero(Box<Self>, Box<Self>),
-    WhenZero(Box<Self>, Box<Self>),
     Neg(Box<Self>),
     Flip(Box<Self>),
+    KoalaBearRange(Box<Self>),
     WordAdd([Box<Self>; 4], [Box<Self>; 4]),
     WordSub([Box<Self>; 4], [Box<Self>; 4]),
     WordSubU([Box<Self>; 4], [Box<Self>; 4]),
@@ -279,6 +280,8 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::IsFirstRow => write!(f, "IsFirstRow"),
             Self::IsTransition => write!(f, "IsTransition"),
             Self::IsLastRow => write!(f, "IsLastRow"),
+            Self::WhenNonZero(x, y) => write!(f, "([{} /= 0] => {})", x, y),
+            Self::WhenZero(x, y) => write!(f, "([{} = 0] => {})", x, y),
             Self::Constant(c) => write!(f, "{}", c),
             Self::Variable(v) => write!(f, "{}", v),
             Self::Add(x, y) => write!(f, "({} + {})", x, y),
@@ -287,16 +290,15 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::MulLo(x, y) => write!(f, "({} *_lo {})", x, y),
             Self::MulHiSS(x, y) => write!(f, "({} *_hiss {})", x, y),
             Self::MulHiUU(x, y) => write!(f, "({} *_hiuu {})", x, y),
-            Self::Neg(x) => write!(f, "-{}", x),
-            Self::Flip(x) => write!(f, "~{}", x),
             Self::And(x, y) => write!(f, "({} && {})", x, y),
             Self::Or(x, y) => write!(f, "({} || {})", x, y),
             Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
             Self::SRL(x, y) => write!(f, "({} >> {})", x, y),
             Self::Lt(x, y) => write!(f, "({} < {})", x, y),
             Self::Msb(x) => write!(f, "msb({})", x),
-            Self::WhenNonZero(x, y) => write!(f, "([{} /= 0] => {})", x, y),
-            Self::WhenZero(x, y) => write!(f, "([{} = 0] => {})", x, y),
+            Self::Neg(x) => write!(f, "-{}", x),
+            Self::Flip(x) => write!(f, "~{}", x),
+            Self::KoalaBearRange(x) => write!(f, "🐨{}🐨", x),
             Self::WordAdd(b, c) => write!(
                 f,
                 "[{}, {}, {}, {}] + [{}, {}, {}, {}]",
@@ -446,6 +448,18 @@ impl LatticeVMSymbolicExpr {
         is_last_row: bool,
         prime: u32,
     ) -> AbstractInterval {
+        let rec = |a: &LatticeVMSymbolicExpr| {
+            a.eval(
+                curr_row,
+                next_row,
+                public_vals,
+                is_first_row,
+                is_transition,
+                is_last_row,
+                prime,
+            )
+        };
+
         match self {
             Self::IsFirstRow => {
                 if is_first_row {
@@ -466,6 +480,22 @@ impl LatticeVMSymbolicExpr {
                     AbstractInterval::one()
                 } else {
                     AbstractInterval::zero()
+                }
+            }
+            Self::WhenNonZero(a, b) => {
+                let cond = rec(a);
+                if let MayBeFlag::True = cond.is_zero(prime) {
+                    AbstractInterval::zero()
+                } else {
+                    rec(b)
+                }
+            }
+            Self::WhenZero(a, b) => {
+                let cond = rec(a);
+                if let MayBeFlag::False = cond.is_zero(prime) {
+                    AbstractInterval::zero()
+                } else {
+                    rec(b)
                 }
             }
             Self::Constant(c) => c.clone(),
@@ -505,163 +535,38 @@ impl LatticeVMSymbolicExpr {
                     None => panic!("public_vals not provided"),
                 },
             },
-            Self::Add(a, b) => {
-                a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                ) + b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                )
-            }
-            Self::Sub(a, b) => {
-                a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                ) - b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                )
-            }
+            Self::Add(a, b) => rec(a) + rec(b),
+            Self::Sub(a, b) => rec(a) - rec(b),
             Self::Mul(a, b) => {
-                let va = a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                );
+                let va = rec(a);
                 if va.is_zero(prime) == MayBeFlag::True {
                     AbstractInterval::zero()
                 } else {
-                    a.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    ) * b.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
+                    rec(a) * rec(b)
                 }
             }
             Self::MulLo(a, b) => {
-                let full = a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                ) * b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                );
+                let full = rec(a) * rec(b);
                 full.modulo(4294967296)
             }
             Self::MulHiSS(a, b) => {
-                let sa = a
-                    .eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                    .to_signed(32);
-                let sb = b
-                    .eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                    .to_signed(32);
+                let sa = rec(a).to_signed(32);
+                let sb = rec(b).to_signed(32);
                 (sa * sb).div_floor(2 ^ 32)
             }
             Self::MulHiUU(a, b) => {
-                let ua = a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                );
-                let ub = b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                );
+                let ua = rec(a);
+                let ub = rec(b);
                 (ua * ub).div_floor(2 ^ 32)
             }
-            Self::Neg(a) => -a.eval(
-                curr_row,
-                next_row,
-                public_vals,
-                is_first_row,
-                is_transition,
-                is_last_row,
-                prime,
-            ),
+            Self::And(a, b) => rec(a) & rec(b),
+            Self::Or(a, b) => rec(a) | rec(b),
+            Self::Xor(a, b) => rec(a) ^ rec(b),
+            Self::SRL(a, b) => rec(a) >> rec(b),
+            Self::Lt(a, b) => rec(a).ltu(rec(b)),
+            Self::Neg(a) => -rec(a),
             Self::Flip(a) => {
-                let is_zero = a
-                    .eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                    .is_zero(prime);
+                let is_zero = rec(a).is_zero(prime);
                 if let MayBeFlag::True = is_zero {
                     AbstractInterval::one()
                 } else {
@@ -669,17 +574,7 @@ impl LatticeVMSymbolicExpr {
                         Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::one())),
                         a.clone(),
                     );
-                    let is_one = tmp
-                        .eval(
-                            curr_row,
-                            next_row,
-                            public_vals,
-                            is_first_row,
-                            is_transition,
-                            is_last_row,
-                            prime,
-                        )
-                        .is_zero(prime);
+                    let is_one = rec(&tmp).is_zero(prime);
                     if let MayBeFlag::True = is_one {
                         AbstractInterval::zero()
                     } else {
@@ -687,680 +582,134 @@ impl LatticeVMSymbolicExpr {
                     }
                 }
             }
-            Self::And(a, b) => {
-                a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                ) & b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                )
-            }
-            Self::Or(a, b) => {
-                a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                ) | b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                )
-            }
-            Self::Xor(a, b) => {
-                a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                ) ^ b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                )
-            }
-            Self::SRL(a, b) => {
-                a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                ) >> b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                )
-            }
-            Self::WhenNonZero(a, b) => {
-                // if a is non-negative, b should be 0
-
-                let cond = a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
+            Self::Msb(a) => msb_maybe(&rec(a)),
+            Self::KoalaBearRange(a) => {
+                let e = LatticeVMSymbolicExpr::Lt(
+                    a.clone(),
+                    Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+                        2130706433,
+                    ))),
                 );
-                if let MayBeFlag::True = cond.is_zero(prime) {
-                    AbstractInterval::zero()
-                } else {
-                    b.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                }
+                rec(&e)
             }
-            Self::WhenZero(a, b) => {
-                // if a is non-negative, b should be 0
-
-                let cond = a.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                );
-                if let MayBeFlag::False = cond.is_zero(prime) {
-                    AbstractInterval::zero()
-                } else {
-                    b.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                }
-            }
-            Self::Lt(a, b) => a
-                .eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                )
-                .ltu(b.eval(
-                    curr_row,
-                    next_row,
-                    public_vals,
-                    is_first_row,
-                    is_transition,
-                    is_last_row,
-                    prime,
-                )),
-            Self::Msb(a) => msb_maybe(&a.eval(
-                curr_row,
-                next_row,
-                public_vals,
-                is_first_row,
-                is_transition,
-                is_last_row,
-                prime,
-            )),
             Self::WordAdd(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_add(&b_ais, &c_ais)
             }
             Self::WordSub(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_sub(&b_ais, &c_ais)
             }
             Self::WordSubU(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_subu(&b_ais, &c_ais)
             }
             Self::WordMul(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_mul(&b_ais, &c_ais)
             }
             Self::WordMulhs(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_mulhs(&b_ais, &c_ais)
             }
             Self::WordMulhu(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_mulhu(&b_ais, &c_ais)
             }
             Self::WordMultl(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_mult(&b_ais, &c_ais).0
             }
             Self::WordMulth(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_mult(&b_ais, &c_ais).1
             }
 
             Self::WordMultul(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_multu(&b_ais, &c_ais).0
             }
             Self::WordMultuh(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_multu(&b_ais, &c_ais).1
             }
             Self::WordDiv(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_div(&b_ais, &c_ais)
             }
             Self::WordSDiv(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_sdiv(&b_ais, &c_ais)
             }
             Self::WordLt(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_ltu(&b_ais, &c_ais)
             }
             Self::WordSLt(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_slt(&b_ais, &c_ais)
             }
             Self::WordAnd(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_and(&b_ais, &c_ais)
             }
             Self::WordOr(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_or(&b_ais, &c_ais)
             }
             Self::WordXOr(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_xor(&b_ais, &c_ais)
             }
             Self::WordEq(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_or(&b_ais, &c_ais)
             }
             Self::WordNEq(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_neq(&b_ais, &c_ais)
             }
             Self::WordSrl(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| {
-                    x.eval(
-                        curr_row,
-                        next_row,
-                        public_vals,
-                        is_first_row,
-                        is_transition,
-                        is_last_row,
-                        prime,
-                    )
-                });
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_srl(&b_ais, &c_ais)
             }
@@ -1750,12 +1099,7 @@ pub fn is_koalabear_word_range(
                             let cond = reconstruct_symbolic_word(&word_expr, 0);
                             return Some(LatticeVMSymbolicExpr::WhenNonZero(
                                 lhs.clone(),
-                                Box::new(LatticeVMSymbolicExpr::Lt(
-                                    Box::new(cond),
-                                    Box::new(LatticeVMSymbolicExpr::Constant(
-                                        AbstractInterval::from_i64(2130706433),
-                                    )),
-                                )),
+                                Box::new(LatticeVMSymbolicExpr::KoalaBearRange(Box::new(cond))),
                             ));
                         }
                     }
@@ -1896,7 +1240,7 @@ pub fn eval_base_constraints(
     let num_steps = trace.data.len();
     let mut is_all_true = true;
     for i in 0..num_steps {
-        let mut j = 0;
+        let mut _j = 0;
         for tc in constraints {
             let flag = if is_strict {
                 tc.eval(
@@ -1932,7 +1276,7 @@ pub fn eval_base_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    println!("j: {}", j);
+                    //println!("{}", _j);
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {
@@ -1941,7 +1285,7 @@ pub fn eval_base_constraints(
                     *potential += 1;
                 }
             }
-            j += 1;
+            _j += 1;
         }
     }
     if is_all_true {
@@ -1957,6 +1301,22 @@ pub struct LatticeVMConstraints {
     pub lookup_constraints: Vec<LatticeVMSymbolicExpr>,
     pub pv_pos_constraints: Vec<LatticeVMSymbolicExpr>,
     pub pv_neg_constraints: Vec<LatticeVMSymbolicExpr>,
+    pub blocking_constraints: Vec<(usize, LatticeVMSymbolicExpr)>,
+}
+
+impl LatticeVMConstraints {
+    pub fn new(
+        air_constraints: Vec<LatticeVMSymbolicExpr>,
+        lookup_constraints: Vec<LatticeVMSymbolicExpr>,
+    ) -> Self {
+        LatticeVMConstraints {
+            air_constraints,
+            lookup_constraints,
+            pv_pos_constraints: vec![],
+            pv_neg_constraints: vec![],
+            blocking_constraints: vec![],
+        }
+    }
 }
 
 pub fn eval_constraints(
@@ -1969,6 +1329,38 @@ pub fn eval_constraints(
     let mut potential = 0;
     let mut memo = HashSet::<(usize, usize)>::new();
 
+    // ########## Check Blocking Constraints ###########
+    let num_steps = trace.data.len();
+    let mut blocking_is_all = true;
+    for (i, bc) in &constraints.blocking_constraints {
+        let flag = bc
+            .eval(
+                &trace.data[*i],
+                if *i + 1 < num_steps {
+                    Some(&trace.data[i + 1])
+                } else {
+                    None
+                },
+                public_vals,
+                *i == 0,
+                *i < num_steps - 1,
+                *i == num_steps - 1,
+                prime,
+            )
+            .is_zero(prime);
+
+        match flag {
+            MayBeFlag::True => {}
+            MayBeFlag::False | MayBeFlag::MayBe => {
+                blocking_is_all = false;
+            }
+        }
+    }
+    if !constraints.blocking_constraints.is_empty() && blocking_is_all {
+        return (MayBeFlag::False, 0, memo);
+    }
+
+    // ########## Check AIR Constraints ###########
     let air_flag = eval_base_constraints(
         trace,
         public_vals,
@@ -1983,7 +1375,8 @@ pub fn eval_constraints(
         MayBeFlag::False => return (MayBeFlag::False, 0, memo),
         MayBeFlag::MayBe => is_all_true = false,
     }
-    println!("6666666666");
+
+    // ########## Check Lookup Constraints ###########
     let air_flag = eval_base_constraints(
         trace,
         public_vals,
@@ -1993,13 +1386,13 @@ pub fn eval_constraints(
         &mut potential,
         &mut memo,
     );
-
     match air_flag {
         MayBeFlag::True => {}
         MayBeFlag::False => return (MayBeFlag::False, 0, memo),
         MayBeFlag::MayBe => is_all_true = false,
     }
 
+    // ########## Check Public-Positive Constraints ###########
     for pp in &constraints.pv_pos_constraints {
         let flag = pp
             .eval(
@@ -2024,6 +1417,7 @@ pub fn eval_constraints(
         }
     }
 
+    // ########## Check Public-Negative Constraints ###########
     for pn in &constraints.pv_neg_constraints {
         let flag = pn
             .eval(
@@ -2120,6 +1514,28 @@ pub fn make_impl_constraint(
             )),
             Box::new(expr),
         ))
+    }
+}
+
+pub fn add_blocking_constraint(
+    output_columns: &[usize],
+    constraints: &mut LatticeVMConstraints,
+    base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
+    i: usize,
+) {
+    for j in output_columns {
+        constraints.blocking_constraints.push((
+            i,
+            LatticeVMSymbolicExpr::Sub(
+                Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                    entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                    index: *j,
+                })),
+                Box::new(LatticeVMSymbolicExpr::Constant(
+                    base_abs_main_trace_data[i][*j].clone(),
+                )),
+            ),
+        ));
     }
 }
 

@@ -1,6 +1,8 @@
+use clap::Parser;
+use core::mem::transmute;
 use std::collections::HashSet;
+use std::fs;
 use std::io;
-use std::mem::transmute;
 
 use itertools::Itertools;
 
@@ -11,9 +13,8 @@ use zkm_core_machine::memory::{
     columns::MemoryInstructionsColumns, columns::NUM_MEMORY_INSTRUCTIONS_COLUMNS,
 };
 use zkm_core_machine::MemoryInstructionsChip;
-use zkm_stark::MachineProver;
 
-use latticevm::quick::quick_api;
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
@@ -27,8 +28,8 @@ use latticevm_ziren::utils::{
 
 fn final_check(
     trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
+    _num_trial: usize,
+    _prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
@@ -80,8 +81,8 @@ pub fn target_program_store(opcode: Opcode, pc_start: u32, pc_base: u32) -> Prog
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode_addsub(target_opcode: &str) -> (Opcode, bool) {
-    match target_opcode {
+pub fn get_opcode(opcode_str: &str) -> (Opcode, bool) {
+    match opcode_str {
         "LB" => (Opcode::LB, true),
         "LBU" => (Opcode::LBU, true),
         "LH" => (Opcode::LH, true),
@@ -98,27 +99,22 @@ pub fn get_opcode_addsub(target_opcode: &str) -> (Opcode, bool) {
 }
 
 fn main() -> Result<(), io::Error> {
-    let target_opcode = "SC";
-    let (opcode, is_load) = get_opcode_addsub(target_opcode);
-
     create_or_clear_dir("voutput")?;
+
+    let args = Args::parse();
+    let opcode_str = args.opcode_str;
+    let mut search_config = load_config(&args.config).unwrap();
+    let (opcode, is_load) = get_opcode(&opcode_str);
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
-
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 10000;
-    let min_row_id = if is_load { 1 } else { 0 };
-    let max_row_id = if is_load { 1 } else { 0 };
-    let num_extracted_rows = if is_load { 2 } else { 1 };
-    let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
     let air = MemoryInstructionsChip::default();
     let air_name = "MemoryInstrs";
     let _colmap = make_col_map();
 
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MemoryInstructionsChip>(
             &air,
             NUM_MEMORY_INSTRUCTIONS_COLUMNS,
@@ -129,19 +125,14 @@ fn main() -> Result<(), io::Error> {
     ];
     if is_load {
         semantic_inputs.extend(&[57, 58, 59, 60]);
+        constraint_info.output_columns = vec![4, 5, 6, 7];
     } else {
         semantic_inputs.extend(&[4, 5, 6, 7]);
+        constraint_info.output_columns = vec![57, 58, 59, 60];
     }
-
-    refinable_cols.retain(|c| !semantic_inputs.contains(c));
-
-    let constraints = LatticeVMConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
-    let minimum_num_taregt_cols = 1; //refinable_cols.len();
+    constraint_info
+        .refinable_cols
+        .retain(|c| !semantic_inputs.contains(c));
 
     // ######################## Program Initialization ###########################
     let program = if is_load {
@@ -149,27 +140,36 @@ fn main() -> Result<(), io::Error> {
     } else {
         target_program_store(opcode, 4, 4)
     };
+    let num_extracted_rows = if is_load { 2 } else { 1 };
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
+    // ######################## Set Info ##########################################
+    let program_info = ProgramInfo {
+        program_str: get_program_str(&program),
+        program_len: program.instructions.len(),
+    };
+
+    search_config.min_row_id = if is_load { 1 } else { 0 };
+    search_config.max_row_id = if is_load { 1 } else { 0 };
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+    }
+
     // ######################## Solve ############################################
-    quick_api(
-        get_program_str(&program),
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &vec![],
+    let result = experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         vec![],
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.instructions.len(),
+        &vec![], // vec![0],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-        prime,
-        seed,
-    )
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }

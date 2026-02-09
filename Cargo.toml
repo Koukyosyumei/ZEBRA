@@ -12,7 +12,10 @@ keywords = ["formal method", "security", "zero-knowledge-proof", "zkp"]
 rand = "0.9.2"
 itertools = "0.14.0"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
+serde_json = "1.0.149"
 priority-queue = "2.7.0"
 ratatui = "0.29"
 crossterm = "0.29"
+clap = { version = "4.5.57", features = ["derive"] }
+serde_yaml = "0.9.34"
+anyhow = "1.0.101"

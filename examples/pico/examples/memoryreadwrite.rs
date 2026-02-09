@@ -1,3 +1,4 @@
+use clap::Parser;
 use core::mem::transmute;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -12,11 +13,11 @@ use pico_vm::chips::chips::riscv_memory::read_write::{
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::quick::quick_api;
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
-use latticevm::utils::{create_or_clear_dir, trace_fmt_with_idxs};
+use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_pico::utils::{
@@ -75,7 +76,7 @@ pub fn target_program_store(opcode: Opcode, pc_start: u32, pc_base: u32) -> Prog
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode_addsub(target_opcode: &str) -> (Opcode, bool) {
+pub fn get_opcode(target_opcode: &str) -> (Opcode, bool) {
     match target_opcode {
         "LB" => (Opcode::LB, true),
         "LBU" => (Opcode::LBU, true),
@@ -90,51 +91,42 @@ pub fn get_opcode_addsub(target_opcode: &str) -> (Opcode, bool) {
 }
 
 fn main() -> Result<(), io::Error> {
-    let target_opcode = "LB";
-    let (opcode, is_load) = get_opcode_addsub(target_opcode);
-
     create_or_clear_dir("voutput")?;
+
+    let args = Args::parse();
+    let opcode_str = args.opcode_str;
+    let mut search_config = load_config(&args.config).unwrap();
+    let (opcode, is_load) = get_opcode(&opcode_str);
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
-
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 10000;
-    let min_row_id = if is_load { 1 } else { 0 };
-    let max_row_id = if is_load { 1 } else { 0 };
-    let num_extracted_rows = if is_load { 2 } else { 1 };
-    let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
     let air: MemoryReadWriteChip<KoalaBear> = MemoryReadWriteChip::default();
     let air_name = "MemoryReadWrite";
     let _colmap = make_col_map();
 
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, MemoryReadWriteChip<KoalaBear>>(
-            &air,
-            NUM_MEMORY_CHIP_COLS,
-            prime,
-        );
+    let (mut constraint_info, _general_lookup_info) = extract_constraints_and_range::<
+        KoalaBear,
+        MemoryReadWriteChip<KoalaBear>,
+    >(&air, NUM_MEMORY_CHIP_COLS, prime);
     let mut semantic_inputs = vec![
         0, 1, 24, 25, 26, 27, 32, 33, 55, 64, 65, 66, 67, 72, 73, 77, 78, 79, 80, 81, 82, 86, 87,
         88, 89, 90, 91,
     ];
     if is_load {
         semantic_inputs.extend(&[28, 29, 30, 31]);
+        constraint_info.output_columns = vec![68, 69, 70, 71];
     } else {
         semantic_inputs.extend(&[68, 69, 70, 71]);
+        constraint_info.output_columns = vec![28, 29, 30, 31];
     }
-    refinable_cols.retain(|c| !semantic_inputs.contains(c));
-    refinable_cols.extend(&[83, 84, 85, 92, 93, 94]);
-
-    let constraints = LatticeVMConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
-    let minimum_num_taregt_cols = 1;
+    constraint_info
+        .refinable_cols
+        .retain(|c| !semantic_inputs.contains(c));
+    constraint_info
+        .refinable_cols
+        .extend(&[83, 84, 85, 92, 93, 94]);
 
     // ######################## Program Initialization ###########################
     let program = if is_load {
@@ -142,70 +134,36 @@ fn main() -> Result<(), io::Error> {
     } else {
         target_program_store(opcode, 4, 4)
     };
+    let num_extracted_rows = if is_load { 2 } else { 1 };
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
+    // ######################## Set Info ##########################################
+    let program_info = ProgramInfo {
+        program_str: get_program_str(&program),
+        program_len: program.instructions.len(),
+    };
+
+    search_config.min_row_id = if is_load { 1 } else { 0 };
+    search_config.max_row_id = if is_load { 1 } else { 0 };
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+    }
+
     // ######################## Solve ############################################
-    quick_api(
-        get_program_str(&program),
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &vec![],
+    let result = experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         vec![],
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.instructions.len(),
+        &vec![], // vec![0],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-        prime,
-        seed,
-    )
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }
-
-/*
-opcode = LB
-addr   = 0x1000
-offset = 0
-prev_value = 0x807F01FF
-
-[1, 32, 34, 35, 52, 54, 60, 63]
-
-MemoryChipCols { values: [MemoryChipValueCols {
-    chunk: 0, clk: 1,
-    addr_word: Word([2, 3, 4, 5]),
-    addr_word_range_checker: FieldWordRangeChecker { most_sig_byte_decomp: [6, 7, 8, 9, 10, 11, 12, 13],
-    upper_all_one: IsZeroGadget { inverse: 14, result: 15 } },
-    addr_aligned: 16, aa_least_sig_byte_decomp: [17, 18, 19, 20, 21, 22],
-    addr_offset: 23,
-    memory_access: MemoryReadWriteCols {
-        prev_value: Word([24, 25, 26, 27]),
-        access: MemoryAccessCols { value: Word([28, 29, 30, 31]),
-        prev_chunk: 32,
-        prev_clk: 33,
-        compare_clk: 34,
-        diff_16bit_limb: 35, diff_8bit_limb: 36 } },
-        offset_is_one: 37,
-        offset_is_two: 38,
-        offset_is_three: 39,
-        most_sig_byte_decomp: [40, 41, 42, 43, 44, 45, 46, 47],
-        unsigned_mem_val: Word([48, 49, 50, 51]),
-        mem_value_is_pos_not_x0: 52,
-        mem_value_is_neg_not_x0: 53,
-        instruction: MemoryInstructionCols {
-            opcode: 54, op_a_0: 55, is_lb: 56, is_lbu: 57, is_lh: 58, is_lhu: 59, is_lw: 60, is_sb: 61, is_sh: 62, is_sw: 63,
-            op_a_access: MemoryReadWriteCols {
-                prev_value: Word([64, 65, 66, 67]),
-                 access: MemoryAccessCols { value: Word([68, 69, 70, 71]), prev_chunk: 72, prev_clk: 73, compare_clk: 74, diff_16bit_limb: 75, diff_8bit_limb: 76 }
-                 },
-            op_b_access: MemoryReadCols { access: MemoryAccessCols { value: Word([77, 78, 79, 80]),
-                                            prev_chunk: 81, prev_clk: 82, compare_clk: 83, diff_16bit_limb: 84, diff_8bit_limb: 85 }
-                 },
-            op_c_access: MemoryReadCols { access: MemoryAccessCols { value: Word([86, 87, 88, 89]),
-                                            prev_chunk: 90, prev_clk: 91, compare_clk: 92, diff_16bit_limb: 93, diff_8bit_limb: 94 }
-            } } }] }
-*/

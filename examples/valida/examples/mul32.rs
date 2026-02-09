@@ -1,3 +1,4 @@
+use clap::Parser;
 use std::collections::HashSet;
 use std::fs;
 use std::io;
@@ -13,10 +14,12 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::quick::quick_api;
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
+use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
@@ -89,18 +92,15 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
+    let args = Args::parse();
+    let _opcode_str = args.opcode_str;
+    let mut search_config = load_config(&args.config).unwrap();
+
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
-    let min_row_id = 0;
-    let max_row_id = 0;
-    let num_extracted_rows = 1;
-    let seed = 41;
-
     // ######################## Extract Add Constraints ##########################
-    println!("ADD AIR MAP");
+    println!("MUL AIR MAP");
     println!("  {:?}", MUL_COL_MAP);
 
     let air = Mul32Chip::default();
@@ -108,25 +108,16 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 5;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
-    refinable_cols.extend(&[8, 9, 10, 11]);
+    constraint_info.refinable_cols.extend(&[8, 9, 10, 11]);
+    println!("{:?}", general_lookup_info);
 
-    for t in &tv_constraints {
-        println!("#### {}", t);
+    for t in &constraint_info.constraints.air_constraints {
+        println!("{}", t);
     }
-    println!("{:?}", refinable_cols);
-    println!("{:?}", range_types);
-
-    let constraints = LatticeVMConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
-    let minimum_num_taregt_cols = 3; //refinable_cols.len();
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>(3, 4);
@@ -134,28 +125,32 @@ fn main() -> Result<(), io::Error> {
         .iter()
         .map(|inst| format!("{}\n", inst))
         .collect::<String>();
-
     let base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
 
+    // ######################## Set Info ##########################################
+    let program_info = ProgramInfo {
+        program_str: program_str,
+        program_len: program.len(),
+    };
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+    }
+
     // ######################## Solve ############################################
-    quick_api(
-        program_str,
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &vec![],
+    let result = experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         vec![],
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.len(),
+        &vec![], // vec![0],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-        prime,
-        seed,
-    )
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }

@@ -1,3 +1,4 @@
+use clap::Parser;
 use core::mem::transmute;
 use std::collections::HashSet;
 use std::io;
@@ -7,21 +8,18 @@ use p3_koala_bear::KoalaBear;
 use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
 use zkm_core_machine::AddSubChip;
-use zkm_stark::MachineProver;
 
-use latticevm::interval::AbstractInterval;
-use latticevm::quick::quick_api;
-use latticevm::smt::expr_to_smt_bv;
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::{save_repr_if_unique, UiState};
 use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn canonical_repr_add(trace: &AbstractTrace) -> String {
+fn cr_add(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
         trace_fmt_with_idxs(trace, 0, &[9, 10, 11, 12]),
@@ -30,34 +28,13 @@ fn canonical_repr_add(trace: &AbstractTrace) -> String {
     )
 }
 
-fn canonical_repr_sub(trace: &AbstractTrace) -> String {
+fn cr_sub(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
         trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
         trace_fmt_with_idxs(trace, 0, &[13, 14, 15, 16]),
         trace_fmt_with_idxs(trace, 0, &[9, 10, 11, 12]),
     )
-}
-
-// ############## Final Check Function ##############################
-fn final_check_add(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    save_repr_if_unique(&canonical_repr_add(trace), known_reprt, ui);
-}
-
-fn final_check_sub(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    save_repr_if_unique(&canonical_repr_sub(trace), known_reprt, ui);
 }
 
 const fn make_col_map() -> AddSubCols<usize> {
@@ -66,12 +43,12 @@ const fn make_col_map() -> AddSubCols<usize> {
 }
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
-    let instructions = vec![Instruction::new(opcode, 1, 2, 3, true, true)];
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
-    match target_opcode {
+pub fn get_opcode(opcode_str: &str) -> Opcode {
+    match opcode_str {
         "ADD" => Opcode::ADD,
         "SUB" => Opcode::SUB,
         _ => panic!("unsupported instruction"),
@@ -79,96 +56,67 @@ pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
 }
 
 fn main() -> Result<(), io::Error> {
-    let target_opcode = "ADD";
-
     create_or_clear_dir("voutput")?;
+
+    let args = Args::parse();
+    let opcode_str = args.opcode_str;
+    let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
-    let min_row_id = 0;
-    let max_row_id = 0;
-    let num_extracted_rows = 1;
-    let seed = 41;
+    // ######################## Canonicalization ##################################
+    let cr = if opcode_str == "ADD" { cr_add } else { cr_sub };
+    let final_check =
+        |at: &AbstractTrace, _n: usize, _p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
+            save_repr_if_unique(&cr(at), kr, ui);
+        };
 
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
     let air_name = "AddSub";
     let _colmap = make_col_map();
 
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
-    if target_opcode == "ADD" {
-        refinable_cols.extend(&[2, 3, 4, 5]);
-    } else if target_opcode == "SUB" {
-        refinable_cols.extend(&[9, 10, 11, 12]);
-    }
-
-    let constraints = LatticeVMConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
+    let output_columns = if opcode_str == "ADD" {
+        vec![2, 3, 4, 5]
+    } else {
+        vec![9, 10, 11, 12]
     };
-    let minimum_num_taregt_cols = refinable_cols.len();
+
+    let (mut constraint_info, _general_lookup_info) =
+        extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
+    constraint_info
+        .refinable_cols
+        .extend(&output_columns.clone());
+    constraint_info.output_columns = output_columns.clone();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
-    let base_abs_main_trace_data =
-        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+    let program = target_program(get_opcode(&opcode_str), 4, 4, 2, 3);
+    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
-    // ######################## Generating SMT Formulas ##########################
-    let mut constants: Vec<(usize, usize, AbstractInterval)> = vec![];
-    let mut neg_constants: Vec<(usize, usize, AbstractInterval)> = vec![];
-    for j in 0..NUM_ADD_SUB_COLS {
-        if !refinable_cols.contains(&j) {
-            constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
-        }
+    // ######################## Set Info ##########################################
+    let program_info = ProgramInfo {
+        program_str: get_program_str(&program),
+        program_len: program.instructions.len(),
+    };
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
-    for j in 0..NUM_ADD_SUB_COLS {
-        if refinable_cols.contains(&j) {
-            neg_constants.push((0, j, base_abs_main_trace_data[0][j].clone()));
-        }
-    }
-    let smt_str = expr_to_smt_bv(
-        &constraints,
-        &constants,
-        &neg_constants,
-        &range_types,
-        1,
-        NUM_ADD_SUB_COLS,
-        0,
-        prime,
-    );
-    println!("{}", smt_str);
-    println!("rr: {:?}", range_types);
 
     // ######################## Solve ############################################
-    quick_api(
-        get_program_str(&program),
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &vec![],
+    let result = experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         vec![],
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.instructions.len(),
+        &vec![], // vec![0],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
-        if target_opcode == "ADD" {
-            final_check_add
-        } else if target_opcode == "SUB" {
-            final_check_sub
-        } else {
-            panic!("unsupported instruction")
-        },
-        prime,
-        seed,
-    )
+        final_check,
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }

@@ -1,3 +1,4 @@
+use clap::Parser;
 use core::mem::transmute;
 use std::io;
 
@@ -8,9 +9,8 @@ use pico_vm::chips::chips::alu::bitwise::BitwiseChip;
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::quick::quick_api;
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::utils::indices_arr;
@@ -39,65 +39,57 @@ pub fn get_opcode_addsub(target_opcode: &str) -> Opcode {
 }
 
 fn main() -> Result<(), io::Error> {
-    let target_opcode = "AND";
-
     create_or_clear_dir("voutput")?;
+
+    let args = Args::parse();
+    let opcode_str = args.opcode_str;
+    let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
-
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 100000000;
-    let min_row_id = 0;
-    let max_row_id = 0;
-    let num_extracted_rows = 1;
-    let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
     let air: BitwiseChip<KoalaBear> = BitwiseChip::default();
     let air_name = "Bitwise";
     let _colmap = make_col_map();
 
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, BitwiseChip<KoalaBear>>(
-            &air,
-            NUM_BITWISE_COLS,
-            prime,
-        );
+    let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
+        KoalaBear,
+        BitwiseChip<KoalaBear>,
+    >(&air, NUM_BITWISE_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
-    refinable_cols.extend(&general_lookup_info.alu_output);
-
-    let constraints = LatticeVMConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
-    let minimum_num_taregt_cols = refinable_cols.len();
+    constraint_info
+        .refinable_cols
+        .extend(&general_lookup_info.alu_output);
+    constraint_info.output_columns = general_lookup_info.alu_output;
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(&target_opcode), 4, 4, 2, 3);
-    let base_abs_main_trace_data =
-        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+    let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, 2, 3);
+    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+
+    // ######################## Set Info ##########################################
+    let program_info = ProgramInfo {
+        program_str: get_program_str(&program),
+        program_len: program.instructions.len(),
+    };
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+    }
 
     // ######################## Solve ############################################
-    quick_api(
-        get_program_str(&program),
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &vec![],
+    let result = experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         vec![],
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.instructions.len(),
+        &vec![], // vec![0],
         dummy_program_counter_refine_fn,
         dummy_adjust_pc_program,
         final_check,
-        prime,
-        seed,
-    )
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }

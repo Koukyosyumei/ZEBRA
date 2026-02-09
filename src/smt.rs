@@ -303,8 +303,9 @@ pub fn expr_to_smt_bv(
         n_pvs: usize,
         vars: &mut HashSet<String>,
         prime: u32,
+        not_field_op: bool,
     ) -> String {
-        let mut acc = helper(&vec[0], row_id, n_rows, n_pvs, vars, prime);
+        let mut acc = helper(&vec[0], row_id, n_rows, n_pvs, vars, prime, not_field_op);
         let mut factor: u32 = 1;
 
         for w in vec.iter().skip(1) {
@@ -312,7 +313,7 @@ pub fn expr_to_smt_bv(
             acc = format!(
                 "(bvadd {} (bvmul {} #x{:08x}))",
                 acc,
-                helper(w, row_id, n_rows, n_pvs, vars, prime),
+                helper(w, row_id, n_rows, n_pvs, vars, prime, not_field_op),
                 factor
             );
         }
@@ -326,10 +327,11 @@ pub fn expr_to_smt_bv(
         n_pvs: usize,
         vars: &mut HashSet<String>,
         prime: u32,
+        not_field_op: bool,
     ) -> String {
         let zero_hex = format!("#x{:08x}", 0);
         let one_hex = format!("#x{:08x}", 1);
-        let mut rec = |e| helper(e, row_id, n_rows, n_pvs, vars, prime);
+        let mut rec = |e| helper(e, row_id, n_rows, n_pvs, vars, prime, not_field_op);
 
         match expr {
             LatticeVMSymbolicExpr::IsFirstRow => {
@@ -379,13 +381,25 @@ pub fn expr_to_smt_bv(
                 name
             }
             LatticeVMSymbolicExpr::Add(a, b) => {
-                format!("(ff_add {} {})", rec(a), rec(b),)
+                if not_field_op {
+                    format!("(bvadd {} {})", rec(a), rec(b),)
+                } else {
+                    format!("(ff_add {} {})", rec(a), rec(b),)
+                }
             }
             LatticeVMSymbolicExpr::Sub(a, b) => {
-                format!("(ff_sub {} {})", rec(a), rec(b),)
+                if not_field_op {
+                    format!("(bvsub {} {})", rec(a), rec(b),) // TODO: fix potential overflow
+                } else {
+                    format!("(ff_sub {} {})", rec(a), rec(b),)
+                }
             }
             LatticeVMSymbolicExpr::Mul(a, b) => {
-                format!("(ff_mul {} {})", rec(a), rec(b),)
+                if not_field_op {
+                    format!("(bvmul {} {})", rec(a), rec(b),) // TODO: fix potential overflow
+                } else {
+                    format!("(ff_mul {} {})", rec(a), rec(b),)
+                }
             }
             LatticeVMSymbolicExpr::MulLo(a, b) => {
                 // low 32 bits of 32x32 multiplication
@@ -409,19 +423,6 @@ pub fn expr_to_smt_bv(
                     rec(b),
                 )
             }
-            LatticeVMSymbolicExpr::Neg(a) => {
-                // Two's complement negation
-                format!("(bvneg {})", rec(a))
-            }
-            LatticeVMSymbolicExpr::Msb(a) => {
-                format!(
-                    "((_ zero_extend {}) ((_ extract {} {}) {}))",
-                    32 - 1,
-                    32 - 1,
-                    32 - 1,
-                    rec(a),
-                )
-            }
             LatticeVMSymbolicExpr::Lt(a, b) => {
                 format!(
                     "(ite (bvult {} {}) {} {})",
@@ -430,9 +431,6 @@ pub fn expr_to_smt_bv(
                     zero_hex,
                     one_hex
                 )
-            }
-            LatticeVMSymbolicExpr::Flip(a) => {
-                format!("(ite (= {} {}) {} {})", rec(a), zero_hex, one_hex, zero_hex)
             }
             LatticeVMSymbolicExpr::And(a, b) => {
                 format!("(bvand {} {})", rec(a), rec(b),)
@@ -446,19 +444,44 @@ pub fn expr_to_smt_bv(
             LatticeVMSymbolicExpr::SRL(a, b) => {
                 format!("(bvlshr {} {})", rec(a), rec(b),)
             }
+            LatticeVMSymbolicExpr::Flip(a) => {
+                format!("(ite (= {} {}) {} {})", rec(a), zero_hex, one_hex, zero_hex)
+            }
+            LatticeVMSymbolicExpr::Neg(a) => {
+                // Two's complement negation
+                format!("(bvneg {})", rec(a))
+            }
+            LatticeVMSymbolicExpr::KoalaBearRange(a) => {
+                let mut rec_t = |e| helper(e, row_id, n_rows, n_pvs, vars, prime, true);
+                format!(
+                    "(ite (bvult {} #x7f000001) {} {})",
+                    rec_t(a),
+                    zero_hex,
+                    one_hex
+                )
+            }
+            LatticeVMSymbolicExpr::Msb(a) => {
+                format!(
+                    "((_ zero_extend {}) ((_ extract {} {}) {}))",
+                    32 - 1,
+                    32 - 1,
+                    32 - 1,
+                    rec(a),
+                )
+            }
             LatticeVMSymbolicExpr::WordAdd(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvadd {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordSubU(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvsub {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordMulhs(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!(
                     "((_ extract 63 32) \
             (bvmul ((_ sign_extend 32) {}) ((_ sign_extend 32) {})))",
@@ -466,8 +489,8 @@ pub fn expr_to_smt_bv(
                 )
             }
             LatticeVMSymbolicExpr::WordMulhu(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!(
                     "((_ extract 63 32) \
             (bvmul ((_ zero_extend 32) {}) ((_ zero_extend 32) {})))",
@@ -476,14 +499,14 @@ pub fn expr_to_smt_bv(
             }
             // 符号付き乗算の低位32ビット (bvmulは下位ビットに関しては符号の有無を問わない)
             LatticeVMSymbolicExpr::WordMultl(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvmul {} {})", a_val, b_val)
             }
             // 符号付き乗算の高位32ビット (WordMulhs と同じ挙動)
             LatticeVMSymbolicExpr::WordMulth(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!(
                     "((_ extract 63 32) (bvmul ((_ sign_extend 32) {}) ((_ sign_extend 32) {})))",
                     a_val, b_val
@@ -491,32 +514,32 @@ pub fn expr_to_smt_bv(
             }
             // 符号なし乗算の低位32ビット
             LatticeVMSymbolicExpr::WordMultul(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvmul {} {})", a_val, b_val)
             }
             // 符号なし乗算の高位32ビット (WordMulhu と同じ挙動)
             LatticeVMSymbolicExpr::WordMultuh(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!(
                     "((_ extract 63 32) (bvmul ((_ zero_extend 32) {}) ((_ zero_extend 32) {})))",
                     a_val, b_val
                 )
             }
             LatticeVMSymbolicExpr::WordMul(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvmul {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordSLt(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
-                format!("(ite (bvslt {} {}) {} {})", a_val, b_val, zero_hex, one_hex)
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                format!("(ite (bvslt {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
             }
             LatticeVMSymbolicExpr::WordSrl(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvlshr {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordAnd(a_vec, b_vec) => {
@@ -580,33 +603,33 @@ pub fn expr_to_smt_bv(
                 acc
             }
             LatticeVMSymbolicExpr::WordSub(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvsub {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordDiv(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvudiv {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordSDiv(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvsdiv {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordLt(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(ite (bvult {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
             }
             LatticeVMSymbolicExpr::WordEq(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(ite (= {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
             }
             LatticeVMSymbolicExpr::WordNEq(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime);
+                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
+                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(ite (= {} {}) {} {})", a_val, b_val, zero_hex, one_hex)
             }
         }
@@ -666,28 +689,28 @@ pub fn expr_to_smt_bv(
     // Add modular constraints using bvurem
     for expr in &constraints.air_constraints {
         for i in 0..n_rows {
-            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime);
+            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime, false);
             smt.push_str(&format!("(assert (= {} {}))\n", body, zero_hex));
         }
     }
 
     for expr in &constraints.lookup_constraints {
         for i in 0..n_rows {
-            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime);
+            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime, false);
             smt.push_str(&format!("(assert (= {} {}))\n", body, zero_hex));
         }
     }
 
     for expr in &constraints.pv_pos_constraints {
         for i in 0..n_rows {
-            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime);
+            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime, false);
             smt.push_str(&format!("(assert (= {} {}))\n", body, zero_hex));
         }
     }
 
     for expr in &constraints.pv_neg_constraints {
         for i in 0..n_rows {
-            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime);
+            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime, false);
             smt.push_str(&format!("(assert (not (= {} {})))\n", body, zero_hex));
         }
     }
@@ -706,7 +729,7 @@ pub fn expr_to_smt_bv(
         smt.push_str("(assert (not (and\n");
         for (i, j, v) in neg_constants {
             smt.push_str(&format!(
-                "  (= trace_{}_{} #x{:08x})\n",
+                "  (= (bvurem trace_{}_{} P) #x{:08x})\n",
                 i,
                 j,
                 v.as_canonical_u32(prime)
@@ -720,6 +743,11 @@ pub fn expr_to_smt_bv(
         if let RangeType::U8 = k {
             for i in 0..n_rows {
                 smt.push_str(&format!("(assert (bvule trace_{}_{} #x000000ff))\n", i, j,));
+            }
+        }
+        if let RangeType::U7 = k {
+            for i in 0..n_rows {
+                smt.push_str(&format!("(assert (bvule trace_{}_{} #x0000007f))\n", i, j,));
             }
         }
     }
