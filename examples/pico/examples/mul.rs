@@ -9,11 +9,8 @@ use pico_vm::chips::chips::alu::mul::MulChip;
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::interval::AbstractInterval;
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
-use latticevm::smt::expr_to_smt_bv;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::utils::indices_arr;
