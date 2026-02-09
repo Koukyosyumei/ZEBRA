@@ -123,39 +123,6 @@ fn main() -> Result<(), io::Error> {
         search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
     }
 
-    let a = vec![
-        12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 20, 155, 0, 20, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0,
-        1, 0, 0, 1,
-    ];
-    /*
-    let a = vec![
-        12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 28, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 12, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-        1, 0, 1,
-    ];*/
-    let mut ai = vec![];
-    ai.push(a.iter().map(|x| AbstractInterval::from_i64(*x)).collect());
-    let at = AbstractTrace::new(ai);
-    let re = eval_constraints(&at, None, &constraint_info.constraints, prime);
-    println!("{:?}", re);
-    println!("{}", constraint_info.constraints.air_constraints[1]);
-    println!("{}", constraint_info.constraints.lookup_constraints[1]);
-
-    /*
-        pub fn eval_constraints(
-        trace: &AbstractTrace,
-        public_vals: Option<&[AbstractInterval]>,
-        constraints: &LatticeVMConstraints,
-        prime: u32,
-    )
-         */
-
-    /**
-     * [12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, ]
-     *
-     * [12, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 20, 155, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1]
-     */
     // ######################## Solve ############################################
     let result = experiment_harness(
         &program_info,
