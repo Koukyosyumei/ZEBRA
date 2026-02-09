@@ -50,6 +50,7 @@ fn main() -> Result<(), io::Error> {
     constraint_info
         .refinable_cols
         .extend(&general_lookup_info.alu_output);
+    constraint_info.output_columns = general_lookup_info.alu_output;
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4, 1, 2);

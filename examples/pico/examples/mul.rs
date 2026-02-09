@@ -63,11 +63,11 @@ fn main() -> Result<(), io::Error> {
     constraint_info
         .refinable_cols
         .extend(&general_lookup_info.alu_output);
+    constraint_info.output_columns = general_lookup_info.alu_output;
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, 2, 3);
-    let base_abs_main_trace_data =
-        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
     // ######################## Set Info ##########################################
     let program_info = ProgramInfo {
