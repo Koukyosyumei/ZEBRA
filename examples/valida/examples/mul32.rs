@@ -115,6 +115,10 @@ fn main() -> Result<(), io::Error> {
     constraint_info.refinable_cols.extend(&[8, 9, 10, 11]);
     println!("{:?}", general_lookup_info);
 
+    for t in &constraint_info.constraints.air_constraints {
+        println!("{}", t);
+    }
+
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>(3, 4);
     let program_str = program
