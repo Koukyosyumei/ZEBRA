@@ -1,10 +1,8 @@
 use clap::Parser;
 use core::mem::transmute;
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 
-use itertools::Itertools;
 
 use p3_koala_bear::KoalaBear;
 
@@ -14,20 +12,13 @@ use zkm_core_machine::control_flow::NUM_BRANCH_COLS;
 use zkm_core_machine::BranchChip;
 use zkm_stark::MachineProver;
 
-use latticevm::interval::AbstractInterval;
-use latticevm::quick::quick_api;
-use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo, SearchConfig};
-use latticevm::smt::expr_to_smt_bv;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::symbolic::eval_constraints;
-use latticevm::symbolic::LatticeVMSymbolicEntry;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::symbolic::LatticeVMSymbolicVal;
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
+use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::{generate_alu_final_checker, UiState};
+use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::symbolic::AbstractTrace;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
