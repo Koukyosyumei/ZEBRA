@@ -235,7 +235,7 @@ where
             LookupType::Byte => {
                 let opcode = &s.values[0];
                 let a1 = &s.values[1];
-                let a2 = &s.values[2];
+                let _a2 = &s.values[2];
                 let b = &s.values[3];
                 let c = &s.values[4];
 
