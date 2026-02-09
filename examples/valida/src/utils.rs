@@ -18,7 +18,9 @@ use valida_program::{MachineWithProgramROM, ProgramTableType};
 
 use latticevm::alu::{get_alu_constraint, WordOp};
 use latticevm::interval::AbstractInterval;
+use latticevm::quick::ConstraintInfo;
 use latticevm::solver::{prepare_constraints_and_range_type, RangeType};
+use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::symbolic::{make_impl_constraint, AbstractTrace, LatticeVMSymbolicExpr as LVSExpr};
 use latticevm::utils::GeneralLookupInfo;
 
@@ -228,7 +230,7 @@ pub fn generate_bootstrap_trace_from_program(
     fp: u32,
 ) -> Vec<Vec<AbstractInterval>> {
     let config = get_machine_config();
-    let (prover_opts, show_preprocessed, show_preprocessed_dims, show_public_verifier) =
+    let (prover_opts, _show_preprocessed, _show_preprocessed_dims, _show_public_verifier) =
         prover_options();
 
     let rom = ProgramROM::new(program.clone());
@@ -241,7 +243,7 @@ pub fn generate_bootstrap_trace_from_program(
     let mut runtime = ValidaRuntime::default_for_field::<BabyBear>();
     let mut state = machine.start(&mut runtime);
     let mut metrics = BasicMachineMetrics::initialize();
-    let (instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
+    let (_instance_data, _output) = BasicMachine::run(&mut state, &mut metrics);
 
     let mut traces = state.machine.generate_traces(&config, prover_opts);
 
@@ -266,13 +268,7 @@ pub fn extract_constraints_and_range<M, SC, C>(
     chip: &C,
     num_cols: usize,
     prime: u32,
-) -> (
-    Vec<LVSExpr>,
-    Vec<LVSExpr>,
-    Vec<usize>,
-    HashMap<usize, RangeType>,
-    GeneralLookupInfo,
-)
+) -> (ConstraintInfo, GeneralLookupInfo)
 where
     M: Machine<SC::Val>,
     SC: StarkConfig,
@@ -280,7 +276,7 @@ where
 {
     let mut u8_cols = vec![];
     let mut multiplicities = Vec::new();
-    let mut lookup_symbolic_constraints = Vec::new();
+    let mut lookup_constraints = Vec::new();
     let mut nested_received_vars_from_cpu = Vec::new();
     let mut general_lookup_info = GeneralLookupInfo::default();
 
@@ -291,7 +287,7 @@ where
         &mut u8_cols,
         &mut nested_received_vars_from_cpu,
         &mut multiplicities,
-        &mut lookup_symbolic_constraints,
+        &mut lookup_constraints,
         prime,
     );
 
@@ -312,7 +308,7 @@ where
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
 
-    let mut tv_constraints = symbolic_constraints
+    let mut air_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<SC::Val>(&sc))
         .collect::<Vec<_>>();
@@ -324,18 +320,23 @@ where
         &u8_cols,
         &multiplicities,
         &received_vars_from_cpu,
-        &mut tv_constraints,
-        &lookup_symbolic_constraints,
+        &mut air_constraints,
+        &lookup_constraints,
         prime,
     );
 
-    (
-        tv_constraints,
-        lookup_symbolic_constraints,
-        refinable_cols,
-        range_types,
-        general_lookup_info,
-    )
+    let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
+    let constraint_info = ConstraintInfo {
+        constraints: constraints,
+        num_total_columns: num_cols,
+        num_pv_columns: 0,
+        output_columns: vec![],
+        refinable_cols: refinable_cols,
+        range_types: range_types,
+        prime: prime,
+    };
+
+    (constraint_info, general_lookup_info)
 }
 
 pub fn make_pc_adjuster(
