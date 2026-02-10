@@ -100,9 +100,9 @@ fn main() -> Result<(), io::Error> {
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 
-        //let x = 3978205083;
-        //let y = 3935068620;
-        // 3978205083 3935068620
+        //let x = 1084634549;
+        // let y = 1325261710;
+        // 1084634549 1325261710
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);

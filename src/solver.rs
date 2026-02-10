@@ -324,6 +324,8 @@ where
                     break;
                 }
 
+                aw.fetch_add(1, Ordering::SeqCst);
+
                 // POP
                 let task = {
                     let mut lock = q.lock().unwrap();
@@ -341,12 +343,12 @@ where
                             let _ = tx.send(SolverMsg::Finished);
                             break;
                         }*/
-                        std::thread::sleep(Duration::from_millis(10));
+                        aw.fetch_sub(1, Ordering::SeqCst);
+                        std::thread::sleep(Duration::from_millis(5));
                         continue;
                     }
                 };
 
-                aw.fetch_add(1, Ordering::SeqCst);
                 l_tr.fetch_add(1, Ordering::Relaxed);
                 let my_global_id = g_tr.fetch_add(1, Ordering::SeqCst);
 
