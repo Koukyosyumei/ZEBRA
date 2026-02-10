@@ -1,5 +1,7 @@
 use clap::Parser;
 use core::mem::transmute;
+use rand::Rng;
+use rand::{rngs::StdRng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
 
@@ -89,34 +91,44 @@ fn main() -> Result<(), io::Error> {
         .refinable_cols
         .extend(&output_columns.clone());
     constraint_info.output_columns = output_columns.clone();
-
-    // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode(&opcode_str), 4, 4, 2, 3);
-    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-
-    // ######################## Set Info ##########################################
-    let program_info = ProgramInfo {
-        program_str: get_program_str(&program),
-        program_len: program.instructions.len(),
-    };
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
-    // ######################## Solve ############################################
-    let result = experiment_harness(
-        &program_info,
-        &mut constraint_info,
-        &search_config,
-        &base_abs_main_trace_data,
-        vec![],
-        &vec![], // vec![0],
-        dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
-        final_check,
-        &args.method,
-    );
-    println!("{:?}", result);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
+    for i in 0..100 {
+        let x: u32 = rng.random();
+        let y: u32 = rng.random();
+
+        //let x = 3978205083;
+        //let y = 3935068620;
+        // 3978205083 3935068620
+
+        // ######################## Program Initialization ###########################
+        let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
+        let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: get_program_str(&program),
+            program_len: program.instructions.len(),
+        };
+
+        // ######################## Solve ############################################
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            vec![],
+            &vec![], // vec![0],
+            dummy_program_counter_refine_fn,
+            dummy_adjust_pc_program,
+            final_check,
+            &args.method,
+        );
+        println!("({} {}), {:?}", x, y, result);
+    }
 
     Ok(())
 }

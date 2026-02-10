@@ -334,12 +334,13 @@ where
                     Some(x) => x,
                     None => {
                         // Termination Logic: Am I the last one and is queue empty?
+                        /*
                         let is_q_empty = q.lock().unwrap().is_empty();
                         if aw.load(Ordering::Relaxed) == 0 && is_q_empty {
                             sd.store(true, Ordering::Relaxed);
                             let _ = tx.send(SolverMsg::Finished);
                             break;
-                        }
+                        }*/
                         std::thread::sleep(Duration::from_millis(10));
                         continue;
                     }
@@ -482,8 +483,15 @@ where
         //  上の try_iter ループを抜けたということは空なので、
         //  active_workers が 0 なら終了とみなせます)
 
+        /*
         let workers_active = Arc::strong_count(&queue) > 1; // メインスレッドも持っているので > 1
         if !workers_active {
+            break;
+        }*/
+
+        let queue_empty = queue.lock().unwrap().is_empty();
+        let workers_idle = active_workers.load(Ordering::SeqCst) == 0;
+        if queue_empty && workers_idle {
             break;
         }
 
@@ -565,7 +573,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 min_row_id,
                 max_row_id,
                 max_expansions,
-                4, // Number of workers (adjust as needed)
+                1, // Number of workers (adjust as needed)
                 seed,
                 prime,
                 ui,
