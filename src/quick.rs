@@ -248,3 +248,13 @@ where
         execution_time: start_time.elapsed(),
     })
 }
+
+pub fn mean_variance(durations: &[std::time::Duration]) -> (std::time::Duration, f64) {
+    assert!(!durations.is_empty());
+    let n = durations.len() as f64;
+    let xs: Vec<f64> = durations.iter().map(|d| d.as_secs_f64()).collect();
+    let mean = xs.iter().sum::<f64>() / n;
+    let variance = xs.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n;
+
+    (std::time::Duration::from_secs_f64(mean), variance)
+}

@@ -1,7 +1,6 @@
 use clap::Parser;
 use core::mem::transmute;
-use rand::Rng;
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
 
@@ -11,7 +10,7 @@ use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
 use zkm_core_machine::AddSubChip;
 
-use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
+use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::{save_repr_if_unique, UiState};
@@ -96,13 +95,10 @@ fn main() -> Result<(), io::Error> {
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
-    for i in 0..100 {
+    let mut ds = vec![];
+    for _ in 0..100 {
         let x: u32 = rng.random();
         let y: u32 = rng.random();
-
-        //let x = 1084634549;
-        // let y = 1325261710;
-        // 1084634549 1325261710
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
@@ -128,7 +124,9 @@ fn main() -> Result<(), io::Error> {
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);
+        ds.push(result.unwrap().execution_time);
     }
+    println!("{:?}", mean_variance(&ds));
 
     Ok(())
 }

@@ -1,5 +1,6 @@
 use clap::Parser;
 use core::mem::transmute;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
 
@@ -10,7 +11,7 @@ use zkm_core_machine::misc::MovCondCols;
 use zkm_core_machine::misc::NUM_MOV_COND_COLS;
 use zkm_core_machine::MovCondChip;
 
-use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
+use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::symbolic::AbstractTrace;
@@ -99,33 +100,43 @@ fn main() -> Result<(), io::Error> {
         constraint_info.range_types.insert(i, RangeType::U8);
     }
 
-    // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode(&opcode_str), 4, 4, 11, 12, 13);
-    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
+    let mut ds = vec![];
+    for _ in 0..100 {
+        let x: u32 = rng.random();
+        let y: u32 = rng.random();
+        let z: u32 = rng.random();
 
-    // ######################## Set Info ##########################################
-    let program_info = ProgramInfo {
-        program_str: get_program_str(&program),
-        program_len: program.instructions.len(),
-    };
-    if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+        // ######################## Program Initialization ###########################
+        let program = target_program(get_opcode(&opcode_str), 4, 4, x, y, z);
+        let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: get_program_str(&program),
+            program_len: program.instructions.len(),
+        };
+        if search_config.minimum_num_taregt_cols == 0 {
+            search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+        }
+
+        // ######################## Solve ############################################
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            vec![],
+            &vec![], // vec![0],
+            dummy_program_counter_refine_fn,
+            dummy_adjust_pc_program,
+            final_check,
+            &args.method,
+        );
+        println!("({} {} {}), {:?}", x, y, z, result);
+        ds.push(result.unwrap().execution_time);
     }
-
-    // ######################## Solve ############################################
-    let result = experiment_harness(
-        &program_info,
-        &mut constraint_info,
-        &search_config,
-        &base_abs_main_trace_data,
-        vec![],
-        &vec![], // vec![0],
-        dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
-        final_check,
-        &args.method,
-    );
-    println!("{:?}", result);
+    println!("{:?}", mean_variance(&ds));
 
     Ok(())
 }
