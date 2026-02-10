@@ -415,7 +415,11 @@ where
     let mut last_tick = std::time::Instant::now();
 
     loop {
+        let mut got_msg = false;
+
         for msg in rx.try_iter() {
+            got_msg = true;
+
             match msg {
                 SolverMsg::UpdateStats {
                     trials,
@@ -494,11 +498,13 @@ where
             break;
         }*/
 
+        //if !got_msg {
         let queue_empty = queue.lock().unwrap().is_empty();
         let workers_idle = active_workers.load(Ordering::SeqCst) == 0;
         if queue_empty && workers_idle {
             break;
         }
+        //}
 
         // ワーカーが全員死んでチャネルも空ならループを抜ける
         // (簡略化のため、Disconnect検知は recv() で行うのが一般的ですが、
