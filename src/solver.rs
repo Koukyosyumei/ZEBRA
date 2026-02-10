@@ -313,7 +313,10 @@ where
             let mut last_ui_update = std::time::Instant::now();
 
             loop {
+                aw.fetch_add(1, Ordering::SeqCst);
+
                 if sd.load(Ordering::Relaxed) {
+                    aw.fetch_sub(1, Ordering::SeqCst);
                     break;
                 }
 
@@ -321,10 +324,9 @@ where
                 if l_tr.load(Ordering::Relaxed) >= max_expansions {
                     sd.store(true, Ordering::Relaxed);
                     let _ = tx.send(SolverMsg::Finished); // Signal main thread
+                    aw.fetch_sub(1, Ordering::SeqCst);
                     break;
                 }
-
-                aw.fetch_add(1, Ordering::SeqCst);
 
                 // POP
                 let task = {
@@ -385,7 +387,6 @@ where
                         }
                     }
                 }
-                aw.fetch_sub(1, Ordering::SeqCst);
 
                 // UI UPDATE (Time-based, not count-based)
                 if last_ui_update.elapsed().as_millis() > 100 {
@@ -396,6 +397,8 @@ where
                     });
                     last_ui_update = std::time::Instant::now();
                 }
+
+                aw.fetch_sub(1, Ordering::SeqCst);
             }
         });
     }
