@@ -103,7 +103,7 @@ fn main() -> Result<(), io::Error> {
     let mut ds = vec![];
     for _ in 0..100 {
         let x: u8 = rng.random_range(0..36);
-        let y: u32 = rng.random_range(0..prime);
+        let y: u32 = rng.random(); // rng.random_range(0..prime);
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
