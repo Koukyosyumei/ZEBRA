@@ -11,6 +11,11 @@ use zkm_core_machine::control_flow::JumpColumns;
 use zkm_core_machine::control_flow::NUM_JUMP_COLS;
 use zkm_core_machine::JumpChip;
 
+use zkm_core_machine::{
+    cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
+    CpuChip,
+};
+
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::symbolic::eval_constraints;
@@ -19,6 +24,7 @@ use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
+use zkm_core_executor::syscalls::SyscallCode;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -50,7 +56,7 @@ const fn make_col_map() -> JumpColumns<usize> {
 }
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
-    let instructions = vec![
+    let mut instructions = vec![
         Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
         Instruction::new(Opcode::Jumpi, x, y, 0, true, true),
     ];
@@ -103,7 +109,7 @@ fn main() -> Result<(), io::Error> {
     let mut ds = vec![];
     for _ in 0..100 {
         let x: u8 = rng.random_range(0..36);
-        let y: u32 = rng.random(); // rng.random_range(0..prime);
+        let y: u32 = rng.random_range(0..prime); //rng.random(); // rng.random_range(0..prime);
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
