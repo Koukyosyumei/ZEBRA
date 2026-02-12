@@ -215,6 +215,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     final_check: FinalCheckFn,
     known_solution: &mut HashSet<String>,
     global_total_trials: Arc<AtomicUsize>,
+    sleep_time: &mut Duration,
 ) -> (bool, bool)
 // (Found, Quit)
 where
@@ -511,6 +512,7 @@ where
         //  ここでは active_workers を見るか、単に少し sleep してループさせる)
 
         // 短いスリープを入れてCPU使用率100%を防ぐ
+        *sleep_time += Duration::from_millis(10);
         thread::sleep(Duration::from_millis(10));
     }
 
@@ -536,6 +538,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     known_solution: &mut HashSet<String>,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    sleep_time: &mut Duration,
 ) where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -584,7 +587,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 min_row_id,
                 max_row_id,
                 max_expansions,
-                1, // Number of workers (adjust as needed)
+                4, // Number of workers (adjust as needed)
                 seed,
                 prime,
                 ui,
@@ -592,6 +595,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 final_check.clone(),
                 known_solution,
                 global_count.clone(),
+                sleep_time,
             );
 
             // 3. DECIDE NEXT STEP

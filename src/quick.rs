@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time;
+use std::time::{self, Duration};
 use std::{fs, io};
 
 use clap::Parser;
@@ -99,6 +99,8 @@ where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
+    let mut sleep_time = Duration::from_millis(0);
+
     // ######################## Blocking Closures ################################
     for i in blocked_rows {
         add_blocking_constraint(
@@ -128,6 +130,7 @@ where
             program_counter_refine_fn,
             align_pc_to_program,
             final_check,
+            &mut sleep_time,
         )
     } else {
         // ######################## Generating SMT Formula ##########################
@@ -174,7 +177,7 @@ where
 
         Ok(VerificationResult {
             num_solutions,
-            execution_time: start_time.elapsed(),
+            execution_time: start_time.elapsed() - sleep_time,
         })
     }
 }
@@ -196,6 +199,7 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     program_counter_refine_fn: ProgramCounterRefinFn,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
+    sleep_time: &mut Duration,
 ) -> Result<VerificationResult, io::Error>
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
@@ -233,6 +237,7 @@ where
         &mut known_solution,
         &mut ui,
         &mut terminal,
+        sleep_time,
     );
 
     disable_raw_mode()?;
