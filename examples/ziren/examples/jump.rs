@@ -13,6 +13,7 @@ use zkm_core_machine::JumpChip;
 
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::symbolic::eval_constraints;
 use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
@@ -48,17 +49,10 @@ const fn make_col_map() -> JumpColumns<usize> {
     unsafe { transmute::<[usize; NUM_JUMP_COLS], JumpColumns<usize>>(indices_arr) }
 }
 
-pub fn target_program(
-    opcode: Opcode,
-    pc_start: u32,
-    pc_base: u32,
-    x: u8,
-    y: u32,
-    z: u32,
-) -> Program {
+pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
     let instructions = vec![
-        Instruction::new(Opcode::ADD, x, 0, y, false, true),
-        Instruction::new(opcode, 0, z, 0, false, true),
+        Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
+        Instruction::new(Opcode::Jumpi, x, y, 0, true, true),
     ];
     Program::new(instructions, pc_start, pc_base)
 }
@@ -108,14 +102,11 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..100 {
-        let x: u8 = 11; //rng.random();
-        let y: u32 = 1315025954; //rng.random();
-        let z: u32 = 3753954205; //rng.random();
-
-        // 11 1315025954 3753954205
+        let x: u8 = rng.random_range(0..36);
+        let y: u32 = rng.random_range(0..prime);
 
         // ######################## Program Initialization ###########################
-        let program = target_program(get_opcode(&opcode_str), 4, 4, x, y, z);
+        let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
         let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
         // ######################## Set Info ##########################################
@@ -137,7 +128,7 @@ fn main() -> Result<(), io::Error> {
             final_check,
             &args.method,
         );
-        println!("({} {} {}), {:?}", x, y, z, result);
+        println!("({} {}), {:?}", x, y, result);
         ds.push(result.unwrap().execution_time);
     }
     println!("{:?}", mean_variance(&ds));
