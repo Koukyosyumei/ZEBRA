@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time;
+use std::time::{self, Duration};
 use std::{fs, io};
 
 use clap::Parser;
@@ -99,6 +99,8 @@ where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
+    let mut sleep_time = Duration::from_millis(0);
+
     // ######################## Blocking Closures ################################
     for i in blocked_rows {
         add_blocking_constraint(
@@ -128,6 +130,7 @@ where
             program_counter_refine_fn,
             align_pc_to_program,
             final_check,
+            &mut sleep_time,
         )
     } else {
         // ######################## Generating SMT Formula ##########################
@@ -145,7 +148,7 @@ where
             &constants,
             &neg_constants,
             &constraint_info.range_types,
-            search_config.max_row_id - search_config.min_row_id + 1,
+            base_abs_main_trace_data.len(),
             constraint_info.num_total_columns,
             constraint_info.num_pv_columns,
             constraint_info.prime,
@@ -174,7 +177,7 @@ where
 
         Ok(VerificationResult {
             num_solutions,
-            execution_time: start_time.elapsed(),
+            execution_time: start_time.elapsed() - sleep_time,
         })
     }
 }
@@ -196,6 +199,7 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     program_counter_refine_fn: ProgramCounterRefinFn,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
+    sleep_time: &mut Duration,
 ) -> Result<VerificationResult, io::Error>
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
@@ -233,6 +237,7 @@ where
         &mut known_solution,
         &mut ui,
         &mut terminal,
+        sleep_time,
     );
 
     disable_raw_mode()?;
@@ -247,4 +252,14 @@ where
         num_solutions: known_solution.len(),
         execution_time: start_time.elapsed(),
     })
+}
+
+pub fn mean_variance(durations: &[std::time::Duration]) -> (std::time::Duration, f64) {
+    assert!(!durations.is_empty());
+    let n = durations.len() as f64;
+    let xs: Vec<f64> = durations.iter().map(|d| d.as_secs_f64()).collect();
+    let mean = xs.iter().sum::<f64>() / n;
+    let variance = xs.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n;
+
+    (std::time::Duration::from_secs_f64(mean), variance)
 }

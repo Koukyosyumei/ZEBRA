@@ -215,6 +215,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     final_check: FinalCheckFn,
     known_solution: &mut HashSet<String>,
     global_total_trials: Arc<AtomicUsize>,
+    sleep_time: &mut Duration,
 ) -> (bool, bool)
 // (Found, Quit)
 where
@@ -313,7 +314,10 @@ where
             let mut last_ui_update = std::time::Instant::now();
 
             loop {
+                aw.fetch_add(1, Ordering::SeqCst);
+
                 if sd.load(Ordering::Relaxed) {
+                    aw.fetch_sub(1, Ordering::SeqCst);
                     break;
                 }
 
@@ -321,6 +325,7 @@ where
                 if l_tr.load(Ordering::Relaxed) >= max_expansions {
                     sd.store(true, Ordering::Relaxed);
                     let _ = tx.send(SolverMsg::Finished); // Signal main thread
+                    aw.fetch_sub(1, Ordering::SeqCst);
                     break;
                 }
 
@@ -334,18 +339,19 @@ where
                     Some(x) => x,
                     None => {
                         // Termination Logic: Am I the last one and is queue empty?
+                        /*
                         let is_q_empty = q.lock().unwrap().is_empty();
                         if aw.load(Ordering::Relaxed) == 0 && is_q_empty {
                             sd.store(true, Ordering::Relaxed);
                             let _ = tx.send(SolverMsg::Finished);
                             break;
-                        }
-                        std::thread::sleep(Duration::from_millis(10));
+                        }*/
+                        aw.fetch_sub(1, Ordering::SeqCst);
+                        std::thread::sleep(Duration::from_millis(5));
                         continue;
                     }
                 };
 
-                aw.fetch_add(1, Ordering::SeqCst);
                 l_tr.fetch_add(1, Ordering::Relaxed);
                 let my_global_id = g_tr.fetch_add(1, Ordering::SeqCst);
 
@@ -382,7 +388,6 @@ where
                         }
                     }
                 }
-                aw.fetch_sub(1, Ordering::SeqCst);
 
                 // UI UPDATE (Time-based, not count-based)
                 if last_ui_update.elapsed().as_millis() > 100 {
@@ -393,6 +398,8 @@ where
                     });
                     last_ui_update = std::time::Instant::now();
                 }
+
+                aw.fetch_sub(1, Ordering::SeqCst);
             }
         });
     }
@@ -409,7 +416,11 @@ where
     let mut last_tick = std::time::Instant::now();
 
     loop {
+        let mut got_msg = false;
+
         for msg in rx.try_iter() {
+            got_msg = true;
+
             match msg {
                 SolverMsg::UpdateStats {
                     trials,
@@ -482,16 +493,26 @@ where
         //  上の try_iter ループを抜けたということは空なので、
         //  active_workers が 0 なら終了とみなせます)
 
+        /*
         let workers_active = Arc::strong_count(&queue) > 1; // メインスレッドも持っているので > 1
         if !workers_active {
             break;
+        }*/
+
+        //if !got_msg {
+        let queue_empty = queue.lock().unwrap().is_empty();
+        let workers_idle = active_workers.load(Ordering::SeqCst) == 0;
+        if queue_empty && workers_idle {
+            break;
         }
+        //}
 
         // ワーカーが全員死んでチャネルも空ならループを抜ける
         // (簡略化のため、Disconnect検知は recv() で行うのが一般的ですが、
         //  ここでは active_workers を見るか、単に少し sleep してループさせる)
 
         // 短いスリープを入れてCPU使用率100%を防ぐ
+        *sleep_time += Duration::from_millis(10);
         thread::sleep(Duration::from_millis(10));
     }
 
@@ -517,6 +538,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     known_solution: &mut HashSet<String>,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    sleep_time: &mut Duration,
 ) where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -573,6 +595,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 final_check.clone(),
                 known_solution,
                 global_count.clone(),
+                sleep_time,
             );
 
             // 3. DECIDE NEXT STEP
