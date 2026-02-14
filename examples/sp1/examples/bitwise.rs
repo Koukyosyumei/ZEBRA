@@ -39,7 +39,7 @@ fn main() -> Result<(), io::Error> {
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
-    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
+    let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract CPU Constraints ##########################
     let air = BitwiseChip::default();

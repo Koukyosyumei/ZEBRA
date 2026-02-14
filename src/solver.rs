@@ -15,7 +15,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use crate::symbolic::{
     apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
     detect_conditional_var_sub_var_constraints, gather_boolean_variables, gather_vars,
-    is_boolean_constraint, is_iszero_operator, is_koalabear_word_range,
+    is_babybear_word_range, is_boolean_constraint, is_iszero_operator, is_koalabear_word_range,
     refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
     AbirConstraint, LatticeVMSymbolicExpr,
 };
@@ -622,6 +622,7 @@ pub fn prepare_constraints_and_range_type(
 
     let mut new_tv_constraints = Vec::new();
     let mut is_in_koalabear_word_range_check = false;
+    let mut is_in_babybear_word_range_check = false;
     let mut is_in_iszero_operator = false;
     for t in tv_constraints.iter() {
         if let Some(exprs) = is_iszero_operator(t, prime) {
@@ -640,8 +641,18 @@ pub fn prepare_constraints_and_range_type(
                     new_tv_constraints.push(expr);
                     is_in_koalabear_word_range_check = true;
                 }
+            } else if let Some(expr) = is_babybear_word_range(t, prime) {
+                if is_in_babybear_word_range_check {
+                    is_in_babybear_word_range_check = false;
+                } else {
+                    new_tv_constraints.push(expr);
+                    is_in_babybear_word_range_check = true;
+                }
             } else {
-                if (!is_in_koalabear_word_range_check) && (!is_in_iszero_operator) {
+                if (!is_in_koalabear_word_range_check)
+                    && (!is_in_iszero_operator)
+                    && (!is_in_babybear_word_range_check)
+                {
                     new_tv_constraints.push(t.clone());
                 }
             }

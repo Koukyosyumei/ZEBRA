@@ -460,6 +460,15 @@ pub fn expr_to_smt_bv(
                     one_hex
                 )
             }
+            LatticeVMSymbolicExpr::BabyBearRange(a) => {
+                let mut rec_t = |e| helper(e, row_id, n_rows, n_pvs, vars, prime, true);
+                format!(
+                    "(ite (bvult {} #x78000001) {} {})",
+                    rec_t(a),
+                    zero_hex,
+                    one_hex
+                )
+            }
             LatticeVMSymbolicExpr::Msb(a) => {
                 format!(
                     "((_ zero_extend {}) ((_ extract {} {}) {}))",
