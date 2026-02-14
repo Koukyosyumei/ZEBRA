@@ -1,30 +1,85 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io;
 
 use itertools::Itertools;
 
 use p3_air::Air;
+use p3_air::BaseAir;
+use p3_field::PrimeField32;
 use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
-use sp1_core_executor::Program;
-use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
-use sp1_stark::InteractionBuilder;
-use sp1_stark::MachineProver;
+use sp1_core_executor::{ExecutionState, Executor, Program};
+use sp1_core_machine::{riscv::RiscvAir, utils::trace_checkpoint, utils::SP1CoreProverError};
+use sp1_stark::{
+    air::SP1_PROOF_NUM_PV_ELTS, baby_bear_poseidon2::BabyBearPoseidon2, CpuProver,
+    InteractionBuilder, MachineProver, SP1CoreOpts,
+};
 
-use latticevm::quick::ConstraintInfo;
-use latticevm::solver::prepare_constraints_and_range_type;
-use latticevm::solver::RangeType;
-use latticevm::symbolic::gather_vars;
-use latticevm::symbolic::LatticeVMConstraints;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
-use latticevm::utils::GeneralLookupInfo;
-use latticevm::{interval::AbstractInterval, symbolic::gather_boolean_variables};
+use latticevm::{
+    interval::AbstractInterval,
+    quick::ConstraintInfo,
+    solver::{prepare_constraints_and_range_type, RangeType},
+    symbolic::{
+        gather_boolean_variables, gather_vars, is_iszero_operator, is_koalabear_word_range,
+        LatticeVMConstraints, LatticeVMSymbolicExpr,
+    },
+    utils::GeneralLookupInfo,
+};
 
-use crate::executor::run_sp1_program;
 use crate::lookup::get_symbolic_lookup_constraints;
 use crate::p3_to_tv::convert_p3_expr;
+
+pub fn run_sp1_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
+    // # Execute the Target Program
+    let mut runtime = Executor::new(program.clone(), SP1CoreOpts::default());
+    let (checkpoint, pv, done) = runtime.execute_state(false).unwrap();
+
+    let mut checkpoint_file = tempfile::tempfile()
+        .map_err(SP1CoreProverError::IoError)
+        .unwrap();
+    checkpoint
+        .save(&mut checkpoint_file)
+        .map_err(SP1CoreProverError::IoError)
+        .unwrap();
+
+    type SC = BabyBearPoseidon2;
+    let config = BabyBearPoseidon2::new();
+    let machine = RiscvAir::machine(config);
+    let prover = CpuProver::new(machine);
+
+    //let mut reader = io::BufReader::new(checkpoint_file);
+    //let execution_state: ExecutionState =
+    //    bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
+    let (records, report) = trace_checkpoint::<SC>(
+        program.clone(),
+        &checkpoint_file,
+        SP1CoreOpts::default(),
+        None,
+    );
+    let mut main_traces = records
+        .iter()
+        .map(|record| prover.generate_traces(record))
+        .collect::<Vec<_>>();
+
+    let mut true_abs_traces = vec![];
+    for mt in &mut main_traces[0] {
+        let nrows = mt.1.values.len() / mt.1.width;
+        let mut rows = vec![];
+        for i in 0..nrows {
+            let row = mt.1.row_mut(i);
+            rows.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .collect(),
+            );
+        }
+        true_abs_traces.push((mt.0.clone(), rows));
+    }
+
+    true_abs_traces
+}
 
 pub fn get_program_str(program: &Program) -> String {
     program

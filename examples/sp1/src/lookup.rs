@@ -190,25 +190,6 @@ where
                         ));
                     }
                 }
-
-                /*
-                let shard = &r.values[0];
-                let clk = &r.values[1];
-                let pc = &r.values[2];
-                let next_pc = &r.values[3];
-                let next_next_pc = &r.values[4];
-                let num_extra_cycles = &r.values[5];
-
-                let hi0 = &r.values[19];
-                let hi1 = &r.values[20];
-                let hi2 = &r.values[21];
-                let hi3 = &r.values[22];
-                let op_a_immutable = &r.values[24];
-                let is_rw_a = &r.values[25];
-                let is_check_memory = &r.values[26];
-                let is_halt = &r.values[27];
-                let is_sequential = &r.values[28];
-                */
             }
             InteractionKind::Byte => {
                 let opcode = &s.values[0];
