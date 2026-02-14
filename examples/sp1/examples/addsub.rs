@@ -87,10 +87,10 @@ fn main() -> Result<(), io::Error> {
     let air_name = "AddSub";
     let colmap = make_col_map();
 
-    let output_columns = if opcode_str == "ADD" {
-        vec![1, 2, 3, 4]
+    let (output_columns, num_extracted_rows, min_row_id, max_row_id) = if opcode_str == "ADD" {
+        (vec![1, 2, 3, 4], 1, 0, 0)
     } else {
-        vec![8, 9, 10, 11]
+        (vec![8, 9, 10, 11], 2, 1, 1)
     };
 
     let (mut constraint_info, _general_lookup_info) =
@@ -101,8 +101,9 @@ fn main() -> Result<(), io::Error> {
     constraint_info.output_columns = output_columns.clone();
 
     // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, 2, 3);
-    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 2);
+    let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, 8, 3);
+    let base_abs_main_trace_data =
+        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
     // ######################## Set Info ##########################################
     let program_info = ProgramInfo {
@@ -111,8 +112,8 @@ fn main() -> Result<(), io::Error> {
     };
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
-        search_config.min_row_id = 1;
-        search_config.max_row_id = 1;
+        search_config.min_row_id = min_row_id;
+        search_config.max_row_id = max_row_id;
     }
 
     // ######################## Solve ############################################
