@@ -33,9 +33,9 @@ fn cr_add(trace: &AbstractTrace) -> String {
 fn cr_sub(trace: &AbstractTrace) -> String {
     format!(
         "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
-        trace_fmt_with_idxs(trace, 0, &[11, 12, 13, 14]),
-        trace_fmt_with_idxs(trace, 0, &[8, 9, 10, 11]),
+        trace_fmt_with_idxs(trace, 1, &[1, 2, 3, 4]),
+        trace_fmt_with_idxs(trace, 1, &[11, 12, 13, 14]),
+        trace_fmt_with_idxs(trace, 1, &[8, 9, 10, 11]),
     )
 }
 
@@ -45,7 +45,15 @@ const fn make_col_map() -> AddSubCols<usize> {
 }
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
-    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
+    let instructions = match opcode {
+        Opcode::ADD => vec![Instruction::new(opcode, 1, x, y, true, true)],
+        Opcode::SUB => vec![
+            Instruction::new(Opcode::ADD, 29, 0, 5, false, true),
+            Instruction::new(Opcode::SUB, 31, x, y, true, true),
+        ],
+        _ => panic!("unsupported instruction"),
+    };
+
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -78,11 +86,6 @@ fn main() -> Result<(), io::Error> {
     let air = AddSubChip::default();
     let air_name = "AddSub";
     let colmap = make_col_map();
-    //println!("{:?}", colmap);
-    println!("operand_1: {:?}", colmap.operand_1);
-    println!("operand_2: {:?}", colmap.operand_2);
-    println!("{:?}", colmap.add_operation);
-    println!("{:?}", colmap.op_a_not_0);
 
     let output_columns = if opcode_str == "ADD" {
         vec![1, 2, 3, 4]
@@ -99,7 +102,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, 2, 3);
-    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 2);
 
     // ######################## Set Info ##########################################
     let program_info = ProgramInfo {
@@ -108,6 +111,8 @@ fn main() -> Result<(), io::Error> {
     };
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+        search_config.min_row_id = 1;
+        search_config.max_row_id = 1;
     }
 
     // ######################## Solve ############################################
