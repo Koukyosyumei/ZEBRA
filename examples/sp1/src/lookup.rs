@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use crate::p3_to_tv::convert_p3_virtual_pair_col;
 use p3_air::Air;
 use p3_air::PairCol;
 use p3_air::VirtualPairCol;
@@ -16,6 +15,8 @@ use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::LatticeVMSymbolicExpr;
 use latticevm::utils::GeneralLookupInfo;
+
+use crate::p3_to_tv::convert_p3_virtual_pair_col as cv;
 
 pub fn add_single_var_col_if_possible<F: PrimeField32>(
     b: &VirtualPairCol<F>,
@@ -65,56 +66,31 @@ where
                         }
                     }
                 }
-                let shard = &r.values[0];
-                let clk = &r.values[1];
-                let pc = &r.values[2];
-                let next_pc = &r.values[3];
-                let num_extra_cycles = &r.values[4];
-                let opcode = &r.values[5];
-                let a0 = &r.values[6];
-                let a1 = &r.values[7];
-                let a2 = &r.values[8];
-                let a3 = &r.values[9];
-                let b0 = &r.values[10];
-                let b1 = &r.values[11];
-                let b2 = &r.values[12];
-                let b3 = &r.values[13];
-                let c0 = &r.values[14];
-                let c1 = &r.values[15];
-                let c2 = &r.values[16];
-                let c3 = &r.values[17];
-
-                for i in 7..11 {
+                for i in 6..10 {
                     add_single_var_col_if_possible(
                         &r.values[i],
                         &mut general_lookup_info.alu_output,
                     );
                 }
-                for i in 11..15 {
+                for i in 10..14 {
                     add_single_var_col_if_possible(
                         &r.values[i],
                         &mut general_lookup_info.alu_input1,
                     );
                 }
-                for i in 15..19 {
+                for i in 14..18 {
                     add_single_var_col_if_possible(
                         &r.values[i],
                         &mut general_lookup_info.alu_input2,
                     );
                 }
-
-                let op_a_0 = &r.values[18];
-                let op_a_immutable = &r.values[19];
-                let is_memory = &r.values[20];
-                let is_syscall = &r.values[21];
-                let is_halt = &r.values[22];
             }
             _ => {}
         }
     }
 
     for s in &sends {
-        let multiplicities = convert_p3_virtual_pair_col(&s.multiplicity);
+        let multiplicities = cv(&s.multiplicity);
 
         match s.kind {
             InteractionKind::Program => {
@@ -123,22 +99,28 @@ where
             InteractionKind::Instruction => {
                 let _shard = &s.values[0];
                 let _clk = &s.values[1];
-                let pc = convert_p3_virtual_pair_col(&s.values[2]);
-                let next_pc = convert_p3_virtual_pair_col(&s.values[3]);
+                let pc = cv(&s.values[2]);
+                let next_pc = cv(&s.values[3]);
+                let opcode = cv(&s.values[5]);
 
-                let opcode = convert_p3_virtual_pair_col(&s.values[5]);
-                let a0 = convert_p3_virtual_pair_col(&s.values[6]);
-                let a1 = convert_p3_virtual_pair_col(&s.values[7]);
-                let a2 = convert_p3_virtual_pair_col(&s.values[8]);
-                let a3 = convert_p3_virtual_pair_col(&s.values[9]);
-                let b0 = convert_p3_virtual_pair_col(&s.values[10]);
-                let b1 = convert_p3_virtual_pair_col(&s.values[11]);
-                let b2 = convert_p3_virtual_pair_col(&s.values[12]);
-                let b3 = convert_p3_virtual_pair_col(&s.values[13]);
-                let c0 = convert_p3_virtual_pair_col(&s.values[14]);
-                let c1 = convert_p3_virtual_pair_col(&s.values[15]);
-                let c2 = convert_p3_virtual_pair_col(&s.values[16]);
-                let c3 = convert_p3_virtual_pair_col(&s.values[17]);
+                let a = [
+                    cv(&s.values[6]),
+                    cv(&s.values[7]),
+                    cv(&s.values[8]),
+                    cv(&s.values[9]),
+                ];
+                let b = [
+                    cv(&s.values[10]),
+                    cv(&s.values[11]),
+                    cv(&s.values[12]),
+                    cv(&s.values[13]),
+                ];
+                let c = [
+                    cv(&s.values[14]),
+                    cv(&s.values[15]),
+                    cv(&s.values[16]),
+                    cv(&s.values[17]),
+                ];
 
                 let tmps = vec![
                     (Opcode::ADD as u8, WordOp::Add),
@@ -152,17 +134,11 @@ where
                     (Opcode::SRL as u8, WordOp::SRL),
                 ];
                 for t in tmps {
-                    let alu_constraint = get_alu_constraint(
-                        &[a0.clone(), a1.clone(), a2.clone(), a3.clone()],
-                        &[b0.clone(), b1.clone(), b2.clone(), b3.clone()],
-                        &[c0.clone(), c1.clone(), c2.clone(), c3.clone()],
-                        &[a0.clone(), a1.clone(), a2.clone(), a3.clone()],
-                        &t.1,
-                    );
+                    let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
                     let impl_constraint =
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
                     if let Some(impl_constraint) = impl_constraint {
-                        for i in 7..19 {
+                        for i in 6..18 {
                             add_single_var_col_if_possible(&s.values[i], u8_cols);
                         }
 
@@ -203,10 +179,10 @@ where
                 add_single_var_col_if_possible(&c, u8_cols);
                 add_single_var_col_if_possible(&a1, u8_cols);
 
-                let a1_expr = convert_p3_virtual_pair_col(&a1);
-                let b_expr = convert_p3_virtual_pair_col(&b);
-                let c_expr = convert_p3_virtual_pair_col(&c);
-                let opcode_condition = convert_p3_virtual_pair_col(&opcode);
+                let a1_expr = cv(&a1);
+                let b_expr = cv(&b);
+                let c_expr = cv(&c);
+                let opcode_condition = cv(&opcode);
 
                 let ops = [
                     (
