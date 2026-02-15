@@ -4,15 +4,16 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
 
-use p3_koala_bear::KoalaBear;
+use p3_baby_bear::BabyBear;
 
 use sp1_core_executor::{Instruction, Opcode, Program};
+use sp1_core_machine::control_flow::BranchChip;
 use sp1_core_machine::control_flow::BranchColumns;
 use sp1_core_machine::control_flow::NUM_BRANCH_COLS;
-use sp1_core_machine::BranchChip;
 use sp1_stark::MachineProver;
 
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
+use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::save_repr_if_unique;
@@ -20,7 +21,7 @@ use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
-use latticevm_ziren::utils::{
+use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
@@ -33,13 +34,12 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "pc: {}, next_pc: [{}], next_next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
-        trace.data[0][0],
-        trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
-        trace_fmt_with_idxs(trace, 0, &[23, 24, 25, 26]),
-        trace_fmt_with_idxs(trace, 0, &[41, 42, 43, 44]),
-        trace_fmt_with_idxs(trace, 0, &[45, 46, 47, 48]),
-        trace_fmt_with_idxs(trace, 0, &[49, 50, 51, 52]),
+        "pc: [{}], next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
+        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
+        trace_fmt_with_idxs(trace, 0, &[5, 6, 7, 8]),
+        trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+        trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
+        trace_fmt_with_idxs(trace, 0, &[18, 19, 20, 21]),
     );
     save_repr_if_unique(&string_representation, known_reprt, ui);
 }
@@ -68,10 +68,8 @@ pub fn target_program(
 pub fn get_opcode(opcode_str: &str) -> Opcode {
     match opcode_str {
         "BEQ" => Opcode::BEQ,
-        "BGEZ" => Opcode::BGEZ,
-        "BGTZ" => Opcode::BGTZ,
-        "BLEZ" => Opcode::BLEZ,
-        "BLTZ" => Opcode::BLTZ,
+        "BGE" => Opcode::BGE,
+        "BLT" => Opcode::BLT,
         "BNE" => Opcode::BNE,
         _ => panic!("unsupported instruction"),
     }
@@ -90,11 +88,18 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = BranchChip::default();
     let air_name = "Branch";
-    let _colmap = make_col_map();
+    let colmap = make_col_map();
+    println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
-    let output_columns = vec![23, 24, 25, 26];
+        extract_constraints_and_range::<BabyBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
+    let output_columns = vec![5, 6, 7, 8];
+    for i in vec![5, 6, 7] {
+        constraint_info.range_types.insert(i, RangeType::U8);
+    }
+    for i in vec![8] {
+        constraint_info.range_types.insert(i, RangeType::U7);
+    }
 
     constraint_info
         .refinable_cols
@@ -106,7 +111,9 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..100 {
+    for itr in 0..100 {
+        search_config.seed = itr;
+        // 348700191 1277004721 3967593022
         let x: u32 = rng.random();
         let y: u32 = rng.random();
         let z: u32 = rng.random();
