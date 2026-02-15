@@ -174,18 +174,17 @@ where
                 let b = &s.values[3];
                 let c = &s.values[4];
 
-                if opcode.column_weights.is_empty() {
-                    if opcode.constant.as_canonical_u32() == 4 {
-                        add_u8_col_if_possible(&b, u8_cols);
-                        add_u8_col_if_possible(&c, u8_cols);
-                    }
+                add_u8_col_if_possible(&b, u8_cols);
+                add_u8_col_if_possible(&c, u8_cols);
 
+                if opcode.column_weights.is_empty() {
                     if opcode.constant.as_canonical_u32() == 8 {
                         add_u16_col_if_possible(&a1, u16_cols);
                     }
                 }
 
                 let a1_expr = cv(&a1);
+                let a2_expr = cv(&a2);
                 let b_expr = cv(&b);
                 let c_expr = cv(&c);
                 let opcode_condition = cv(&opcode);
@@ -193,6 +192,7 @@ where
                 let ops = [
                     (
                         0,
+                        &a1_expr,
                         LatticeVMSymbolicExpr::And(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
@@ -200,6 +200,7 @@ where
                     ),
                     (
                         1,
+                        &a1_expr,
                         LatticeVMSymbolicExpr::Or(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
@@ -207,26 +208,48 @@ where
                     ),
                     (
                         2,
+                        &a1_expr,
                         LatticeVMSymbolicExpr::Xor(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
                         ),
                     ),
                     (
+                        5,
+                        &a1_expr,
+                        LatticeVMSymbolicExpr::SRL(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        ),
+                    ),
+                    (
+                        5,
+                        &a2_expr,
+                        LatticeVMSymbolicExpr::SRLCarry(
+                            Box::new(b_expr.clone()),
+                            Box::new(c_expr.clone()),
+                        ),
+                    ),
+                    (
                         6,
+                        &a1_expr,
                         LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
                             Box::new(b_expr.clone()),
                             Box::new(c_expr.clone()),
                         ))),
                     ),
-                    (7, LatticeVMSymbolicExpr::Msb(Box::new(b_expr.clone()))),
+                    (
+                        7,
+                        &a1_expr,
+                        LatticeVMSymbolicExpr::Msb(Box::new(b_expr.clone())),
+                    ),
                 ];
 
-                for (opcode, op_expr) in ops {
+                for (opcode, a_expr, op_expr) in ops {
                     let el_constraint = make_impl_constraint(
                         opcode,
                         &opcode_condition,
-                        LatticeVMSymbolicExpr::Sub(Box::new(a1_expr.clone()), Box::new(op_expr)),
+                        LatticeVMSymbolicExpr::Sub(Box::new(a_expr.clone()), Box::new(op_expr)),
                         prime,
                     );
                     if let Some(el_constraint) = el_constraint {

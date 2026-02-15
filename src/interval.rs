@@ -358,6 +358,76 @@ impl AbstractInterval {
         }
     }
 
+    pub fn shr_carry(self, rhs: Self) -> (Self, Self) {
+        if self.lo < 0 || rhs.lo < 0 {
+            //panic!("LTU for negative region is not supported. {}", self);
+            return (
+                AbstractInterval::from_i64(123456),
+                AbstractInterval::from_i64(123456),
+            );
+            //return AbstractInterval::bool();
+        }
+        // assert!(self.lo >= 0 && rhs.lo >= 0);
+
+        // Logical right shift with carry
+        // self = x interval
+        // rhs  = shift amount interval
+        // Assume 0 <= values <= 255
+        let a = self.lo as u64;
+        let b = self.hi as u64;
+        let c = rhs.lo as u32;
+        let d = rhs.hi as u32;
+
+        // ---- shifted result ----
+        let shift_lo = (a >> d) as i64;
+        let shift_hi = (b >> c) as i64;
+
+        // ---- carry ----
+        let carry = if a == b && c == d {
+            // exact singleton
+            let s = c;
+            let carry_val = if s >= 64 {
+                a
+            } else if s == 0 {
+                0
+            } else {
+                a & ((1u64 << s) - 1)
+            };
+
+            AbstractInterval::from_i64(carry_val as i64)
+        } else if c >= 64 {
+            // always full drop
+            AbstractInterval {
+                lo: a as i64,
+                hi: b as i64,
+            }
+        } else if d >= 64 {
+            // may fully drop
+            AbstractInterval {
+                lo: a as i64,
+                hi: b as i64,
+            }
+        } else if d == 0 {
+            AbstractInterval { lo: 0, hi: 0 }
+        } else {
+            let max_mask = (1u64 << d) - 1;
+            let hi = std::cmp::min(b, max_mask);
+
+            AbstractInterval {
+                lo: 0,
+                hi: hi as i64,
+            }
+        };
+
+        (
+            AbstractInterval {
+                lo: shift_lo,
+                hi: shift_hi,
+            },
+            carry,
+        )
+    }
+
     pub fn ltu(&self, rhs: Self) -> AbstractInterval {
         if self.lo < 0 {
             //panic!("LTU for negative region is not supported. {}", self);

@@ -73,6 +73,7 @@ pub enum LatticeVMSymbolicExpr {
     Or(Box<Self>, Box<Self>),
     Xor(Box<Self>, Box<Self>),
     SRL(Box<Self>, Box<Self>),
+    SRLCarry(Box<Self>, Box<Self>),
     Lt(Box<Self>, Box<Self>),
     Msb(Box<Self>),
     Neg(Box<Self>),
@@ -144,6 +145,10 @@ pub fn gather_vars_simple(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
         LatticeVMSymbolicExpr::SRL(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::SRLCarry(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
@@ -295,6 +300,7 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Or(x, y) => write!(f, "({} || {})", x, y),
             Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
             Self::SRL(x, y) => write!(f, "({} >> {})", x, y),
+            Self::SRLCarry(x, y) => write!(f, "({} >>~ {})", x, y),
             Self::Lt(x, y) => write!(f, "({} < {})", x, y),
             Self::Msb(x) => write!(f, "msb({})", x),
             Self::Neg(x) => write!(f, "-{}", x),
@@ -565,6 +571,7 @@ impl LatticeVMSymbolicExpr {
             Self::Or(a, b) => rec(a) | rec(b),
             Self::Xor(a, b) => rec(a) ^ rec(b),
             Self::SRL(a, b) => rec(a) >> rec(b),
+            Self::SRLCarry(a, b) => rec(a).shr_carry(rec(b)).1,
             Self::Lt(a, b) => rec(a).ltu(rec(b)),
             Self::Neg(a) => -rec(a),
             Self::Flip(a) => {
@@ -1325,6 +1332,7 @@ pub fn eval_base_constraints(
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {
+                    //println!("{}: {}", _j, tc);
                     gather_vars(i, tc, memo);
                     is_all_true = false;
                     *potential += 1;

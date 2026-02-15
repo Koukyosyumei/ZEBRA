@@ -444,6 +444,15 @@ pub fn expr_to_smt_bv(
             LatticeVMSymbolicExpr::SRL(a, b) => {
                 format!("(bvlshr {} {})", rec(a), rec(b),)
             }
+            LatticeVMSymbolicExpr::SRLCarry(a, b) => {
+                format!(
+                    "(bvand {} (bvsub (bvshl {} {}) {}))",
+                    rec(a),
+                    one_hex,
+                    rec(b),
+                    one_hex
+                )
+            }
             LatticeVMSymbolicExpr::Flip(a) => {
                 format!("(ite (= {} {}) {} {})", rec(a), zero_hex, one_hex, zero_hex)
             }
