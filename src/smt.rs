@@ -749,6 +749,11 @@ pub fn expr_to_smt_bv(
 
     // ranges
     for (j, k) in range_types {
+        if let RangeType::U16 = k {
+            for i in 0..n_rows {
+                smt.push_str(&format!("(assert (bvule trace_{}_{} #x0000ffff))\n", i, j,));
+            }
+        }
         if let RangeType::U8 = k {
             for i in 0..n_rows {
                 smt.push_str(&format!("(assert (bvule trace_{}_{} #x000000ff))\n", i, j,));

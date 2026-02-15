@@ -1321,7 +1321,7 @@ pub fn eval_base_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    //println!("{}", _j);
+                    //println!("{}: {}", _j, tc);
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {

@@ -115,6 +115,7 @@ where
     A: Air<InteractionBuilder<F>> + Air<SymbolicAirBuilder<F>>,
 {
     let mut u8_cols = vec![];
+    let mut u16_cols = vec![];
     let mut multiplicities = HashSet::new();
     let mut lookup_constraints = Vec::new();
     let mut received_vars_from_cpu = HashSet::new();
@@ -126,6 +127,7 @@ where
         0,
         SP1_PROOF_NUM_PV_ELTS,
         &mut u8_cols,
+        &mut u16_cols,
         &mut multiplicities,
         &mut lookup_constraints,
         &mut received_vars_from_cpu,
@@ -140,6 +142,7 @@ where
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         num_cols,
         &u8_cols,
+        &mut u16_cols,
         &multiplicities,
         &received_vars_from_cpu,
         &mut air_constraints,

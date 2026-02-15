@@ -610,6 +610,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
 pub fn prepare_constraints_and_range_type(
     num_cols: usize,
     u8_cols: &Vec<usize>,
+    u16_cols: &Vec<usize>,
     multiplicities: &HashSet<usize>,
     received_vars_from_cpu: &HashSet<usize>,
     tv_constraints: &mut Vec<LatticeVMSymbolicExpr>,
@@ -678,6 +679,9 @@ pub fn prepare_constraints_and_range_type(
         .collect();
     for c in u8_cols {
         range_types.insert(*c, RangeType::U8);
+    }
+    for c in u16_cols {
+        range_types.insert(*c, RangeType::U16);
     }
 
     (refinable_cols, range_types)
