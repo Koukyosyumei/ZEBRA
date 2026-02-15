@@ -33,10 +33,10 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "pc: [{}], next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
+        "pc: [{}], next_pc: [{}], op_b_value: [{}], op_c_value: [{}]",
         trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
         trace_fmt_with_idxs(trace, 0, &[5, 6, 7, 8]),
-        trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+        //trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
         trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
         trace_fmt_with_idxs(trace, 0, &[18, 19, 20, 21]),
     );
@@ -111,7 +111,7 @@ fn main() -> Result<(), io::Error> {
     let mut ds = vec![];
     for _ in 0..100 {
         let x: u8 = rng.random_range(0..32);
-        let y: u32 = rng.random_range(0..prime); //rng.random(); // rng.random_range(0..prime);
+        let y: u32 = rng.random_range(0..10000); //rng.random(); // rng.random_range(0..prime);
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 8, 8, x, y);
