@@ -146,7 +146,6 @@ where
         &lookup_constraints,
         prime,
     );
-    println!("444: {:?}", refinable_cols);
 
     let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
     let constraint_info = ConstraintInfo {
