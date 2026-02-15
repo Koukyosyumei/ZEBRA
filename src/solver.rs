@@ -587,7 +587,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 min_row_id,
                 max_row_id,
                 max_expansions,
-                4, // Number of workers (adjust as needed)
+                8, // Number of workers (adjust as needed)
                 seed,
                 prime,
                 ui,

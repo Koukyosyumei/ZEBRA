@@ -50,7 +50,7 @@ const fn make_col_map() -> JumpColumns<usize> {
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
     let mut instructions = vec![
-        Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
+        //Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
         Instruction::new(Opcode::JAL, x, y, 0, true, true),
     ];
     Program::new(instructions, pc_start, pc_base)
@@ -83,7 +83,10 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BabyBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
     let output_columns = vec![5, 6, 7, 8];
-    for i in vec![5, 6, 7, 8] {
+    for i in vec![5, 6, 7, 8, 0, 1, 2] {
+        constraint_info.range_types.insert(i, RangeType::U8);
+    }
+    for i in vec![8] {
         constraint_info.range_types.insert(i, RangeType::U8);
     }
 
@@ -92,18 +95,26 @@ fn main() -> Result<(), io::Error> {
         .extend(&output_columns.clone());
     constraint_info.output_columns = output_columns.clone();
 
-    if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 2; //constraint_info.refinable_cols.len();
+    for t in &constraint_info.constraints.air_constraints {
+        println!("# {}", t);
     }
+    for t in &constraint_info.constraints.lookup_constraints {
+        println!("* {}", t);
+    }
+
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+    }
+    search_config.seed = 1;
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..1 {
-        let x: u8 = rng.random_range(0..36);
-        let y: u32 = rng.random_range(0..prime); //rng.random(); // rng.random_range(0..prime);
+        let x: u8 = rng.random_range(0..32);
+        let y: u32 = rng.random_range(0..256); //rng.random(); // rng.random_range(0..prime);
 
         // ######################## Program Initialization ###########################
-        let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
+        let program = target_program(get_opcode(&opcode_str), 8, 8, x, y);
         let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
         // ######################## Set Info ##########################################

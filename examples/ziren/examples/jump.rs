@@ -91,6 +91,13 @@ fn main() -> Result<(), io::Error> {
         extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
     let output_columns = vec![19, 20, 21, 22, 37, 38, 39, 40];
 
+    for t in &constraint_info.constraints.air_constraints {
+        println!("# {}", t);
+    }
+    for t in &constraint_info.constraints.lookup_constraints {
+        println!("* {}", t);
+    }
+
     constraint_info
         .refinable_cols
         .extend(&output_columns.clone());
