@@ -3,40 +3,22 @@ use core::mem::transmute;
 use std::collections::HashSet;
 use std::io;
 
-use p3_koala_bear::KoalaBear;
+use p3_baby_bear::BabyBear;
 
-use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::alu::{DivRemCols, NUM_DIVREM_COLS};
-use zkm_core_machine::DivRemChip;
+use sp1_core_executor::{Instruction, Opcode, Program};
+use sp1_core_machine::alu::{DivRemCols, NUM_DIVREM_COLS};
+use sp1_core_machine::riscv::DivRemChip;
 
-use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
+use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::symbolic::AbstractTrace;
 use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::UiState;
+use latticevm::ui::{generate_alu_final_checker, UiState};
 use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
 
-use latticevm_ziren::utils::{
+use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
-
-fn canonical_repr_div(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-        trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
-    )
-}
-
-fn canonical_repr_rem(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-        trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
-    )
-}
 
 const fn make_col_map() -> DivRemCols<usize> {
     let indices_arr = indices_arr::<{ NUM_DIVREM_COLS }>();
@@ -52,8 +34,8 @@ pub fn get_opcode(opcode_str: &str) -> Opcode {
     match opcode_str {
         "DIV" => Opcode::DIV,
         "DIVU" => Opcode::DIVU,
-        "MOD" => Opcode::MOD,
-        "MODU" => Opcode::MODU,
+        "REM" => Opcode::REM,
+        "REMU" => Opcode::REMU,
         _ => panic!("unsupported instruction"),
     }
 }
@@ -68,37 +50,19 @@ fn main() -> Result<(), io::Error> {
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
-    // ######################## Canonicalization ##################################
-    let cr = if opcode_str == "DIV" || opcode_str == "DIVU" {
-        canonical_repr_div
-    } else {
-        canonical_repr_rem
-    };
-    let final_check =
-        |at: &AbstractTrace, _n: usize, _p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
-            save_repr_if_unique(&cr(at), kr, ui);
-        };
-
-    let output_columns = if opcode_str == "DIV" || opcode_str == "DIVU" {
-        vec![10, 11, 12, 13]
-    } else {
-        vec![14, 15, 16, 17]
-    };
-
     // ######################## Extract CPU Constraints ##########################
     let air = DivRemChip::default();
     let air_name = "DivRem";
-    let _colmap = make_col_map();
-    let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
+    let colmap = make_col_map();
+
+    let (mut constraint_info, general_lookup_info) =
+        extract_constraints_and_range::<BabyBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
+    let final_check = generate_alu_final_checker(general_lookup_info.clone());
+    println!("{:?}", general_lookup_info);
+
     constraint_info
         .refinable_cols
-        .extend(&output_columns.clone());
-    constraint_info.output_columns = output_columns.clone();
-
-    for i in &output_columns {
-        constraint_info.range_types.insert(*i, RangeType::U8);
-    }
+        .extend(&general_lookup_info.alu_output.clone());
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode(&opcode_str), 4, 4, 13, 3);
