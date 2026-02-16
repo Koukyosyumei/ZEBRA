@@ -1,5 +1,3 @@
-use num_traits::One;
-
 use p3_air::PairCol;
 use p3_field::PrimeField32;
 use p3_uni_stark::{Entry, SymbolicVariable};
