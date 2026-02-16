@@ -16,7 +16,7 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::UiState;
+use latticevm::ui::{generate_memory_op_final_checker, UiState};
 use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
@@ -35,16 +35,11 @@ fn final_check(
     let mut string_representation = String::new();
     for i in 0..trace.data.len() {
         let row_string_representation = format!(
-            "clk: {}\nprev_value: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nop_a_access: {}\nmem_access: [{}]",
+            "clk: {}\nop_a_access: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nmem_access: [{}]",
             trace.data[i][1],
-            trace_fmt_with_idxs(trace, i, &[24, 25, 26, 27]),
+            trace_fmt_with_idxs(trace, i, &[68, 69, 70, 71]),
             trace_fmt_with_idxs(trace, i, &[77, 78, 79, 80]),
             trace_fmt_with_idxs(trace, i, &[86, 87, 88, 89]),
-            format!(
-                "prev_value: [{}], value: [{}]",
-                trace_fmt_with_idxs(trace, i, &[64, 65, 66, 67]),
-                trace_fmt_with_idxs(trace, i, &[68, 69, 70, 71])
-            ),
             trace_fmt_with_idxs(trace, i, &[28, 29, 30, 31]),
         );
         string_representation.push_str(&row_string_representation);
@@ -110,6 +105,8 @@ fn main() -> Result<(), io::Error> {
         KoalaBear,
         MemoryReadWriteChip<KoalaBear>,
     >(&air, NUM_MEMORY_CHIP_COLS, prime);
+    let final_check =
+        generate_memory_op_final_checker(general_lookup_info.clone(), 1, vec![28, 29, 30, 31]);
     let mut semantic_inputs = vec![
         0, 1, 24, 25, 26, 27, 32, 33, 55, 64, 65, 66, 67, 72, 73, 77, 78, 79, 80, 81, 82, 86, 87,
         88, 89, 90, 91,
