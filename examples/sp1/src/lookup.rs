@@ -18,18 +18,13 @@ use latticevm::utils::GeneralLookupInfo;
 
 use crate::p3_to_tv::convert_p3_virtual_pair_col as cv;
 
-pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+pub fn add_single_col_if_possible<F: PrimeField32>(
+    b: &VirtualPairCol<F>,
+    u8_cols: &mut Vec<usize>,
+) {
     if !b.column_weights.is_empty() {
         if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
             u8_cols.push(col_idx);
-        }
-    }
-}
-
-pub fn add_u16_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u16_cols: &mut Vec<usize>) {
-    if !b.column_weights.is_empty() {
-        if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
-            u16_cols.push(col_idx);
         }
     }
 }
@@ -73,13 +68,13 @@ where
                     }
                 }
                 for i in 6..10 {
-                    add_u8_col_if_possible(&r.values[i], &mut general_lookup_info.alu_output);
+                    add_single_col_if_possible(&r.values[i], &mut general_lookup_info.op_a);
                 }
                 for i in 10..14 {
-                    add_u8_col_if_possible(&r.values[i], &mut general_lookup_info.alu_input1);
+                    add_single_col_if_possible(&r.values[i], &mut general_lookup_info.op_b);
                 }
                 for i in 14..18 {
-                    add_u8_col_if_possible(&r.values[i], &mut general_lookup_info.alu_input2);
+                    add_single_col_if_possible(&r.values[i], &mut general_lookup_info.op_c);
                 }
             }
             _ => {}
@@ -139,7 +134,7 @@ where
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 6..18 {
-                            add_u8_col_if_possible(&s.values[i], u8_cols);
+                            add_single_col_if_possible(&s.values[i], u8_cols);
                         }
 
                         lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
@@ -174,12 +169,12 @@ where
                 let b = &s.values[3];
                 let c = &s.values[4];
 
-                add_u8_col_if_possible(&b, u8_cols);
-                add_u8_col_if_possible(&c, u8_cols);
+                add_single_col_if_possible(&b, u8_cols);
+                add_single_col_if_possible(&c, u8_cols);
 
                 if opcode.column_weights.is_empty() {
                     if opcode.constant.as_canonical_u32() == 8 {
-                        add_u16_col_if_possible(&a1, u16_cols);
+                        add_single_col_if_possible(&a1, u16_cols);
                     }
                 }
 
