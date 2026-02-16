@@ -49,8 +49,8 @@ fn main() -> Result<(), io::Error> {
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
         .refinable_cols
-        .extend(&general_lookup_info.alu_output);
-    constraint_info.output_columns = general_lookup_info.alu_output;
+        .extend(&general_lookup_info.op_a);
+    constraint_info.output_columns = general_lookup_info.op_a;
 
     // ######################## Program Initialization ###########################
     let program = target_program(4, 4, 1, 2);
