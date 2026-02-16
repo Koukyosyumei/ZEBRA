@@ -32,7 +32,7 @@ pub fn add_single_col_if_possible<F: PrimeField32>(
 pub fn get_symbolic_lookup_constraints<F, A>(
     air: &A,
     preprocessed_width: usize,
-    num_public_values: usize,
+    _num_public_values: usize,
     u8_cols: &mut Vec<usize>,
     u16_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,

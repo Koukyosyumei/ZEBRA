@@ -23,7 +23,7 @@ use crate::p3_to_tv::convert_p3_expr;
 pub fn run_sp1_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), SP1CoreOpts::default());
-    let (checkpoint, pv, done) = runtime.execute_state(false).unwrap();
+    let (checkpoint, _pv, _done) = runtime.execute_state(false).unwrap();
 
     let mut checkpoint_file = tempfile::tempfile()
         .map_err(SP1CoreProverError::IoError)
@@ -41,7 +41,7 @@ pub fn run_sp1_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterv
     //let mut reader = io::BufReader::new(checkpoint_file);
     //let execution_state: ExecutionState =
     //    bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
-    let (records, report) = trace_checkpoint::<SC>(
+    let (records, _report) = trace_checkpoint::<SC>(
         program.clone(),
         &checkpoint_file,
         SP1CoreOpts::default(),
