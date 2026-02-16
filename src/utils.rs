@@ -55,9 +55,9 @@ pub fn create_or_clear_dir(path: &str) -> std::io::Result<()> {
 
 #[derive(Default, Debug, Clone)]
 pub struct GeneralLookupInfo {
-    pub alu_output: Vec<usize>,
-    pub alu_input1: Vec<usize>,
-    pub alu_input2: Vec<usize>,
+    pub op_a: Vec<usize>,
+    pub op_b: Vec<usize>,
+    pub op_c: Vec<usize>,
     pub pc_table_is_real: LatticeVMSymbolicExpr,
 }
 

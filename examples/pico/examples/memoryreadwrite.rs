@@ -24,31 +24,6 @@ use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let mut string_representation = String::new();
-    for i in 0..trace.data.len() {
-        let row_string_representation = format!(
-            "clk: {}\nop_a_access: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nmem_access: [{}]",
-            trace.data[i][1],
-            trace_fmt_with_idxs(trace, i, &[68, 69, 70, 71]),
-            trace_fmt_with_idxs(trace, i, &[77, 78, 79, 80]),
-            trace_fmt_with_idxs(trace, i, &[86, 87, 88, 89]),
-            trace_fmt_with_idxs(trace, i, &[28, 29, 30, 31]),
-        );
-        string_representation.push_str(&row_string_representation);
-        string_representation.push_str("\n--------------\n");
-    }
-
-    save_repr_if_unique(&string_representation, known_reprt, ui);
-}
-
 const fn make_col_map() -> MemoryChipCols<usize> {
     let indices_arr = indices_arr::<{ NUM_MEMORY_CHIP_COLS }>();
     unsafe { transmute::<[usize; NUM_MEMORY_CHIP_COLS], MemoryChipCols<usize>>(indices_arr) }
@@ -105,8 +80,14 @@ fn main() -> Result<(), io::Error> {
         KoalaBear,
         MemoryReadWriteChip<KoalaBear>,
     >(&air, NUM_MEMORY_CHIP_COLS, prime);
-    let final_check =
-        generate_memory_op_final_checker(general_lookup_info.clone(), 1, vec![28, 29, 30, 31]);
+
+    let final_check = generate_memory_op_final_checker(
+        1,                    // clk
+        vec![68, 69, 70, 71], // op_a
+        vec![77, 78, 79, 80], // op_b
+        vec![86, 87, 88, 89], // op_c
+        vec![28, 29, 30, 31], // mem
+    );
     let mut semantic_inputs = vec![
         0, 1, 24, 25, 26, 27, 32, 33, 55, 64, 65, 66, 67, 72, 73, 77, 78, 79, 80, 81, 82, 86, 87,
         88, 89, 90, 91,

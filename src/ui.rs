@@ -125,19 +125,40 @@ pub fn generate_alu_final_checker(
           _prime: u32,
           known_reprt: &mut HashSet<String>,
           ui: &mut UiState| {
-        let i1 = &general_lookup_info.alu_input1;
-        let i2 = &general_lookup_info.alu_input2;
-        let o = &general_lookup_info.alu_output;
         let string_representation = format!(
             "input0: [{}], input1: [{}], output: [{}]",
-            trace_fmt_with_idxs(trace, 0, &[i1[0], i1[1], i1[2], i1[3]]),
-            trace_fmt_with_idxs(trace, 0, &[i2[0], i2[1], i2[2], i2[3]]),
-            if o.len() == 4 {
-                trace_fmt_with_idxs(trace, 0, &[o[0], o[1], o[2], o[3]])
-            } else {
-                format!("{}", trace.data[0][o[0]]).to_string()
-            },
+            trace_fmt_with_idxs(trace, 0, &general_lookup_info.op_b),
+            trace_fmt_with_idxs(trace, 0, &general_lookup_info.op_c),
+            trace_fmt_with_idxs(trace, 0, &general_lookup_info.op_a),
         );
+        save_repr_if_unique(&string_representation, known_reprt, ui);
+    }
+}
+
+pub fn generate_memory_op_final_checker(
+    clk_column: usize,
+    op_a_columns: Vec<usize>,
+    op_b_columns: Vec<usize>,
+    op_c_columns: Vec<usize>,
+    memory_columns: Vec<usize>,
+) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone {
+    move |trace: &AbstractTrace,
+          _num_trial: usize,
+          _prime: u32,
+          known_reprt: &mut HashSet<String>,
+          ui: &mut UiState| {
+        let mut string_representation = String::new();
+        for i in 0..trace.data.len() {
+            let row_string_representation = format!(
+                "clk: {}\nop_a_access: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nmem_access: [{}]\n--------------\n",
+                trace.data[i][clk_column],
+                trace_fmt_with_idxs(trace, i, &op_a_columns),
+                trace_fmt_with_idxs(trace, i, &op_b_columns),
+                trace_fmt_with_idxs(trace, i, &op_c_columns),
+                trace_fmt_with_idxs(trace, i, &memory_columns),
+            );
+            string_representation.push_str(&row_string_representation);
+        }
         save_repr_if_unique(&string_representation, known_reprt, ui);
     }
 }
