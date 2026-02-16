@@ -62,7 +62,7 @@ fn main() -> Result<(), io::Error> {
 
     constraint_info
         .refinable_cols
-        .extend(&general_lookup_info.alu_output.clone());
+        .extend(&general_lookup_info.op_a.clone());
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode(&opcode_str), 4, 4, 13, 3);

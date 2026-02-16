@@ -66,8 +66,8 @@ fn main() -> Result<(), io::Error> {
 
     constraint_info
         .refinable_cols
-        .extend(&general_lookup_info.alu_output.clone());
-    constraint_info.output_columns = general_lookup_info.alu_output.clone();
+        .extend(&general_lookup_info.op_a.clone());
+    constraint_info.output_columns = general_lookup_info.op_a.clone();
     for i in &constraint_info.output_columns {
         constraint_info.range_types.insert(*i, RangeType::U8);
     }
