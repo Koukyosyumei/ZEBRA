@@ -95,10 +95,7 @@ pub fn generate_abstract_trace(
     base_abs_main_trace_data
 }
 
-pub fn add_single_col_if_possible<F: PrimeField32>(
-    b: &VirtualPairCol<F>,
-    u8_cols: &mut Vec<usize>,
-) {
+pub fn try_add_single_var_col<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
     if !b.column_weights.is_empty() {
         if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
             u8_cols.push(col_idx);
@@ -147,17 +144,17 @@ where
                 }
 
                 for i in 1..13 {
-                    add_single_col_if_possible(&r.values[i], u8_cols);
+                    try_add_single_var_col(&r.values[i], u8_cols);
                 }
 
                 for i in 1..5 {
-                    add_single_col_if_possible(&r.values[i], &mut general_lookup_info.op_a);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_a);
                 }
                 for i in 5..9 {
-                    add_single_col_if_possible(&r.values[i], &mut general_lookup_info.op_b);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_b);
                 }
                 for i in 9..13 {
-                    add_single_col_if_possible(&r.values[i], &mut general_lookup_info.op_c);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_c);
                 }
             }
             _ => {}
@@ -222,12 +219,12 @@ where
                 let b = &s.values[3];
                 let c = &s.values[4];
 
-                add_single_col_if_possible(&b, u8_cols);
-                add_single_col_if_possible(&c, u8_cols);
+                try_add_single_var_col(&b, u8_cols);
+                try_add_single_var_col(&c, u8_cols);
 
                 if opcode.column_weights.is_empty() {
                     if opcode.constant.as_canonical_u32() == 8 {
-                        add_single_col_if_possible(&a1, u16_cols);
+                        try_add_single_var_col(&a1, u16_cols);
                     }
                 }
 

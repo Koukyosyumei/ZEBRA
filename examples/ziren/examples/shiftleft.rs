@@ -48,8 +48,8 @@ fn main() -> Result<(), io::Error> {
 
     constraint_info
         .refinable_cols
-        .extend(&general_lookup_info.alu_output.clone());
-    constraint_info.output_columns = general_lookup_info.alu_output.clone();
+        .extend(&general_lookup_info.op_a.clone());
+    constraint_info.output_columns = general_lookup_info.op_a.clone();
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
