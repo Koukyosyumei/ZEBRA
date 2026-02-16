@@ -124,7 +124,6 @@ where
     let mut general_lookup_info = GeneralLookupInfo::default();
     let mut builder = SymbolicConstraintFolder::new(preprocessed_width, air.width());
     air.eval(&mut builder);
-
     let (sends, receives) = builder.lookups();
 
     for r in &receives {
