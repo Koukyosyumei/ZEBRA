@@ -237,47 +237,24 @@ where
                     }
                 }
 
-                let a1_expr = cv(&a1);
-                let a2_expr = cv(&a1);
-                let b_e = cv(&b);
-                let c_e = cv(&c);
                 let opcode_condition = cv(&opcode);
 
                 let ops = [
-                    (
-                        0,
-                        &a1_expr,
-                        LVSExpr::And(Box::new(b_e.clone()), Box::new(c_e.clone())),
-                    ),
-                    (
-                        1,
-                        &a1_expr,
-                        LVSExpr::Or(Box::new(b_e.clone()), Box::new(c_e.clone())),
-                    ),
-                    (
-                        2,
-                        &a1_expr,
-                        LVSExpr::Xor(Box::new(b_e.clone()), Box::new(c_e.clone())),
-                    ),
-                    (
-                        3,
-                        &a1_expr,
-                        LVSExpr::SRL(Box::new(b_e.clone()), Box::new(c_e.clone())),
-                    ),
+                    (0, cv(&a1), LVSExpr::And(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (1, cv(&a1), LVSExpr::Or(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (2, cv(&a1), LVSExpr::Xor(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (3, cv(&a1), LVSExpr::SRL(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (
                         4,
-                        &a2_expr,
-                        LVSExpr::SRLCarry(Box::new(b_e.clone()), Box::new(c_e.clone())),
+                        cv(&a2),
+                        LVSExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
                     ),
                     (
                         5,
-                        &a1_expr,
-                        LVSExpr::Flip(Box::new(LVSExpr::Lt(
-                            Box::new(b_e.clone()),
-                            Box::new(c_e.clone()),
-                        ))), // lt(b, c) on abstractinterval returns 0 when b < c
+                        cv(&a1),
+                        LVSExpr::Flip(Box::new(LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c))))), // lt(b, c) on abstractinterval returns 0 when b < c
                     ),
-                    (6, &a1_expr, LVSExpr::Msb(Box::new(b_e.clone()))),
+                    (6, cv(&a1), LVSExpr::Msb(Box::new(cv(&b)))),
                 ];
 
                 for (opcode, a_expr, op_expr) in ops {
