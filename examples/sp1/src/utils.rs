@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 
-
 use p3_air::Air;
-use p3_air::BaseAir;
 use p3_field::PrimeField32;
 use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
@@ -15,11 +13,8 @@ use sp1_stark::{
 };
 
 use latticevm::{
-    interval::AbstractInterval,
-    quick::ConstraintInfo,
-    solver::prepare_constraints_and_range_type,
-    symbolic::LatticeVMConstraints,
-    utils::GeneralLookupInfo,
+    interval::AbstractInterval, quick::ConstraintInfo, solver::prepare_constraints_and_range_type,
+    symbolic::LatticeVMConstraints, utils::GeneralLookupInfo,
 };
 
 use crate::lookup::get_symbolic_lookup_constraints;
