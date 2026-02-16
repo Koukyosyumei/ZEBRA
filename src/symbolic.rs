@@ -73,11 +73,13 @@ pub enum LatticeVMSymbolicExpr {
     Or(Box<Self>, Box<Self>),
     Xor(Box<Self>, Box<Self>),
     SRL(Box<Self>, Box<Self>),
+    SRLCarry(Box<Self>, Box<Self>),
     Lt(Box<Self>, Box<Self>),
     Msb(Box<Self>),
     Neg(Box<Self>),
     Flip(Box<Self>),
     KoalaBearRange(Box<Self>),
+    BabyBearRange(Box<Self>),
     WordAdd([Box<Self>; 4], [Box<Self>; 4]),
     WordSub([Box<Self>; 4], [Box<Self>; 4]),
     WordSubU([Box<Self>; 4], [Box<Self>; 4]),
@@ -143,6 +145,10 @@ pub fn gather_vars_simple(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
         LatticeVMSymbolicExpr::SRL(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        LatticeVMSymbolicExpr::SRLCarry(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
@@ -294,11 +300,13 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Or(x, y) => write!(f, "({} || {})", x, y),
             Self::Xor(x, y) => write!(f, "({} ^ {})", x, y),
             Self::SRL(x, y) => write!(f, "({} >> {})", x, y),
+            Self::SRLCarry(x, y) => write!(f, "({} >>~ {})", x, y),
             Self::Lt(x, y) => write!(f, "({} < {})", x, y),
             Self::Msb(x) => write!(f, "msb({})", x),
             Self::Neg(x) => write!(f, "-{}", x),
             Self::Flip(x) => write!(f, "~{}", x),
             Self::KoalaBearRange(x) => write!(f, "🐨{}🐨", x),
+            Self::BabyBearRange(x) => write!(f, "👶{}👶", x),
             Self::WordAdd(b, c) => write!(
                 f,
                 "[{}, {}, {}, {}] + [{}, {}, {}, {}]",
@@ -563,6 +571,7 @@ impl LatticeVMSymbolicExpr {
             Self::Or(a, b) => rec(a) | rec(b),
             Self::Xor(a, b) => rec(a) ^ rec(b),
             Self::SRL(a, b) => rec(a) >> rec(b),
+            Self::SRLCarry(a, b) => rec(a).shr_carry(rec(b)).1,
             Self::Lt(a, b) => rec(a).ltu(rec(b)),
             Self::Neg(a) => -rec(a),
             Self::Flip(a) => {
@@ -588,6 +597,15 @@ impl LatticeVMSymbolicExpr {
                     a.clone(),
                     Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
                         2130706433,
+                    ))),
+                );
+                rec(&e)
+            }
+            Self::BabyBearRange(a) => {
+                let e = LatticeVMSymbolicExpr::Lt(
+                    a.clone(),
+                    Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
+                        2013265921,
                     ))),
                 );
                 rec(&e)
@@ -1111,6 +1129,40 @@ pub fn is_koalabear_word_range(
     None
 }
 
+pub fn is_babybear_word_range(
+    constraint: &LatticeVMSymbolicExpr,
+    prime: u32,
+) -> Option<LatticeVMSymbolicExpr> {
+    if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = constraint {
+        if let LatticeVMSymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
+            if let LatticeVMSymbolicExpr::Constant(c) = *r_rhs {
+                if c.as_canonical_u32(prime) == 785099 {
+                    if let Some(word) = collect_add_vars_vec(&r_lhs) {
+                        if word.len() == 4 {
+                            let word_expr: Vec<_> = word
+                                .iter()
+                                .map(|&index| {
+                                    LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
+                                        entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                                        index,
+                                    })
+                                })
+                                .collect();
+                            let cond = reconstruct_symbolic_word(&word_expr, 0);
+                            return Some(LatticeVMSymbolicExpr::WhenNonZero(
+                                lhs.clone(),
+                                Box::new(LatticeVMSymbolicExpr::BabyBearRange(Box::new(cond))),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
 pub fn is_boolean_constraint(constraint: &LatticeVMSymbolicExpr) -> Option<usize> {
     use LatticeVMSymbolicExpr::*;
 
@@ -1276,10 +1328,11 @@ pub fn eval_base_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    //println!("{}", _j);
+                    //println!("{}: {}", _j, tc);
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {
+                    //println!("{}: {}", _j, tc);
                     gather_vars(i, tc, memo);
                     is_all_true = false;
                     *potential += 1;

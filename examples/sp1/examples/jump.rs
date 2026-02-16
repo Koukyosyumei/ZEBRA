@@ -4,17 +4,12 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
 
-use p3_koala_bear::KoalaBear;
+use p3_baby_bear::BabyBear;
 
-use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::control_flow::JumpColumns;
-use zkm_core_machine::control_flow::NUM_JUMP_COLS;
-use zkm_core_machine::JumpChip;
-
-use zkm_core_machine::{
-    cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
-    CpuChip,
-};
+use sp1_core_executor::{Instruction, Opcode, Program};
+use sp1_core_machine::control_flow::JumpChip;
+use sp1_core_machine::control_flow::JumpColumns;
+use sp1_core_machine::control_flow::NUM_JUMP_COLS;
 
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
@@ -24,9 +19,8 @@ use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use zkm_core_executor::syscalls::SyscallCode;
 
-use latticevm_ziren::utils::{
+use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
@@ -39,13 +33,12 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "pc: {}, next_pc: [{}], next_next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
-        trace.data[0][0],
-        trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
-        trace_fmt_with_idxs(trace, 0, &[19, 20, 21, 22]),
-        trace_fmt_with_idxs(trace, 0, &[37, 38, 39, 40]),
-        trace_fmt_with_idxs(trace, 0, &[41, 42, 43, 44]),
-        trace_fmt_with_idxs(trace, 0, &[45, 46, 47, 48]),
+        "pc: [{}], next_pc: [{}], op_b_value: [{}], op_c_value: [{}]",
+        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
+        trace_fmt_with_idxs(trace, 0, &[5, 6, 7, 8]),
+        //trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+        trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
+        trace_fmt_with_idxs(trace, 0, &[18, 19, 20, 21]),
     );
     save_repr_if_unique(&string_representation, known_reprt, ui);
 }
@@ -57,17 +50,16 @@ const fn make_col_map() -> JumpColumns<usize> {
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
     let mut instructions = vec![
-        Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
-        Instruction::new(Opcode::Jumpi, x, y, 0, true, true),
+        //Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
+        Instruction::new(Opcode::JAL, x, y, 0, true, true),
     ];
     Program::new(instructions, pc_start, pc_base)
 }
 
 pub fn get_opcode(opcode_str: &str) -> Opcode {
     match opcode_str {
-        "Jump" => Opcode::Jump,
-        "Jumpi" => Opcode::Jumpi,
-        "JumpDirect" => Opcode::JumpDirect,
+        "JAL" => Opcode::JAL,
+        "JALR" => Opcode::JALR,
         _ => panic!("unsupported instruction"),
     }
 }
@@ -80,16 +72,28 @@ fn main() -> Result<(), io::Error> {
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
-    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
+    let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract CPU Constraints ##########################
     let air = JumpChip::default();
     let air_name = "Jump";
-    let _colmap = make_col_map();
+    let colmap = make_col_map();
+    println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
-    let output_columns = vec![19, 20, 21, 22, 37, 38, 39, 40];
+        extract_constraints_and_range::<BabyBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
+    let output_columns = vec![5, 6, 7, 8];
+    for i in vec![5, 6, 7, 8, 0, 1, 2] {
+        constraint_info.range_types.insert(i, RangeType::U8);
+    }
+    for i in vec![8] {
+        constraint_info.range_types.insert(i, RangeType::U8);
+    }
+
+    constraint_info
+        .refinable_cols
+        .extend(&output_columns.clone());
+    constraint_info.output_columns = output_columns.clone();
 
     for t in &constraint_info.constraints.air_constraints {
         println!("# {}", t);
@@ -98,28 +102,19 @@ fn main() -> Result<(), io::Error> {
         println!("* {}", t);
     }
 
-    constraint_info
-        .refinable_cols
-        .extend(&output_columns.clone());
-    constraint_info.output_columns = output_columns.clone();
-    for i in vec![19, 20, 21, 37, 38, 39] {
-        constraint_info.range_types.insert(i, RangeType::U8);
-    }
-    for i in vec![22, 40] {
-        constraint_info.range_types.insert(i, RangeType::U7);
-    }
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
+    search_config.seed = 1;
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..100 {
-        let x: u8 = rng.random_range(0..36);
-        let y: u32 = rng.random_range(0..prime); //rng.random(); // rng.random_range(0..prime);
+        let x: u8 = rng.random_range(0..32);
+        let y: u32 = rng.random_range(0..10000); //rng.random(); // rng.random_range(0..prime);
 
         // ######################## Program Initialization ###########################
-        let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
+        let program = target_program(get_opcode(&opcode_str), 8, 8, x, y);
         let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
         // ######################## Set Info ##########################################

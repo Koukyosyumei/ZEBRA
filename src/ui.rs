@@ -132,7 +132,11 @@ pub fn generate_alu_final_checker(
             "input0: [{}], input1: [{}], output: [{}]",
             trace_fmt_with_idxs(trace, 0, &[i1[0], i1[1], i1[2], i1[3]]),
             trace_fmt_with_idxs(trace, 0, &[i2[0], i2[1], i2[2], i2[3]]),
-            trace_fmt_with_idxs(trace, 0, &[o[0], o[1], o[2], o[3]]),
+            if o.len() == 4 {
+                trace_fmt_with_idxs(trace, 0, &[o[0], o[1], o[2], o[3]])
+            } else {
+                format!("{}", trace.data[0][o[0]]).to_string()
+            },
         );
         save_repr_if_unique(&string_representation, known_reprt, ui);
     }

@@ -444,6 +444,15 @@ pub fn expr_to_smt_bv(
             LatticeVMSymbolicExpr::SRL(a, b) => {
                 format!("(bvlshr {} {})", rec(a), rec(b),)
             }
+            LatticeVMSymbolicExpr::SRLCarry(a, b) => {
+                format!(
+                    "(bvand {} (bvsub (bvshl {} {}) {}))",
+                    rec(a),
+                    one_hex,
+                    rec(b),
+                    one_hex
+                )
+            }
             LatticeVMSymbolicExpr::Flip(a) => {
                 format!("(ite (= {} {}) {} {})", rec(a), zero_hex, one_hex, zero_hex)
             }
@@ -455,6 +464,15 @@ pub fn expr_to_smt_bv(
                 let mut rec_t = |e| helper(e, row_id, n_rows, n_pvs, vars, prime, true);
                 format!(
                     "(ite (bvult {} #x7f000001) {} {})",
+                    rec_t(a),
+                    zero_hex,
+                    one_hex
+                )
+            }
+            LatticeVMSymbolicExpr::BabyBearRange(a) => {
+                let mut rec_t = |e| helper(e, row_id, n_rows, n_pvs, vars, prime, true);
+                format!(
+                    "(ite (bvult {} #x78000001) {} {})",
                     rec_t(a),
                     zero_hex,
                     one_hex
@@ -740,6 +758,11 @@ pub fn expr_to_smt_bv(
 
     // ranges
     for (j, k) in range_types {
+        if let RangeType::U16 = k {
+            for i in 0..n_rows {
+                smt.push_str(&format!("(assert (bvule trace_{}_{} #x0000ffff))\n", i, j,));
+            }
+        }
         if let RangeType::U8 = k {
             for i in 0..n_rows {
                 smt.push_str(&format!("(assert (bvule trace_{}_{} #x000000ff))\n", i, j,));

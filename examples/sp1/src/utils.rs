@@ -1,27 +1,85 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io;
 
 use itertools::Itertools;
 
 use p3_air::Air;
+use p3_air::BaseAir;
+use p3_field::PrimeField32;
 use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
-use sp1_core_executor::Program;
-use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
-use sp1_stark::InteractionBuilder;
-use sp1_stark::MachineProver;
+use sp1_core_executor::{ExecutionState, Executor, Program};
+use sp1_core_machine::{riscv::RiscvAir, utils::trace_checkpoint, utils::SP1CoreProverError};
+use sp1_stark::{
+    air::SP1_PROOF_NUM_PV_ELTS, baby_bear_poseidon2::BabyBearPoseidon2, CpuProver,
+    InteractionBuilder, MachineProver, SP1CoreOpts,
+};
 
-use latticevm::solver::RangeType;
-use latticevm::symbolic::gather_vars;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::symbolic::{is_iszero_operator, is_koalabear_word_range};
-use latticevm::utils::GeneralLookupInfo;
-use latticevm::{interval::AbstractInterval, symbolic::gather_boolean_variables};
+use latticevm::{
+    interval::AbstractInterval,
+    quick::ConstraintInfo,
+    solver::{prepare_constraints_and_range_type, RangeType},
+    symbolic::{
+        gather_boolean_variables, gather_vars, is_iszero_operator, is_koalabear_word_range,
+        LatticeVMConstraints, LatticeVMSymbolicExpr,
+    },
+    utils::GeneralLookupInfo,
+};
 
-use crate::executor::run_sp1_program;
 use crate::lookup::get_symbolic_lookup_constraints;
 use crate::p3_to_tv::convert_p3_expr;
+
+pub fn run_sp1_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
+    // # Execute the Target Program
+    let mut runtime = Executor::new(program.clone(), SP1CoreOpts::default());
+    let (checkpoint, pv, done) = runtime.execute_state(false).unwrap();
+
+    let mut checkpoint_file = tempfile::tempfile()
+        .map_err(SP1CoreProverError::IoError)
+        .unwrap();
+    checkpoint
+        .save(&mut checkpoint_file)
+        .map_err(SP1CoreProverError::IoError)
+        .unwrap();
+
+    type SC = BabyBearPoseidon2;
+    let config = BabyBearPoseidon2::new();
+    let machine = RiscvAir::machine(config);
+    let prover = CpuProver::new(machine);
+
+    //let mut reader = io::BufReader::new(checkpoint_file);
+    //let execution_state: ExecutionState =
+    //    bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
+    let (records, report) = trace_checkpoint::<SC>(
+        program.clone(),
+        &checkpoint_file,
+        SP1CoreOpts::default(),
+        None,
+    );
+    let mut main_traces = records
+        .iter()
+        .map(|record| prover.generate_traces(record))
+        .collect::<Vec<_>>();
+
+    let mut true_abs_traces = vec![];
+    for mt in &mut main_traces[0] {
+        let nrows = mt.1.values.len() / mt.1.width;
+        let mut rows = vec![];
+        for i in 0..nrows {
+            let row = mt.1.row_mut(i);
+            rows.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .collect(),
+            );
+        }
+        true_abs_traces.push((mt.0.clone(), rows));
+    }
+
+    true_abs_traces
+}
 
 pub fn get_program_str(program: &Program) -> String {
     program
@@ -51,19 +109,15 @@ pub fn extract_constraints_and_range<F, A>(
     air: &A,
     num_cols: usize,
     prime: u32,
-) -> (
-    Vec<LatticeVMSymbolicExpr>,
-    Vec<usize>,
-    HashMap<usize, RangeType>,
-    GeneralLookupInfo,
-)
+) -> (ConstraintInfo, GeneralLookupInfo)
 where
     F: p3_field::PrimeField32,
     A: Air<InteractionBuilder<F>> + Air<SymbolicAirBuilder<F>>,
 {
     let mut u8_cols = vec![];
+    let mut u16_cols = vec![];
     let mut multiplicities = HashSet::new();
-    let mut lookup_symbolic_constraints = Vec::new();
+    let mut lookup_constraints = Vec::new();
     let mut received_vars_from_cpu = HashSet::new();
 
     let symbolic_constraints: Vec<SymbolicExpression<F>> =
@@ -73,72 +127,39 @@ where
         0,
         SP1_PROOF_NUM_PV_ELTS,
         &mut u8_cols,
+        &mut u16_cols,
         &mut multiplicities,
-        &mut lookup_symbolic_constraints,
+        &mut lookup_constraints,
         &mut received_vars_from_cpu,
         prime,
     );
 
-    let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
-    refinable_cols.retain(|c| !multiplicities.contains(c));
-    refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
-
-    let mut tv_constraints = symbolic_constraints
+    let mut air_constraints = symbolic_constraints
         .iter()
         .map(|sc| convert_p3_expr::<F>(&sc))
         .collect::<Vec<_>>();
 
-    let mut new_tv_constraints = Vec::new();
-    let mut is_in_koalabear_word_range_check = false;
-    let mut is_in_iszero_operator = false;
-    for t in &tv_constraints {
-        if let Some(exprs) = is_iszero_operator(t, prime) {
-            if is_in_iszero_operator {
-                is_in_iszero_operator = false;
-            } else {
-                new_tv_constraints.push(exprs[0].clone());
-                new_tv_constraints.push(exprs[1].clone());
-                is_in_iszero_operator = true;
-            }
-        } else {
-            if let Some(expr) = is_koalabear_word_range(t, prime) {
-                if is_in_koalabear_word_range_check {
-                    is_in_koalabear_word_range_check = false;
-                } else {
-                    new_tv_constraints.push(expr);
-                    is_in_koalabear_word_range_check = true;
-                }
-            } else {
-                if (!is_in_koalabear_word_range_check) && (!is_in_iszero_operator) {
-                    new_tv_constraints.push(t.clone());
-                }
-            }
-        }
-    }
-    tv_constraints = new_tv_constraints;
+    let (refinable_cols, range_types) = prepare_constraints_and_range_type(
+        num_cols,
+        &u8_cols,
+        &mut u16_cols,
+        &multiplicities,
+        &received_vars_from_cpu,
+        &mut air_constraints,
+        &lookup_constraints,
+        prime,
+    );
 
-    tv_constraints.extend(lookup_symbolic_constraints);
+    let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
+    let constraint_info = ConstraintInfo {
+        constraints: constraints,
+        num_total_columns: num_cols,
+        num_pv_columns: 0,
+        output_columns: vec![],
+        refinable_cols: refinable_cols,
+        range_types: range_types,
+        prime: prime,
+    };
 
-    let mut used_vars = HashSet::new();
-    for t in &tv_constraints {
-        gather_vars(0, t, &mut used_vars);
-    }
-    let used_var_ids: HashSet<usize> = used_vars.iter().map(|x| x.1).collect();
-    refinable_cols.retain(|c| used_var_ids.contains(c));
-
-    let potential_boolean_vars = gather_boolean_variables(&tv_constraints, &multiplicities);
-    let mut range_types: HashMap<usize, RangeType> = potential_boolean_vars
-        .iter()
-        .map(|k| (*k, RangeType::Bool))
-        .collect();
-    for c in &u8_cols {
-        range_types.insert(*c, RangeType::U8);
-    }
-
-    (
-        tv_constraints,
-        refinable_cols,
-        range_types,
-        general_lookup_info,
-    )
+    (constraint_info, general_lookup_info)
 }
