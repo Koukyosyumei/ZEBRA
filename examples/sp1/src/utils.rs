@@ -1,8 +1,5 @@
-use std::collections::HashMap;
 use std::collections::HashSet;
-use std::io;
 
-use itertools::Itertools;
 
 use p3_air::Air;
 use p3_air::BaseAir;
@@ -10,7 +7,7 @@ use p3_field::PrimeField32;
 use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
-use sp1_core_executor::{ExecutionState, Executor, Program};
+use sp1_core_executor::{Executor, Program};
 use sp1_core_machine::{riscv::RiscvAir, utils::trace_checkpoint, utils::SP1CoreProverError};
 use sp1_stark::{
     air::SP1_PROOF_NUM_PV_ELTS, baby_bear_poseidon2::BabyBearPoseidon2, CpuProver,
@@ -20,11 +17,8 @@ use sp1_stark::{
 use latticevm::{
     interval::AbstractInterval,
     quick::ConstraintInfo,
-    solver::{prepare_constraints_and_range_type, RangeType},
-    symbolic::{
-        gather_boolean_variables, gather_vars, is_iszero_operator, is_koalabear_word_range,
-        LatticeVMConstraints, LatticeVMSymbolicExpr,
-    },
+    solver::prepare_constraints_and_range_type,
+    symbolic::LatticeVMConstraints,
     utils::GeneralLookupInfo,
 };
 
