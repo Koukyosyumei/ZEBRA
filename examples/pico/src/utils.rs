@@ -116,6 +116,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     preprocessed_width: usize,
     _num_public_values: usize,
     u8_cols: &mut Vec<usize>,
+    u16_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,
     lookup_constraints: &mut Vec<LVSExpr>,
     received_vars_from_cpu: &mut HashSet<usize>,
@@ -223,22 +224,21 @@ where
             LookupType::Byte => {
                 let opcode = &s.values[0];
                 let a1 = &s.values[1];
-                let _a2 = &s.values[2];
+                let a2 = &s.values[2];
                 let b = &s.values[3];
                 let c = &s.values[4];
 
-                if opcode.column_weights.is_empty() {
-                    if opcode.constant.as_canonical_u32() == 7 {
-                        add_u8_col_if_possible(&b, u8_cols);
-                        add_u8_col_if_possible(&c, u8_cols);
-                    }
+                add_u8_col_if_possible(&b, u8_cols);
+                add_u8_col_if_possible(&c, u8_cols);
 
+                if opcode.column_weights.is_empty() {
                     if opcode.constant.as_canonical_u32() == 8 {
-                        add_u16_col_if_possible(&a1, u8_cols);
+                        add_u16_col_if_possible(&a1, u16_cols);
                     }
                 }
 
                 let a1_expr = cv(&a1);
+                let a2_expr = cv(&a1);
                 let b_e = cv(&b);
                 let c_e = cv(&c);
                 let opcode_condition = cv(&opcode);
@@ -246,28 +246,45 @@ where
                 let ops = [
                     (
                         0,
+                        &a1_expr,
                         LVSExpr::And(Box::new(b_e.clone()), Box::new(c_e.clone())),
                     ),
-                    (1, LVSExpr::Or(Box::new(b_e.clone()), Box::new(c_e.clone()))),
+                    (
+                        1,
+                        &a1_expr,
+                        LVSExpr::Or(Box::new(b_e.clone()), Box::new(c_e.clone())),
+                    ),
                     (
                         2,
+                        &a1_expr,
                         LVSExpr::Xor(Box::new(b_e.clone()), Box::new(c_e.clone())),
                     ),
                     (
+                        3,
+                        &a1_expr,
+                        LVSExpr::SRL(Box::new(b_e.clone()), Box::new(c_e.clone())),
+                    ),
+                    (
+                        4,
+                        &a2_expr,
+                        LVSExpr::SRLCarry(Box::new(b_e.clone()), Box::new(c_e.clone())),
+                    ),
+                    (
                         5,
+                        &a1_expr,
                         LVSExpr::Flip(Box::new(LVSExpr::Lt(
                             Box::new(b_e.clone()),
                             Box::new(c_e.clone()),
                         ))), // lt(b, c) on abstractinterval returns 0 when b < c
                     ),
-                    (6, LVSExpr::Msb(Box::new(b_e.clone()))),
+                    (6, &a1_expr, LVSExpr::Msb(Box::new(b_e.clone()))),
                 ];
 
-                for (opcode, op_expr) in ops {
+                for (opcode, a_expr, op_expr) in ops {
                     let el_constraint = make_impl_constraint(
                         opcode,
                         &opcode_condition,
-                        LVSExpr::Sub(Box::new(a1_expr.clone()), Box::new(op_expr)),
+                        LVSExpr::Sub(Box::new(a_expr.clone()), Box::new(op_expr)),
                         prime,
                     );
                     if let Some(el_constraint) = el_constraint {
@@ -292,6 +309,7 @@ where
     A: Air<SymbolicConstraintFolder<F>>,
 {
     let mut u8_cols = vec![];
+    let mut u16_cols = vec![];
     let mut multiplicities = HashSet::new();
     let mut lookup_constraints = Vec::new();
     let mut received_vars_from_cpu = HashSet::new();
@@ -302,6 +320,7 @@ where
         0,
         NUM_PUBLIC_VALUES_COLS,
         &mut u8_cols,
+        &mut u16_cols,
         &mut multiplicities,
         &mut lookup_constraints,
         &mut received_vars_from_cpu,
@@ -316,6 +335,7 @@ where
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         num_cols,
         &u8_cols,
+        &u16_cols,
         &multiplicities,
         &received_vars_from_cpu,
         &mut air_constraints,
