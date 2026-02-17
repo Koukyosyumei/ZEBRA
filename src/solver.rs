@@ -416,10 +416,10 @@ where
     let mut last_tick = std::time::Instant::now();
 
     loop {
-        let mut got_msg = false;
+        let mut _got_msg = false;
 
         for msg in rx.try_iter() {
-            got_msg = true;
+            _got_msg = true;
 
             match msg {
                 SolverMsg::UpdateStats {
