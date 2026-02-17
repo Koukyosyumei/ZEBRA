@@ -131,7 +131,7 @@ where
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         num_cols,
         &u8_cols,
-        &mut u16_cols,
+        &u16_cols,
         &multiplicities,
         &received_vars_from_cpu,
         &mut air_constraints,
