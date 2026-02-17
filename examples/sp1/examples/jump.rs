@@ -109,9 +109,9 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..100 {
+    for _ in 0..30 {
         let x: u8 = rng.random_range(0..32);
-        let y: u32 = rng.random_range(0..10000); //rng.random(); // rng.random_range(0..prime);
+        let y: u32 = rng.random_range(0..256); //rng.random(); // rng.random_range(0..prime);
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 8, 8, x, y);
