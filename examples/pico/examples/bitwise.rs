@@ -1,5 +1,7 @@
 use clap::Parser;
 use core::mem::transmute;
+use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::collections::HashSet;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -9,7 +11,7 @@ use pico_vm::chips::chips::alu::bitwise::BitwiseChip;
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
+use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
@@ -62,34 +64,43 @@ fn main() -> Result<(), io::Error> {
         .refinable_cols
         .extend(&general_lookup_info.op_a);
     constraint_info.output_columns = general_lookup_info.op_a;
-
-    // ######################## Program Initialization ###########################
-    let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, 2, 3);
-    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-
-    // ######################## Set Info ##########################################
-    let program_info = ProgramInfo {
-        program_str: get_program_str(&program),
-        program_len: program.instructions.len(),
-    };
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
-    // ######################## Solve ############################################
-    let result = experiment_harness(
-        &program_info,
-        &mut constraint_info,
-        &search_config,
-        &base_abs_main_trace_data,
-        vec![],
-        &vec![], // vec![0],
-        dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
-        final_check,
-        &args.method,
-    );
-    println!("{:?}", result);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
+    let mut ds = vec![];
+    for _ in 0..30 {
+        let x: u32 = rng.random();
+        let y: u32 = rng.random();
+
+        // ######################## Program Initialization ###########################
+        let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, x, y);
+        let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: get_program_str(&program),
+            program_len: program.instructions.len(),
+        };
+
+        // ######################## Solve ############################################
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            vec![],
+            &vec![], // vec![0],
+            dummy_program_counter_refine_fn,
+            dummy_adjust_pc_program,
+            &final_check,
+            &args.method,
+        );
+        println!("({} {}), {:?}", x, y, result);
+        ds.push(result.unwrap().execution_time);
+    }
+    println!("{:?}", mean_variance(&ds));
 
     Ok(())
 }
