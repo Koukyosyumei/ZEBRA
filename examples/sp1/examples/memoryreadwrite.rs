@@ -1,59 +1,29 @@
 use clap::Parser;
 use core::mem::transmute;
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::fs;
 use std::io;
 
-use itertools::Itertools;
+use p3_baby_bear::BabyBear;
 
-use p3_koala_bear::KoalaBear;
-
-use zkm_core_executor::{Instruction, Opcode, Program};
-use zkm_core_machine::memory::{
+use sp1_core_executor::{Instruction, Opcode, Program};
+use sp1_core_machine::memory::MemoryInstructionsChip;
+use sp1_core_machine::memory::{
     columns::MemoryInstructionsColumns, columns::NUM_MEMORY_INSTRUCTIONS_COLUMNS,
 };
-use zkm_core_machine::MemoryInstructionsChip;
 
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::UiState;
+use latticevm::ui::{generate_memory_op_final_checker, UiState};
 use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
-use latticevm_ziren::utils::{
+use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
-
-fn final_check(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let mut string_representation = String::new();
-    for i in 0..trace.data.len() {
-        let row_string_representation = format!(
-            "clk: {}\nprev_value: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nop_a_access: {}\nmem_access: [{}]",
-            trace.data[i][3],
-            trace_fmt_with_idxs(trace, i, &[53, 54, 55, 56]),
-            trace_fmt_with_idxs(trace, i, &[8, 9, 10, 11]),
-            trace_fmt_with_idxs(trace, i, &[12, 13, 14, 15]),
-            format!(
-                "prev_value: [{}], value: [{}]",
-                trace_fmt_with_idxs(trace, i, &[66, 67, 68, 69]),
-                trace_fmt_with_idxs(trace, i, &[4, 5, 6, 7])
-            ),
-            trace_fmt_with_idxs(trace, i, &[57, 58, 59, 60]),
-        );
-        string_representation.push_str(&row_string_representation);
-        string_representation.push_str("\n--------------\n");
-    }
-
-    save_repr_if_unique(&string_representation, known_reprt, ui);
-}
 
 const fn make_col_map() -> MemoryInstructionsColumns<usize> {
     let indices_arr = indices_arr::<{ NUM_MEMORY_INSTRUCTIONS_COLUMNS }>();
@@ -84,16 +54,13 @@ pub fn target_program_store(opcode: Opcode, pc_start: u32, pc_base: u32) -> Prog
 pub fn get_opcode(opcode_str: &str) -> (Opcode, bool) {
     match opcode_str {
         "LB" => (Opcode::LB, true),
-        "LBU" => (Opcode::LBU, true),
         "LH" => (Opcode::LH, true),
-        "LHU" => (Opcode::LHU, true),
         "LW" => (Opcode::LW, true),
+        "LBU" => (Opcode::LBU, true),
+        "LHU" => (Opcode::LHU, true),
         "SB" => (Opcode::SB, false),
         "SH" => (Opcode::SH, false),
         "SW" => (Opcode::SW, false),
-        "SC" => (Opcode::SC, false),
-        "SWL" => (Opcode::SWL, false),
-        "SWR" => (Opcode::SWR, false),
         _ => panic!("unsupported instruction"),
     }
 }
@@ -112,23 +79,33 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = MemoryInstructionsChip::default();
     let air_name = "MemoryInstrs";
-    let _colmap = make_col_map();
+    let colmap = make_col_map();
+    println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, MemoryInstructionsChip>(
+        extract_constraints_and_range::<BabyBear, MemoryInstructionsChip>(
             &air,
             NUM_MEMORY_INSTRUCTIONS_COLUMNS,
             prime,
         );
+
+    let final_check = generate_memory_op_final_checker(
+        2,                    // clk
+        vec![3, 4, 5, 6],     // op_a
+        vec![7, 8, 9, 10],    // op_b
+        vec![11, 12, 13, 14], // op_c
+        vec![38, 39, 40, 41], // mem
+    );
     let mut semantic_inputs = vec![
-        0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15, 53, 54, 55, 56, 66, 67, 68, 69,
+        0, 1, 2, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+        34, 35, 36, 37, 42, 43,
     ];
     if is_load {
-        semantic_inputs.extend(&[57, 58, 59, 60]);
-        constraint_info.output_columns = vec![4, 5, 6, 7];
+        semantic_inputs.extend(&[38, 39, 40, 41]);
+        constraint_info.output_columns = vec![3, 4, 5, 6];
     } else {
-        semantic_inputs.extend(&[4, 5, 6, 7]);
-        constraint_info.output_columns = vec![57, 58, 59, 60];
+        semantic_inputs.extend(&[3, 4, 5, 6]);
+        constraint_info.output_columns = vec![38, 39, 40, 41];
     }
     constraint_info
         .refinable_cols
