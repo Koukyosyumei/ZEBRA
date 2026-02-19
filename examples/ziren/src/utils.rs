@@ -267,11 +267,7 @@ where
                         cv(&a2),
                         LVSExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
                     ),
-                    (
-                        6,
-                        cv(&a2),
-                        LVSExpr::Flip(Box::new(LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c))))),
-                    ),
+                    (6, cv(&a1), LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (7, cv(&a1), LVSExpr::Msb(Box::new(cv(&b)))),
                 ];
 

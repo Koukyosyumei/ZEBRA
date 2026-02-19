@@ -240,11 +240,7 @@ where
                         cv(&a2),
                         LVSExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
                     ),
-                    (
-                        5,
-                        cv(&a1),
-                        LVSExpr::Flip(Box::new(LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c))))), // lt(b, c) on abstractinterval returns 0 when b < c
-                    ),
+                    (5, cv(&a1), LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (6, cv(&a1), LVSExpr::Msb(Box::new(cv(&b)))),
                 ];
 

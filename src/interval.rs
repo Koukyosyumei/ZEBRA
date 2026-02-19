@@ -435,11 +435,11 @@ impl AbstractInterval {
             //return AbstractInterval::bool();
         }
 
-        // returns zero when self < rhs
+        // returns one when self < rhs
         if self.hi < rhs.lo {
-            AbstractInterval::zero()
-        } else if self.lo >= rhs.hi {
             AbstractInterval::one()
+        } else if self.lo >= rhs.hi {
+            AbstractInterval::zero()
         } else {
             AbstractInterval::bool()
         }
