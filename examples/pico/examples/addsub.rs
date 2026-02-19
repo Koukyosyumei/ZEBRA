@@ -93,6 +93,14 @@ fn main() -> Result<(), io::Error> {
     constraint_info
         .refinable_cols
         .extend(&output_columns.clone());
+
+    /*
+    use latticevm::solver::RangeType;
+    constraint_info.refinable_cols.push(7);
+    constraint_info.refinable_cols.push(11);
+    constraint_info.range_types.insert(7, RangeType::U8);
+    constraint_info.range_types.insert(11, RangeType::U8);*/
+
     constraint_info.output_columns = output_columns.clone();
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();

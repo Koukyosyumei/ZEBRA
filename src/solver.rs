@@ -412,6 +412,13 @@ where
     // let mut subset_finished = false;
 
     // 描画更新の頻度を制御（例: 30 FPS = 約33ms, ここでは少し余裕を見て 50ms）
+    ui.status = format!(
+        "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
+        refinable_cols, 0, 0, 1
+    );
+    terminal
+        .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
+        .unwrap();
     let tick_rate = Duration::from_millis(50);
     let mut last_tick = std::time::Instant::now();
 
@@ -441,6 +448,12 @@ where
                     );
                     final_check(&trace, trials, prime, known_solution, ui);
                     solution_found = true;
+                    if last_tick.elapsed() >= tick_rate {
+                        terminal
+                            .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
+                            .unwrap();
+                        last_tick = std::time::Instant::now();
+                    }
                 }
                 SolverMsg::Finished => {
                     // ui.status = format!("Subset: {:?}\nFinished", refinable_cols);
