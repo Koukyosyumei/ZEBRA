@@ -23,14 +23,14 @@ use pico_vm::{
     primitives::consts::RISCV_NUM_PVS,
 };
 
-use latticevm::alu::{get_alu_constraint, WordOp};
+use latticevm::constraint::LatticeVMConstraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::ConstraintInfo;
 use latticevm::solver::prepare_constraints_and_range_type;
 use latticevm::symbolic::{
-    make_impl_constraint, LatticeVMConstraints, LatticeVMSymbolicExpr as LVSExpr,
+    make_impl_constraint, GeneralLookupInfo, LatticeVMSymbolicExpr as LVSExpr,
 };
-use latticevm::utils::GeneralLookupInfo;
+use latticevm::wordop::{get_alu_constraint, WordOp};
 
 use crate::p3_to_tv::convert_p3_expr;
 use crate::p3_to_tv::convert_p3_virtual_pair_col as cv;

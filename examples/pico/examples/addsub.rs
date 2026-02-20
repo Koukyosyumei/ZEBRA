@@ -13,10 +13,9 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::{save_repr_if_unique, UiState};
-use latticevm::utils::indices_arr;
-use latticevm::utils::{create_or_clear_dir, trace_fmt_with_idxs};
+use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
+use latticevm::utils::{create_or_clear_dir, indices_arr};
+use latticevm::{canonicalizer::save_repr_if_unique, ui::UiState};
 
 use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
