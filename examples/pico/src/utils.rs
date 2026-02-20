@@ -23,14 +23,14 @@ use pico_vm::{
     primitives::consts::RISCV_NUM_PVS,
 };
 
-use latticevm::alu::{get_alu_constraint, WordOp};
+use latticevm::constraint::LatticeVMConstraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::quick::ConstraintInfo;
 use latticevm::solver::prepare_constraints_and_range_type;
 use latticevm::symbolic::{
-    make_impl_constraint, LatticeVMConstraints, LatticeVMSymbolicExpr as LVSExpr,
+    make_impl_constraint, GeneralLookupInfo, LatticeVMSymbolicExpr as LVSExpr,
 };
-use latticevm::utils::GeneralLookupInfo;
+use latticevm::wordop::{get_alu_constraint, WordOp};
 
 use crate::p3_to_tv::convert_p3_expr;
 use crate::p3_to_tv::convert_p3_virtual_pair_col as cv;
@@ -95,15 +95,7 @@ pub fn generate_abstract_trace(
     base_abs_main_trace_data
 }
 
-pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
-    if !b.column_weights.is_empty() {
-        if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
-            u8_cols.push(col_idx);
-        }
-    }
-}
-
-pub fn add_u16_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+pub fn try_add_single_var_col<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
     if !b.column_weights.is_empty() {
         if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
             u8_cols.push(col_idx);
@@ -129,7 +121,6 @@ where
     let mut general_lookup_info = GeneralLookupInfo::default();
     let mut builder = SymbolicConstraintFolder::new(preprocessed_width, air.width());
     air.eval(&mut builder);
-
     let (sends, receives) = builder.lookups();
 
     for r in &receives {
@@ -153,17 +144,17 @@ where
                 }
 
                 for i in 1..13 {
-                    add_u8_col_if_possible(&r.values[i], u8_cols);
+                    try_add_single_var_col(&r.values[i], u8_cols);
                 }
 
                 for i in 1..5 {
-                    add_u8_col_if_possible(&r.values[i], &mut general_lookup_info.alu_output);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_a);
                 }
                 for i in 5..9 {
-                    add_u8_col_if_possible(&r.values[i], &mut general_lookup_info.alu_input1);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_b);
                 }
                 for i in 9..13 {
-                    add_u8_col_if_possible(&r.values[i], &mut general_lookup_info.alu_input2);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_c);
                 }
             }
             _ => {}
@@ -228,12 +219,12 @@ where
                 let b = &s.values[3];
                 let c = &s.values[4];
 
-                add_u8_col_if_possible(&b, u8_cols);
-                add_u8_col_if_possible(&c, u8_cols);
+                try_add_single_var_col(&b, u8_cols);
+                try_add_single_var_col(&c, u8_cols);
 
                 if opcode.column_weights.is_empty() {
                     if opcode.constant.as_canonical_u32() == 8 {
-                        add_u16_col_if_possible(&a1, u16_cols);
+                        try_add_single_var_col(&a1, u16_cols);
                     }
                 }
 
@@ -249,11 +240,7 @@ where
                         cv(&a2),
                         LVSExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
                     ),
-                    (
-                        5,
-                        cv(&a1),
-                        LVSExpr::Flip(Box::new(LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c))))), // lt(b, c) on abstractinterval returns 0 when b < c
-                    ),
+                    (5, cv(&a1), LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (6, cv(&a1), LVSExpr::Msb(Box::new(cv(&b)))),
                 ];
 

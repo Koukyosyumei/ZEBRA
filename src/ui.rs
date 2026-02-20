@@ -1,5 +1,3 @@
-use std::{collections::HashSet, fs};
-
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
@@ -7,8 +5,9 @@ use ratatui::{
     Frame,
 };
 
-use crate::{interval::MayBeFlag, utils::trace_fmt_with_idxs};
-use crate::{symbolic::AbstractTrace, utils::GeneralLookupInfo};
+use crate::interval::MayBeFlag;
+use crate::symbolic::GeneralLookupInfo;
+use crate::trace::AbstractTrace;
 
 pub struct UiState {
     pub status: String,
@@ -92,53 +91,6 @@ impl UiState {
         f.render_widget(top_right, top_chunks[1]);
         f.render_widget(bottom_left, bottom_chunks[0]);
         f.render_widget(bottom_right, bottom_chunks[1]);
-    }
-}
-
-pub fn save_repr_if_unique(
-    string_representation: &String,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    if !known_reprt.contains(string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation.clone();
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
-}
-
-pub fn generate_alu_final_checker(
-    general_lookup_info: GeneralLookupInfo,
-) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone {
-    move |trace: &AbstractTrace,
-          _num_trial: usize,
-          _prime: u32,
-          known_reprt: &mut HashSet<String>,
-          ui: &mut UiState| {
-        let i1 = &general_lookup_info.alu_input1;
-        let i2 = &general_lookup_info.alu_input2;
-        let o = &general_lookup_info.alu_output;
-        let string_representation = format!(
-            "input0: [{}], input1: [{}], output: [{}]",
-            trace_fmt_with_idxs(trace, 0, &[i1[0], i1[1], i1[2], i1[3]]),
-            trace_fmt_with_idxs(trace, 0, &[i2[0], i2[1], i2[2], i2[3]]),
-            if o.len() == 4 {
-                trace_fmt_with_idxs(trace, 0, &[o[0], o[1], o[2], o[3]])
-            } else {
-                format!("{}", trace.data[0][o[0]]).to_string()
-            },
-        );
-        save_repr_if_unique(&string_representation, known_reprt, ui);
     }
 }
 

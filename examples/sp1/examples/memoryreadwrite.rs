@@ -2,34 +2,36 @@ use clap::Parser;
 use core::mem::transmute;
 use itertools::Itertools;
 use std::collections::HashSet;
+use std::fs;
 use std::io;
 
-use p3_koala_bear::KoalaBear;
+use p3_baby_bear::BabyBear;
 
-use pico_vm::chips::chips::riscv_memory::read_write::{
-    columns::{MemoryChipCols, NUM_MEMORY_CHIP_COLS},
-    MemoryReadWriteChip,
+use sp1_core_executor::{Instruction, Opcode, Program};
+use sp1_core_machine::memory::MemoryInstructionsChip;
+use sp1_core_machine::memory::{
+    columns::MemoryInstructionsColumns, columns::NUM_MEMORY_INSTRUCTIONS_COLUMNS,
 };
-use pico_vm::compiler::riscv::program::Program;
-use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::canonicalizer::{generate_memory_op_final_checker, save_repr_if_unique};
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::ui::UiState;
+use latticevm::ui::save_repr_if_unique;
+use latticevm::ui::{generate_memory_op_final_checker, UiState};
+use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{
-    constraint::LatticeVMConstraints,
-    trace::{trace_fmt_with_idxs, AbstractTrace},
-};
+use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
 
-use latticevm_pico::utils::{
+use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-const fn make_col_map() -> MemoryChipCols<usize> {
-    let indices_arr = indices_arr::<{ NUM_MEMORY_CHIP_COLS }>();
-    unsafe { transmute::<[usize; NUM_MEMORY_CHIP_COLS], MemoryChipCols<usize>>(indices_arr) }
+const fn make_col_map() -> MemoryInstructionsColumns<usize> {
+    let indices_arr = indices_arr::<{ NUM_MEMORY_INSTRUCTIONS_COLUMNS }>();
+    unsafe {
+        transmute::<[usize; NUM_MEMORY_INSTRUCTIONS_COLUMNS], MemoryInstructionsColumns<usize>>(
+            indices_arr,
+        )
+    }
 }
 
 pub fn target_program_load(opcode: Opcode, pc_start: u32, pc_base: u32) -> Program {
@@ -49,13 +51,13 @@ pub fn target_program_store(opcode: Opcode, pc_start: u32, pc_base: u32) -> Prog
     Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn get_opcode(target_opcode: &str) -> (Opcode, bool) {
-    match target_opcode {
+pub fn get_opcode(opcode_str: &str) -> (Opcode, bool) {
+    match opcode_str {
         "LB" => (Opcode::LB, true),
-        "LBU" => (Opcode::LBU, true),
         "LH" => (Opcode::LH, true),
-        "LHU" => (Opcode::LHU, true),
         "LW" => (Opcode::LW, true),
+        "LBU" => (Opcode::LBU, true),
+        "LHU" => (Opcode::LHU, true),
         "SB" => (Opcode::SB, false),
         "SH" => (Opcode::SH, false),
         "SW" => (Opcode::SW, false),
@@ -75,39 +77,39 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
     // ######################## Extract CPU Constraints ##########################
-    let air: MemoryReadWriteChip<KoalaBear> = MemoryReadWriteChip::default();
-    let air_name = "MemoryReadWrite";
-    let _colmap = make_col_map();
+    let air = MemoryInstructionsChip::default();
+    let air_name = "MemoryInstrs";
+    let colmap = make_col_map();
+    println!("{:?}", colmap);
 
-    let (mut constraint_info, _general_lookup_info) = extract_constraints_and_range::<
-        KoalaBear,
-        MemoryReadWriteChip<KoalaBear>,
-    >(&air, NUM_MEMORY_CHIP_COLS, prime);
+    let (mut constraint_info, _general_lookup_info) =
+        extract_constraints_and_range::<BabyBear, MemoryInstructionsChip>(
+            &air,
+            NUM_MEMORY_INSTRUCTIONS_COLUMNS,
+            prime,
+        );
 
     let final_check = generate_memory_op_final_checker(
-        1,                    // clk
-        vec![68, 69, 70, 71], // op_a
-        vec![77, 78, 79, 80], // op_b
-        vec![86, 87, 88, 89], // op_c
-        vec![28, 29, 30, 31], // mem
+        2,                    // clk
+        vec![3, 4, 5, 6],     // op_a
+        vec![7, 8, 9, 10],    // op_b
+        vec![11, 12, 13, 14], // op_c
+        vec![38, 39, 40, 41], // mem
     );
     let mut semantic_inputs = vec![
-        0, 1, 24, 25, 26, 27, 32, 33, 55, 64, 65, 66, 67, 72, 73, 77, 78, 79, 80, 81, 82, 86, 87,
-        88, 89, 90, 91,
+        0, 1, 2, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+        34, 35, 36, 37, 42, 43,
     ];
     if is_load {
-        semantic_inputs.extend(&[28, 29, 30, 31]);
-        constraint_info.output_columns = vec![68, 69, 70, 71];
+        semantic_inputs.extend(&[38, 39, 40, 41]);
+        constraint_info.output_columns = vec![3, 4, 5, 6];
     } else {
-        semantic_inputs.extend(&[68, 69, 70, 71]);
-        constraint_info.output_columns = vec![28, 29, 30, 31];
+        semantic_inputs.extend(&[3, 4, 5, 6]);
+        constraint_info.output_columns = vec![38, 39, 40, 41];
     }
     constraint_info
         .refinable_cols
         .retain(|c| !semantic_inputs.contains(c));
-    constraint_info
-        .refinable_cols
-        .extend(&[83, 84, 85, 92, 93, 94]);
 
     // ######################## Program Initialization ###########################
     let program = if is_load {

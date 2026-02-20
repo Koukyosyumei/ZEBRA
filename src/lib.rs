@@ -1,10 +1,14 @@
-pub mod alu;
+pub mod canonicalizer;
+pub mod constraint;
 pub mod interval;
 pub mod macros;
 pub mod quick;
+pub mod shrinker;
 pub mod smt;
 pub mod solver;
 pub mod state;
 pub mod symbolic;
+pub mod trace;
 pub mod ui;
 pub mod utils;
+pub mod wordop;

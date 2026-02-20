@@ -12,19 +12,44 @@ use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use crate::symbolic::{
+use crate::shrinker::{
     apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
-    detect_conditional_var_sub_var_constraints, gather_boolean_variables, gather_vars,
-    is_babybear_word_range, is_boolean_constraint, is_iszero_operator, is_koalabear_word_range,
-    refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
-    AbirConstraint, LatticeVMSymbolicExpr,
+    detect_conditional_var_sub_var_constraints, refine_conditional_constraints_var_sub_const,
+    refine_conditional_constraints_var_sub_var, AbirConstraint,
+};
+use crate::symbolic::{
+    gather_boolean_variables, gather_vars, is_babybear_word_range, is_boolean_constraint,
+    is_iszero_operator, is_koalabear_word_range, LatticeVMSymbolicExpr,
 };
 use crate::{
+    constraint::{eval_constraints, LatticeVMConstraints},
     interval::{AbstractInterval, MayBeFlag},
-    symbolic::{eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints},
+    trace::{refine_trace, AbstractTrace},
     ui::UiState,
 };
 
+/// Describes the allowed value range for a column when initializing an abstract state.
+///
+/// This enum is used to construct an [`AbstractInterval`] representing the
+/// initial domain of a variable (e.g., a column in a trace). Variants correspond
+/// to common bounded integer domains, constants, or unconstrained ranges.
+///
+/// # Variants
+///
+/// * `Bool`  — Boolean domain `{0, 1}`.
+/// * `U4`    — Unsigned 4-bit integer domain `[0, 15]`.
+/// * `U7`    — Unsigned 7-bit integer domain `[0, 126]`.
+/// * `U8`    — Unsigned 8-bit integer domain `[0, 255]`.
+/// * `U16`   — Unsigned 16-bit integer domain `[0, 65535]`.
+/// * `Top`   — Unconstrained domain over the full field (bounded by the modulus).
+/// * `Const(i64)` — A single constant value.
+/// * `Any(i64, i64)` — Explicit inclusive interval `[lo, hi]`.
+///
+/// # Notes
+///
+/// * Domains are interpreted as integer intervals.
+/// * `Top` typically spans the entire finite field defined by the program modulus.
+/// * No validation is performed to ensure bounds are consistent with the field.
 #[derive(Clone, Debug)]
 pub enum RangeType {
     Bool,
@@ -37,6 +62,37 @@ pub enum RangeType {
     Any(i64, i64),
 }
 
+/// Constructs the initial abstract interval for a given column.
+///
+/// If a range specification exists for `col_idx`, the corresponding interval
+/// is returned. Otherwise, the column is initialized to the top (unconstrained)
+/// interval over the field defined by `prime`.
+///
+/// # Parameters
+///
+/// * `col_idx` — Column index whose initial value is being created.
+/// * `range_types` — Mapping from column indices to their allowed ranges.
+/// * `prime` — Field modulus used when constructing top intervals.
+///
+/// # Returns
+///
+/// An [`AbstractInterval`] representing the initial domain of the column.
+///
+/// # Behavior
+///
+/// * If `range_types` contains an entry for `col_idx`, the interval is derived
+///   from the associated [`RangeType`].
+/// * If no entry exists, the column is treated as unconstrained (`Top`).
+///
+/// # Panics
+///
+/// This function does not panic under normal conditions.
+///
+/// # Notes
+///
+/// * The returned interval is purely symbolic and may later be refined
+///   by constraint propagation.
+/// * Bounds are not automatically reduced modulo `prime`.
 pub fn make_init_val(
     col_idx: usize,
     range_types: &HashMap<usize, RangeType>,
@@ -58,7 +114,24 @@ pub fn make_init_val(
     }
 }
 
-/// Messages sent from workers to the UI thread
+/// Messages sent from worker threads to the UI or coordinator thread.
+///
+/// This enum enables asynchronous progress reporting and result delivery
+/// during parallel search or solving.
+///
+/// # Variants
+///
+/// * `UpdateStats` — Periodic status update.
+///     * `trials` — Number of nodes processed so far.
+///     * `unsat` — Number of nodes determined unsatisfiable.
+///     * `queue_len` — Current size of the work queue.
+/// * `SolutionFound` — A valid solution trace has been discovered.
+///     * Contains the solution trace and the number of steps taken.
+/// * `Finished` — All work has completed and no further messages will follow.
+///
+/// # Threading
+///
+/// Intended for use with channels in a multi-threaded solver architecture.
 pub enum SolverMsg {
     UpdateStats {
         trials: usize,
@@ -69,24 +142,120 @@ pub enum SolverMsg {
     Finished,
 }
 
-/// The outcome of processing a single node
+/// Result of processing a single search node.
+///
+/// Returned by worker routines after attempting refinement and constraint
+/// evaluation on a node.
+///
+/// # Variants
+///
+/// * `Success` — A satisfying trace has been found.
+/// * `Pruned` — The node is unsatisfiable and should be discarded.
+/// * `Refined` — The node produced child nodes that should be explored.
+///
+/// This type guides the global search strategy (e.g., queue expansion).
 enum NodeProcessingResult {
     Success(AbstractTrace),
     Pruned, // Unsatisfiable
     Refined(Vec<(SearchNode, Potential)>),
 }
 
-/// Result of constraint checking on a node.
+/// Heuristic score associated with a node in the search space.
+///
+/// Represented as `(priority, depth_penalty)` or another solver-specific
+/// ordering metric. Lower values typically indicate higher priority,
+/// but interpretation depends on the queue implementation.
+///
+/// Used to guide best-first or heuristic search strategies.
 pub type Potential = (i32, i32);
 
-/// Node inside the search queue.
-/// depth: number of refinement steps so far.
+/// A node in the solver's search space.
+///
+/// Each node represents a partially refined abstract execution trace
+/// along with its depth in the refinement tree.
+///
+/// # Fields
+///
+/// * `main_trace` — The abstract trace representing current constraints.
+/// * `depth` — Number of refinement steps applied from the root.
+///
+/// # Usage
+///
+/// Nodes are stored in priority queues or work lists and expanded
+/// during the search for satisfying executions.
+///
+/// # Traits
+///
+/// Implements `Eq`, `Hash`, and `PartialEq` to allow deduplication
+/// and storage in hash-based collections.
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct SearchNode {
     main_trace: AbstractTrace,
     depth: usize,
 }
 
+#[derive(Clone, Debug)]
+pub enum VerificationStatus {
+    Verified,
+    TimedOut,
+    ResourceLimitReached,
+    Interrupted,
+}
+
+/// Processes a single search node by applying refinements, generating children,
+/// and evaluating constraints.
+///
+/// This function performs one expansion step in the solver's search procedure.
+/// It applies local constraint propagation, attempts domain refinement, and
+/// evaluates candidate child traces.
+///
+/// # Parameters
+///
+/// * `head` — The node to process.
+/// * `public_trace` — Public input trace used for constraint evaluation.
+/// * `constraints` — Global VM constraints to be satisfied.
+/// * `prime` — Field modulus.
+/// * `rng` — Random number generator for stochastic refinement.
+/// * `align_pc_to_program` — Callback that aligns program counters to valid locations.
+/// * `refinment_target_indicies_main` — Preferred indices for general refinement.
+/// * `bool_target_indices` — Indices prioritized for boolean refinement.
+/// * `min_row_id`, `max_row_id` — Row bounds eligible for refinement.
+/// * `conditional_var_sub_const_constraints` — Conditional constraints of the form
+///   variable minus constant.
+/// * `eq_constraints` — Variable equality constraints.
+/// * `abir_constraints` — Additional ABIR constraints.
+///
+/// # Returns
+///
+/// A [`NodeProcessingResult`] indicating whether:
+///
+/// * a solution was found,
+/// * the node should be pruned, or
+/// * new child nodes were generated.
+///
+/// # Algorithm Overview
+///
+/// 1. Apply constraint-driven refinements.
+/// 2. Generate candidate refinements of the trace.
+/// 3. Evaluate each child against the constraints.
+/// 4. Return immediately if a satisfying trace is found.
+/// 5. Otherwise return refined children with heuristic priorities.
+///
+/// # Pruning
+///
+/// If any refinement proves the node unsatisfiable, the node is discarded
+/// without generating children.
+///
+/// # Parallelism
+///
+/// Intended to run inside worker threads. Generated children can be pushed
+/// back to a global queue for load balancing.
+///
+/// # Notes
+///
+/// * Evaluation is sequential within this function.
+/// * Heuristic potentials are computed to guide future exploration.
+/// * Randomization helps avoid pathological search orderings.
 fn process_single_node(
     head: SearchNode,
     public_trace: AbstractTrace,
@@ -196,7 +365,115 @@ fn process_single_node(
     }
 }
 
-// Return type: (Did we find a solution?, Did user request global exit?)
+/// Runs a parallel best-first search to solve a constraint system over abstract traces,
+/// with live UI updates and cooperative termination.
+///
+/// This function explores the refinement search space starting from `initial_node`,
+/// using multiple worker threads and a shared priority queue. Workers repeatedly
+/// expand nodes via [`process_single_node`], evaluate constraints, and push refined
+/// candidates back into the queue until a solution is found, the search space is
+/// exhausted, a maximum expansion limit is reached, or the user requests exit.
+///
+/// The solver operates on a *subset* of refinable columns (`refinable_cols`),
+/// allowing callers to partition the search space across multiple invocations.
+///
+/// # Parameters
+///
+/// * `initial_node` — Root node of the search (will be cloned internally).
+/// * `public_trace` — Public input trace used during constraint evaluation.
+/// * `constraints` — Shared VM constraint system.
+/// * `refinable_cols` — Column indices allowed to be refined in this subset.
+/// * `range_types` — Domain specifications for columns.
+/// * `align_pc_to_program` — Callback that adjusts traces to valid program counters.
+/// * `min_row_id`, `max_row_id` — Inclusive row bounds eligible for refinement.
+/// * `max_expansions` — Per-subset limit on node expansions before forced shutdown.
+/// * `num_workers` — Number of worker threads to spawn.
+/// * `seed` — Base RNG seed (worker seeds are derived deterministically).
+/// * `prime` — Field modulus.
+/// * `ui` — Mutable UI state for rendering progress and logs.
+/// * `terminal` — Terminal backend used for drawing the UI.
+/// * `final_check` — Callback invoked when a candidate solution is found.
+/// * `known_solution` — Set used to deduplicate previously discovered solutions.
+/// * `global_total_trials` — Global counter shared across subsets.
+/// * `sleep_time` — Accumulates idle sleep time to throttle CPU usage.
+///
+/// # Returns
+///
+/// A pair `(found, quit)` where:
+///
+/// * `found` — `true` if at least one satisfying trace was discovered.
+/// * `quit` — `true` if the user requested global termination (e.g., pressed `q`).
+///
+/// # Algorithm Overview
+///
+/// 1. **Preprocessing**
+///    * Detects conditional boolean constraints and adjusts target indices.
+///    * Extracts auxiliary constraint forms (conditional, equality, ABIR).
+///
+/// 2. **Shared State Initialization**
+///    * Creates a thread-safe priority queue of search nodes.
+///    * Initializes counters and shutdown flags.
+///    * Enqueues the initial node.
+///
+/// 3. **Worker Execution**
+///    Each worker:
+///    * Pops nodes from the queue
+///    * Applies refinements and evaluates constraints
+///    * Reports results via a message channel
+///    * Pushes refined children back into the queue
+///    * Periodically sends progress updates
+///
+/// 4. **UI Event Loop**
+///    The main thread:
+///    * Receives worker messages
+///    * Updates status and logs
+///    * Invokes `final_check` on candidate solutions
+///    * Handles user input (e.g., quit requests)
+///    * Terminates when the queue is empty and all workers are idle
+///
+/// # Concurrency Model
+///
+/// * Workers share a priority queue protected by a mutex.
+/// * Progress and results are communicated through an MPSC channel.
+/// * A shutdown flag enables cooperative termination.
+/// * Each worker uses an independent RNG stream.
+///
+/// # Termination Conditions
+///
+/// The search stops when any of the following occurs:
+///
+/// * A solution is found (search continues unless externally stopped)
+/// * The priority queue becomes empty and all workers are idle
+/// * `max_expansions` is reached
+/// * The user presses `q` or `c`
+///
+/// # UI Behavior
+///
+/// * Progress statistics are updated periodically (time-based).
+/// * Rendering occurs at a fixed tick rate.
+/// * Logs include discovered solution traces.
+///
+/// # Notes
+///
+/// * The search is heuristic and not guaranteed to find a solution.
+/// * Multiple solutions may be discovered during a single run.
+/// * `initial_node` is not consumed; a clone is used internally.
+/// * This function blocks until completion for the given subset.
+///
+/// # Thread Safety
+///
+/// All shared structures use `Arc` and atomic primitives to ensure
+/// safe concurrent access.
+///
+/// # Panics
+///
+/// May panic if terminal rendering fails or if mutexes are poisoned.
+///
+/// # See Also
+///
+/// * [`process_single_node`] — Core node expansion routine.
+/// * [`SolverMsg`] — Messages exchanged between workers and UI thread.
+/// * [`SearchNode`] — Representation of search states.
 pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     initial_node: &mut SearchNode,
     public_trace: AbstractTrace,
@@ -216,7 +493,9 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     known_solution: &mut HashSet<String>,
     global_total_trials: Arc<AtomicUsize>,
     sleep_time: &mut Duration,
-) -> (bool, bool)
+    start_time: &std::time::Instant,
+    time_out: Duration,
+) -> (VerificationStatus, bool, bool)
 // (Found, Quit)
 where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
@@ -411,15 +690,22 @@ where
     let mut user_quit = false;
     // let mut subset_finished = false;
 
-    // 描画更新の頻度を制御（例: 30 FPS = 約33ms, ここでは少し余裕を見て 50ms）
+    ui.status = format!(
+        "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
+        refinable_cols, 0, 0, 1
+    );
+    terminal
+        .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
+        .unwrap();
+    // 30 FPR = ~33ms
     let tick_rate = Duration::from_millis(50);
     let mut last_tick = std::time::Instant::now();
 
     loop {
-        let mut got_msg = false;
+        let mut _got_msg = false;
 
         for msg in rx.try_iter() {
-            got_msg = true;
+            _got_msg = true;
 
             match msg {
                 SolverMsg::UpdateStats {
@@ -427,8 +713,6 @@ where
                     unsat,
                     queue_len,
                 } => {
-                    // 書式生成はコストがかかるので、本当に描画が必要な時だけやる手もありますが、
-                    // ここでは最新状態で上書きし続ける
                     ui.status = format!(
                         "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
                         refinable_cols, trials, unsat, queue_len
@@ -441,6 +725,12 @@ where
                     );
                     final_check(&trace, trials, prime, known_solution, ui);
                     solution_found = true;
+                    if last_tick.elapsed() >= tick_rate {
+                        terminal
+                            .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
+                            .unwrap();
+                        last_tick = std::time::Instant::now();
+                    }
                 }
                 SolverMsg::Finished => {
                     // ui.status = format!("Subset: {:?}\nFinished", refinable_cols);
@@ -448,27 +738,32 @@ where
                     // subset_finished = true;
                 }
             }
+
+            if local_trials.load(Ordering::SeqCst) >= max_expansions {
+                shutdown.store(true, Ordering::SeqCst);
+                return (
+                    VerificationStatus::ResourceLimitReached,
+                    solution_found,
+                    user_quit,
+                );
+            }
+
+            if start_time.elapsed() >= time_out {
+                shutdown.store(true, Ordering::SeqCst);
+                return (VerificationStatus::TimedOut, solution_found, user_quit);
+            }
         }
 
-        // 全スレッドが終了し、かつメッセージもない場合のチェック
-        // (rx.try_iter()が終わった時点でDisconnectなら終了)
-        // ただし、mpscは送信側がすべてドロップされると RecvError を返しますが、
-        // try_iter は単にループを抜けるので、ここで明示的な終了判定を入れるか、
-        // active_workers 等を見るのが確実です。
-        // 簡単のため、shutdownフラグと solution_found で判定します。
-
         // --------------------------------------------------------
-        // 2. キー入力のチェック (最優先)
+        // 2. Check Key Inputs
         // --------------------------------------------------------
-        // timeout ブロックの中ではなく、ループ毎に必ずチェックします。
-        // poll(Duration::ZERO) はノンブロッキングです。
         if event::poll(Duration::from_millis(0)).unwrap() {
             if let Event::Key(key) = event::read().unwrap() {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Char('c') => {
                         user_quit = true;
                         shutdown.store(true, Ordering::SeqCst);
-                        return (solution_found, user_quit);
+                        return (VerificationStatus::Interrupted, solution_found, user_quit);
                     }
                     _ => {}
                 }
@@ -476,7 +771,7 @@ where
         }
 
         // --------------------------------------------------------
-        // 3. 描画更新 (一定時間経過時のみ)
+        // 3. Update UI
         // --------------------------------------------------------
         if last_tick.elapsed() >= tick_rate {
             terminal
@@ -485,40 +780,114 @@ where
             last_tick = std::time::Instant::now();
         }
 
-        // 全ワーカーが終了したかの判定
-        // (厳密には active_workers == 0 && queue empty ですが、
-        //  SolverMsg::Finished をカウントする等の方法もあります。
-        //  ここではシンプルに channel が切断されているかを確認する手段として
-        //  rx.try_recv()のエラーを見る方法もありますが、
-        //  上の try_iter ループを抜けたということは空なので、
-        //  active_workers が 0 なら終了とみなせます)
+        // --------------------------------------------------------
+        // 4. Check whether all workers finished
+        // --------------------------------------------------------
+        if local_trials.load(Ordering::SeqCst) >= max_expansions {
+            return (
+                VerificationStatus::ResourceLimitReached,
+                solution_found,
+                user_quit,
+            );
+        }
 
-        /*
-        let workers_active = Arc::strong_count(&queue) > 1; // メインスレッドも持っているので > 1
-        if !workers_active {
-            break;
-        }*/
+        if start_time.elapsed() >= time_out {
+            return (VerificationStatus::TimedOut, solution_found, user_quit);
+        }
 
-        //if !got_msg {
         let queue_empty = queue.lock().unwrap().is_empty();
         let workers_idle = active_workers.load(Ordering::SeqCst) == 0;
         if queue_empty && workers_idle {
             break;
         }
-        //}
 
-        // ワーカーが全員死んでチャネルも空ならループを抜ける
-        // (簡略化のため、Disconnect検知は recv() で行うのが一般的ですが、
-        //  ここでは active_workers を見るか、単に少し sleep してループさせる)
-
-        // 短いスリープを入れてCPU使用率100%を防ぐ
+        // tiny sleep to avoid the over-usage of CPU
         *sleep_time += Duration::from_millis(10);
         thread::sleep(Duration::from_millis(10));
     }
 
-    (solution_found, user_quit)
+    (VerificationStatus::Verified, solution_found, user_quit)
 }
 
+/// Orchestrates a parallel search over progressively larger subsets of refinable
+/// columns, invoking [`parallel_solve`] for each subset until termination.
+///
+/// This function implements a hierarchical search strategy:
+///
+/// 1. Iterate over subset sizes `k`, starting from `minimum_num_taregt_cols`
+///    up to the full set of refinable columns.
+/// 2. For each size, enumerate combinations of columns (shuffled randomly).
+/// 3. For each subset, construct a fresh initial abstract trace restricted
+///    to those columns.
+/// 4. Invoke the parallel solver on that subset.
+/// 5. Stop early if the user requests termination.
+///
+/// The approach allows the solver to prioritize smaller refinement sets first,
+/// which often yields solutions faster and reduces combinatorial explosion.
+///
+/// # Parameters
+///
+/// * `constraints` — VM constraint system to satisfy.
+/// * `refinable_cols` — Full list of columns eligible for refinement.
+/// * `range_types` — Domain specifications for columns.
+/// * `base_abs_main_trace_data` — Baseline abstract trace data used as a template.
+/// * `public_vals` — Public input values (single-row trace).
+/// * `max_expansions` — Maximum node expansions per subset search.
+/// * `minimum_num_taregt_cols` — Minimum subset size to consider.
+/// * `min_row_id`, `max_row_id` — Inclusive row bounds for refinement.
+/// * `program_len` — Length of the program (used for PC refinement).
+/// * `program_counter_refine_fn` — Callback that refines program counter domains.
+/// * `align_pc_to_program` — Callback to align traces to valid program counters.
+/// * `final_check` — Callback invoked when candidate solutions are found.
+/// * `prime` — Field modulus.
+/// * `seed` — RNG seed for deterministic subset ordering.
+/// * `known_solution` — Set used to deduplicate discovered solutions.
+/// * `ui` — Mutable UI state for progress reporting.
+/// * `terminal` — Terminal backend for rendering.
+/// * `sleep_time` — Accumulates solver idle time for throttling.
+///
+/// # Search Strategy
+///
+/// For each subset:
+///
+/// * The base trace is cloned.
+/// * Selected columns are reinitialized using [`make_init_val`].
+/// * Program counter domains may be further refined.
+/// * A fresh root [`SearchNode`] is created.
+/// * The subset is solved independently using multiple worker threads.
+///
+/// Subsets are processed in randomized order to avoid worst-case patterns.
+///
+/// # Termination
+///
+/// The outer loop stops when:
+///
+/// * All subsets have been explored, or
+/// * The user requests exit (e.g., presses `q`)
+///
+/// Solutions discovered in earlier subsets do not prevent exploration of later
+/// subsets unless externally terminated.
+///
+/// # Concurrency
+///
+/// Each subset search runs independently but shares immutable data via `Arc`.
+/// A global trial counter tracks progress across subsets.
+///
+/// # Notes
+///
+/// * The function blocks until completion or user exit.
+/// * The base trace template is never modified directly.
+/// * Smaller subsets typically correspond to simpler hypotheses.
+///
+/// # Panics
+///
+/// May panic if terminal rendering fails.
+///
+/// # See Also
+///
+/// * [`parallel_solve`] — Performs the per-subset parallel search.
+/// * [`make_init_val`] — Initializes column domains.
+/// * [`SearchNode`] — Root node representation.
 pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
     refinable_cols: &Vec<usize>, // Full plan
@@ -539,7 +908,9 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     sleep_time: &mut Duration,
-) where
+    time_out: Duration,
+) -> VerificationStatus
+where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
@@ -548,8 +919,10 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     let shared_constraints = Arc::new(constraints.clone());
     let shared_range_types = Arc::new(range_types.clone());
     let global_count = Arc::new(AtomicUsize::new(0));
+    let start_time = std::time::Instant::now();
 
     let mut rng = StdRng::seed_from_u64(seed);
+    let mut last_verification_status = VerificationStatus::Interrupted;
 
     // --- OUTER LOOP: Subset Sizes ---
     'outer: for k in minimum_num_taregt_cols..(refinable_cols.len() + 1) {
@@ -577,7 +950,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
 
             // 2. RUN SOLVER for THIS subset
             // We pass ownership of subset_indices wrapped in Arc
-            let (_found, quit) = parallel_solve(
+            let (status, _found, quit) = parallel_solve(
                 &mut initial_node,
                 public_trace,
                 shared_constraints.clone(),
@@ -596,7 +969,14 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 known_solution,
                 global_count.clone(),
                 sleep_time,
+                &start_time,
+                time_out,
             );
+            last_verification_status = status;
+
+            if start_time.elapsed() >= time_out {
+                break 'outer;
+            }
 
             // 3. DECIDE NEXT STEP
             if quit {
@@ -605,8 +985,83 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
             }
         }
     }
+
+    last_verification_status
 }
 
+/// Preprocesses symbolic constraints to determine refinable columns and their
+/// initial value ranges.
+///
+/// This function analyzes transition and lookup constraints to:
+///
+/// * Remove columns that should not be refined
+/// * Normalize composite constraint patterns (e.g., `iszero`, word range checks)
+/// * Identify variables actually used in constraints
+/// * Infer domain types (Boolean, U8, U16, etc.)
+///
+/// The resulting outputs guide initialization and refinement during solving.
+///
+/// # Parameters
+///
+/// * `num_cols` — Total number of columns in the trace.
+/// * `u8_cols` — Columns known to hold 8-bit unsigned values.
+/// * `u16_cols` — Columns known to hold 16-bit unsigned values.
+/// * `multiplicities` — Columns representing multiplicity counters (excluded).
+/// * `received_vars_from_cpu` — Columns externally controlled by the CPU (excluded).
+/// * `tv_constraints` — Transition constraints (modified in place).
+/// * `lookup_symbolic_constraints` — Additional lookup constraints.
+/// * `prime` — Field modulus used for symbolic analysis.
+///
+/// # Returns
+///
+/// A pair `(refinable_cols, range_types)` where:
+///
+/// * `refinable_cols` — Columns eligible for refinement.
+/// * `range_types` — Mapping from column index to inferred [`RangeType`].
+///
+/// # Processing Steps
+///
+/// 1. **Initial Filtering**
+///    Remove columns that must remain fixed (multiplicities, CPU inputs).
+///
+/// 2. **Constraint Normalization**
+///    Detect and rewrite special constructs such as:
+///
+///    * `iszero` operators
+///    * Word range checks (e.g., KoalaBear, BabyBear)
+///
+///    These patterns often expand into multiple simpler constraints.
+///
+/// 3. **Variable Usage Analysis**
+///    Collect all variable indices appearing in constraints and retain only
+///    those columns that are actually used.
+///
+/// 4. **Boolean Variable Detection**
+///    Identify variables constrained to `{0,1}` and mark them as `RangeType::Bool`.
+///
+/// 5. **Explicit Range Assignment**
+///    Override inferred ranges for known byte-width columns (`U8`, `U16`).
+///
+/// # Notes
+///
+/// * `tv_constraints` is modified in place to contain the normalized set.
+/// * Lookup constraints contribute to variable usage but are not rewritten.
+/// * Columns without explicit range types default to unconstrained (`Top`)
+///   during initialization.
+///
+/// # Use Cases
+///
+/// Typically invoked once before launching the solver to construct the
+/// refinement plan and domain information.
+///
+/// # Panics
+///
+/// This function does not panic under normal conditions.
+///
+/// # See Also
+///
+/// * [`RangeType`] — Domain specification enum.
+/// * [`make_init_val`] — Uses the resulting range map for initialization.
 pub fn prepare_constraints_and_range_type(
     num_cols: usize,
     u8_cols: &Vec<usize>,

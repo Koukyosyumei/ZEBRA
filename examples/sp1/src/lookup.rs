@@ -9,16 +9,16 @@ use sp1_core_executor::Opcode;
 use sp1_stark::InteractionBuilder;
 use sp1_stark::InteractionKind;
 
-use latticevm::alu::get_alu_constraint;
-use latticevm::alu::WordOp;
 use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
-use latticevm::symbolic::LatticeVMSymbolicExpr;
-use latticevm::utils::GeneralLookupInfo;
+use latticevm::symbolic::GeneralLookupInfo;
+use latticevm::symbolic::LatticeVMSymbolicExpr as LExpr;
+use latticevm::wordop::get_alu_constraint;
+use latticevm::wordop::WordOp;
 
 use crate::p3_to_tv::convert_p3_virtual_pair_col as cv;
 
-pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
+pub fn try_add_single_var_col<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &mut Vec<usize>) {
     if !b.column_weights.is_empty() {
         if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
             u8_cols.push(col_idx);
@@ -26,22 +26,15 @@ pub fn add_u8_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u8_cols: &
     }
 }
 
-pub fn add_u16_col_if_possible<F: PrimeField32>(b: &VirtualPairCol<F>, u16_cols: &mut Vec<usize>) {
-    if !b.column_weights.is_empty() {
-        if let p3_air::PairCol::Main(col_idx) = b.column_weights[0].0 {
-            u16_cols.push(col_idx);
-        }
-    }
-}
-
 pub fn get_symbolic_lookup_constraints<F, A>(
     air: &A,
     preprocessed_width: usize,
-    num_public_values: usize,
+    _num_public_values: usize,
     u8_cols: &mut Vec<usize>,
     u16_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,
-    lookup_constraints: &mut Vec<LatticeVMSymbolicExpr>,
+    air_constraints: &mut Vec<LExpr>,
+    lookup_constraints: &mut Vec<LExpr>,
     received_vars_from_cpu: &mut HashSet<usize>,
     prime: u32,
 ) -> GeneralLookupInfo
@@ -73,13 +66,13 @@ where
                     }
                 }
                 for i in 6..10 {
-                    add_u8_col_if_possible(&r.values[i], &mut general_lookup_info.alu_output);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_a);
                 }
                 for i in 10..14 {
-                    add_u8_col_if_possible(&r.values[i], &mut general_lookup_info.alu_input1);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_b);
                 }
                 for i in 14..18 {
-                    add_u8_col_if_possible(&r.values[i], &mut general_lookup_info.alu_input2);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_c);
                 }
             }
             _ => {}
@@ -139,28 +132,26 @@ where
                         make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 6..18 {
-                            add_u8_col_if_possible(&s.values[i], u8_cols);
+                            try_add_single_var_col(&s.values[i], u8_cols);
                         }
 
-                        lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                        lookup_constraints.push(LExpr::Mul(
                             Box::new(multiplicities.clone()),
                             Box::new(impl_constraint),
                         ));
                     }
 
-                    let pc_constraint = LatticeVMSymbolicExpr::Sub(
+                    let pc_constraint = LExpr::Sub(
                         Box::new(next_pc.clone()),
-                        Box::new(LatticeVMSymbolicExpr::Add(
+                        Box::new(LExpr::Add(
                             Box::new(pc.clone()),
-                            Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                                4,
-                            ))),
+                            Box::new(LExpr::Constant(AbstractInterval::from_i64(4))),
                         )),
                     );
                     let impl_pc_constraint =
                         make_impl_constraint(t.0 as i64, &opcode, pc_constraint, prime);
                     if let Some(impl_pc_constraint) = impl_pc_constraint {
-                        lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                        air_constraints.push(LExpr::Mul(
                             Box::new(multiplicities.clone()),
                             Box::new(impl_pc_constraint),
                         ));
@@ -174,86 +165,42 @@ where
                 let b = &s.values[3];
                 let c = &s.values[4];
 
-                add_u8_col_if_possible(&b, u8_cols);
-                add_u8_col_if_possible(&c, u8_cols);
+                try_add_single_var_col(&b, u8_cols);
+                try_add_single_var_col(&c, u8_cols);
 
                 if opcode.column_weights.is_empty() {
                     if opcode.constant.as_canonical_u32() == 8 {
-                        add_u16_col_if_possible(&a1, u16_cols);
+                        try_add_single_var_col(&a1, u16_cols);
                     }
                 }
 
                 let a1_expr = cv(&a1);
                 let a2_expr = cv(&a2);
-                let b_expr = cv(&b);
-                let c_expr = cv(&c);
                 let opcode_condition = cv(&opcode);
 
                 let ops = [
-                    (
-                        0,
-                        &a1_expr,
-                        LatticeVMSymbolicExpr::And(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
-                        ),
-                    ),
-                    (
-                        1,
-                        &a1_expr,
-                        LatticeVMSymbolicExpr::Or(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
-                        ),
-                    ),
-                    (
-                        2,
-                        &a1_expr,
-                        LatticeVMSymbolicExpr::Xor(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
-                        ),
-                    ),
-                    (
-                        5,
-                        &a1_expr,
-                        LatticeVMSymbolicExpr::SRL(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
-                        ),
-                    ),
+                    (0, &a1_expr, LExpr::And(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (1, &a1_expr, LExpr::Or(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (2, &a1_expr, LExpr::Xor(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (5, &a1_expr, LExpr::SRL(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (
                         5,
                         &a2_expr,
-                        LatticeVMSymbolicExpr::SRLCarry(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
-                        ),
+                        LExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
                     ),
-                    (
-                        6,
-                        &a1_expr,
-                        LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
-                            Box::new(b_expr.clone()),
-                            Box::new(c_expr.clone()),
-                        ))),
-                    ),
-                    (
-                        7,
-                        &a1_expr,
-                        LatticeVMSymbolicExpr::Msb(Box::new(b_expr.clone())),
-                    ),
+                    (6, &a1_expr, LExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (7, &a1_expr, LExpr::Msb(Box::new(cv(&b)))),
                 ];
 
                 for (opcode, a_expr, op_expr) in ops {
                     let el_constraint = make_impl_constraint(
                         opcode,
                         &opcode_condition,
-                        LatticeVMSymbolicExpr::Sub(Box::new(a_expr.clone()), Box::new(op_expr)),
+                        LExpr::Sub(Box::new(a_expr.clone()), Box::new(op_expr)),
                         prime,
                     );
                     if let Some(el_constraint) = el_constraint {
-                        lookup_constraints.push(LatticeVMSymbolicExpr::Mul(
+                        lookup_constraints.push(LExpr::Mul(
                             Box::new(multiplicities.clone()),
                             Box::new(el_constraint),
                         ));

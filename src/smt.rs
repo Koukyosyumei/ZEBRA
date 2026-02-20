@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::constraint::LatticeVMConstraints;
 use crate::interval::AbstractInterval;
 use crate::solver::RangeType;
-use crate::symbolic::LatticeVMConstraints;
 use crate::symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr};
 
 pub fn expr_to_smt(
@@ -103,7 +103,7 @@ pub fn expr_to_smt(
                 format!("(* {} {})", rec(a), rec(b))
             }
             LatticeVMSymbolicExpr::Lt(a, b) => {
-                format!("(ite (< {} {}) 0 1)", rec(a), rec(b),)
+                format!("(ite (< {} {}) 1 0)", rec(a), rec(b),)
             }
             LatticeVMSymbolicExpr::Flip(a) => {
                 format!("(ite (= {} 0) 1 0)", rec(a),)
@@ -428,8 +428,8 @@ pub fn expr_to_smt_bv(
                     "(ite (bvult {} {}) {} {})",
                     rec(a),
                     rec(b),
-                    zero_hex,
-                    one_hex
+                    one_hex,
+                    zero_hex
                 )
             }
             LatticeVMSymbolicExpr::And(a, b) => {

@@ -16,10 +16,13 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use serde::Deserialize;
 
 use crate::smt::expr_to_smt_bv;
-use crate::solver::{run_parallel_solver, RangeType};
-use crate::symbolic::add_blocking_constraint;
+use crate::solver::{run_parallel_solver, RangeType, VerificationStatus};
 use crate::ui::UiState;
-use crate::{interval::AbstractInterval, symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use crate::{
+    constraint::{add_blocking_constraint, LatticeVMConstraints},
+    interval::AbstractInterval,
+    trace::AbstractTrace,
+};
 
 pub struct ProgramInfo {
     pub program_str: String,
@@ -39,6 +42,7 @@ pub struct ConstraintInfo {
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct SearchConfig {
+    pub time_out_ms: u64,
     pub minimum_num_taregt_cols: usize,
     pub max_expansions: usize,
     pub min_row_id: usize,
@@ -49,6 +53,7 @@ pub struct SearchConfig {
 impl Default for SearchConfig {
     fn default() -> Self {
         SearchConfig {
+            time_out_ms: 10000,
             minimum_num_taregt_cols: 0,
             max_expansions: 1000000000,
             min_row_id: 0,
@@ -78,6 +83,7 @@ pub struct Args {
 
 #[derive(Debug)]
 pub struct VerificationResult {
+    pub status: VerificationStatus,
     pub num_solutions: usize,
     pub execution_time: std::time::Duration,
 }
@@ -100,6 +106,7 @@ where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
     let mut sleep_time = Duration::from_millis(0);
+    let time_out = Duration::from_millis(search_config.time_out_ms);
 
     // ######################## Blocking Closures ################################
     for i in blocked_rows {
@@ -131,6 +138,7 @@ where
             align_pc_to_program,
             final_check,
             &mut sleep_time,
+            time_out,
         )
     } else {
         // ######################## Generating SMT Formula ##########################
@@ -176,6 +184,7 @@ where
         };
 
         Ok(VerificationResult {
+            status: VerificationStatus::Verified,
             num_solutions,
             execution_time: start_time.elapsed() - sleep_time,
         })
@@ -200,6 +209,7 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
+    time_out: Duration,
 ) -> Result<VerificationResult, io::Error>
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
@@ -218,7 +228,7 @@ where
     let mut known_solution = HashSet::<String>::new();
     let start_time = time::Instant::now();
 
-    run_parallel_solver(
+    let verification_status = run_parallel_solver(
         constraints,
         &refinable_cols,
         range_types,
@@ -238,6 +248,7 @@ where
         &mut ui,
         &mut terminal,
         sleep_time,
+        time_out,
     );
 
     disable_raw_mode()?;
@@ -249,6 +260,7 @@ where
     terminal.show_cursor()?;
 
     Ok(VerificationResult {
+        status: verification_status,
         num_solutions: known_solution.len(),
         execution_time: start_time.elapsed(),
     })

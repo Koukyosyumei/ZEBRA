@@ -1,16 +1,11 @@
-use std::collections::HashMap;
 use std::collections::HashSet;
-use std::io;
-
-use itertools::Itertools;
 
 use p3_air::Air;
-use p3_air::BaseAir;
 use p3_field::PrimeField32;
 use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
-use sp1_core_executor::{ExecutionState, Executor, Program};
+use sp1_core_executor::{Executor, Program};
 use sp1_core_machine::{riscv::RiscvAir, utils::trace_checkpoint, utils::SP1CoreProverError};
 use sp1_stark::{
     air::SP1_PROOF_NUM_PV_ELTS, baby_bear_poseidon2::BabyBearPoseidon2, CpuProver,
@@ -18,14 +13,8 @@ use sp1_stark::{
 };
 
 use latticevm::{
-    interval::AbstractInterval,
-    quick::ConstraintInfo,
-    solver::{prepare_constraints_and_range_type, RangeType},
-    symbolic::{
-        gather_boolean_variables, gather_vars, is_iszero_operator, is_koalabear_word_range,
-        LatticeVMConstraints, LatticeVMSymbolicExpr,
-    },
-    utils::GeneralLookupInfo,
+    constraint::LatticeVMConstraints, interval::AbstractInterval, quick::ConstraintInfo,
+    solver::prepare_constraints_and_range_type, symbolic::GeneralLookupInfo,
 };
 
 use crate::lookup::get_symbolic_lookup_constraints;
@@ -34,7 +23,7 @@ use crate::p3_to_tv::convert_p3_expr;
 pub fn run_sp1_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), SP1CoreOpts::default());
-    let (checkpoint, pv, done) = runtime.execute_state(false).unwrap();
+    let (checkpoint, _pv, _done) = runtime.execute_state(false).unwrap();
 
     let mut checkpoint_file = tempfile::tempfile()
         .map_err(SP1CoreProverError::IoError)
@@ -52,7 +41,7 @@ pub fn run_sp1_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterv
     //let mut reader = io::BufReader::new(checkpoint_file);
     //let execution_state: ExecutionState =
     //    bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
-    let (records, report) = trace_checkpoint::<SC>(
+    let (records, _report) = trace_checkpoint::<SC>(
         program.clone(),
         &checkpoint_file,
         SP1CoreOpts::default(),
@@ -122,6 +111,11 @@ where
 
     let symbolic_constraints: Vec<SymbolicExpression<F>> =
         get_symbolic_constraints(air, 0, SP1_PROOF_NUM_PV_ELTS);
+    let mut air_constraints = symbolic_constraints
+        .iter()
+        .map(|sc| convert_p3_expr::<F>(&sc))
+        .collect::<Vec<_>>();
+
     let general_lookup_info = get_symbolic_lookup_constraints::<F, A>(
         air,
         0,
@@ -129,20 +123,16 @@ where
         &mut u8_cols,
         &mut u16_cols,
         &mut multiplicities,
+        &mut air_constraints,
         &mut lookup_constraints,
         &mut received_vars_from_cpu,
         prime,
     );
 
-    let mut air_constraints = symbolic_constraints
-        .iter()
-        .map(|sc| convert_p3_expr::<F>(&sc))
-        .collect::<Vec<_>>();
-
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         num_cols,
         &u8_cols,
-        &mut u16_cols,
+        &u16_cols,
         &multiplicities,
         &received_vars_from_cpu,
         &mut air_constraints,

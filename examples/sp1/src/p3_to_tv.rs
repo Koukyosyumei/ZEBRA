@@ -1,9 +1,6 @@
-use num_traits::{One, Signed, Zero};
-
-use p3_air::{PairCol, VirtualPairCol};
-use p3_field::Field;
+use p3_air::PairCol;
 use p3_field::PrimeField32;
-use p3_uni_stark::{Entry, SymbolicExpression, SymbolicVariable};
+use p3_uni_stark::{Entry, SymbolicVariable};
 
 use latticevm::impl_p3_to_tv_conversion;
 use latticevm::{

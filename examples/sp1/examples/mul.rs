@@ -10,13 +10,13 @@ use sp1_core_machine::alu::MulCols;
 use sp1_core_machine::alu::NUM_MUL_COLS;
 use sp1_core_machine::riscv::MulChip;
 
+use latticevm::canonicalizer::generate_alu_final_checker;
+use latticevm::constraint::eval_constraints;
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::make_init_val;
 use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::eval_constraints;
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::generate_alu_final_checker;
+use latticevm::trace::AbstractTrace;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_sp1::utils::{
@@ -66,8 +66,8 @@ fn main() -> Result<(), io::Error> {
 
     constraint_info
         .refinable_cols
-        .extend(&general_lookup_info.alu_output.clone());
-    constraint_info.output_columns = general_lookup_info.alu_output.clone();
+        .extend(&general_lookup_info.op_a.clone());
+    constraint_info.output_columns = general_lookup_info.op_a.clone();
     for i in &constraint_info.output_columns {
         constraint_info.range_types.insert(*i, RangeType::U8);
     }
@@ -78,7 +78,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..100 {
+    for _ in 0..30 {
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 

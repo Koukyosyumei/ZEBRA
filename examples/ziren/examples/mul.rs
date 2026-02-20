@@ -1,56 +1,77 @@
 use clap::Parser;
-use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::io;
+use std::mem::transmute;
 
-use p3_koala_bear::KoalaBear;
+use p3_baby_bear::BabyBear;
 
-use pico_vm::chips::chips::alu::sll::SLLChip;
-use pico_vm::chips::chips::alu::sll::{ShiftLeftCols, NUM_SLL_COLS};
-use pico_vm::compiler::riscv::program::Program;
-use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
+use zkm_core_executor::{Instruction, Opcode, Program};
+use zkm_core_machine::alu::MulCols;
+use zkm_core_machine::alu::NUM_MUL_COLS;
+use zkm_core_machine::MulChip;
 
-use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
+use latticevm::solver::make_init_val;
+use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::symbolic::eval_constraints;
+use latticevm::symbolic::AbstractTrace;
+use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
-use latticevm_pico::utils::{
+use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-const fn make_col_map() -> ShiftLeftCols<usize> {
-    let indices_arr = indices_arr::<{ NUM_SLL_COLS }>();
-    unsafe { transmute::<[usize; NUM_SLL_COLS], ShiftLeftCols<usize>>(indices_arr) }
+pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
+    let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
+    Program::new(instructions, pc_start, pc_base)
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
-    let instructions = vec![Instruction::new(Opcode::SLL, 1, x, y, true, true)];
-    Program::new(instructions, pc_start, pc_base)
+const fn make_col_map() -> MulCols<usize> {
+    let indices_arr = indices_arr::<{ NUM_MUL_COLS }>();
+    unsafe { transmute::<[usize; NUM_MUL_COLS], MulCols<usize>>(indices_arr) }
+}
+
+pub fn get_opcode(opcode_str: &str) -> Opcode {
+    match opcode_str {
+        "MUL" => Opcode::MUL,
+        "MULT" => Opcode::MULT,
+        "MULTU" => Opcode::MULTU,
+        _ => panic!("unsupported instruction"),
+    }
 }
 
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let _opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str;
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
-    let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
+    let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract CPU Constraints ##########################
-    let air: SLLChip<KoalaBear> = SLLChip::default();
-    let air_name = "ShiftLeft";
-    let _colmap = make_col_map();
+    let air = MulChip::default();
+    let air_name = "Mul";
+    let colmap = make_col_map();
+    println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, SLLChip<KoalaBear>>(&air, NUM_SLL_COLS, prime);
+        extract_constraints_and_range::<BabyBear, MulChip>(&air, NUM_MUL_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
+    println!("{:?}", general_lookup_info);
+
     constraint_info
         .refinable_cols
-        .extend(&general_lookup_info.op_a);
-    constraint_info.output_columns = general_lookup_info.op_a;
+        .extend(&general_lookup_info.op_a.clone());
+    constraint_info.refinable_cols.retain(|a| *a < 42);
+    constraint_info.output_columns = general_lookup_info.op_a.clone();
+    for i in &constraint_info.output_columns {
+        constraint_info.range_types.insert(*i, RangeType::U8);
+    }
+
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
@@ -62,8 +83,9 @@ fn main() -> Result<(), io::Error> {
         let y: u32 = rng.random();
 
         // ######################## Program Initialization ###########################
-        let program = target_program(4, 4, x, y);
-        let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+        let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
+        let mut base_abs_main_trace_data =
+            generate_abstract_trace(&program, air_name.to_string(), 1);
 
         // ######################## Set Info ##########################################
         let program_info = ProgramInfo {

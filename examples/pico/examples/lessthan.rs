@@ -9,11 +9,10 @@ use pico_vm::chips::chips::alu::lt::{LtCols, NUM_LT_COLS};
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
+use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::ui::generate_alu_final_checker;
-use latticevm::utils::create_or_clear_dir;
-use latticevm::utils::indices_arr;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -57,8 +56,8 @@ fn main() -> Result<(), io::Error> {
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
         .refinable_cols
-        .extend(&general_lookup_info.alu_output);
-    constraint_info.output_columns = general_lookup_info.alu_output;
+        .extend(&general_lookup_info.op_a);
+    constraint_info.output_columns = general_lookup_info.op_a;
 
     // ######################## Program Initialization ###########################
     let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, 2, 3);

@@ -274,6 +274,7 @@ where
     C: ChipWithPersistence<M, SC>,
 {
     let mut u8_cols = vec![];
+    let mut u16_cols = vec![];
     let mut multiplicities = Vec::new();
     let mut lookup_constraints = Vec::new();
     let mut nested_received_vars_from_cpu = Vec::new();
@@ -298,9 +299,9 @@ where
         .collect();
 
     if let [a, b, c, d, e, f, g, h, i, j, k, el] = received_vars_from_cpu.as_slice() {
-        general_lookup_info.alu_input1.extend([*a, *b, *c, *d]);
-        general_lookup_info.alu_input2.extend([*e, *f, *g, *h]);
-        general_lookup_info.alu_output.extend([*i, *j, *k, *el]);
+        general_lookup_info.op_b.extend([*a, *b, *c, *d]);
+        general_lookup_info.op_c.extend([*e, *f, *g, *h]);
+        general_lookup_info.op_a.extend([*i, *j, *k, *el]);
     }
 
     let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
@@ -317,6 +318,7 @@ where
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         num_cols,
         &u8_cols,
+        &u16_cols,
         &multiplicities,
         &received_vars_from_cpu,
         &mut air_constraints,

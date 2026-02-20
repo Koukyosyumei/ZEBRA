@@ -131,6 +131,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     preprocessed_width: usize,
     _num_public_values: usize,
     u8_cols: &mut Vec<usize>,
+    u16_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,
     lookup_constraints: &mut Vec<LVSExpr>,
     received_vars_from_cpu: &mut HashSet<usize>,
@@ -164,13 +165,13 @@ where
                     }
                 }
                 for i in 7..11 {
-                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.alu_output);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_a);
                 }
                 for i in 11..15 {
-                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.alu_input1);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_b);
                 }
                 for i in 15..19 {
-                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.alu_input2);
+                    try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_c);
                 }
             }
             _ => {}
@@ -243,30 +244,38 @@ where
             LookupKind::Byte => {
                 let s_opcode = &s.values[0];
                 let a1 = &s.values[1];
-                let _a2 = &s.values[2];
+                let a2 = &s.values[2];
                 let b = &s.values[3];
                 let c = &s.values[4];
 
-                // Range U8
                 try_add_single_var_col(&b, u8_cols);
                 try_add_single_var_col(&c, u8_cols);
-                try_add_single_var_col(&a1, u8_cols);
+
+                if s_opcode.column_weights.is_empty() {
+                    if s_opcode.constant.as_canonical_u32() == 8 {
+                        try_add_single_var_col(&a1, u16_cols);
+                    }
+                }
 
                 let ops = [
-                    (0, LVSExpr::And(Box::new(cv(&b)), Box::new(cv(&c)))),
-                    (1, LVSExpr::Or(Box::new(cv(&b)), Box::new(cv(&c)))),
-                    (2, LVSExpr::Xor(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (0, cv(&a1), LVSExpr::And(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (1, cv(&a1), LVSExpr::Or(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (2, cv(&a1), LVSExpr::Xor(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (5, cv(&a1), LVSExpr::SRL(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (
-                        6,
-                        LVSExpr::Flip(Box::new(LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c))))),
+                        5,
+                        cv(&a2),
+                        LVSExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
                     ),
+                    (6, cv(&a1), LVSExpr::Lt(Box::new(cv(&b)), Box::new(cv(&c)))),
+                    (7, cv(&a1), LVSExpr::Msb(Box::new(cv(&b)))),
                 ];
 
-                for (opcode, op_expr) in ops {
+                for (opcode, a_expr, op_expr) in ops {
                     let el_constraint = make_impl_constraint(
                         opcode,
                         &cv(&s_opcode),
-                        LVSExpr::Sub(Box::new(cv(&a1)), Box::new(op_expr)),
+                        LVSExpr::Sub(Box::new(a_expr), Box::new(op_expr)),
                         prime,
                     );
                     if let Some(el_constraint) = el_constraint {
@@ -294,6 +303,7 @@ where
     A: Air<LookupBuilder<F>> + Air<SymbolicAirBuilder<F>>,
 {
     let mut u8_cols = vec![];
+    let mut u16_cols = vec![];
     let mut multiplicities = HashSet::new();
     let mut lookup_constraints = Vec::new();
     let mut received_vars_from_cpu = HashSet::new();
@@ -305,6 +315,7 @@ where
         0,
         ZKM_PROOF_NUM_PV_ELTS,
         &mut u8_cols,
+        &mut u16_cols,
         &mut multiplicities,
         &mut lookup_constraints,
         &mut received_vars_from_cpu,
@@ -319,6 +330,7 @@ where
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         num_cols,
         &u8_cols,
+        &u16_cols,
         &multiplicities,
         &received_vars_from_cpu,
         &mut air_constraints,
