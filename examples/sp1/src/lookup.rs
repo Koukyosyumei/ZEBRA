@@ -9,12 +9,12 @@ use sp1_core_executor::Opcode;
 use sp1_stark::InteractionBuilder;
 use sp1_stark::InteractionKind;
 
-use latticevm::alu::get_alu_constraint;
-use latticevm::alu::WordOp;
 use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
+use latticevm::symbolic::GeneralLookupInfo;
 use latticevm::symbolic::LatticeVMSymbolicExpr as LExpr;
-use latticevm::utils::GeneralLookupInfo;
+use latticevm::wordop::get_alu_constraint;
+use latticevm::wordop::WordOp;
 
 use crate::p3_to_tv::convert_p3_virtual_pair_col as cv;
 
