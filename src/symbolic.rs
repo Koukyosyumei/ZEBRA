@@ -1794,6 +1794,23 @@ pub fn gather_boolean_variables(
     result.iter().cloned().collect()
 }
 
+/// Represents an abstract execution trace as a table of symbolic intervals.
+///
+/// Each row corresponds to a timestep, and each column represents a variable or
+/// memory cell. Intervals may be singletons (concrete values) or ranges.
+///
+/// Additionally tracks positions of singleton values for quick access.
+///
+/// # Fields
+///
+/// * `data` — `Vec<Vec<AbstractInterval>>` representing the trace table
+/// * `singleton_positions` — List of `(row, col)` indices where intervals are singletons
+///
+/// # Use Cases
+///
+/// * Constraint evaluation over abstract traces
+/// * Interval refinement
+/// * Symbolic execution and analysis
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct AbstractTrace {
     pub data: Vec<Vec<AbstractInterval>>,
@@ -1818,6 +1835,23 @@ impl fmt::Display for AbstractTrace {
 }
 
 impl AbstractTrace {
+    /// Constructs a new `AbstractTrace` from raw interval data.
+    ///
+    /// Automatically identifies all singleton positions in the trace for faster
+    /// refinement and constraint evaluation.
+    ///
+    /// # Parameters
+    ///
+    /// * `raw_trace` — 2D vector of `AbstractInterval` representing initial trace
+    ///
+    /// # Returns
+    ///
+    /// A fully initialized `AbstractTrace` with `singleton_positions` populated.
+    ///
+    /// # Use Cases
+    ///
+    /// * Initial trace creation
+    /// * Preprocessing before constraint evaluation
     pub fn new(raw_trace: Vec<Vec<AbstractInterval>>) -> Self {
         let mut singleton_positions = Vec::new();
         for i in 0..raw_trace.len() {
@@ -1833,6 +1867,21 @@ impl AbstractTrace {
         }
     }
 
+    /// Compares two abstract traces and returns positions of differing intervals.
+    ///
+    /// # Parameters
+    ///
+    /// * `other` — Another `AbstractTrace` to compare with
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<(usize, usize)>` listing `(row, column)` positions where intervals differ.
+    ///
+    /// # Use Cases
+    ///
+    /// * Detecting updates from refinement
+    /// * Debugging changes in interval propagation
+    /// * Differential testing of symbolic traces
     pub fn diff_positions(&self, other: &Self) -> Vec<(usize, usize)> {
         let mut diffs = vec![];
 
@@ -1848,6 +1897,32 @@ impl AbstractTrace {
     }
 }
 
+/// Evaluates a set of symbolic constraints over a trace.
+///
+/// Traverses each row and evaluates constraints in either strict or relaxed mode,
+/// recording potential refinements and collecting uncertain variable positions.
+///
+/// # Parameters
+///
+/// * `trace` — Abstract trace to evaluate
+/// * `public_vals` — Optional array of public input intervals
+/// * `constraints` — List of symbolic expressions to evaluate
+/// * `prime` — Field modulus for arithmetic operations
+/// * `is_strict` — Whether to use strict zero evaluation
+/// * `potential` — Counter of non-conclusive evaluations (incremented)
+/// * `memo` — Set to record uncertain variable positions
+///
+/// # Returns
+///
+/// * `MayBeFlag::True` — All constraints strictly satisfied
+/// * `MayBeFlag::False` — At least one constraint violated
+/// * `MayBeFlag::MayBe` — Some constraints inconclusive
+///
+/// # Use Cases
+///
+/// * Constraint propagation
+/// * Symbolic execution
+/// * Interval refinement in AIR constraints
 pub fn eval_base_constraints(
     trace: &AbstractTrace,
     public_vals: Option<&[AbstractInterval]>,
@@ -1916,6 +1991,15 @@ pub fn eval_base_constraints(
     }
 }
 
+/// Encapsulates all symbolic constraints for a Lattice VM.
+///
+/// Divides constraints into categories:
+///
+/// * `air_constraints` — Core trace constraints (analogous to AIR)
+/// * `lookup_constraints` — Table/lookup constraints
+/// * `pv_pos_constraints` — Public-positive constraints
+/// * `pv_neg_constraints` — Public-negative constraints
+/// * `blocking_constraints` — Row-specific blocking constraints
 #[derive(Clone)]
 pub struct LatticeVMConstraints {
     pub air_constraints: Vec<LatticeVMSymbolicExpr>,
@@ -1926,6 +2010,22 @@ pub struct LatticeVMConstraints {
 }
 
 impl LatticeVMConstraints {
+    /// Constructs a `LatticeVMConstraints` object with specified AIR and lookup constraints.
+    ///
+    /// Other constraint vectors are initialized empty.
+    ///
+    /// # Parameters
+    ///
+    /// * `air_constraints` — Vector of AIR constraints
+    /// * `lookup_constraints` — Vector of lookup constraints
+    ///
+    /// # Returns
+    ///
+    /// Initialized `LatticeVMConstraints` object.
+    ///
+    /// # Use Cases
+    ///
+    /// * Constraint collection before evaluation
     pub fn new(
         air_constraints: Vec<LatticeVMSymbolicExpr>,
         lookup_constraints: Vec<LatticeVMSymbolicExpr>,
@@ -1940,6 +2040,31 @@ impl LatticeVMConstraints {
     }
 }
 
+/// Evaluates all Lattice VM constraints over a trace.
+///
+/// Processes blocking, AIR, lookup, and public constraints, returning an overall
+/// `MayBeFlag`, a potential counter, and the memo of uncertain variables.
+///
+/// # Parameters
+///
+/// * `trace` — Abstract execution trace
+/// * `public_vals` — Optional public input intervals
+/// * `constraints` — LatticeVMConstraints object
+/// * `prime` — Field modulus
+///
+/// # Returns
+///
+/// `(MayBeFlag, i32, HashSet<(usize, usize)>)`
+///
+/// * `MayBeFlag` — True, False, or MayBe depending on constraint satisfaction
+/// * `i32` — Potential counter (number of inconclusive evaluations)
+/// * `HashSet<(usize, usize)>` — Positions of variables contributing to MayBe
+///
+/// # Use Cases
+///
+/// * Comprehensive constraint evaluation
+/// * Solver pruning
+/// * Trace analysis and verification
 pub fn eval_constraints(
     trace: &AbstractTrace,
     public_vals: Option<&[AbstractInterval]>,
@@ -2070,6 +2195,33 @@ pub fn eval_constraints(
     }
 }
 
+/// Refines an abstract trace by splitting intervals on target indices.
+///
+/// Randomly selects a row in the specified range, chooses a non-singleton variable
+/// from `refinement_target_indices`, and splits it to generate candidate traces.
+///
+/// # Parameters
+///
+/// * `trace` — Trace to refine
+/// * `refinment_target_indicies` — Indices of columns to refine
+/// * `min_row_id` — Minimum row index for refinement
+/// * `max_row_id` — Maximum row index for refinement
+/// * `prime` — Field modulus
+/// * `rng` — Random number generator
+///
+/// # Returns
+///
+/// `(Option<Vec<AbstractTrace>>, bool)`
+///
+/// * `Some(candidates)` — Candidate traces generated from splitting
+/// * `None` — Nothing to refine
+/// * `bool` — True if a split actually occurred, False otherwise
+///
+/// # Use Cases
+///
+/// * Search-based trace refinement
+/// * Interval branching in solvers
+/// * Randomized symbolic execution
 pub fn refine_trace(
     trace: &AbstractTrace,
     refinment_target_indicies: &Vec<usize>,
@@ -2113,6 +2265,32 @@ pub fn refine_trace(
     //}
 }
 
+/// Creates a conditional implementation constraint based on an opcode.
+///
+/// If `opcode_var` equals the constant `opcode_val`, returns `expr` directly.
+/// Otherwise, wraps it in a `WhenZero` condition:
+///
+/// ```text
+/// WhenZero(opcode_var - opcode_val, expr)
+/// ```
+///
+/// # Parameters
+///
+/// * `opcode_val` — Target opcode value
+/// * `opcode_var` — Symbolic expression representing opcode
+/// * `expr` — Constraint expression to conditionally apply
+/// * `prime` — Field modulus
+///
+/// # Returns
+///
+/// * `Some(LatticeVMSymbolicExpr)` — Conditional constraint
+/// * `None` — Opcode constant mismatch
+///
+/// # Use Cases
+///
+/// * Conditional execution constraints
+/// * Opcode-specific constraint enforcement
+/// * Modular constraint generation in Lattice VM
 pub fn make_impl_constraint(
     opcode_val: i64,
     opcode_var: &LatticeVMSymbolicExpr,
