@@ -18,6 +18,51 @@ pub struct AbstractInterval {
     pub hi: i64,
 }
 
+// Helper: Find the mask of bits that vary within the interval [lo, hi]
+pub fn varying_bits(lo: i64, hi: i64) -> u64 {
+    if lo == hi {
+        return 0;
+    }
+    let diff = (lo as u64) ^ (hi as u64);
+    if diff == 0 {
+        return 0;
+    }
+    let msb = 63 - diff.leading_zeros();
+    (1u64 << (msb + 1)) - 1
+}
+
+fn div_floor_i64(x: i64, k: i64) -> i64 {
+    debug_assert!(k > 0);
+    if x >= 0 {
+        x / k
+    } else {
+        -((-x + k - 1) / k)
+    }
+}
+
+pub fn msb_u8(b: u8) -> bool {
+    (b & 0b1000_0000) != 0
+}
+
+pub fn msb_maybe(interval: &AbstractInterval) -> AbstractInterval {
+    if interval.lo < 0 {
+        return AbstractInterval::bool();
+    }
+
+    let lo_msb = msb_u8(interval.lo as u8);
+    let hi_msb = msb_u8(interval.hi as u8);
+
+    if lo_msb == hi_msb {
+        if lo_msb {
+            AbstractInterval::one()
+        } else {
+            AbstractInterval::zero()
+        }
+    } else {
+        AbstractInterval::bool()
+    }
+}
+
 impl fmt::Display for AbstractInterval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_singleton() {
@@ -72,19 +117,6 @@ impl Neg for AbstractInterval {
             hi: -self.lo,
         }
     }
-}
-
-// Helper: Find the mask of bits that vary within the interval [lo, hi]
-pub fn varying_bits(lo: i64, hi: i64) -> u64 {
-    if lo == hi {
-        return 0;
-    }
-    let diff = (lo as u64) ^ (hi as u64);
-    if diff == 0 {
-        return 0;
-    }
-    let msb = 63 - diff.leading_zeros();
-    (1u64 << (msb + 1)) - 1
 }
 
 impl BitAnd<Self> for AbstractInterval {
@@ -219,15 +251,6 @@ impl Shr<AbstractInterval> for AbstractInterval {
         let hi = self.hi >> min_shift;
 
         Self { lo, hi }
-    }
-}
-
-fn div_floor_i64(x: i64, k: i64) -> i64 {
-    debug_assert!(k > 0);
-    if x >= 0 {
-        x / k
-    } else {
-        -((-x + k - 1) / k)
     }
 }
 
@@ -531,29 +554,6 @@ impl AbstractInterval {
                 hi: half - 1,
             }
         }
-    }
-}
-
-pub fn msb_u8(b: u8) -> bool {
-    (b & 0b1000_0000) != 0
-}
-
-pub fn msb_maybe(interval: &AbstractInterval) -> AbstractInterval {
-    if interval.lo < 0 {
-        return AbstractInterval::bool();
-    }
-
-    let lo_msb = msb_u8(interval.lo as u8);
-    let hi_msb = msb_u8(interval.hi as u8);
-
-    if lo_msb == hi_msb {
-        if lo_msb {
-            AbstractInterval::one()
-        } else {
-            AbstractInterval::zero()
-        }
-    } else {
-        AbstractInterval::bool()
     }
 }
 

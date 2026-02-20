@@ -7,8 +7,9 @@ use ratatui::{
     Frame,
 };
 
-use crate::{interval::MayBeFlag, utils::trace_fmt_with_idxs};
-use crate::{symbolic::AbstractTrace, utils::GeneralLookupInfo};
+use crate::interval::MayBeFlag;
+use crate::symbolic::GeneralLookupInfo;
+use crate::trace::{trace_fmt_with_idxs, AbstractTrace};
 
 pub struct UiState {
     pub status: String,

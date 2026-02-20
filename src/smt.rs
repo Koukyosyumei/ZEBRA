@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::constraint::LatticeVMConstraints;
 use crate::interval::AbstractInterval;
 use crate::solver::RangeType;
-use crate::symbolic::LatticeVMConstraints;
 use crate::symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr};
 
 pub fn expr_to_smt(

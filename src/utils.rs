@@ -1,7 +1,5 @@
 use std::{fs, path::Path};
 
-use crate::symbolic::{AbstractTrace, LatticeVMSymbolicExpr};
-
 #[derive(Debug)]
 pub struct BitCombinationsDictOrder {
     len: usize,
@@ -53,14 +51,6 @@ pub fn create_or_clear_dir(path: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct GeneralLookupInfo {
-    pub op_a: Vec<usize>,
-    pub op_b: Vec<usize>,
-    pub op_c: Vec<usize>,
-    pub pc_table_is_real: LatticeVMSymbolicExpr,
-}
-
 pub const fn indices_arr<const N: usize>() -> [usize; N] {
     let mut indices_arr = [0; N];
     let mut i = 0;
@@ -69,11 +59,4 @@ pub const fn indices_arr<const N: usize>() -> [usize; N] {
         i += 1;
     }
     indices_arr
-}
-
-pub fn trace_fmt_with_idxs(trace: &AbstractTrace, i: usize, idxs: &[usize]) -> String {
-    idxs.iter()
-        .map(|&j| trace.data[i][j].to_string())
-        .collect::<Vec<_>>()
-        .join(", ")
 }

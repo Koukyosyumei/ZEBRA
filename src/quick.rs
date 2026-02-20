@@ -17,9 +17,12 @@ use serde::Deserialize;
 
 use crate::smt::expr_to_smt_bv;
 use crate::solver::{run_parallel_solver, RangeType};
-use crate::symbolic::add_blocking_constraint;
 use crate::ui::UiState;
-use crate::{interval::AbstractInterval, symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use crate::{
+    constraint::{add_blocking_constraint, LatticeVMConstraints},
+    interval::AbstractInterval,
+    trace::AbstractTrace,
+};
 
 pub struct ProgramInfo {
     pub program_str: String,

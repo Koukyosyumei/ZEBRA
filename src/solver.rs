@@ -12,16 +12,19 @@ use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use crate::symbolic::{
+use crate::shrinker::{
     apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
-    detect_conditional_var_sub_var_constraints, gather_boolean_variables, gather_vars,
-    is_babybear_word_range, is_boolean_constraint, is_iszero_operator, is_koalabear_word_range,
-    refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
-    AbirConstraint, LatticeVMSymbolicExpr,
+    detect_conditional_var_sub_var_constraints, refine_conditional_constraints_var_sub_const,
+    refine_conditional_constraints_var_sub_var, AbirConstraint,
+};
+use crate::symbolic::{
+    gather_boolean_variables, gather_vars, is_babybear_word_range, is_boolean_constraint,
+    is_iszero_operator, is_koalabear_word_range, LatticeVMSymbolicExpr,
 };
 use crate::{
+    constraint::{eval_constraints, LatticeVMConstraints},
     interval::{AbstractInterval, MayBeFlag},
-    symbolic::{eval_constraints, refine_trace, AbstractTrace, LatticeVMConstraints},
+    trace::{refine_trace, AbstractTrace},
     ui::UiState,
 };
 
