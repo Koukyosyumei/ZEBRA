@@ -9,12 +9,12 @@ use sp1_core_executor::{Instruction, Opcode, Program};
 use sp1_core_machine::alu::{DivRemCols, NUM_DIVREM_COLS};
 use sp1_core_machine::riscv::DivRemChip;
 
+use latticevm::canonicalizer::{generate_alu_final_checker, save_repr_if_unique};
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::{generate_alu_final_checker, UiState};
-use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
+use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
+use latticevm::ui::UiState;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
