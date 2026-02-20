@@ -191,6 +191,60 @@ pub struct SearchNode {
     depth: usize,
 }
 
+/// Processes a single search node by applying refinements, generating children,
+/// and evaluating constraints.
+///
+/// This function performs one expansion step in the solver's search procedure.
+/// It applies local constraint propagation, attempts domain refinement, and
+/// evaluates candidate child traces.
+///
+/// # Parameters
+///
+/// * `head` — The node to process.
+/// * `public_trace` — Public input trace used for constraint evaluation.
+/// * `constraints` — Global VM constraints to be satisfied.
+/// * `prime` — Field modulus.
+/// * `rng` — Random number generator for stochastic refinement.
+/// * `align_pc_to_program` — Callback that aligns program counters to valid locations.
+/// * `refinment_target_indicies_main` — Preferred indices for general refinement.
+/// * `bool_target_indices` — Indices prioritized for boolean refinement.
+/// * `min_row_id`, `max_row_id` — Row bounds eligible for refinement.
+/// * `conditional_var_sub_const_constraints` — Conditional constraints of the form
+///   variable minus constant.
+/// * `eq_constraints` — Variable equality constraints.
+/// * `abir_constraints` — Additional ABIR constraints.
+///
+/// # Returns
+///
+/// A [`NodeProcessingResult`] indicating whether:
+///
+/// * a solution was found,
+/// * the node should be pruned, or
+/// * new child nodes were generated.
+///
+/// # Algorithm Overview
+///
+/// 1. Apply constraint-driven refinements.
+/// 2. Generate candidate refinements of the trace.
+/// 3. Evaluate each child against the constraints.
+/// 4. Return immediately if a satisfying trace is found.
+/// 5. Otherwise return refined children with heuristic priorities.
+///
+/// # Pruning
+///
+/// If any refinement proves the node unsatisfiable, the node is discarded
+/// without generating children.
+///
+/// # Parallelism
+///
+/// Intended to run inside worker threads. Generated children can be pushed
+/// back to a global queue for load balancing.
+///
+/// # Notes
+///
+/// * Evaluation is sequential within this function.
+/// * Heuristic potentials are computed to guide future exploration.
+/// * Randomization helps avoid pathological search orderings.
 fn process_single_node(
     head: SearchNode,
     public_trace: AbstractTrace,
@@ -300,7 +354,115 @@ fn process_single_node(
     }
 }
 
-// Return type: (Did we find a solution?, Did user request global exit?)
+/// Runs a parallel best-first search to solve a constraint system over abstract traces,
+/// with live UI updates and cooperative termination.
+///
+/// This function explores the refinement search space starting from `initial_node`,
+/// using multiple worker threads and a shared priority queue. Workers repeatedly
+/// expand nodes via [`process_single_node`], evaluate constraints, and push refined
+/// candidates back into the queue until a solution is found, the search space is
+/// exhausted, a maximum expansion limit is reached, or the user requests exit.
+///
+/// The solver operates on a *subset* of refinable columns (`refinable_cols`),
+/// allowing callers to partition the search space across multiple invocations.
+///
+/// # Parameters
+///
+/// * `initial_node` — Root node of the search (will be cloned internally).
+/// * `public_trace` — Public input trace used during constraint evaluation.
+/// * `constraints` — Shared VM constraint system.
+/// * `refinable_cols` — Column indices allowed to be refined in this subset.
+/// * `range_types` — Domain specifications for columns.
+/// * `align_pc_to_program` — Callback that adjusts traces to valid program counters.
+/// * `min_row_id`, `max_row_id` — Inclusive row bounds eligible for refinement.
+/// * `max_expansions` — Per-subset limit on node expansions before forced shutdown.
+/// * `num_workers` — Number of worker threads to spawn.
+/// * `seed` — Base RNG seed (worker seeds are derived deterministically).
+/// * `prime` — Field modulus.
+/// * `ui` — Mutable UI state for rendering progress and logs.
+/// * `terminal` — Terminal backend used for drawing the UI.
+/// * `final_check` — Callback invoked when a candidate solution is found.
+/// * `known_solution` — Set used to deduplicate previously discovered solutions.
+/// * `global_total_trials` — Global counter shared across subsets.
+/// * `sleep_time` — Accumulates idle sleep time to throttle CPU usage.
+///
+/// # Returns
+///
+/// A pair `(found, quit)` where:
+///
+/// * `found` — `true` if at least one satisfying trace was discovered.
+/// * `quit` — `true` if the user requested global termination (e.g., pressed `q`).
+///
+/// # Algorithm Overview
+///
+/// 1. **Preprocessing**
+///    * Detects conditional boolean constraints and adjusts target indices.
+///    * Extracts auxiliary constraint forms (conditional, equality, ABIR).
+///
+/// 2. **Shared State Initialization**
+///    * Creates a thread-safe priority queue of search nodes.
+///    * Initializes counters and shutdown flags.
+///    * Enqueues the initial node.
+///
+/// 3. **Worker Execution**
+///    Each worker:
+///    * Pops nodes from the queue
+///    * Applies refinements and evaluates constraints
+///    * Reports results via a message channel
+///    * Pushes refined children back into the queue
+///    * Periodically sends progress updates
+///
+/// 4. **UI Event Loop**
+///    The main thread:
+///    * Receives worker messages
+///    * Updates status and logs
+///    * Invokes `final_check` on candidate solutions
+///    * Handles user input (e.g., quit requests)
+///    * Terminates when the queue is empty and all workers are idle
+///
+/// # Concurrency Model
+///
+/// * Workers share a priority queue protected by a mutex.
+/// * Progress and results are communicated through an MPSC channel.
+/// * A shutdown flag enables cooperative termination.
+/// * Each worker uses an independent RNG stream.
+///
+/// # Termination Conditions
+///
+/// The search stops when any of the following occurs:
+///
+/// * A solution is found (search continues unless externally stopped)
+/// * The priority queue becomes empty and all workers are idle
+/// * `max_expansions` is reached
+/// * The user presses `q` or `c`
+///
+/// # UI Behavior
+///
+/// * Progress statistics are updated periodically (time-based).
+/// * Rendering occurs at a fixed tick rate.
+/// * Logs include discovered solution traces.
+///
+/// # Notes
+///
+/// * The search is heuristic and not guaranteed to find a solution.
+/// * Multiple solutions may be discovered during a single run.
+/// * `initial_node` is not consumed; a clone is used internally.
+/// * This function blocks until completion for the given subset.
+///
+/// # Thread Safety
+///
+/// All shared structures use `Arc` and atomic primitives to ensure
+/// safe concurrent access.
+///
+/// # Panics
+///
+/// May panic if terminal rendering fails or if mutexes are poisoned.
+///
+/// # See Also
+///
+/// * [`process_single_node`] — Core node expansion routine.
+/// * [`SolverMsg`] — Messages exchanged between workers and UI thread.
+/// * [`SearchNode`] — Representation of search states.
 pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     initial_node: &mut SearchNode,
     public_trace: AbstractTrace,
@@ -515,7 +677,6 @@ where
     let mut user_quit = false;
     // let mut subset_finished = false;
 
-    // 描画更新の頻度を制御（例: 30 FPS = 約33ms, ここでは少し余裕を見て 50ms）
     ui.status = format!(
         "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
         refinable_cols, 0, 0, 1
@@ -523,6 +684,7 @@ where
     terminal
         .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
         .unwrap();
+    // 30 FPR = ~33ms
     let tick_rate = Duration::from_millis(50);
     let mut last_tick = std::time::Instant::now();
 
@@ -538,8 +700,6 @@ where
                     unsat,
                     queue_len,
                 } => {
-                    // 書式生成はコストがかかるので、本当に描画が必要な時だけやる手もありますが、
-                    // ここでは最新状態で上書きし続ける
                     ui.status = format!(
                         "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
                         refinable_cols, trials, unsat, queue_len
@@ -567,18 +727,9 @@ where
             }
         }
 
-        // 全スレッドが終了し、かつメッセージもない場合のチェック
-        // (rx.try_iter()が終わった時点でDisconnectなら終了)
-        // ただし、mpscは送信側がすべてドロップされると RecvError を返しますが、
-        // try_iter は単にループを抜けるので、ここで明示的な終了判定を入れるか、
-        // active_workers 等を見るのが確実です。
-        // 簡単のため、shutdownフラグと solution_found で判定します。
-
         // --------------------------------------------------------
-        // 2. キー入力のチェック (最優先)
+        // 2. Check Key Inputs
         // --------------------------------------------------------
-        // timeout ブロックの中ではなく、ループ毎に必ずチェックします。
-        // poll(Duration::ZERO) はノンブロッキングです。
         if event::poll(Duration::from_millis(0)).unwrap() {
             if let Event::Key(key) = event::read().unwrap() {
                 match key.code {
@@ -593,7 +744,7 @@ where
         }
 
         // --------------------------------------------------------
-        // 3. 描画更新 (一定時間経過時のみ)
+        // 3. Update UI
         // --------------------------------------------------------
         if last_tick.elapsed() >= tick_rate {
             terminal
@@ -602,33 +753,16 @@ where
             last_tick = std::time::Instant::now();
         }
 
-        // 全ワーカーが終了したかの判定
-        // (厳密には active_workers == 0 && queue empty ですが、
-        //  SolverMsg::Finished をカウントする等の方法もあります。
-        //  ここではシンプルに channel が切断されているかを確認する手段として
-        //  rx.try_recv()のエラーを見る方法もありますが、
-        //  上の try_iter ループを抜けたということは空なので、
-        //  active_workers が 0 なら終了とみなせます)
-
-        /*
-        let workers_active = Arc::strong_count(&queue) > 1; // メインスレッドも持っているので > 1
-        if !workers_active {
-            break;
-        }*/
-
-        //if !got_msg {
+        // --------------------------------------------------------
+        // 4. Check whether all workers finished
+        // --------------------------------------------------------
         let queue_empty = queue.lock().unwrap().is_empty();
         let workers_idle = active_workers.load(Ordering::SeqCst) == 0;
         if queue_empty && workers_idle {
             break;
         }
-        //}
 
-        // ワーカーが全員死んでチャネルも空ならループを抜ける
-        // (簡略化のため、Disconnect検知は recv() で行うのが一般的ですが、
-        //  ここでは active_workers を見るか、単に少し sleep してループさせる)
-
-        // 短いスリープを入れてCPU使用率100%を防ぐ
+        // tiny sleep to avoid the over-usage of CPU
         *sleep_time += Duration::from_millis(10);
         thread::sleep(Duration::from_millis(10));
     }
