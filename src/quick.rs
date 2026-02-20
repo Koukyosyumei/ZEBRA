@@ -16,7 +16,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use serde::Deserialize;
 
 use crate::smt::expr_to_smt_bv;
-use crate::solver::{run_parallel_solver, RangeType};
+use crate::solver::{run_parallel_solver, RangeType, VerificationStatus};
 use crate::ui::UiState;
 use crate::{
     constraint::{add_blocking_constraint, LatticeVMConstraints},
@@ -83,6 +83,7 @@ pub struct Args {
 
 #[derive(Debug)]
 pub struct VerificationResult {
+    pub status: VerificationStatus,
     pub num_solutions: usize,
     pub execution_time: std::time::Duration,
 }
@@ -183,6 +184,7 @@ where
         };
 
         Ok(VerificationResult {
+            status: VerificationStatus::Verified,
             num_solutions,
             execution_time: start_time.elapsed() - sleep_time,
         })
@@ -226,7 +228,7 @@ where
     let mut known_solution = HashSet::<String>::new();
     let start_time = time::Instant::now();
 
-    run_parallel_solver(
+    let verification_status = run_parallel_solver(
         constraints,
         &refinable_cols,
         range_types,
@@ -258,6 +260,7 @@ where
     terminal.show_cursor()?;
 
     Ok(VerificationResult {
+        status: verification_status,
         num_solutions: known_solution.len(),
         execution_time: start_time.elapsed(),
     })

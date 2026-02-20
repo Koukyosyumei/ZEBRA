@@ -909,7 +909,8 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     sleep_time: &mut Duration,
     time_out: Duration,
-) where
+) -> VerificationStatus
+where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
@@ -921,6 +922,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     let start_time = std::time::Instant::now();
 
     let mut rng = StdRng::seed_from_u64(seed);
+    let mut last_verification_status = VerificationStatus::Interrupted;
 
     // --- OUTER LOOP: Subset Sizes ---
     'outer: for k in minimum_num_taregt_cols..(refinable_cols.len() + 1) {
@@ -948,7 +950,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
 
             // 2. RUN SOLVER for THIS subset
             // We pass ownership of subset_indices wrapped in Arc
-            let (_status, _found, quit) = parallel_solve(
+            let (status, _found, quit) = parallel_solve(
                 &mut initial_node,
                 public_trace,
                 shared_constraints.clone(),
@@ -970,6 +972,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 &start_time,
                 time_out,
             );
+            last_verification_status = status;
 
             if start_time.elapsed() >= time_out {
                 break 'outer;
@@ -982,6 +985,8 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
             }
         }
     }
+
+    last_verification_status
 }
 
 /// Preprocesses symbolic constraints to determine refinable columns and their
