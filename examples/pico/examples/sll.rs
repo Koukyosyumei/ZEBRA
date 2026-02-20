@@ -1,7 +1,6 @@
 use clap::Parser;
 use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::HashSet;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -11,11 +10,10 @@ use pico_vm::chips::chips::alu::sll::{ShiftLeftCols, NUM_SLL_COLS};
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
+use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::ui::generate_alu_final_checker;
-use latticevm::utils::create_or_clear_dir;
-use latticevm::utils::indices_arr;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
