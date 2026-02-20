@@ -770,6 +770,85 @@ where
     (solution_found, user_quit)
 }
 
+/// Orchestrates a parallel search over progressively larger subsets of refinable
+/// columns, invoking [`parallel_solve`] for each subset until termination.
+///
+/// This function implements a hierarchical search strategy:
+///
+/// 1. Iterate over subset sizes `k`, starting from `minimum_num_taregt_cols`
+///    up to the full set of refinable columns.
+/// 2. For each size, enumerate combinations of columns (shuffled randomly).
+/// 3. For each subset, construct a fresh initial abstract trace restricted
+///    to those columns.
+/// 4. Invoke the parallel solver on that subset.
+/// 5. Stop early if the user requests termination.
+///
+/// The approach allows the solver to prioritize smaller refinement sets first,
+/// which often yields solutions faster and reduces combinatorial explosion.
+///
+/// # Parameters
+///
+/// * `constraints` — VM constraint system to satisfy.
+/// * `refinable_cols` — Full list of columns eligible for refinement.
+/// * `range_types` — Domain specifications for columns.
+/// * `base_abs_main_trace_data` — Baseline abstract trace data used as a template.
+/// * `public_vals` — Public input values (single-row trace).
+/// * `max_expansions` — Maximum node expansions per subset search.
+/// * `minimum_num_taregt_cols` — Minimum subset size to consider.
+/// * `min_row_id`, `max_row_id` — Inclusive row bounds for refinement.
+/// * `program_len` — Length of the program (used for PC refinement).
+/// * `program_counter_refine_fn` — Callback that refines program counter domains.
+/// * `align_pc_to_program` — Callback to align traces to valid program counters.
+/// * `final_check` — Callback invoked when candidate solutions are found.
+/// * `prime` — Field modulus.
+/// * `seed` — RNG seed for deterministic subset ordering.
+/// * `known_solution` — Set used to deduplicate discovered solutions.
+/// * `ui` — Mutable UI state for progress reporting.
+/// * `terminal` — Terminal backend for rendering.
+/// * `sleep_time` — Accumulates solver idle time for throttling.
+///
+/// # Search Strategy
+///
+/// For each subset:
+///
+/// * The base trace is cloned.
+/// * Selected columns are reinitialized using [`make_init_val`].
+/// * Program counter domains may be further refined.
+/// * A fresh root [`SearchNode`] is created.
+/// * The subset is solved independently using multiple worker threads.
+///
+/// Subsets are processed in randomized order to avoid worst-case patterns.
+///
+/// # Termination
+///
+/// The outer loop stops when:
+///
+/// * All subsets have been explored, or
+/// * The user requests exit (e.g., presses `q`)
+///
+/// Solutions discovered in earlier subsets do not prevent exploration of later
+/// subsets unless externally terminated.
+///
+/// # Concurrency
+///
+/// Each subset search runs independently but shares immutable data via `Arc`.
+/// A global trial counter tracks progress across subsets.
+///
+/// # Notes
+///
+/// * The function blocks until completion or user exit.
+/// * The base trace template is never modified directly.
+/// * Smaller subsets typically correspond to simpler hypotheses.
+///
+/// # Panics
+///
+/// May panic if terminal rendering fails.
+///
+/// # See Also
+///
+/// * [`parallel_solve`] — Performs the per-subset parallel search.
+/// * [`make_init_val`] — Initializes column domains.
+/// * [`SearchNode`] — Root node representation.
 pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
     refinable_cols: &Vec<usize>, // Full plan
@@ -858,6 +937,79 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     }
 }
 
+/// Preprocesses symbolic constraints to determine refinable columns and their
+/// initial value ranges.
+///
+/// This function analyzes transition and lookup constraints to:
+///
+/// * Remove columns that should not be refined
+/// * Normalize composite constraint patterns (e.g., `iszero`, word range checks)
+/// * Identify variables actually used in constraints
+/// * Infer domain types (Boolean, U8, U16, etc.)
+///
+/// The resulting outputs guide initialization and refinement during solving.
+///
+/// # Parameters
+///
+/// * `num_cols` — Total number of columns in the trace.
+/// * `u8_cols` — Columns known to hold 8-bit unsigned values.
+/// * `u16_cols` — Columns known to hold 16-bit unsigned values.
+/// * `multiplicities` — Columns representing multiplicity counters (excluded).
+/// * `received_vars_from_cpu` — Columns externally controlled by the CPU (excluded).
+/// * `tv_constraints` — Transition constraints (modified in place).
+/// * `lookup_symbolic_constraints` — Additional lookup constraints.
+/// * `prime` — Field modulus used for symbolic analysis.
+///
+/// # Returns
+///
+/// A pair `(refinable_cols, range_types)` where:
+///
+/// * `refinable_cols` — Columns eligible for refinement.
+/// * `range_types` — Mapping from column index to inferred [`RangeType`].
+///
+/// # Processing Steps
+///
+/// 1. **Initial Filtering**
+///    Remove columns that must remain fixed (multiplicities, CPU inputs).
+///
+/// 2. **Constraint Normalization**
+///    Detect and rewrite special constructs such as:
+///
+///    * `iszero` operators
+///    * Word range checks (e.g., KoalaBear, BabyBear)
+///
+///    These patterns often expand into multiple simpler constraints.
+///
+/// 3. **Variable Usage Analysis**
+///    Collect all variable indices appearing in constraints and retain only
+///    those columns that are actually used.
+///
+/// 4. **Boolean Variable Detection**
+///    Identify variables constrained to `{0,1}` and mark them as `RangeType::Bool`.
+///
+/// 5. **Explicit Range Assignment**
+///    Override inferred ranges for known byte-width columns (`U8`, `U16`).
+///
+/// # Notes
+///
+/// * `tv_constraints` is modified in place to contain the normalized set.
+/// * Lookup constraints contribute to variable usage but are not rewritten.
+/// * Columns without explicit range types default to unconstrained (`Top`)
+///   during initialization.
+///
+/// # Use Cases
+///
+/// Typically invoked once before launching the solver to construct the
+/// refinement plan and domain information.
+///
+/// # Panics
+///
+/// This function does not panic under normal conditions.
+///
+/// # See Also
+///
+/// * [`RangeType`] — Domain specification enum.
+/// * [`make_init_val`] — Uses the resulting range map for initialization.
 pub fn prepare_constraints_and_range_type(
     num_cols: usize,
     u8_cols: &Vec<usize>,

@@ -16,6 +16,51 @@ use crate::alu::{
 };
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 
+/// Identifies the source and temporal position of a symbolic value within the
+/// Lattice VM execution model.
+///
+/// A symbolic entry specifies both:
+///
+/// * **Trace segment** — Which logical table the value belongs to
+/// * **Row context** — Whether the value refers to the current or next row
+///
+/// This abstraction allows symbolic expressions to uniformly reference values
+/// across multiple trace domains used in constraint systems (e.g., AIR/STARK-like
+/// formulations).
+///
+/// # Variants
+///
+/// * `Main { is_curr }` — Value from the main execution trace
+/// * `Permutation { is_curr }` — Value from the permutation trace
+/// * `Preprocessed { is_curr }` — Value from preprocessed auxiliary data
+/// * `Public` — Public input (row-independent)
+///
+/// The `is_curr` flag indicates whether the value refers to:
+///
+/// * `true`  → the current row
+/// * `false` → the next row
+///
+/// Public values have no row dependence.
+///
+/// # Display Format
+///
+/// The `Display` implementation renders entries as:
+///
+/// * `"curr"` — Current row value
+/// * `"next"` — Next row value
+/// * `"public"` — Public input
+///
+/// This representation is designed for compact debugging and constraint printing.
+///
+/// # Use Cases
+///
+/// Typically embedded within [`LatticeVMSymbolicVal`] to form leaf nodes in
+/// symbolic expression trees.
+///
+/// # See Also
+///
+/// * [`LatticeVMSymbolicVal`] — Symbolic variable representation
+/// * [`LatticeVMSymbolicExpr`] — Symbolic expression tree
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum LatticeVMSymbolicEntry {
     Main { is_curr: bool },
@@ -41,7 +86,54 @@ impl fmt::Display for LatticeVMSymbolicEntry {
     }
 }
 
-/// Represents a single symbolic variable, like a column in the trace.
+/// Represents a single symbolic variable referencing a column in a trace segment.
+///
+/// A symbolic value combines:
+///
+/// * A [`LatticeVMSymbolicEntry`] describing the trace domain and row context
+/// * A column index within that domain
+///
+/// Together, these uniquely identify a concrete value in the execution trace
+/// during symbolic constraint evaluation.
+///
+/// # Fields
+///
+/// * `entry` — Source trace segment and row selector
+/// * `index` — Column index within that segment
+///
+/// # Semantics
+///
+/// Conceptually corresponds to:
+///
+/// ```text
+/// entry[index]
+/// ```
+///
+/// Examples:
+///
+/// * `curr[5]` — Column 5 of the current main trace row
+/// * `next[2]` — Column 2 of the next row
+/// * `public[0]` — First public input value
+///
+/// # Display Format
+///
+/// Printed as `<entry>[<index>]`, e.g.:
+///
+/// ```text
+/// curr[3]
+/// next[7]
+/// public[0]
+/// ```
+///
+/// # Use Cases
+///
+/// Serves as a leaf node in [`LatticeVMSymbolicExpr`] trees representing
+/// constraints over traces.
+///
+/// # See Also
+///
+/// * [`LatticeVMSymbolicEntry`] — Domain and row selector
+/// * [`LatticeVMSymbolicExpr`] — Expression tree using these variables
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct LatticeVMSymbolicVal {
     pub entry: LatticeVMSymbolicEntry,
@@ -53,7 +145,54 @@ impl fmt::Display for LatticeVMSymbolicVal {
         write!(f, "{}[{}]", self.entry, self.index)
     }
 }
-/// An enum representing a symbolic expression tree.
+
+/// Symbolic expression tree used to represent constraints over Lattice VM traces.
+///
+/// Expressions are constructed from symbolic variables, constants, arithmetic
+/// operators, and structural predicates describing the execution context.
+/// They are typically evaluated over abstract intervals or concrete field
+/// values during constraint solving.
+///
+/// This enum forms the core intermediate representation (IR) for symbolic
+/// reasoning about VM execution.
+///
+/// # Structural Predicates
+///
+/// These variants describe properties of the current row position within
+/// the trace:
+///
+/// * `IsFirstRow` — True only for the first row
+/// * `IsTransition` — True for rows with a valid successor
+/// * `IsLastRow` — True only for the final row
+///
+/// Such predicates are commonly used in AIR-style constraints to enforce
+/// boundary conditions.
+///
+/// # Evaluation Context
+///
+/// Expressions are evaluated with access to:
+///
+/// * Current row values
+/// * Next row values (if available)
+/// * Public inputs
+/// * Field modulus
+///
+/// # Use Cases
+///
+/// * Transition constraints
+/// * Boundary constraints
+/// * Lookup conditions
+/// * Symbolic simplification and analysis
+///
+/// # Notes
+///
+/// Additional variants (not shown here) typically include arithmetic
+/// operations, constants, and variable references.
+///
+/// # See Also
+///
+/// * [`LatticeVMSymbolicVal`] — Variable leaf nodes
+/// * [`LatticeVMSymbolicEntry`] — Trace domain selector
 #[derive(Clone, Debug, Serialize)]
 pub enum LatticeVMSymbolicExpr {
     IsFirstRow,
@@ -735,6 +874,50 @@ impl LatticeVMSymbolicExpr {
     }
 }
 
+/// Collects variable indices appearing in a purely additive expression tree.
+///
+/// This function traverses a symbolic expression and extracts the indices of
+/// variables that participate in a sum composed only of additions and variables.
+/// The result is returned as a set to eliminate duplicates.
+///
+/// # Supported Structure
+///
+/// The expression must be composed exclusively of:
+///
+/// * `Add(lhs, rhs)` nodes
+/// * `Variable` leaf nodes
+///
+/// Any other construct (e.g., `Sub`, `Mul`, constants, predicates) causes the
+/// function to return `None`.
+///
+/// # Returns
+///
+/// * `Some(HashSet<usize>)` — Set of variable indices in the additive expression
+/// * `None` — Expression is not a pure sum of variables
+///
+/// # Example
+///
+/// For an expression equivalent to:
+///
+/// ```text
+/// x_i + x_j + x_k
+/// ```
+///
+/// the function returns:
+///
+/// ```text
+/// {i, j, k}
+/// ```
+///
+/// # Use Cases
+///
+/// * Detecting packed word constructions
+/// * Recognizing linear combinations without coefficients
+/// * Constraint pattern matching
+///
+/// # See Also
+///
+/// * [`collect_add_vars_vec`] — Same operation preserving order and duplicates
 fn collect_add_vars(expr: &LatticeVMSymbolicExpr) -> Option<HashSet<usize>> {
     match expr {
         LatticeVMSymbolicExpr::Add(lhs, rhs) => {
@@ -752,6 +935,51 @@ fn collect_add_vars(expr: &LatticeVMSymbolicExpr) -> Option<HashSet<usize>> {
     }
 }
 
+/// Collects variable indices from a purely additive expression as an ordered list.
+///
+/// Similar to [`collect_add_vars`], but returns a vector preserving the traversal
+/// order and allowing duplicate indices.
+///
+/// This is useful when the positional arrangement of variables is significant,
+/// such as reconstructing multi-limb words or structured encodings.
+///
+/// # Supported Structure
+///
+/// Accepts only expressions composed of:
+///
+/// * `Add(lhs, rhs)`
+/// * `Variable`
+///
+/// Any other expression form results in `None`.
+///
+/// # Returns
+///
+/// * `Some(Vec<usize>)` — Ordered list of variable indices
+/// * `None` — Expression is not a pure sum of variables
+///
+/// # Example
+///
+/// For:
+///
+/// ```text
+/// x_3 + x_5 + x_7
+/// ```
+///
+/// returns:
+///
+/// ```text
+/// [3, 5, 7]
+/// ```
+///
+/// # Use Cases
+///
+/// * Word reconstruction from limbs
+/// * Range-check pattern detection
+/// * Symbolic encoding analysis
+///
+/// # See Also
+///
+/// * [`collect_add_vars`] — Set-based variant
 fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
     match expr {
         LatticeVMSymbolicExpr::Add(lhs, rhs) => {
@@ -769,6 +997,50 @@ fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
     }
 }
 
+/// Detects selector-gated constant assignment constraints.
+///
+/// Searches for constraints of the form:
+///
+/// ```text
+/// selector * (curr[v] - target) = 0
+/// ```
+///
+/// where `selector` and `v` are variables from the current row and `target` is a
+/// constant value.
+///
+/// Such constraints express a conditional assignment:
+///
+/// > If `selector = 1`, then `curr[v] = target`.
+///
+/// # Parameters
+///
+/// * `constraints` — Symbolic constraints to analyze
+/// * `prime` — Field modulus used for canonical constant interpretation
+///
+/// # Returns
+///
+/// A list of tuples:
+///
+/// ```text
+/// (selector_index, value_index, target_constant)
+/// ```
+///
+/// representing each detected conditional constraint.
+///
+/// # Detection Strategy
+///
+/// Matches multiplication nodes where one operand is a selector variable and
+/// the other is a subtraction of a variable and a constant, regardless of order.
+///
+/// # Use Cases
+///
+/// * Interval refinement under conditional execution
+/// * Symbolic simplification
+/// * Constraint-driven search pruning
+///
+/// # See Also
+///
+/// * [`refine_conditional_constraints_var_sub_const`]
 pub fn detect_conditional_var_sub_const_constraints(
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
@@ -803,7 +1075,43 @@ pub fn detect_conditional_var_sub_const_constraints(
     const_constraints
 }
 
-/// 1. selector * (curr[val_idx] - target_val) = 0
+/// Applies interval refinement for selector-controlled constant assignments.
+///
+/// Implements refinement for constraints of the form:
+///
+/// ```text
+/// selector * (curr[v] - target) = 0
+/// ```
+///
+/// If the selector is known to be `1`, the value variable is intersected with
+/// the singleton interval `{target}`.
+///
+/// # Parameters
+///
+/// * `trace` — Abstract execution trace to refine
+/// * `const_constraints` — Triples `(selector_idx, value_idx, target_constant)`
+///
+/// # Returns
+///
+/// * `MayBeFlag::False` — Constraint violation detected
+/// * `MayBeFlag::MayBe` — Refinement applied successfully or inconclusive
+///
+/// # Behavior
+///
+/// For each row:
+///
+/// * If selector interval is exactly `{1}`:
+///   * Restrict the value interval to `target`
+///   * Fail if intersection is empty
+///
+/// Future improvements may infer `selector = 0` when the value cannot equal
+/// the target.
+///
+/// # Use Cases
+///
+/// * Constraint propagation
+/// * Search-space pruning
+/// * Abstract interpretation
 pub fn refine_conditional_constraints_var_sub_const(
     trace: &mut AbstractTrace,
     const_constraints: &[(usize, usize, i64)], // (selector_idx, value_idx, target_constant)
@@ -832,6 +1140,41 @@ pub fn refine_conditional_constraints_var_sub_const(
     MayBeFlag::MayBe
 }
 
+/// Detects selector-gated equality constraints between variables.
+///
+/// Searches for constraints of the form:
+///
+/// ```text
+/// selector * (curr[a] - curr[b]) = 0
+/// ```
+///
+/// expressing:
+///
+/// > If `selector = 1`, then `curr[a] = curr[b]`.
+///
+/// # Parameters
+///
+/// * `constraints` — Symbolic constraints to analyze
+///
+/// # Returns
+///
+/// A list of triples:
+///
+/// ```text
+/// (selector_index, a_index, b_index)
+/// ```
+///
+/// representing detected conditional equalities.
+///
+/// # Use Cases
+///
+/// * Equality propagation
+/// * Alias detection
+/// * Interval tightening
+///
+/// # See Also
+///
+/// * [`refine_conditional_constraints_var_sub_var`]
 pub fn detect_conditional_var_sub_var_constraints(
     constraints: &[LatticeVMSymbolicExpr],
 ) -> Vec<(usize, usize, usize)> {
@@ -861,7 +1204,39 @@ pub fn detect_conditional_var_sub_var_constraints(
     eq_constraints
 }
 
-/// selector * (curr[a_idx] - curr[b_idx]) = 0
+/// Refines intervals using selector-controlled variable equality constraints.
+///
+/// Implements propagation for:
+///
+/// ```text
+/// selector * (curr[a] - curr[b]) = 0
+/// ```
+///
+/// If the selector is known to be `1`, both variables are intersected with each
+/// other, enforcing equality.
+///
+/// # Parameters
+///
+/// * `trace` — Abstract trace to refine
+/// * `eq_constraints` — Triples `(selector_idx, a_idx, b_idx)`
+///
+/// # Returns
+///
+/// * `MayBeFlag::False` — Inconsistent intervals detected
+/// * `MayBeFlag::MayBe` — Refinement applied or inconclusive
+///
+/// # Behavior
+///
+/// For each row where selector equals `{1}`:
+///
+/// * Replace intervals of `a` and `b` with their intersection
+/// * Fail if intersection is empty
+///
+/// # Use Cases
+///
+/// * Constraint propagation
+/// * Equality reasoning
+/// * Solver pruning
 pub fn refine_conditional_constraints_var_sub_var(
     trace: &mut AbstractTrace,
     eq_constraints: &[(usize, usize, usize)], // (selector_idx, a_idx, b_idx)
@@ -890,6 +1265,31 @@ pub fn refine_conditional_constraints_var_sub_var(
     MayBeFlag::MayBe
 }
 
+/// Normalizes additive expressions by moving a subtraction term to the right.
+///
+/// Performs the rewrite:
+///
+/// ```text
+/// (a - c) + b  →  (a + b) - c
+/// ```
+///
+/// This canonicalization simplifies pattern matching for affine forms and is
+/// particularly useful for detecting constraints of the form `L - d·e`.
+///
+/// # Parameters
+///
+/// * `expr` — Expression to normalize
+///
+/// # Returns
+///
+/// A transformed expression if the pattern matches, otherwise a clone of the
+/// original expression.
+///
+/// # Use Cases
+///
+/// * Affine constraint detection
+/// * Symbolic normalization
+/// * Pattern matching for interval refinement
 pub fn move_sub_expr_to_right(expr: &LatticeVMSymbolicExpr) -> LatticeVMSymbolicExpr {
     // (a - c) + b ==> (a + b) - c
     if let LatticeVMSymbolicExpr::Add(lhs_1, rhs_1) = expr {
@@ -933,6 +1333,41 @@ pub fn move_sub_expr_to_right(expr: &LatticeVMSymbolicExpr) -> LatticeVMSymbolic
 //   ⌊(h - amin) / d
 // ]
 
+/// Represents an affine backward interval refinement (ABIR) constraint.
+///
+/// Models relations of the form:
+///
+/// ```text
+/// a = L - d * e
+/// ```
+///
+/// where:
+///
+/// * `a` — Left-hand side variable
+/// * `L` — Affine symbolic expression independent of `a` and `e`
+/// * `e` — Quotient variable
+/// * `d` — Positive stride (integer coefficient)
+///
+/// Such constraints allow backward propagation of interval information from
+/// `a` and `L` to refine the possible values of `e`.
+///
+/// # Fields
+///
+/// * `lhs_var` — Index of variable `a`
+/// * `affine_rhs` — Expression representing `L`
+/// * `quotient_var` — Index of variable `e`
+/// * `stride` — Positive coefficient `d`
+///
+/// # Use Cases
+///
+/// * Division-like constraints
+/// * Modular decompositions
+/// * Bit/limb extraction reasoning
+///
+/// # See Also
+///
+/// * [`detect_abir_constraints`]
+/// * [`apply_abir_refinement`]
 #[derive(Debug, Clone)]
 pub struct AbirConstraint {
     pub lhs_var: usize,                         // a
@@ -941,6 +1376,43 @@ pub struct AbirConstraint {
     pub stride: u32,                            // d > 0
 }
 
+/// Detects affine backward interval refinement (ABIR) constraints.
+///
+/// Identifies constraints equivalent to:
+///
+/// ```text
+/// a - (L - d * e) = 0
+/// ```
+///
+/// which implies:
+///
+/// ```text
+/// a = L - d * e
+/// ```
+///
+/// Subject to the side condition that variables `a` and `e` do not occur in `L`.
+///
+/// # Parameters
+///
+/// * `constraints` — Symbolic constraints to analyze
+/// * `prime` — Field modulus for constant interpretation
+///
+/// # Returns
+///
+/// A list of [`AbirConstraint`] objects describing detected affine relations.
+///
+/// # Detection Steps
+///
+/// 1. Match subtraction structure
+/// 2. Normalize RHS to `L - d·e`
+/// 3. Extract stride and quotient variable
+/// 4. Verify independence conditions
+///
+/// # Use Cases
+///
+/// * Interval refinement for quotient variables
+/// * Detecting arithmetic decompositions
+/// * Constraint simplification
 pub fn detect_abir_constraints(
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
@@ -1003,6 +1475,47 @@ pub fn detect_abir_constraints(
     result
 }
 
+/// Applies affine backward interval refinement (ABIR) to an abstract trace.
+///
+/// For constraints of the form:
+///
+/// ```text
+/// a = L - d * e
+/// ```
+///
+/// this function refines the interval of `e` using bounds inferred from `a`
+/// and the evaluated range of `L`.
+///
+/// # Parameters
+///
+/// * `trace` — Abstract trace to refine
+/// * `constraints` — ABIR constraints to apply
+/// * `prime` — Field modulus for evaluation
+///
+/// # Returns
+///
+/// A pair:
+///
+/// ```text
+/// (MayBeFlag, refinement_log)
+/// ```
+///
+/// where the log records interval updates applied to quotient variables.
+///
+/// # Behavior
+///
+/// For each step:
+///
+/// 1. Evaluate `L` under current intervals
+/// 2. Compute inferred bounds for `e`
+/// 3. Intersect with existing interval
+/// 4. Fail if intersection is empty
+///
+/// # Use Cases
+///
+/// * Division reasoning
+/// * Constraint propagation
+/// * Solver pruning
 pub fn apply_abir_refinement(
     trace: &mut AbstractTrace,
     constraints: &[AbirConstraint],
@@ -1052,6 +1565,22 @@ pub fn apply_abir_refinement(
     (MayBeFlag::MayBe, logs)
 }
 
+/// Detects a specialized encoding of an `is_zero` operator.
+///
+/// Recognizes a constraint pattern that encodes conditional behavior depending
+/// on whether an expression evaluates to zero, and rewrites it into explicit
+/// conditional symbolic expressions.
+///
+/// # Returns
+///
+/// * `Some(Vec<LatticeVMSymbolicExpr>)` — Equivalent conditional constraints
+/// * `None` — Pattern not recognized
+///
+/// # Use Cases
+///
+/// * De-sugaring arithmetic encodings
+/// * Conditional reasoning
+/// * Constraint normalization
 pub fn is_iszero_operator(
     constraint: &LatticeVMSymbolicExpr,
     prime: u32,
@@ -1095,6 +1624,21 @@ pub fn is_iszero_operator(
     None
 }
 
+/// Detects KoalaBear word-range check constraints.
+///
+/// Identifies constraints encoding that a 4-limb word lies within the valid
+/// KoalaBear field range and converts them into a semantic range predicate.
+///
+/// # Returns
+///
+/// * `Some(expr)` — Rewritten constraint using `KoalaBearRange`
+/// * `None` — Pattern not recognized
+///
+/// # Use Cases
+///
+/// * Field-specific range validation
+/// * Symbolic simplification
+/// * Constraint abstraction
 pub fn is_koalabear_word_range(
     constraint: &LatticeVMSymbolicExpr,
     prime: u32,
@@ -1129,6 +1673,15 @@ pub fn is_koalabear_word_range(
     None
 }
 
+/// Detects BabyBear word-range check constraints.
+///
+/// Similar to [`is_koalabear_word_range`], but for the BabyBear field.
+/// Converts low-level arithmetic encodings into a semantic range predicate.
+///
+/// # Returns
+///
+/// * `Some(expr)` — Range predicate expression
+/// * `None` — Pattern not matched
 pub fn is_babybear_word_range(
     constraint: &LatticeVMSymbolicExpr,
     prime: u32,
@@ -1163,6 +1716,21 @@ pub fn is_babybear_word_range(
     None
 }
 
+/// Detects Boolean constraints of the form `x * (x - 1) = 0`.
+///
+/// This polynomial identity holds exactly when `x ∈ {0, 1}`, enforcing that
+/// the variable is Boolean.
+///
+/// # Returns
+///
+/// * `Some(index)` — Index of the Boolean variable
+/// * `None` — Constraint is not a Boolean check
+///
+/// # Use Cases
+///
+/// * Identifying selector variables
+/// * Range inference
+/// * Domain restriction
 pub fn is_boolean_constraint(constraint: &LatticeVMSymbolicExpr) -> Option<usize> {
     use LatticeVMSymbolicExpr::*;
 
