@@ -128,10 +128,6 @@ fn main() -> Result<(), io::Error> {
     constraint_info.constraints.pv_pos_constraints = pv_pos_constraints;
     constraint_info.constraints.pv_neg_constraints = pv_neg_constraints;
 
-    let minimum_num_taregt_cols = 1; //refinable_cols.len();
-    println!("{:?}", constraint_info.refinable_cols);
-    println!("{:?}", general_lookup_info);
-
     // ######################## Program Initialization ###########################
     let program = target_program(2013265921 - 8, 2013265921 - 8);
     let mut base_abs_main_trace_data =
@@ -170,6 +166,7 @@ fn main() -> Result<(), io::Error> {
         final_check,
         &args.method,
     );
+    println!("{:?}", result);
 
     Ok(())
 }
