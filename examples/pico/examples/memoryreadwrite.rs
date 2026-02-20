@@ -13,12 +13,15 @@ use pico_vm::chips::chips::riscv_memory::read_write::{
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
+use latticevm::canonicalizer::{generate_memory_op_final_checker, save_repr_if_unique};
 use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::{generate_memory_op_final_checker, UiState};
-use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::ui::UiState;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
+use latticevm::{
+    constraint::LatticeVMConstraints,
+    trace::{trace_fmt_with_idxs, AbstractTrace},
+};
 
 use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,

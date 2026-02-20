@@ -485,6 +485,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     known_solution: &mut HashSet<String>,
     global_total_trials: Arc<AtomicUsize>,
     sleep_time: &mut Duration,
+    start_time: &std::time::Instant,
     time_out: Duration,
 ) -> (bool, bool)
 // (Found, Quit)
@@ -692,7 +693,6 @@ where
     let tick_rate = Duration::from_millis(50);
     let mut last_tick = std::time::Instant::now();
 
-    let start_time = std::time::Instant::now();
     loop {
         let mut _got_msg = false;
 
@@ -732,7 +732,8 @@ where
             }
 
             if start_time.elapsed() >= time_out {
-                break;
+                shutdown.store(true, Ordering::SeqCst);
+                return (solution_found, user_quit);
             }
         }
 
@@ -772,7 +773,8 @@ where
         }
 
         if start_time.elapsed() >= time_out {
-            break;
+            shutdown.store(true, Ordering::SeqCst);
+            return (solution_found, user_quit);
         }
 
         // tiny sleep to avoid the over-usage of CPU
@@ -892,6 +894,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     let shared_constraints = Arc::new(constraints.clone());
     let shared_range_types = Arc::new(range_types.clone());
     let global_count = Arc::new(AtomicUsize::new(0));
+    let start_time = std::time::Instant::now();
 
     let mut rng = StdRng::seed_from_u64(seed);
 
@@ -940,8 +943,13 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 known_solution,
                 global_count.clone(),
                 sleep_time,
+                &start_time,
                 time_out,
             );
+
+            if start_time.elapsed() >= time_out {
+                break 'outer;
+            }
 
             // 3. DECIDE NEXT STEP
             if quit {
