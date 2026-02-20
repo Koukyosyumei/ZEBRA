@@ -117,7 +117,7 @@ fn main() -> Result<(), io::Error> {
         program_len: program.len(),
     };
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = 2; //constraint_info.refinable_cols.len();
     }
 
     // ######################## Solve ############################################
