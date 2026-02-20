@@ -25,6 +25,28 @@ use crate::{
     ui::UiState,
 };
 
+/// Describes the allowed value range for a column when initializing an abstract state.
+///
+/// This enum is used to construct an [`AbstractInterval`] representing the
+/// initial domain of a variable (e.g., a column in a trace). Variants correspond
+/// to common bounded integer domains, constants, or unconstrained ranges.
+///
+/// # Variants
+///
+/// * `Bool`  — Boolean domain `{0, 1}`.
+/// * `U4`    — Unsigned 4-bit integer domain `[0, 15]`.
+/// * `U7`    — Unsigned 7-bit integer domain `[0, 126]`.
+/// * `U8`    — Unsigned 8-bit integer domain `[0, 255]`.
+/// * `U16`   — Unsigned 16-bit integer domain `[0, 65535]`.
+/// * `Top`   — Unconstrained domain over the full field (bounded by the modulus).
+/// * `Const(i64)` — A single constant value.
+/// * `Any(i64, i64)` — Explicit inclusive interval `[lo, hi]`.
+///
+/// # Notes
+///
+/// * Domains are interpreted as integer intervals.
+/// * `Top` typically spans the entire finite field defined by the program modulus.
+/// * No validation is performed to ensure bounds are consistent with the field.
 #[derive(Clone, Debug)]
 pub enum RangeType {
     Bool,
@@ -37,6 +59,37 @@ pub enum RangeType {
     Any(i64, i64),
 }
 
+/// Constructs the initial abstract interval for a given column.
+///
+/// If a range specification exists for `col_idx`, the corresponding interval
+/// is returned. Otherwise, the column is initialized to the top (unconstrained)
+/// interval over the field defined by `prime`.
+///
+/// # Parameters
+///
+/// * `col_idx` — Column index whose initial value is being created.
+/// * `range_types` — Mapping from column indices to their allowed ranges.
+/// * `prime` — Field modulus used when constructing top intervals.
+///
+/// # Returns
+///
+/// An [`AbstractInterval`] representing the initial domain of the column.
+///
+/// # Behavior
+///
+/// * If `range_types` contains an entry for `col_idx`, the interval is derived
+///   from the associated [`RangeType`].
+/// * If no entry exists, the column is treated as unconstrained (`Top`).
+///
+/// # Panics
+///
+/// This function does not panic under normal conditions.
+///
+/// # Notes
+///
+/// * The returned interval is purely symbolic and may later be refined
+///   by constraint propagation.
+/// * Bounds are not automatically reduced modulo `prime`.
 pub fn make_init_val(
     col_idx: usize,
     range_types: &HashMap<usize, RangeType>,
@@ -58,7 +111,24 @@ pub fn make_init_val(
     }
 }
 
-/// Messages sent from workers to the UI thread
+/// Messages sent from worker threads to the UI or coordinator thread.
+///
+/// This enum enables asynchronous progress reporting and result delivery
+/// during parallel search or solving.
+///
+/// # Variants
+///
+/// * `UpdateStats` — Periodic status update.
+///     * `trials` — Number of nodes processed so far.
+///     * `unsat` — Number of nodes determined unsatisfiable.
+///     * `queue_len` — Current size of the work queue.
+/// * `SolutionFound` — A valid solution trace has been discovered.
+///     * Contains the solution trace and the number of steps taken.
+/// * `Finished` — All work has completed and no further messages will follow.
+///
+/// # Threading
+///
+/// Intended for use with channels in a multi-threaded solver architecture.
 pub enum SolverMsg {
     UpdateStats {
         trials: usize,
@@ -69,18 +139,52 @@ pub enum SolverMsg {
     Finished,
 }
 
-/// The outcome of processing a single node
+/// Result of processing a single search node.
+///
+/// Returned by worker routines after attempting refinement and constraint
+/// evaluation on a node.
+///
+/// # Variants
+///
+/// * `Success` — A satisfying trace has been found.
+/// * `Pruned` — The node is unsatisfiable and should be discarded.
+/// * `Refined` — The node produced child nodes that should be explored.
+///
+/// This type guides the global search strategy (e.g., queue expansion).
 enum NodeProcessingResult {
     Success(AbstractTrace),
     Pruned, // Unsatisfiable
     Refined(Vec<(SearchNode, Potential)>),
 }
 
-/// Result of constraint checking on a node.
+/// Heuristic score associated with a node in the search space.
+///
+/// Represented as `(priority, depth_penalty)` or another solver-specific
+/// ordering metric. Lower values typically indicate higher priority,
+/// but interpretation depends on the queue implementation.
+///
+/// Used to guide best-first or heuristic search strategies.
 pub type Potential = (i32, i32);
 
-/// Node inside the search queue.
-/// depth: number of refinement steps so far.
+/// A node in the solver's search space.
+///
+/// Each node represents a partially refined abstract execution trace
+/// along with its depth in the refinement tree.
+///
+/// # Fields
+///
+/// * `main_trace` — The abstract trace representing current constraints.
+/// * `depth` — Number of refinement steps applied from the root.
+///
+/// # Usage
+///
+/// Nodes are stored in priority queues or work lists and expanded
+/// during the search for satisfying executions.
+///
+/// # Traits
+///
+/// Implements `Eq`, `Hash`, and `PartialEq` to allow deduplication
+/// and storage in hash-based collections.
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct SearchNode {
     main_trace: AbstractTrace,
