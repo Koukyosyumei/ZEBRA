@@ -80,7 +80,7 @@ pub fn eval_base_constraints(
             match flag {
                 MayBeFlag::True => {}
                 MayBeFlag::False => {
-                    //println!("{}: {}", _j, tc);
+                    //println!("({}, {}): {}, {} ^^{}", i, _j, tc, prime, is_strict);
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {

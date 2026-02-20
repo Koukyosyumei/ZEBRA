@@ -111,6 +111,11 @@ where
 
     let symbolic_constraints: Vec<SymbolicExpression<F>> =
         get_symbolic_constraints(air, 0, SP1_PROOF_NUM_PV_ELTS);
+    let mut air_constraints = symbolic_constraints
+        .iter()
+        .map(|sc| convert_p3_expr::<F>(&sc))
+        .collect::<Vec<_>>();
+
     let general_lookup_info = get_symbolic_lookup_constraints::<F, A>(
         air,
         0,
@@ -118,15 +123,11 @@ where
         &mut u8_cols,
         &mut u16_cols,
         &mut multiplicities,
+        &mut air_constraints,
         &mut lookup_constraints,
         &mut received_vars_from_cpu,
         prime,
     );
-
-    let mut air_constraints = symbolic_constraints
-        .iter()
-        .map(|sc| convert_p3_expr::<F>(&sc))
-        .collect::<Vec<_>>();
 
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         num_cols,

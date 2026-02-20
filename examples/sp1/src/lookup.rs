@@ -33,6 +33,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     u8_cols: &mut Vec<usize>,
     u16_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,
+    air_constraints: &mut Vec<LExpr>,
     lookup_constraints: &mut Vec<LExpr>,
     received_vars_from_cpu: &mut HashSet<usize>,
     prime: u32,
@@ -150,7 +151,7 @@ where
                     let impl_pc_constraint =
                         make_impl_constraint(t.0 as i64, &opcode, pc_constraint, prime);
                     if let Some(impl_pc_constraint) = impl_pc_constraint {
-                        lookup_constraints.push(LExpr::Mul(
+                        air_constraints.push(LExpr::Mul(
                             Box::new(multiplicities.clone()),
                             Box::new(impl_pc_constraint),
                         ));
