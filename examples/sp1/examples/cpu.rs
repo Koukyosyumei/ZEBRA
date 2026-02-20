@@ -108,16 +108,14 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (8..35).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 100000;
     let min_row_id = 0;
     let max_row_id = 3;
     let num_extracted_rows = 5;
-    let seed = 41;
 
     // ######################## Extract CPU Constraints ##########################
     let air = CpuChip::default();
     let air_name = "Cpu";
-    println!("{:?}", CPU_COL_MAP);
+    //println!("{:?}", CPU_COL_MAP);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, prime);
@@ -130,7 +128,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let program = target_program(2013265921 - 8, 2013265921 - 8);
-    let mut base_abs_main_trace_data =
+    let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
     let adjust_pc_program = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
@@ -140,7 +138,6 @@ fn main() -> Result<(), io::Error> {
     public_vals[40] = AbstractInterval::from_i64(2013265921 - 8);
     public_vals[41] = AbstractInterval::zero();
     public_vals[44] = AbstractInterval::one();
-    let refinment_target_indicies_pv: Vec<usize> = vec![];
 
     // ######################## Set Info ##########################################
     let program_info = ProgramInfo {
