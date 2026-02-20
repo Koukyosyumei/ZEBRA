@@ -42,6 +42,7 @@ pub struct ConstraintInfo {
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct SearchConfig {
+    pub time_out_ms: u64,
     pub minimum_num_taregt_cols: usize,
     pub max_expansions: usize,
     pub min_row_id: usize,
@@ -52,6 +53,7 @@ pub struct SearchConfig {
 impl Default for SearchConfig {
     fn default() -> Self {
         SearchConfig {
+            time_out_ms: 10000,
             minimum_num_taregt_cols: 0,
             max_expansions: 1000000000,
             min_row_id: 0,
@@ -103,6 +105,7 @@ where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
     let mut sleep_time = Duration::from_millis(0);
+    let time_out = Duration::from_millis(search_config.time_out_ms);
 
     // ######################## Blocking Closures ################################
     for i in blocked_rows {
@@ -134,6 +137,7 @@ where
             align_pc_to_program,
             final_check,
             &mut sleep_time,
+            time_out,
         )
     } else {
         // ######################## Generating SMT Formula ##########################
@@ -203,6 +207,7 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
+    time_out: Duration,
 ) -> Result<VerificationResult, io::Error>
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
@@ -241,6 +246,7 @@ where
         &mut ui,
         &mut terminal,
         sleep_time,
+        time_out,
     );
 
     disable_raw_mode()?;

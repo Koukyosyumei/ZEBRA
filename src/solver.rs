@@ -485,6 +485,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     known_solution: &mut HashSet<String>,
     global_total_trials: Arc<AtomicUsize>,
     sleep_time: &mut Duration,
+    time_out: Duration,
 ) -> (bool, bool)
 // (Found, Quit)
 where
@@ -691,6 +692,7 @@ where
     let tick_rate = Duration::from_millis(50);
     let mut last_tick = std::time::Instant::now();
 
+    let start_time = std::time::Instant::now();
     loop {
         let mut _got_msg = false;
 
@@ -728,6 +730,10 @@ where
                     // subset_finished = true;
                 }
             }
+
+            if start_time.elapsed() >= time_out {
+                break;
+            }
         }
 
         // --------------------------------------------------------
@@ -762,6 +768,10 @@ where
         let queue_empty = queue.lock().unwrap().is_empty();
         let workers_idle = active_workers.load(Ordering::SeqCst) == 0;
         if queue_empty && workers_idle {
+            break;
+        }
+
+        if start_time.elapsed() >= time_out {
             break;
         }
 
@@ -872,6 +882,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     sleep_time: &mut Duration,
+    time_out: Duration,
 ) where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -929,6 +940,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
                 known_solution,
                 global_count.clone(),
                 sleep_time,
+                time_out,
             );
 
             // 3. DECIDE NEXT STEP
