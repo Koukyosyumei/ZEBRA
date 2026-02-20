@@ -194,6 +194,14 @@ pub struct SearchNode {
     depth: usize,
 }
 
+#[derive(Clone, Debug)]
+pub enum VerificationStatus {
+    Verified,
+    TimedOut,
+    ResourceLimitReached,
+    Interrupted,
+}
+
 /// Processes a single search node by applying refinements, generating children,
 /// and evaluating constraints.
 ///
@@ -487,7 +495,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     sleep_time: &mut Duration,
     start_time: &std::time::Instant,
     time_out: Duration,
-) -> (bool, bool)
+) -> (VerificationStatus, bool, bool)
 // (Found, Quit)
 where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
@@ -731,9 +739,18 @@ where
                 }
             }
 
+            if local_trials.load(Ordering::SeqCst) >= max_expansions {
+                shutdown.store(true, Ordering::SeqCst);
+                return (
+                    VerificationStatus::ResourceLimitReached,
+                    solution_found,
+                    user_quit,
+                );
+            }
+
             if start_time.elapsed() >= time_out {
                 shutdown.store(true, Ordering::SeqCst);
-                return (solution_found, user_quit);
+                return (VerificationStatus::TimedOut, solution_found, user_quit);
             }
         }
 
@@ -746,7 +763,7 @@ where
                     KeyCode::Char('q') | KeyCode::Char('c') => {
                         user_quit = true;
                         shutdown.store(true, Ordering::SeqCst);
-                        return (solution_found, user_quit);
+                        return (VerificationStatus::Interrupted, solution_found, user_quit);
                     }
                     _ => {}
                 }
@@ -766,15 +783,22 @@ where
         // --------------------------------------------------------
         // 4. Check whether all workers finished
         // --------------------------------------------------------
+        if local_trials.load(Ordering::SeqCst) >= max_expansions {
+            return (
+                VerificationStatus::ResourceLimitReached,
+                solution_found,
+                user_quit,
+            );
+        }
+
+        if start_time.elapsed() >= time_out {
+            return (VerificationStatus::TimedOut, solution_found, user_quit);
+        }
+
         let queue_empty = queue.lock().unwrap().is_empty();
         let workers_idle = active_workers.load(Ordering::SeqCst) == 0;
         if queue_empty && workers_idle {
             break;
-        }
-
-        if start_time.elapsed() >= time_out {
-            shutdown.store(true, Ordering::SeqCst);
-            return (solution_found, user_quit);
         }
 
         // tiny sleep to avoid the over-usage of CPU
@@ -782,7 +806,7 @@ where
         thread::sleep(Duration::from_millis(10));
     }
 
-    (solution_found, user_quit)
+    (VerificationStatus::Verified, solution_found, user_quit)
 }
 
 /// Orchestrates a parallel search over progressively larger subsets of refinable
@@ -924,7 +948,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
 
             // 2. RUN SOLVER for THIS subset
             // We pass ownership of subset_indices wrapped in Arc
-            let (_found, quit) = parallel_solve(
+            let (_status, _found, quit) = parallel_solve(
                 &mut initial_node,
                 public_trace,
                 shared_constraints.clone(),
