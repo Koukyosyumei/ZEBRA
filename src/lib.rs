@@ -1,3 +1,4 @@
+pub mod canonicalizer;
 pub mod constraint;
 pub mod interval;
 pub mod macros;
