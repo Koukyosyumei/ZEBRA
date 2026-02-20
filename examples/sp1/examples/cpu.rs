@@ -14,17 +14,16 @@ use sp1_core_machine::{
     cpu::CpuChip,
 };
 use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
-use sp1_stark::MachineProver;
 
 use latticevm::constraint::eval_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
 use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::solver::dummy_program_counter_refine_fn;
 use latticevm::state::AbstractState;
+use latticevm::trace::AbstractTrace;
 use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
-use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{constraint::LatticeVMConstraints, trace::AbstractTrace};
+use latticevm::utils::create_or_clear_dir;
 
 use latticevm_sp1::pv_constraints::get_pv_constraints;
 use latticevm_sp1::utils::{
@@ -47,7 +46,7 @@ pub fn sp1_abstract_trace_to_abstract_state(
 // ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
-    num_trial: usize,
+    _num_trial: usize,
     prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
@@ -100,7 +99,6 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
