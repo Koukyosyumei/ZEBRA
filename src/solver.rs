@@ -299,7 +299,7 @@ fn process_single_node(
     constraints: &LatticeVMConstraints,
     prime: u32,
     rng: &mut StdRng,
-    align_pc_to_program: &impl Fn(&mut AbstractTrace, u32),
+    align_pc_to_program: Option<&impl Fn(&mut AbstractTrace, u32)>,
     refinment_target_indicies_main: &Vec<usize>,
     bool_target_indices: &[usize],
     min_row_id: usize,
@@ -376,7 +376,9 @@ fn process_single_node(
 
     let mut results = Vec::new();
     for mut kid_trace in children {
-        align_pc_to_program(&mut kid_trace, prime);
+        if let Some(align_pc_to_program) = align_pc_to_program {
+            align_pc_to_program(&mut kid_trace, prime);
+        }
         let (res, pot, _) =
             eval_constraints(&kid_trace, Some(&public_trace.data[0]), constraints, prime);
 
@@ -671,7 +673,7 @@ where
                     &c_cons,
                     prime,
                     &mut rng,
-                    &c_align,
+                    Some(&c_align),
                     &c_rp,
                     &c_bool,
                     search_config.min_row_id,
