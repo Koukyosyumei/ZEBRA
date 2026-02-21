@@ -96,7 +96,7 @@ fn main() -> Result<(), io::Error> {
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap().execution_time);
+        ds.push(result.unwrap().0.execution_time);
     }
     println!("{:?}", mean_variance(&ds));
 
