@@ -73,7 +73,6 @@ where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
     let mut sleep_time = Duration::from_millis(0);
-    let time_out = Duration::from_millis(search_config.time_out_ms);
 
     // ######################## Blocking Closures ################################
     for i in blocked_rows {
@@ -96,7 +95,6 @@ where
             align_pc_to_program,
             final_check,
             &mut sleep_time,
-            time_out,
         )
     } else {
         // ######################## Generating SMT Formula ##########################
@@ -159,7 +157,6 @@ pub fn quick_api<FinalCheckFn, AlignPcToProgramFn>(
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
-    time_out: Duration,
 ) -> Result<VerificationResult, io::Error>
 where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -188,7 +185,6 @@ where
         &mut ui,
         &mut terminal,
         sleep_time,
-        time_out,
     );
 
     disable_raw_mode()?;

@@ -422,10 +422,7 @@ fn process_single_node(
 /// * `refinable_cols` — Column indices allowed to be refined in this subset.
 /// * `range_types` — Domain specifications for columns.
 /// * `align_pc_to_program` — Callback that adjusts traces to valid program counters.
-/// * `min_row_id`, `max_row_id` — Inclusive row bounds eligible for refinement.
-/// * `max_expansions` — Per-subset limit on node expansions before forced shutdown.
-/// * `num_workers` — Number of worker threads to spawn.
-/// * `seed` — Base RNG seed (worker seeds are derived deterministically).
+/// * `search_config` - Search config
 /// * `prime` — Field modulus.
 /// * `ui` — Mutable UI state for rendering progress and logs.
 /// * `terminal` — Terminal backend used for drawing the UI.
@@ -527,13 +524,13 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     global_total_trials: Arc<AtomicUsize>,
     sleep_time: &mut Duration,
     start_time: &std::time::Instant,
-    time_out: Duration,
 ) -> (VerificationStatus, bool, bool)
 // (Found, Quit)
 where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
 {
+    let time_out = Duration::from_millis(search_config.time_out_ms);
     let mut conditional_bool_target_indices = Vec::<(usize, usize)>::new();
 
     for t in &constraints.air_constraints {
@@ -860,20 +857,12 @@ where
 ///
 /// # Parameters
 ///
-/// * `constraints` — VM constraint system to satisfy.
-/// * `refinable_cols` — Full list of columns eligible for refinement.
-/// * `range_types` — Domain specifications for columns.
+/// * `constraint_info` — VM constraint system to satisfy.
 /// * `base_abs_main_trace_data` — Baseline abstract trace data used as a template.
 /// * `public_vals` — Public input values (single-row trace).
-/// * `max_expansions` — Maximum node expansions per subset search.
-/// * `minimum_num_taregt_cols` — Minimum subset size to consider.
-/// * `min_row_id`, `max_row_id` — Inclusive row bounds for refinement.
-/// * `program_len` — Length of the program (used for PC refinement).
-/// * `program_counter_refine_fn` — Callback that refines program counter domains.
+/// * `search_config` - Search config
 /// * `align_pc_to_program` — Callback to align traces to valid program counters.
 /// * `final_check` — Callback invoked when candidate solutions are found.
-/// * `prime` — Field modulus.
-/// * `seed` — RNG seed for deterministic subset ordering.
 /// * `known_solution` — Set used to deduplicate discovered solutions.
 /// * `ui` — Mutable UI state for progress reporting.
 /// * `terminal` — Terminal backend for rendering.
@@ -932,7 +921,6 @@ pub fn run_parallel_solver<FinalCheckFn, AlignPcToProgramFn>(
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     sleep_time: &mut Duration,
-    time_out: Duration,
 ) -> (VerificationStatus, usize)
 where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -995,11 +983,10 @@ where
                 global_count.clone(),
                 sleep_time,
                 &start_time,
-                time_out,
             );
             last_verification_status = status;
 
-            if start_time.elapsed() >= time_out {
+            if let VerificationStatus::TimedOut = last_verification_status {
                 break 'outer;
             }
 
