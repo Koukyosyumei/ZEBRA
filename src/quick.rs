@@ -121,10 +121,7 @@ where
     if verification_method == "bb" {
         quick_api(
             program_info.program_str.clone(),
-            &constraint_info.constraints,
-            &constraint_info.refinable_cols,
-            &constraint_info.range_types,
-            constraint_info.prime,
+            constraint_info,
             &base_abs_main_trace_data,
             public_vals,
             search_config.max_expansions,
@@ -191,10 +188,7 @@ where
 
 pub fn quick_api<FinalCheckFn, AlignPcToProgramFn>(
     program_str: String,
-    constraints: &LatticeVMConstraints,
-    refinable_cols: &Vec<usize>,
-    range_types: &HashMap<usize, RangeType>,
-    prime: u32,
+    constraint_info: &mut ConstraintInfo,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     max_expansions: usize,
@@ -224,9 +218,9 @@ where
     let start_time = time::Instant::now();
 
     let (verification_status, global_count) = run_parallel_solver(
-        constraints,
-        &refinable_cols,
-        range_types,
+        &constraint_info.constraints,
+        &constraint_info.refinable_cols,
+        &constraint_info.range_types,
         base_abs_main_trace_data,
         public_vals,
         max_expansions,
@@ -235,7 +229,7 @@ where
         max_row_id,
         align_pc_to_program,
         final_check,
-        prime,
+        constraint_info.prime,
         seed,
         &mut known_solution,
         &mut ui,
