@@ -11,6 +11,7 @@ use priority_queue::PriorityQueue;
 use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
+use serde::Deserialize;
 
 use crate::shrinker::{
     apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
@@ -200,6 +201,40 @@ pub enum VerificationStatus {
     TimedOut,
     ResourceLimitReached,
     Interrupted,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct SearchConfig {
+    pub time_out_ms: u64,
+    pub minimum_num_taregt_cols: usize,
+    pub max_expansions: usize,
+    pub min_row_id: usize,
+    pub max_row_id: usize,
+    pub seed: u64,
+}
+
+impl Default for SearchConfig {
+    fn default() -> Self {
+        SearchConfig {
+            time_out_ms: 10000,
+            minimum_num_taregt_cols: 0,
+            max_expansions: 1000000000,
+            min_row_id: 0,
+            max_row_id: 0,
+            seed: 41,
+        }
+    }
+}
+
+pub struct ConstraintInfo {
+    pub constraints: LatticeVMConstraints,
+    pub num_total_columns: usize,
+    pub num_pv_columns: usize,
+    pub output_columns: Vec<usize>,
+    pub refinable_cols: Vec<usize>,
+    pub range_types: HashMap<usize, RangeType>,
+    pub prime: u32,
 }
 
 /// Processes a single search node by applying refinements, generating children,
@@ -889,19 +924,12 @@ where
 /// * [`make_init_val`] — Initializes column domains.
 /// * [`SearchNode`] — Root node representation.
 pub fn run_parallel_solver<FinalCheckFn, AlignPcToProgramFn>(
-    constraints: &LatticeVMConstraints,
-    refinable_cols: &Vec<usize>, // Full plan
-    range_types: &HashMap<usize, RangeType>,
+    constraint_info: &ConstraintInfo,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
-    max_expansions: usize,
-    minimum_num_taregt_cols: usize,
-    min_row_id: usize,
-    max_row_id: usize,
+    search_config: &SearchConfig,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
-    prime: u32,
-    seed: u64,
     known_solution: &mut HashSet<String>,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
@@ -912,18 +940,47 @@ where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
+    /*
+        let (verification_status, global_count) = run_parallel_solver(
+            &constraint_info.constraints,
+            &constraint_info.refinable_cols,
+            &constraint_info.range_types,
+            base_abs_main_trace_data,
+            public_vals,
+            search_config.max_expansions,
+            search_config.minimum_num_taregt_cols,
+            search_config.min_row_id,
+            search_config.max_row_id,
+            align_pc_to_program,
+            final_check,
+            constraint_info.prime,
+            search_config.seed,
+            &mut known_solution,
+            &mut ui,
+            &mut terminal,
+            sleep_time,
+            time_out,
+        );
+    */
+
     // Arc wrappers for constant data shared across all subsets
-    let shared_constraints = Arc::new(constraints.clone());
-    let shared_range_types = Arc::new(range_types.clone());
+    let shared_constraints = Arc::new(constraint_info.constraints.clone());
+    let shared_range_types = Arc::new(constraint_info.range_types.clone());
     let global_count = Arc::new(AtomicUsize::new(0));
     let start_time = std::time::Instant::now();
 
-    let mut rng = StdRng::seed_from_u64(seed);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut last_verification_status = VerificationStatus::Interrupted;
 
     // --- OUTER LOOP: Subset Sizes ---
-    'outer: for k in minimum_num_taregt_cols..(refinable_cols.len() + 1) {
-        let mut column_subsets: Vec<_> = refinable_cols.iter().combinations(k).collect();
+    'outer: for k in
+        search_config.minimum_num_taregt_cols..(constraint_info.refinable_cols.len() + 1)
+    {
+        let mut column_subsets: Vec<_> = constraint_info
+            .refinable_cols
+            .iter()
+            .combinations(k)
+            .collect();
         column_subsets.shuffle(&mut rng);
 
         // --- MIDDLE LOOP: Specific Subsets ---
@@ -932,9 +989,10 @@ where
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
             let subset_indices: Vec<usize> = column_subset.iter().cloned().cloned().collect();
 
-            for i in min_row_id..(max_row_id + 1) {
+            for i in search_config.min_row_id..(search_config.max_row_id + 1) {
                 for c in &subset_indices {
-                    abs_main_trace_data[i][*c] = make_init_val(*c, range_types, prime);
+                    abs_main_trace_data[i][*c] =
+                        make_init_val(*c, &constraint_info.range_types, constraint_info.prime);
                 }
             }
 
@@ -953,12 +1011,12 @@ where
                 Arc::new(subset_indices), // Subset specific plan
                 shared_range_types.clone(),
                 align_pc_to_program.clone(),
-                min_row_id,
-                max_row_id,
-                max_expansions,
+                search_config.min_row_id,
+                search_config.max_row_id,
+                search_config.max_expansions,
                 8, // Number of workers (adjust as needed)
-                seed,
-                prime,
+                search_config.seed,
+                constraint_info.prime,
                 ui,
                 terminal,
                 final_check.clone(),

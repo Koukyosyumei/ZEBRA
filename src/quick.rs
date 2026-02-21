@@ -16,7 +16,9 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use serde::Deserialize;
 
 use crate::smt::expr_to_smt_bv;
-use crate::solver::{run_parallel_solver, RangeType, VerificationStatus};
+use crate::solver::{
+    run_parallel_solver, ConstraintInfo, RangeType, SearchConfig, VerificationStatus,
+};
 use crate::ui::UiState;
 use crate::{
     constraint::{add_blocking_constraint, LatticeVMConstraints},
@@ -27,40 +29,6 @@ use crate::{
 pub struct ProgramInfo {
     pub program_str: String,
     pub program_len: usize,
-}
-
-pub struct ConstraintInfo {
-    pub constraints: LatticeVMConstraints,
-    pub num_total_columns: usize,
-    pub num_pv_columns: usize,
-    pub output_columns: Vec<usize>,
-    pub refinable_cols: Vec<usize>,
-    pub range_types: HashMap<usize, RangeType>,
-    pub prime: u32,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(default)]
-pub struct SearchConfig {
-    pub time_out_ms: u64,
-    pub minimum_num_taregt_cols: usize,
-    pub max_expansions: usize,
-    pub min_row_id: usize,
-    pub max_row_id: usize,
-    pub seed: u64,
-}
-
-impl Default for SearchConfig {
-    fn default() -> Self {
-        SearchConfig {
-            time_out_ms: 10000,
-            minimum_num_taregt_cols: 0,
-            max_expansions: 1000000000,
-            min_row_id: 0,
-            max_row_id: 0,
-            seed: 41,
-        }
-    }
 }
 
 pub fn load_config(path: &std::path::Path) -> anyhow::Result<SearchConfig> {
@@ -210,19 +178,12 @@ where
     let start_time = time::Instant::now();
 
     let (verification_status, global_count) = run_parallel_solver(
-        &constraint_info.constraints,
-        &constraint_info.refinable_cols,
-        &constraint_info.range_types,
+        &constraint_info,
         base_abs_main_trace_data,
         public_vals,
-        search_config.max_expansions,
-        search_config.minimum_num_taregt_cols,
-        search_config.min_row_id,
-        search_config.max_row_id,
+        search_config,
         align_pc_to_program,
         final_check,
-        constraint_info.prime,
-        search_config.seed,
         &mut known_solution,
         &mut ui,
         &mut terminal,
