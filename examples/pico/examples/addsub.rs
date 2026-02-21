@@ -11,8 +11,10 @@ use pico_vm::chips::chips::alu::add_sub::AddSubChip;
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::quick::{experiment_harness, generate_report, load_config, Args, ProgramInfo};
-use latticevm::solver::dummy_adjust_pc_programgit;
+use latticevm::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
+use latticevm::solver::dummy_adjust_pc_program;
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{canonicalizer::save_repr_if_unique, ui::UiState};
@@ -61,7 +63,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -136,7 +138,9 @@ fn main() -> Result<(), io::Error> {
         println!("({} {}), {:?}", x, y, result);
         ds.push(result.unwrap());
     }
-    println!("{:?}", generate_report(&ds));
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    write_output(args, search_config, report);
 
     Ok(())
 }

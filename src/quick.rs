@@ -38,7 +38,7 @@ pub struct Args {
     #[arg(long)]
     pub config: PathBuf,
     #[arg(long, default_value = "output.yaml")]
-    pub ouptput: PathBuf,
+    pub ouptput_path: PathBuf,
     #[arg(long, default_value = "bb")]
     pub method: String,
     #[arg(long, default_value = "none")]
@@ -244,4 +244,24 @@ pub fn generate_report(results: &[VerificationResult]) -> ResultReport {
         exe_time_mean,
         exe_time_variance,
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct OutputBundle {
+    pub config: SearchConfig,
+    pub args: Args,
+    pub report: ResultReport,
+}
+
+pub fn write_output(args: Args, config: SearchConfig, report: ResultReport) -> anyhow::Result<()> {
+    let mut file = File::create(&args.ouptput_path)?;
+    let bundle = OutputBundle {
+        config,
+        args,
+        report,
+    };
+    let yaml = serde_yaml::to_string(&bundle)?;
+    file.write_all(yaml.as_bytes())?;
+
+    Ok(())
 }
