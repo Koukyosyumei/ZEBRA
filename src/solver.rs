@@ -293,13 +293,13 @@ pub struct ConstraintInfo {
 /// * Evaluation is sequential within this function.
 /// * Heuristic potentials are computed to guide future exploration.
 /// * Randomization helps avoid pathological search orderings.
-fn process_single_node(
+fn process_single_node<AlignPcToProgramFn>(
     head: SearchNode,
     public_trace: AbstractTrace,
     constraints: &LatticeVMConstraints,
     prime: u32,
     rng: &mut StdRng,
-    align_pc_to_program: Option<&impl Fn(&mut AbstractTrace, u32)>,
+    align_pc_to_program: Option<&AlignPcToProgramFn>,
     refinment_target_indicies_main: &Vec<usize>,
     bool_target_indices: &[usize],
     min_row_id: usize,
@@ -307,7 +307,10 @@ fn process_single_node(
     conditional_var_sub_const_constraints: &[(usize, usize, i64)],
     eq_constraints: &[(usize, usize, usize)],
     abir_constraints: &[AbirConstraint],
-) -> NodeProcessingResult {
+) -> NodeProcessingResult
+where
+    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
+{
     let mut main_trace = head.main_trace;
 
     // 1. Initial Refinements (ABIR, Conditional, etc.)
