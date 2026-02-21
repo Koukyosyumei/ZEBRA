@@ -112,13 +112,13 @@ where
                     cv(&s.values[17]),
                 ];
 
+                // ALU Constraints
                 let tmps = vec![
                     (Opcode::ADD as u8, WordOp::Add),
                     (Opcode::SUB as u8, WordOp::SubU),
                     (Opcode::MUL as u8, WordOp::Mul),
                     (Opcode::MULH as u8, WordOp::MulH),
                     (Opcode::MULHU as u8, WordOp::MulHU),
-                    //(Opcode::MULHSU as u8, WordOp::MulHSU),
                     (Opcode::SLT as u8, WordOp::SLt),
                     (Opcode::SLTU as u8, WordOp::SLt),
                     (Opcode::AND as u8, WordOp::And),
@@ -140,6 +140,35 @@ where
                             Box::new(impl_constraint),
                         ));
                     }
+
+                    let pc_constraint = LExpr::Sub(
+                        Box::new(next_pc.clone()),
+                        Box::new(LExpr::Add(
+                            Box::new(pc.clone()),
+                            Box::new(LExpr::Constant(AbstractInterval::from_i64(4))),
+                        )),
+                    );
+                    let impl_pc_constraint =
+                        make_impl_constraint(t.0 as i64, &opcode, pc_constraint, prime);
+                    if let Some(impl_pc_constraint) = impl_pc_constraint {
+                        air_constraints.push(LExpr::Mul(
+                            Box::new(multiplicities.clone()),
+                            Box::new(impl_pc_constraint),
+                        ));
+                    }
+                }
+
+                // Branch Constraints
+                let tmps = vec![
+                    (Opcode::BEQ as u8, WordOp::Add),
+                    (Opcode::BGE as u8, WordOp::SubU),
+                    (Opcode::BLT as u8, WordOp::Mul),
+                    (Opcode::BNE as u8, WordOp::Mul),
+                ];
+                for t in tmps {
+                    let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
+                    let impl_constraint =
+                        make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
 
                     let pc_constraint = LExpr::Sub(
                         Box::new(next_pc.clone()),

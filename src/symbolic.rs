@@ -7,9 +7,9 @@ use serde::Serialize;
 
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 use crate::wordop::{
-    reconstruct_symbolic_word, word_add, word_and, word_div, word_ltu, word_mul, word_mulhs,
-    word_mulhu, word_mult, word_multu, word_neq, word_or, word_sdiv, word_slt, word_srl, word_sub,
-    word_subu, word_xor,
+    reconstruct_symbolic_word, word_add, word_and, word_div, word_eq, word_ltu, word_mul,
+    word_mulhs, word_mulhu, word_mult, word_multu, word_neq, word_or, word_sdiv, word_slt,
+    word_srl, word_sub, word_subu, word_xor,
 };
 
 /// Identifies the source and temporal position of a symbolic value within the
@@ -680,7 +680,7 @@ impl LatticeVMSymbolicExpr {
                 let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
                 let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
-                word_or(&b_ais, &c_ais)
+                word_eq(&b_ais, &c_ais)
             }
             Self::WordNEq(b, c) => {
                 let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
