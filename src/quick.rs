@@ -13,6 +13,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
+use serde::Serialize;
 
 use crate::smt::expr_to_smt_bv;
 use crate::solver::{run_parallel_solver, ConstraintInfo, SearchConfig, VerificationStatus};
@@ -32,7 +33,7 @@ pub fn load_config(path: &std::path::Path) -> anyhow::Result<SearchConfig> {
     Ok(cfg)
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Serialize)]
 pub struct Args {
     #[arg(long)]
     pub config: PathBuf,
@@ -208,7 +209,7 @@ pub fn mean_variance(durations: &[std::time::Duration]) -> (std::time::Duration,
     (std::time::Duration::from_secs_f64(mean), variance)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct ResultReport {
     pub success_ratio: f64,
     pub exe_time_mean: f64,

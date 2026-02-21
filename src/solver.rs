@@ -11,7 +11,7 @@ use priority_queue::PriorityQueue;
 use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::shrinker::{
     apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
@@ -203,7 +203,7 @@ pub enum VerificationStatus {
     Interrupted,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(default)]
 pub struct SearchConfig {
     pub num_workers: usize,
