@@ -11,8 +11,8 @@ use pico_vm::chips::chips::alu::add_sub::AddSubChip;
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::quick::{experiment_harness, generate_report, load_config, Args, ProgramInfo};
+use latticevm::solver::dummy_adjust_pc_programgit;
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{canonicalizer::save_repr_if_unique, ui::UiState};
@@ -134,9 +134,9 @@ fn main() -> Result<(), io::Error> {
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap().execution_time);
+        ds.push(result.unwrap());
     }
-    println!("{:?}", mean_variance(&ds));
+    println!("{:?}", generate_report(&ds));
 
     Ok(())
 }

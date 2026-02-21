@@ -207,3 +207,40 @@ pub fn mean_variance(durations: &[std::time::Duration]) -> (std::time::Duration,
 
     (std::time::Duration::from_secs_f64(mean), variance)
 }
+
+#[derive(Debug)]
+pub struct ResultReport {
+    pub success_ratio: f64,
+    pub exe_time_mean: f64,
+    pub exe_time_variance: f64,
+}
+
+pub fn generate_report(results: &[VerificationResult]) -> ResultReport {
+    assert!(!results.is_empty());
+    let n = results.len() as f64;
+
+    let success_ratio = results
+        .iter()
+        .map(|d| {
+            if let VerificationStatus::Verified = d.status {
+                1.0
+            } else {
+                0.0
+            }
+        })
+        .sum::<f64>()
+        / n;
+
+    let xs: Vec<f64> = results
+        .iter()
+        .map(|d| d.execution_time.as_secs_f64())
+        .collect();
+    let exe_time_mean = xs.iter().sum::<f64>() / n;
+    let exe_time_variance = xs.iter().map(|x| (x - exe_time_mean).powi(2)).sum::<f64>() / n;
+
+    ResultReport {
+        success_ratio,
+        exe_time_mean,
+        exe_time_variance,
+    }
+}
