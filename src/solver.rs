@@ -203,9 +203,10 @@ pub enum VerificationStatus {
     Interrupted,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(default)]
 pub struct SearchConfig {
+    pub num_workers: usize,
     pub time_out_ms: u64,
     pub minimum_num_taregt_cols: usize,
     pub max_expansions: usize,
@@ -217,6 +218,7 @@ pub struct SearchConfig {
 impl Default for SearchConfig {
     fn default() -> Self {
         SearchConfig {
+            num_workers: 8,
             time_out_ms: 10000,
             minimum_num_taregt_cols: 0,
             max_expansions: 1000000000,
@@ -516,11 +518,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     refinable_cols: Arc<Vec<usize>>, // Specific to this subset
     range_types: Arc<HashMap<usize, RangeType>>,
     align_pc_to_program: AlignPcToProgramFn,
-    min_row_id: usize,
-    max_row_id: usize,
-    max_expansions: usize,
-    num_workers: usize,
-    seed: u64,
+    search_config: SearchConfig,
     prime: u32,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
@@ -540,7 +538,7 @@ where
 
     for t in &constraints.air_constraints {
         if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = t {
-            for i in min_row_id..(max_row_id + 1) {
+            for i in search_config.min_row_id..(search_config.max_row_id + 1) {
                 let lv = lhs.eval(
                     &initial_node.main_trace.data[i],
                     if i >= initial_node.main_trace.data.len() - 1 {
@@ -573,7 +571,7 @@ where
     for c in conditional_bool_target_indices {
         if !bool_target_indices.contains(&c.1) {
             bool_target_indices.push(c.1.clone());
-            for i in min_row_id..(max_row_id + 1) {
+            for i in search_config.min_row_id..(search_config.max_row_id + 1) {
                 if !initial_node.main_trace.data[i][c.1].is_singleton() {
                     initial_node.main_trace.data[i][c.1] = AbstractInterval::bool();
                 }
@@ -603,7 +601,7 @@ where
         .push(initial_node.clone(), (0, i32::MAX));
 
     // --- 3. SPAWN WORKERS ---
-    for wid in 0..num_workers {
+    for wid in 0..search_config.num_workers {
         let q = queue.clone();
         let aw = active_workers.clone();
         let l_tr = local_trials.clone();
@@ -623,7 +621,7 @@ where
         let c_align = align_pc_to_program.clone();
 
         thread::spawn(move || {
-            let mut rng = StdRng::seed_from_u64(seed + wid as u64);
+            let mut rng = StdRng::seed_from_u64(search_config.seed + wid as u64);
             // Time-based throttling to prevent freezing
             let mut last_ui_update = std::time::Instant::now();
 
@@ -636,7 +634,7 @@ where
                 }
 
                 // Check Max Expansions
-                if l_tr.load(Ordering::Relaxed) >= max_expansions {
+                if l_tr.load(Ordering::Relaxed) >= search_config.max_expansions {
                     sd.store(true, Ordering::Relaxed);
                     let _ = tx.send(SolverMsg::Finished); // Signal main thread
                     aw.fetch_sub(1, Ordering::SeqCst);
@@ -679,8 +677,8 @@ where
                     &c_align,
                     &c_rp,
                     &c_bool,
-                    min_row_id,
-                    max_row_id,
+                    search_config.min_row_id,
+                    search_config.max_row_id,
                     &c_cvsc,
                     &c_cvsv,
                     &c_abir,
@@ -774,7 +772,7 @@ where
                 }
             }
 
-            if local_trials.load(Ordering::SeqCst) >= max_expansions {
+            if local_trials.load(Ordering::SeqCst) >= search_config.max_expansions {
                 shutdown.store(true, Ordering::SeqCst);
                 return (
                     VerificationStatus::ResourceLimitReached,
@@ -818,7 +816,7 @@ where
         // --------------------------------------------------------
         // 4. Check whether all workers finished
         // --------------------------------------------------------
-        if local_trials.load(Ordering::SeqCst) >= max_expansions {
+        if local_trials.load(Ordering::SeqCst) >= search_config.max_expansions {
             return (
                 VerificationStatus::ResourceLimitReached,
                 solution_found,
@@ -940,29 +938,6 @@ where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
-    /*
-        let (verification_status, global_count) = run_parallel_solver(
-            &constraint_info.constraints,
-            &constraint_info.refinable_cols,
-            &constraint_info.range_types,
-            base_abs_main_trace_data,
-            public_vals,
-            search_config.max_expansions,
-            search_config.minimum_num_taregt_cols,
-            search_config.min_row_id,
-            search_config.max_row_id,
-            align_pc_to_program,
-            final_check,
-            constraint_info.prime,
-            search_config.seed,
-            &mut known_solution,
-            &mut ui,
-            &mut terminal,
-            sleep_time,
-            time_out,
-        );
-    */
-
     // Arc wrappers for constant data shared across all subsets
     let shared_constraints = Arc::new(constraint_info.constraints.clone());
     let shared_range_types = Arc::new(constraint_info.range_types.clone());
@@ -1011,11 +986,7 @@ where
                 Arc::new(subset_indices), // Subset specific plan
                 shared_range_types.clone(),
                 align_pc_to_program.clone(),
-                search_config.min_row_id,
-                search_config.max_row_id,
-                search_config.max_expansions,
-                8, // Number of workers (adjust as needed)
-                search_config.seed,
+                search_config.clone(),
                 constraint_info.prime,
                 ui,
                 terminal,
