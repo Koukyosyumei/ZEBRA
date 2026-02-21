@@ -13,17 +13,12 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use serde::Deserialize;
 
 use crate::smt::expr_to_smt_bv;
-use crate::solver::{
-    run_parallel_solver, ConstraintInfo, RangeType, SearchConfig, VerificationStatus,
-};
+use crate::solver::{run_parallel_solver, ConstraintInfo, SearchConfig, VerificationStatus};
 use crate::ui::UiState;
 use crate::{
-    constraint::{add_blocking_constraint, LatticeVMConstraints},
-    interval::AbstractInterval,
-    trace::AbstractTrace,
+    constraint::add_blocking_constraint, interval::AbstractInterval, trace::AbstractTrace,
 };
 
 pub struct ProgramInfo {
@@ -64,7 +59,7 @@ pub fn experiment_harness<FinalCheckFn, AlignPcToProgramFn>(
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     blocked_rows: &Vec<usize>,
-    align_pc_to_program: AlignPcToProgramFn,
+    align_pc_to_program: Option<AlignPcToProgramFn>,
     final_check: FinalCheckFn,
     verification_method: &String,
 ) -> Result<VerificationResult, io::Error>
@@ -154,7 +149,7 @@ pub fn quick_api<FinalCheckFn, AlignPcToProgramFn>(
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     search_config: &SearchConfig,
-    align_pc_to_program: AlignPcToProgramFn,
+    align_pc_to_program: Option<AlignPcToProgramFn>,
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
 ) -> Result<VerificationResult, io::Error>

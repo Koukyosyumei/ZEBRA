@@ -299,7 +299,7 @@ fn process_single_node<AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
     prime: u32,
     rng: &mut StdRng,
-    align_pc_to_program: Option<&AlignPcToProgramFn>,
+    align_pc_to_program: Option<AlignPcToProgramFn>,
     refinment_target_indicies_main: &Vec<usize>,
     bool_target_indices: &[usize],
     min_row_id: usize,
@@ -379,7 +379,7 @@ where
 
     let mut results = Vec::new();
     for mut kid_trace in children {
-        if let Some(align_pc_to_program) = align_pc_to_program {
+        if let Some(ref align_pc_to_program) = align_pc_to_program {
             align_pc_to_program(&mut kid_trace, prime);
         }
         let (res, pot, _) =
@@ -519,7 +519,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     constraints: Arc<LatticeVMConstraints>,
     refinable_cols: Arc<Vec<usize>>, // Specific to this subset
     range_types: Arc<HashMap<usize, RangeType>>,
-    align_pc_to_program: AlignPcToProgramFn,
+    align_pc_to_program: Option<AlignPcToProgramFn>,
     search_config: SearchConfig,
     prime: u32,
     ui: &mut UiState,
@@ -676,7 +676,7 @@ where
                     &c_cons,
                     prime,
                     &mut rng,
-                    Some(&c_align),
+                    c_align.clone(),
                     &c_rp,
                     &c_bool,
                     search_config.min_row_id,
@@ -920,7 +920,7 @@ pub fn run_parallel_solver<FinalCheckFn, AlignPcToProgramFn>(
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     search_config: &SearchConfig,
-    align_pc_to_program: AlignPcToProgramFn,
+    align_pc_to_program: Option<AlignPcToProgramFn>,
     final_check: FinalCheckFn,
     known_solution: &mut HashSet<String>,
     ui: &mut UiState,
