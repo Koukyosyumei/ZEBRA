@@ -85,6 +85,7 @@ pub struct Args {
 pub struct VerificationResult {
     pub status: VerificationStatus,
     pub num_solutions: usize,
+    pub num_total_trials: usize,
     pub execution_time: std::time::Duration,
 }
 
@@ -99,7 +100,7 @@ pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramF
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     verification_method: &String,
-) -> Result<(VerificationResult, usize), io::Error>
+) -> Result<VerificationResult, io::Error>
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -183,14 +184,12 @@ where
             panic!("error: {}", stdout)
         };
 
-        Ok((
-            VerificationResult {
-                status: VerificationStatus::Verified,
-                num_solutions,
-                execution_time: start_time.elapsed() - sleep_time,
-            },
-            0,
-        ))
+        Ok(VerificationResult {
+            status: VerificationStatus::Verified,
+            num_total_trials: 0,
+            num_solutions,
+            execution_time: start_time.elapsed() - sleep_time,
+        })
     }
 }
 
@@ -213,7 +212,7 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
     time_out: Duration,
-) -> Result<(VerificationResult, usize), io::Error>
+) -> Result<VerificationResult, io::Error>
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -262,14 +261,12 @@ where
     )?;
     terminal.show_cursor()?;
 
-    Ok((
-        VerificationResult {
-            status: verification_status,
-            num_solutions: known_solution.len(),
-            execution_time: start_time.elapsed(),
-        },
-        global_count,
-    ))
+    Ok(VerificationResult {
+        status: verification_status,
+        num_total_trials: global_count,
+        num_solutions: known_solution.len(),
+        execution_time: start_time.elapsed(),
+    })
 }
 
 pub fn mean_variance(durations: &[std::time::Duration]) -> (std::time::Duration, f64) {
