@@ -140,7 +140,7 @@ fn main() -> Result<(), io::Error> {
     }
     let report = generate_report(&ds);
     println!("{:?}", report);
-    write_output(args, search_config, report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }
