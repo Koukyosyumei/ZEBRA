@@ -293,13 +293,13 @@ pub struct ConstraintInfo {
 /// * Evaluation is sequential within this function.
 /// * Heuristic potentials are computed to guide future exploration.
 /// * Randomization helps avoid pathological search orderings.
-fn process_single_node<AlignPcToProgramFn>(
+fn process_single_node(
     head: SearchNode,
     public_trace: AbstractTrace,
     constraints: &LatticeVMConstraints,
     prime: u32,
     rng: &mut StdRng,
-    align_pc_to_program: Option<AlignPcToProgramFn>,
+    align_pc_to_program: &impl Fn(&mut AbstractTrace, u32),
     refinment_target_indicies_main: &Vec<usize>,
     bool_target_indices: &[usize],
     min_row_id: usize,
@@ -307,10 +307,7 @@ fn process_single_node<AlignPcToProgramFn>(
     conditional_var_sub_const_constraints: &[(usize, usize, i64)],
     eq_constraints: &[(usize, usize, usize)],
     abir_constraints: &[AbirConstraint],
-) -> NodeProcessingResult
-where
-    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
-{
+) -> NodeProcessingResult {
     let mut main_trace = head.main_trace;
 
     // 1. Initial Refinements (ABIR, Conditional, etc.)
@@ -379,9 +376,7 @@ where
 
     let mut results = Vec::new();
     for mut kid_trace in children {
-        if let Some(ref align_pc_to_program) = align_pc_to_program {
-            align_pc_to_program(&mut kid_trace, prime);
-        }
+        align_pc_to_program(&mut kid_trace, prime);
         let (res, pot, _) =
             eval_constraints(&kid_trace, Some(&public_trace.data[0]), constraints, prime);
 
@@ -519,7 +514,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     constraints: Arc<LatticeVMConstraints>,
     refinable_cols: Arc<Vec<usize>>, // Specific to this subset
     range_types: Arc<HashMap<usize, RangeType>>,
-    align_pc_to_program: Option<AlignPcToProgramFn>,
+    align_pc_to_program: AlignPcToProgramFn,
     search_config: SearchConfig,
     prime: u32,
     ui: &mut UiState,
@@ -676,7 +671,7 @@ where
                     &c_cons,
                     prime,
                     &mut rng,
-                    c_align.clone(),
+                    &c_align,
                     &c_rp,
                     &c_bool,
                     search_config.min_row_id,
@@ -862,7 +857,7 @@ where
 ///
 /// # Parameters
 ///
-/// * `constraint_info` — VM constraint system to satisfy.
+/// * `constraints_info` — VM constraint system to satisfy.
 /// * `base_abs_main_trace_data` — Baseline abstract trace data used as a template.
 /// * `public_vals` — Public input values (single-row trace).
 /// * `search_config` - Search config
@@ -920,7 +915,7 @@ pub fn run_parallel_solver<FinalCheckFn, AlignPcToProgramFn>(
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     search_config: &SearchConfig,
-    align_pc_to_program: Option<AlignPcToProgramFn>,
+    align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     known_solution: &mut HashSet<String>,
     ui: &mut UiState,

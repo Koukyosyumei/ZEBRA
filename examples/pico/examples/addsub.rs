@@ -129,12 +129,12 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            None,
+            dummy_adjust_pc_program,
             final_check,
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap().0.execution_time);
+        ds.push(result.unwrap().execution_time);
     }
     println!("{:?}", mean_variance(&ds));
 

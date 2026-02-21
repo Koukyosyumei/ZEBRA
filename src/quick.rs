@@ -59,7 +59,7 @@ pub fn experiment_harness<FinalCheckFn, AlignPcToProgramFn>(
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     blocked_rows: &Vec<usize>,
-    align_pc_to_program: Option<AlignPcToProgramFn>,
+    align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     verification_method: &String,
 ) -> Result<VerificationResult, io::Error>
@@ -149,7 +149,7 @@ pub fn quick_api<FinalCheckFn, AlignPcToProgramFn>(
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     search_config: &SearchConfig,
-    align_pc_to_program: Option<AlignPcToProgramFn>,
+    align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
 ) -> Result<VerificationResult, io::Error>

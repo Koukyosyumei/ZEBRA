@@ -25,8 +25,7 @@ use pico_vm::{
 
 use latticevm::constraint::LatticeVMConstraints;
 use latticevm::interval::AbstractInterval;
-use latticevm::quick::ConstraintInfo;
-use latticevm::solver::prepare_constraints_and_range_type;
+use latticevm::solver::{prepare_constraints_and_range_type, ConstraintInfo};
 use latticevm::symbolic::{
     make_impl_constraint, GeneralLookupInfo, LatticeVMSymbolicExpr as LVSExpr,
 };
