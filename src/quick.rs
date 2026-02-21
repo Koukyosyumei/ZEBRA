@@ -150,7 +150,7 @@ where
 
 pub fn quick_api<FinalCheckFn, AlignPcToProgramFn>(
     program_str: String,
-    constraint_info: &mut ConstraintInfo,
+    constraint_info: &ConstraintInfo,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     search_config: &SearchConfig,
