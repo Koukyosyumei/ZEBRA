@@ -888,7 +888,7 @@ where
 /// * [`parallel_solve`] — Performs the per-subset parallel search.
 /// * [`make_init_val`] — Initializes column domains.
 /// * [`SearchNode`] — Root node representation.
-pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
+pub fn run_parallel_solver<FinalCheckFn, AlignPcToProgramFn>(
     constraints: &LatticeVMConstraints,
     refinable_cols: &Vec<usize>, // Full plan
     range_types: &HashMap<usize, RangeType>,
@@ -898,8 +898,6 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     minimum_num_taregt_cols: usize,
     min_row_id: usize,
     max_row_id: usize,
-    program_len: usize,
-    program_counter_refine_fn: ProgramCounterRefinFn,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     prime: u32,
@@ -911,7 +909,6 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     time_out: Duration,
 ) -> (VerificationStatus, usize)
 where
-    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
@@ -938,7 +935,6 @@ where
             for i in min_row_id..(max_row_id + 1) {
                 for c in &subset_indices {
                     abs_main_trace_data[i][*c] = make_init_val(*c, range_types, prime);
-                    program_counter_refine_fn(&mut abs_main_trace_data, program_len, i, *c);
                 }
             }
 

@@ -89,20 +89,18 @@ pub struct VerificationResult {
     pub execution_time: std::time::Duration,
 }
 
-pub fn experiment_harness<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
+pub fn experiment_harness<FinalCheckFn, AlignPcToProgramFn>(
     program_info: &ProgramInfo,
     constraint_info: &mut ConstraintInfo,
     search_config: &SearchConfig,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     blocked_rows: &Vec<usize>,
-    program_counter_refine_fn: ProgramCounterRefinFn,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     verification_method: &String,
 ) -> Result<VerificationResult, io::Error>
 where
-    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
@@ -123,7 +121,6 @@ where
     if verification_method == "bb" {
         quick_api(
             program_info.program_str.clone(),
-            program_info.program_len,
             &constraint_info.constraints,
             &constraint_info.refinable_cols,
             &constraint_info.range_types,
@@ -135,7 +132,6 @@ where
             search_config.min_row_id,
             search_config.max_row_id,
             search_config.seed,
-            program_counter_refine_fn,
             align_pc_to_program,
             final_check,
             &mut sleep_time,
@@ -193,9 +189,8 @@ where
     }
 }
 
-pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
+pub fn quick_api<FinalCheckFn, AlignPcToProgramFn>(
     program_str: String,
-    program_len: usize,
     constraints: &LatticeVMConstraints,
     refinable_cols: &Vec<usize>,
     range_types: &HashMap<usize, RangeType>,
@@ -207,14 +202,12 @@ pub fn quick_api<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
     min_row_id: usize,
     max_row_id: usize,
     seed: u64,
-    program_counter_refine_fn: ProgramCounterRefinFn,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
     time_out: Duration,
 ) -> Result<VerificationResult, io::Error>
 where
-    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
@@ -240,8 +233,6 @@ where
         minimum_num_taregt_cols,
         min_row_id,
         max_row_id,
-        program_len,
-        program_counter_refine_fn,
         align_pc_to_program,
         final_check,
         prime,
