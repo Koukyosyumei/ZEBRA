@@ -909,7 +909,7 @@ pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgram
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     sleep_time: &mut Duration,
     time_out: Duration,
-) -> VerificationStatus
+) -> (VerificationStatus, usize)
 where
     ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -986,7 +986,10 @@ where
         }
     }
 
-    last_verification_status
+    (
+        last_verification_status,
+        global_count.load(Ordering::SeqCst),
+    )
 }
 
 /// Preprocesses symbolic constraints to determine refinable columns and their
