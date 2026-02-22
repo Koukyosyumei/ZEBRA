@@ -14,7 +14,7 @@ mod tests {
 
     use latticevm_sp1::utils::{extract_constraints_and_range, generate_abstract_trace};
 
-    const prime: u32 = 2_u32.pow(31) - 2_u32.pow(27) + 1;
+    const PRIME: u32 = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     #[test]
     fn test_branch_beq() {
@@ -31,7 +31,7 @@ mod tests {
         // ######################## Extract CPU Constraints ##########################
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, prime);
+            extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -43,12 +43,12 @@ mod tests {
         public_vals[44] = AbstractInterval::one();
 
         let mut at = AbstractTrace::new(base_abs_main_trace_data);
-        let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, prime);
+        let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, PRIME);
         assert!(result.0 == MayBeFlag::True);
 
         at.data[2][6] = AbstractInterval::from_i64(16);
         public_vals[41] = AbstractInterval::from_i64(16);
-        let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, prime);
+        let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, PRIME);
         assert!(result.0 == MayBeFlag::False);
     }
 
@@ -67,7 +67,7 @@ mod tests {
         // ######################## Extract CPU Constraints ##########################
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, prime);
+            extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -79,12 +79,12 @@ mod tests {
         public_vals[44] = AbstractInterval::one();
 
         let mut at = AbstractTrace::new(base_abs_main_trace_data);
-        let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, prime);
+        let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, PRIME);
         assert!(result.0 == MayBeFlag::True);
 
         at.data[2][6] = AbstractInterval::from_i64(16);
         public_vals[41] = AbstractInterval::from_i64(16);
-        let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, prime);
+        let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, PRIME);
         assert!(result.0 == MayBeFlag::False);
     }
 }
