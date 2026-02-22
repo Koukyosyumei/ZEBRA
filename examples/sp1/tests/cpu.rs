@@ -2,28 +2,17 @@
 mod tests {
     use p3_baby_bear::BabyBear;
 
-    use sp1_core_executor::syscalls::SyscallCode;
     use sp1_core_executor::{Instruction, Opcode, Program};
-    use sp1_core_machine::{
-        cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
-        cpu::CpuChip,
-    };
+    use sp1_core_machine::{cpu::columns::NUM_CPU_COLS, cpu::CpuChip};
     use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
 
     use latticevm::constraint::eval_constraints;
     use latticevm::interval::AbstractInterval;
     use latticevm::interval::MayBeFlag;
-    use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
-    use latticevm::solver::dummy_program_counter_refine_fn;
-    use latticevm::state::AbstractState;
-    use latticevm::trace::AbstractTrace;
-    use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
-    use latticevm::utils::create_or_clear_dir;
 
-    use latticevm_sp1::pv_constraints::get_pv_constraints;
-    use latticevm_sp1::utils::{
-        extract_constraints_and_range, generate_abstract_trace, get_program_str,
-    };
+    use latticevm::trace::AbstractTrace;
+
+    use latticevm_sp1::utils::{extract_constraints_and_range, generate_abstract_trace};
 
     const prime: u32 = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
@@ -41,7 +30,7 @@ mod tests {
 
         // ######################## Extract CPU Constraints ##########################
         let air = CpuChip::default();
-        let (mut constraint_info, general_lookup_info) =
+        let (constraint_info, _general_lookup_info) =
             extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, prime);
 
         // ######################## Program Initialization ###########################
@@ -77,7 +66,7 @@ mod tests {
 
         // ######################## Extract CPU Constraints ##########################
         let air = CpuChip::default();
-        let (mut constraint_info, general_lookup_info) =
+        let (constraint_info, _general_lookup_info) =
             extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, prime);
 
         // ######################## Program Initialization ###########################
