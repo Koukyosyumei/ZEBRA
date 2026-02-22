@@ -167,6 +167,7 @@ where
                     (Opcode::BLT as u8, ControFLowOp::BLT),
                     (Opcode::BGEU as u8, ControFLowOp::BGEU),
                     (Opcode::BLTU as u8, ControFLowOp::BLTU),
+                    (Opcode::JAL as u8, ControFLowOp::JAL),
                 ];
                 for t in tmps {
                     let cf_constraints =
