@@ -22,6 +22,7 @@ pub enum WordOp {
     Or,
     Xor,
     Lt,
+    SLe,
     SLt,
     SRL,
     Eq,
@@ -161,6 +162,13 @@ pub fn get_alu_constraint(
         WordOp::Lt => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
             Box::new(LatticeVMSymbolicExpr::WordLt(
+                b.clone().map(|f| Box::new(f)),
+                c.clone().map(|f| Box::new(f)),
+            )),
+        ),
+        WordOp::SLe => LatticeVMSymbolicExpr::Sub(
+            Box::new(a_word),
+            Box::new(LatticeVMSymbolicExpr::WordSLe(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
@@ -455,6 +463,19 @@ pub fn word_ltu(a: &Word, b: &Word) -> AbstractInterval {
     let b = word_to_unsigned(b);
 
     if a.hi < b.lo {
+        AbstractInterval { lo: 1, hi: 1 }
+    } else if a.lo >= b.hi {
+        AbstractInterval { lo: 0, hi: 0 }
+    } else {
+        AbstractInterval { lo: 0, hi: 1 }
+    }
+}
+
+pub fn word_sle(a: &Word, b: &Word) -> AbstractInterval {
+    let a = word_to_unsigned(a).to_signed(WORD_BITS);
+    let b = word_to_unsigned(b).to_signed(WORD_BITS);
+
+    if a.hi <= b.lo {
         AbstractInterval { lo: 1, hi: 1 }
     } else if a.lo >= b.hi {
         AbstractInterval { lo: 0, hi: 0 }

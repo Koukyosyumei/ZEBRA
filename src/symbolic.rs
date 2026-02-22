@@ -8,8 +8,8 @@ use serde::Serialize;
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 use crate::wordop::{
     reconstruct_symbolic_word, word_add, word_and, word_div, word_eq, word_ltu, word_mul,
-    word_mulhs, word_mulhu, word_mult, word_multu, word_neq, word_or, word_sdiv, word_slt,
-    word_srl, word_sub, word_subu, word_xor,
+    word_mulhs, word_mulhu, word_mult, word_multu, word_neq, word_or, word_sdiv, word_sle,
+    word_slt, word_srl, word_sub, word_subu, word_xor,
 };
 
 /// Identifies the source and temporal position of a symbolic value within the
@@ -228,6 +228,7 @@ pub enum LatticeVMSymbolicExpr {
     WordDiv([Box<Self>; 4], [Box<Self>; 4]),
     WordSDiv([Box<Self>; 4], [Box<Self>; 4]),
     WordLt([Box<Self>; 4], [Box<Self>; 4]),
+    WordSLe([Box<Self>; 4], [Box<Self>; 4]),
     WordSLt([Box<Self>; 4], [Box<Self>; 4]),
     WordAnd([Box<Self>; 4], [Box<Self>; 4]),
     WordOr([Box<Self>; 4], [Box<Self>; 4]),
@@ -338,6 +339,11 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::WordSLt(b, c) => write!(
                 f,
                 "[{}, {}, {}, {}] <_s [{}, {}, {}, {}]",
+                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
+            ),
+            Self::WordSLe(b, c) => write!(
+                f,
+                "[{}, {}, {}, {}] <=_s [{}, {}, {}, {}]",
                 b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
             ),
             Self::WordAnd(b, c) => write!(
@@ -651,6 +657,12 @@ impl LatticeVMSymbolicExpr {
                 let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
                 word_ltu(&b_ais, &c_ais)
+            }
+            Self::WordSLe(b, c) => {
+                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
+                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
+
+                word_sle(&b_ais, &c_ais)
             }
             Self::WordSLt(b, c) => {
                 let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));

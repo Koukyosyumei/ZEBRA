@@ -5,8 +5,10 @@ use crate::wordop::reconstruct_symbolic_word;
 #[derive(Debug)]
 pub enum ControFLowOp {
     BEQ,
+    BGT,
     BGE,
     BGEU,
+    BLE,
     BLT,
     BLTU,
     BNE,
@@ -79,6 +81,44 @@ pub fn get_control_flow_constraint(
             ),
             LExpr::WhenNonZero(
                 Box::new(LExpr::WordSLt(a_box, b_box)),
+                Box::new(LExpr::Sub(
+                    Box::new(next_pc.clone()),
+                    Box::new(LExpr::Add(
+                        Box::new(pc.clone()),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                    )),
+                )),
+            ),
+        ],
+        ControFLowOp::BGT => vec![
+            LExpr::WhenZero(
+                Box::new(LExpr::WordSLe(a_box.clone(), b_box.clone())),
+                Box::new(LExpr::Sub(
+                    Box::new(next_pc.clone()),
+                    Box::new(LExpr::Add(Box::new(pc.clone()), Box::new(c_expr))),
+                )),
+            ),
+            LExpr::WhenNonZero(
+                Box::new(LExpr::WordSLe(a_box, b_box)),
+                Box::new(LExpr::Sub(
+                    Box::new(next_pc.clone()),
+                    Box::new(LExpr::Add(
+                        Box::new(pc.clone()),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                    )),
+                )),
+            ),
+        ],
+        ControFLowOp::BLE => vec![
+            LExpr::WhenNonZero(
+                Box::new(LExpr::WordSLe(a_box.clone(), b_box.clone())),
+                Box::new(LExpr::Sub(
+                    Box::new(next_pc.clone()),
+                    Box::new(LExpr::Add(Box::new(pc.clone()), Box::new(c_expr))),
+                )),
+            ),
+            LExpr::WhenZero(
+                Box::new(LExpr::WordSLe(a_box, b_box)),
                 Box::new(LExpr::Sub(
                     Box::new(next_pc.clone()),
                     Box::new(LExpr::Add(
