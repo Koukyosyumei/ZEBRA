@@ -14,6 +14,7 @@ pub enum ControFLowOp {
     BNE,
     JAL,
     JALR,
+    Jumpi,
 }
 
 pub fn get_control_flow_constraint(
@@ -185,6 +186,7 @@ pub fn get_control_flow_constraint(
                 )),
             ),
         ],
+        ControFLowOp::Jumpi => vec![LExpr::Sub(Box::new(next_pc.clone()), Box::new(b_expr))],
         ControFLowOp::JAL => vec![LExpr::Sub(
             Box::new(next_pc.clone()),
             Box::new(LExpr::Add(Box::new(pc.clone()), Box::new(b_expr))),

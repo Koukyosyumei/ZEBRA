@@ -272,6 +272,9 @@ where
                     (Opcode::BGTZ as u8, ControFLowOp::BGT),
                     (Opcode::BLEZ as u8, ControFLowOp::BLE),
                     (Opcode::BLTZ as u8, ControFLowOp::BLT),
+                    (Opcode::Jump as u8, ControFLowOp::Jumpi),
+                    (Opcode::Jumpi as u8, ControFLowOp::Jumpi),
+                    (Opcode::JumpDirect as u8, ControFLowOp::JAL),
                 ];
                 for t in tmps {
                     let cf_constraints =
