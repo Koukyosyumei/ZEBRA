@@ -162,9 +162,11 @@ where
                 // Branch Constraints
                 let tmps = vec![
                     (Opcode::BEQ as u8, ControFLowOp::BEQ),
+                    (Opcode::BNE as u8, ControFLowOp::BNE),
                     (Opcode::BGE as u8, ControFLowOp::BGE),
                     (Opcode::BLT as u8, ControFLowOp::BLT),
-                    (Opcode::BNE as u8, ControFLowOp::BNE),
+                    (Opcode::BGEU as u8, ControFLowOp::BGEU),
+                    (Opcode::BLTU as u8, ControFLowOp::BLTU),
                 ];
                 for t in tmps {
                     let cf_constraints =
