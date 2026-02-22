@@ -25,7 +25,8 @@ pub fn get_control_flow_constraint(
 ) -> Vec<LExpr> {
     let a_box = a.clone().map(|f| Box::new(f));
     let b_box = b.clone().map(|f| Box::new(f));
-    let a_expr = reconstruct_symbolic_word(a, 0);
+    let c_box = c.clone().map(|f| Box::new(f));
+    //let a_expr = reconstruct_symbolic_word(a, 0);
     let b_expr = reconstruct_symbolic_word(b, 0);
     let c_expr = reconstruct_symbolic_word(c, 0);
 
@@ -150,7 +151,7 @@ pub fn get_control_flow_constraint(
         )],
         ControFLowOp::JALR => vec![LExpr::Sub(
             Box::new(next_pc.clone()),
-            Box::new(LExpr::WordAdd(a_box, b_box)),
+            Box::new(LExpr::WordAdd(b_box, c_box)),
         )],
     }
 }
