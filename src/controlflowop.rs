@@ -26,6 +26,7 @@ pub fn get_control_flow_constraint(
     let a_box = a.clone().map(|f| Box::new(f));
     let b_box = b.clone().map(|f| Box::new(f));
     let a_expr = reconstruct_symbolic_word(a, 0);
+    let b_expr = reconstruct_symbolic_word(b, 0);
     let c_expr = reconstruct_symbolic_word(c, 0);
 
     match op {
@@ -145,7 +146,7 @@ pub fn get_control_flow_constraint(
         ],
         ControFLowOp::JAL => vec![LExpr::Sub(
             Box::new(next_pc.clone()),
-            Box::new(LExpr::Add(Box::new(pc.clone()), Box::new(a_expr))),
+            Box::new(LExpr::Add(Box::new(pc.clone()), Box::new(b_expr))),
         )],
         ControFLowOp::JALR => vec![LExpr::Sub(
             Box::new(next_pc.clone()),
