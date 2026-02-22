@@ -1,16 +1,16 @@
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-    use std::collections::HashSet;
-    use std::fs;
-    use std::io;
+    
+    
+    
+    
 
     use p3_koala_bear::KoalaBear;
 
-    use zkm_core_executor::syscalls::SyscallCode;
+    
     use zkm_core_executor::{Instruction, Opcode, Program};
     use zkm_core_machine::{
-        cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
+        cpu::columns::NUM_CPU_COLS,
         CpuChip,
     };
     use zkm_stark::MachineProver;
@@ -19,14 +19,14 @@ mod tests {
     use latticevm::constraint::eval_constraints;
     use latticevm::interval::AbstractInterval;
     use latticevm::interval::MayBeFlag;
-    use latticevm::quick::quick_api;
-    use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-    use latticevm::state::AbstractState;
-    use latticevm::{constraint::LatticeVMConstraints, trace::AbstractTrace};
+    
+    
+    
+    use latticevm::trace::AbstractTrace;
 
-    use latticevm_ziren::utils::get_pv_constraints;
+    
     use latticevm_ziren::utils::{
-        extract_constraints_and_range, generate_abstract_trace, get_program_str,
+        extract_constraints_and_range, generate_abstract_trace,
     };
 
     const PRIME: u32 = 2_u32.pow(31) - 2_u32.pow(24) + 1;
@@ -44,7 +44,7 @@ mod tests {
         }
 
         let air = CpuChip::default();
-        let (mut constraint_info, _general_lookup_info) =
+        let (constraint_info, _general_lookup_info) =
             extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
 
         // ######################## Program Initialization ###########################
@@ -78,7 +78,7 @@ mod tests {
         }
 
         let air = CpuChip::default();
-        let (mut constraint_info, _general_lookup_info) =
+        let (constraint_info, _general_lookup_info) =
             extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
 
         // ######################## Program Initialization ###########################
@@ -112,7 +112,7 @@ mod tests {
         }
 
         let air = CpuChip::default();
-        let (mut constraint_info, _general_lookup_info) =
+        let (constraint_info, _general_lookup_info) =
             extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
 
         // ######################## Program Initialization ###########################
