@@ -294,7 +294,7 @@ mod tests {
         public_vals[41] = AbstractInterval::from_i64(16);
         public_vals[44] = AbstractInterval::one();
 
-        let mut at = AbstractTrace::new(base_abs_main_trace_data);
+        let at = AbstractTrace::new(base_abs_main_trace_data);
         let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, PRIME);
         assert!(result.0 == MayBeFlag::True);
     }
@@ -361,7 +361,7 @@ mod tests {
         public_vals[41] = AbstractInterval::from_i64(16);
         public_vals[44] = AbstractInterval::one();
 
-        let mut at = AbstractTrace::new(base_abs_main_trace_data);
+        let at = AbstractTrace::new(base_abs_main_trace_data);
         let result = eval_constraints(&at, Some(&public_vals), &constraint_info.constraints, PRIME);
         assert!(result.0 == MayBeFlag::True);
     }
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn test_branch_jal() {
         fn target_program(pc_start: u32, pc_base: u32) -> Program {
-            let mut instructions = vec![Instruction::new(Opcode::JAL, 29, 9, 0, true, true)];
+            let instructions = vec![Instruction::new(Opcode::JAL, 29, 9, 0, true, true)];
 
             Program::new(instructions, pc_start, pc_base)
         }
@@ -402,7 +402,7 @@ mod tests {
     #[test]
     fn test_branch_jalr() {
         fn target_program(pc_start: u32, pc_base: u32) -> Program {
-            let mut instructions = vec![
+            let instructions = vec![
                 Instruction::new(Opcode::ADD, 28, 0, 8, false, true),
                 Instruction::new(Opcode::JALR, 29, 28, 8, false, true),
             ];
@@ -438,7 +438,7 @@ mod tests {
     #[test]
     fn test_branch_jalr_allignment() {
         fn target_program(pc_start: u32, pc_base: u32) -> Program {
-            let mut instructions = vec![
+            let instructions = vec![
                 Instruction::new(Opcode::ADD, 28, 0, 8, false, true),
                 Instruction::new(Opcode::JALR, 29, 28, 16, false, true),
             ];
