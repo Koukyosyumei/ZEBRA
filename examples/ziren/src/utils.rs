@@ -13,15 +13,18 @@ use zkm_stark::{
     CpuProver, LookupBuilder, LookupKind, MachineProver, ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS,
 };
 
-use latticevm::alu::{get_alu_constraint, WordOp};
+use latticevm::constraint::LatticeVMConstraints;
+use latticevm::controlflowop::get_control_flow_constraint;
+use latticevm::controlflowop::ControFLowOp;
 use latticevm::interval::AbstractInterval;
-use latticevm::quick::ConstraintInfo;
 use latticevm::solver::prepare_constraints_and_range_type;
+use latticevm::solver::ConstraintInfo;
+use latticevm::symbolic::GeneralLookupInfo;
 use latticevm::symbolic::{
-    make_impl_constraint, LatticeVMConstraints, LatticeVMSymbolicEntry,
-    LatticeVMSymbolicExpr as LVSExpr, LatticeVMSymbolicVal,
+    make_impl_constraint, LatticeVMSymbolicEntry, LatticeVMSymbolicExpr as LVSExpr,
+    LatticeVMSymbolicVal,
 };
-use latticevm::utils::GeneralLookupInfo;
+use latticevm::wordop::{get_alu_constraint, WordOp};
 
 use crate::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col as cv};
 
@@ -133,6 +136,7 @@ pub fn get_symbolic_lookup_constraints<F, A>(
     u8_cols: &mut Vec<usize>,
     u16_cols: &mut Vec<usize>,
     multiplicities: &mut HashSet<usize>,
+    air_constraints: &mut Vec<LVSExpr>,
     lookup_constraints: &mut Vec<LVSExpr>,
     received_vars_from_cpu: &mut HashSet<usize>,
     prime: u32,
@@ -186,6 +190,8 @@ where
                 general_lookup_info.pc_table_is_real = multiplicities.clone();
             }
             LookupKind::Instruction => {
+                let next_pc = cv(&s.values[3]);
+                let next_next_pc = cv(&s.values[4]);
                 let opcode = cv(&s.values[6]);
                 let a = [
                     cv(&s.values[7]),
@@ -212,6 +218,7 @@ where
                     cv(&s.values[22]),
                 ];
 
+                // ALU constraints
                 for t in [
                     (Opcode::ADD as u8, WordOp::Add),
                     (Opcode::SUB as u8, WordOp::SubU),
@@ -238,6 +245,46 @@ where
                             Box::new(multiplicities.clone()),
                             Box::new(impl_constraint),
                         ));
+                    }
+
+                    let pc_constraint = LVSExpr::Sub(
+                        Box::new(next_next_pc.clone()),
+                        Box::new(LVSExpr::Add(
+                            Box::new(next_pc.clone()),
+                            Box::new(LVSExpr::Constant(AbstractInterval::from_i64(4))),
+                        )),
+                    );
+                    let impl_pc_constraint =
+                        make_impl_constraint(t.0 as i64, &opcode, pc_constraint, prime);
+                    if let Some(impl_pc_constraint) = impl_pc_constraint {
+                        air_constraints.push(LVSExpr::Mul(
+                            Box::new(multiplicities.clone()),
+                            Box::new(impl_pc_constraint),
+                        ));
+                    }
+                }
+
+                // Branch Constraints
+                let tmps = vec![
+                    (Opcode::BEQ as u8, ControFLowOp::BEQ),
+                    (Opcode::BNE as u8, ControFLowOp::BNE),
+                    (Opcode::BGEZ as u8, ControFLowOp::BGE),
+                    (Opcode::BGTZ as u8, ControFLowOp::BGT),
+                    (Opcode::BLEZ as u8, ControFLowOp::BLE),
+                    (Opcode::BLTZ as u8, ControFLowOp::BLT),
+                ];
+                for t in tmps {
+                    let cf_constraints =
+                        get_control_flow_constraint(&next_pc, &next_next_pc, &a, &b, &c, &t.1, 4);
+
+                    for cfc in cf_constraints {
+                        let impl_constraint = make_impl_constraint(t.0 as i64, &opcode, cfc, prime);
+                        if let Some(impl_constraint) = impl_constraint {
+                            air_constraints.push(LVSExpr::Mul(
+                                Box::new(multiplicities.clone()),
+                                Box::new(impl_constraint),
+                            ));
+                        }
                     }
                 }
             }
@@ -310,6 +357,10 @@ where
 
     let symbolic_constraints: Vec<SymbolicExpression<F>> =
         get_symbolic_constraints(air, 0, ZKM_PROOF_NUM_PV_ELTS);
+    let mut air_constraints = symbolic_constraints
+        .iter()
+        .map(|sc| convert_p3_expr::<F>(&sc))
+        .collect::<Vec<_>>();
     let general_lookup_info = get_symbolic_lookup_constraints::<F, A>(
         air,
         0,
@@ -317,15 +368,11 @@ where
         &mut u8_cols,
         &mut u16_cols,
         &mut multiplicities,
+        &mut air_constraints,
         &mut lookup_constraints,
         &mut received_vars_from_cpu,
         prime,
     );
-
-    let mut air_constraints = symbolic_constraints
-        .iter()
-        .map(|sc| convert_p3_expr::<F>(&sc))
-        .collect::<Vec<_>>();
 
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         num_cols,
