@@ -9,6 +9,7 @@ use sp1_core_executor::Opcode;
 use sp1_stark::InteractionBuilder;
 use sp1_stark::InteractionKind;
 
+use latticevm::controlflowop::{get_control_flow_constraint, ControFLowOp};
 use latticevm::interval::AbstractInterval;
 use latticevm::symbolic::make_impl_constraint;
 use latticevm::symbolic::GeneralLookupInfo;
@@ -160,30 +161,23 @@ where
 
                 // Branch Constraints
                 let tmps = vec![
-                    (Opcode::BEQ as u8, WordOp::Add),
-                    (Opcode::BGE as u8, WordOp::SubU),
-                    (Opcode::BLT as u8, WordOp::Mul),
-                    (Opcode::BNE as u8, WordOp::Mul),
+                    (Opcode::BEQ as u8, ControFLowOp::BEQ),
+                    (Opcode::BGE as u8, ControFLowOp::BGE),
+                    (Opcode::BLT as u8, ControFLowOp::BLT),
+                    (Opcode::BNE as u8, ControFLowOp::BNE),
                 ];
                 for t in tmps {
-                    let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
-                    let impl_constraint =
-                        make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+                    let cf_constraints =
+                        get_control_flow_constraint(&pc, &next_pc, &a, &b, &c, &t.1, 4);
 
-                    let pc_constraint = LExpr::Sub(
-                        Box::new(next_pc.clone()),
-                        Box::new(LExpr::Add(
-                            Box::new(pc.clone()),
-                            Box::new(LExpr::Constant(AbstractInterval::from_i64(4))),
-                        )),
-                    );
-                    let impl_pc_constraint =
-                        make_impl_constraint(t.0 as i64, &opcode, pc_constraint, prime);
-                    if let Some(impl_pc_constraint) = impl_pc_constraint {
-                        air_constraints.push(LExpr::Mul(
-                            Box::new(multiplicities.clone()),
-                            Box::new(impl_pc_constraint),
-                        ));
+                    for cfc in cf_constraints {
+                        let impl_constraint = make_impl_constraint(t.0 as i64, &opcode, cfc, prime);
+                        if let Some(impl_constraint) = impl_constraint {
+                            air_constraints.push(LExpr::Mul(
+                                Box::new(multiplicities.clone()),
+                                Box::new(impl_constraint),
+                            ));
+                        }
                     }
                 }
             }
