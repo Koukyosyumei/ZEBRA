@@ -1,33 +1,17 @@
 #[cfg(test)]
 mod tests {
-    
-    
-    
-    
-
     use p3_koala_bear::KoalaBear;
 
-    
     use zkm_core_executor::{Instruction, Opcode, Program};
-    use zkm_core_machine::{
-        cpu::columns::NUM_CPU_COLS,
-        CpuChip,
-    };
-    use zkm_stark::MachineProver;
+    use zkm_core_machine::{cpu::columns::NUM_CPU_COLS, CpuChip};
     use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
     use latticevm::constraint::eval_constraints;
     use latticevm::interval::AbstractInterval;
     use latticevm::interval::MayBeFlag;
-    
-    
-    
     use latticevm::trace::AbstractTrace;
 
-    
-    use latticevm_ziren::utils::{
-        extract_constraints_and_range, generate_abstract_trace,
-    };
+    use latticevm_ziren::utils::{extract_constraints_and_range, generate_abstract_trace};
 
     const PRIME: u32 = 2_u32.pow(31) - 2_u32.pow(24) + 1;
 
