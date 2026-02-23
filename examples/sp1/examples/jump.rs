@@ -119,7 +119,7 @@ fn main() -> Result<(), io::Error> {
     for _ in 0..30 {
         let r1: u8 = rng.random_range(0..32);
         let r2: u8 = rng.random_range(0..32);
-        let x: u32 = rng.random_range(0..10000); //1006632960
+        let x: u32 = rng.random_range(0..2_u32.pow(21)); //1006632960
         let y: u32 = rng.random_range(0..10000);
 
         // ######################## Program Initialization ###########################
