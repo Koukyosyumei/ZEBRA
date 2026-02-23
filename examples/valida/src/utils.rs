@@ -99,7 +99,7 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
                         for t in tmps {
                             let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
                             let impl_constraint =
-                                make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+                                make_impl_constraint(t.0 as i128, &opcode, alu_constraint, prime);
 
                             if let Some(impl_constraint) = impl_constraint {
                                 for i in 1..13 {
@@ -255,7 +255,7 @@ pub fn generate_bootstrap_trace_from_program(
             let row = traces.row_mut(i);
             rows.push(
                 row.iter()
-                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .map(|v| AbstractInterval::from_i128(v.as_canonical_u32() as i128))
                     .collect(),
             );
         }
@@ -356,18 +356,18 @@ pub fn make_pc_adjuster(
                 let pc = row[1].as_canonical_u32(prime) as usize;
                 if pc < program.len() {
                     let instr = program[pc];
-                    row[3] = AbstractInterval::from_i64(instr.opcode.into());
-                    row[4] = AbstractInterval::from_i64(instr.operands.0[0].into());
-                    row[5] = AbstractInterval::from_i64(instr.operands.0[1].into());
-                    row[6] = AbstractInterval::from_i64(instr.operands.0[2].into());
-                    row[7] = AbstractInterval::from_i64(instr.operands.0[3].into());
-                    row[8] = AbstractInterval::from_i64(instr.operands.0[4].into());
+                    row[3] = AbstractInterval::from_i128(instr.opcode.into());
+                    row[4] = AbstractInterval::from_i128(instr.operands.0[0].into());
+                    row[5] = AbstractInterval::from_i128(instr.operands.0[1].into());
+                    row[6] = AbstractInterval::from_i128(instr.operands.0[2].into());
+                    row[7] = AbstractInterval::from_i128(instr.operands.0[3].into());
+                    row[8] = AbstractInterval::from_i128(instr.operands.0[4].into());
 
                     if row[3].as_canonical_u32(prime) == 8 {
                         for i in 4..57 {
                             row[i] = AbstractInterval::zero();
                         }
-                        row[24] = AbstractInterval::from_i64(1);
+                        row[24] = AbstractInterval::from_i128(1);
                     }
                 }
             } else {
@@ -388,7 +388,7 @@ pub fn refine_pc_interval(
     if j == 1 {
         abs_main_trace_data[i][j] = AbstractInterval {
             lo: 0,
-            hi: (program_len - 1) as i64,
+            hi: (program_len - 1) as i128,
         };
     }
 }

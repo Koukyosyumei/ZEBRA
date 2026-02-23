@@ -33,24 +33,6 @@ use latticevm_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
 
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let string_representation = format!(
-        "input0: [{}], input1: [{}], output: [{}, 0, 0, 0]",
-        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
-        trace_fmt_with_idxs(trace, 0, &[4, 5, 6, 7]),
-        trace.data[0][11],
-    );
-
-    save_repr_if_unique(&string_representation, known_reprt, ui);
-}
-
 fn get_target_program<Val: StarkField>(opcode: u32, a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let _bytes_per_instr = BYTES_PER_INSTR as i32;
     let a_bytes = a.to_le_bytes();

@@ -229,13 +229,22 @@ where
 
                 let opcode_condition = cv(&opcode);
 
+                /*
+                                   (5, cv(&a1), LVSExpr::SRL(Box::new(cv(&b)), Box::new(cv(&c)))),
+                   (
+                       5,
+                       cv(&a2),
+                       LVSExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
+                   ),
+                */
+
                 let ops = [
                     (0, cv(&a1), LVSExpr::And(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (1, cv(&a1), LVSExpr::Or(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (2, cv(&a1), LVSExpr::Xor(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (3, cv(&a1), LVSExpr::SRL(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (
-                        4,
+                        3,
                         cv(&a2),
                         LVSExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
                     ),
