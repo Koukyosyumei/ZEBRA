@@ -44,7 +44,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
