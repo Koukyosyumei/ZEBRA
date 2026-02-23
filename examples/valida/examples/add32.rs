@@ -80,8 +80,8 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..30 {
-        let x: i32 = rng.r#gen_range(0..0x3C000000);
-        let y: i32 = rng.r#gen();
+        let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
+        let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
 
         // ######################## Program Initialization ###########################
         let program = get_target_program::<BabyBear>(x as i32, y as i32);
