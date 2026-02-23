@@ -58,26 +58,31 @@ impl IntervalMemory {
 
     // ---- READ CHECK ----
     pub fn check_read(&self, addr: &AbstractInterval, val: &AbstractInterval) -> MayBeFlag {
-        let mut any_overlap = false;
+        let zero = AbstractInterval { lo: 0, hi: 0 };
+
         let mut all_contained = true;
         let mut all_disjoint = true;
 
+        // ---- 既存セグメントとの重なり ----
         for seg in &self.segs {
             if seg.addr.is_intersects(addr) {
-                any_overlap = true;
-
                 if !val.is_contains(&seg.value) {
                     all_contained = false;
                 }
-
                 if !seg.value.is_disjoint(val) {
                     all_disjoint = false;
                 }
             }
         }
 
-        if !any_overlap {
-            return MayBeFlag::MayBe; // 初期値不明
+        // ---- 未書き込み部分（= 0） ----
+        if !self.covers(addr) {
+            if !val.is_contains(&zero) {
+                all_contained = false;
+            }
+            if !zero.is_disjoint(val) {
+                all_disjoint = false;
+            }
         }
 
         if all_contained {
@@ -87,6 +92,31 @@ impl IntervalMemory {
         } else {
             MayBeFlag::MayBe
         }
+    }
+
+    // addr 全体が write で覆われているか
+    fn covers(&self, addr: &AbstractInterval) -> bool {
+        let mut covered_lo = addr.lo;
+
+        let mut segs: Vec<_> = self
+            .segs
+            .iter()
+            .filter(|s| s.addr.is_intersects(addr))
+            .collect();
+
+        segs.sort_by_key(|s| s.addr.lo);
+
+        for s in segs {
+            if s.addr.lo > covered_lo {
+                return false;
+            }
+            covered_lo = covered_lo.max(s.addr.hi + 1);
+            if covered_lo > addr.hi {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
@@ -114,5 +144,257 @@ fn combine(a: &MayBeFlag, b: &MayBeFlag) -> MayBeFlag {
         (MayBeFlag::False, _) | (_, MayBeFlag::False) => MayBeFlag::False,
         (MayBeFlag::MayBe, _) | (_, MayBeFlag::MayBe) => MayBeFlag::MayBe,
         _ => MayBeFlag::True,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn iv(lo: i64, hi: i64) -> AbstractInterval {
+        AbstractInterval { lo, hi }
+    }
+
+    // =========================================================
+    // write tests
+    // =========================================================
+
+    #[test]
+    fn write_into_empty_memory() {
+        let mut mem = IntervalMemory::new();
+        mem.write(&iv(10, 20), &iv(1, 1));
+
+        assert_eq!(mem.segs.len(), 1);
+        assert_eq!(mem.segs[0].addr, iv(10, 20));
+        assert_eq!(mem.segs[0].value, iv(1, 1));
+    }
+
+    #[test]
+    fn write_non_overlapping_keeps_both() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 9), &iv(1, 1));
+        mem.write(&iv(20, 29), &iv(2, 2));
+
+        assert_eq!(mem.segs.len(), 2);
+    }
+
+    #[test]
+    fn write_overwrites_middle_and_splits() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 99), &iv(1, 1));
+        mem.write(&iv(20, 29), &iv(2, 2));
+
+        assert_eq!(mem.segs.len(), 3);
+
+        assert_eq!(mem.segs[0].addr, iv(0, 19));
+        assert_eq!(mem.segs[0].value, iv(1, 1));
+        assert_eq!(mem.segs[1].addr, iv(30, 99));
+        assert_eq!(mem.segs[1].value, iv(1, 1));
+        assert_eq!(mem.segs[2].addr, iv(20, 29));
+        assert_eq!(mem.segs[2].value, iv(2, 2));
+    }
+
+    #[test]
+    fn write_full_overwrite() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 99), &iv(1, 1));
+        mem.write(&iv(0, 99), &iv(2, 2));
+
+        assert_eq!(mem.segs.len(), 1);
+        assert_eq!(mem.segs[0].value, iv(2, 2));
+    }
+
+    #[test]
+    fn write_partial_overlap_left() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(10, 30), &iv(1, 1));
+        mem.write(&iv(0, 15), &iv(2, 2));
+
+        assert_eq!(mem.segs.len(), 2);
+
+        assert_eq!(mem.segs[0].addr, iv(16, 30));
+        assert_eq!(mem.segs[0].value, iv(1, 1));
+        assert_eq!(mem.segs[1].addr, iv(0, 15));
+        assert_eq!(mem.segs[1].value, iv(2, 2));
+    }
+
+    // =========================================================
+    // check_read tests
+    // =========================================================
+
+    #[test]
+    fn read_from_empty_memory_is_true() {
+        let mem = IntervalMemory::new();
+
+        let r = mem.check_read(&iv(0, 10), &iv(0, 0));
+        assert_eq!(r, MayBeFlag::True);
+    }
+
+    fn read_from_empty_memory_is_false() {
+        let mem = IntervalMemory::new();
+
+        let r = mem.check_read(&iv(0, 10), &iv(5, 5));
+        assert_eq!(r, MayBeFlag::False);
+    }
+
+    fn read_from_empty_memory_is_maybe() {
+        let mem = IntervalMemory::new();
+
+        let r = mem.check_read(&iv(0, 10), &iv(0, 5));
+        assert_eq!(r, MayBeFlag::MayBe);
+    }
+
+    #[test]
+    fn read_exact_match_true() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 9), &iv(7, 7));
+
+        let r = mem.check_read(&iv(0, 9), &iv(7, 7));
+        assert_eq!(r, MayBeFlag::True);
+    }
+
+    #[test]
+    fn read_value_superset_true() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 9), &iv(5, 10));
+
+        let r = mem.check_read(&iv(0, 9), &iv(0, 20));
+        assert_eq!(r, MayBeFlag::True);
+    }
+
+    #[test]
+    fn read_disjoint_false() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 9), &iv(10, 20));
+
+        let r = mem.check_read(&iv(0, 9), &iv(0, 5));
+        assert_eq!(r, MayBeFlag::False);
+    }
+
+    #[test]
+    fn read_partial_overlap_maybe() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 9), &iv(10, 20));
+
+        let r = mem.check_read(&iv(0, 9), &iv(15, 30));
+        assert_eq!(r, MayBeFlag::MayBe);
+    }
+
+    #[test]
+    fn read_multiple_segments_all_valid_true() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 9), &iv(1, 1));
+        mem.write(&iv(10, 19), &iv(2, 2));
+
+        let r = mem.check_read(&iv(0, 19), &iv(0, 5));
+        assert_eq!(r, MayBeFlag::True);
+    }
+
+    #[test]
+    fn read_multiple_segments_some_invalid_maybe() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 9), &iv(1, 1));
+        mem.write(&iv(10, 19), &iv(100, 100));
+
+        let r = mem.check_read(&iv(0, 19), &iv(0, 10));
+        assert_eq!(r, MayBeFlag::MayBe);
+    }
+
+    #[test]
+    fn read_multiple_segments_all_invalid_false() {
+        let mut mem = IntervalMemory::new();
+
+        mem.write(&iv(0, 9), &iv(100, 100));
+        mem.write(&iv(10, 19), &iv(200, 200));
+
+        let r = mem.check_read(&iv(0, 19), &iv(0, 50));
+        assert_eq!(r, MayBeFlag::False);
+    }
+
+    // =========================================================
+    // check_memory_consistency tests
+    // =========================================================
+
+    #[test]
+    fn simple_write_then_read_true() {
+        let ops = vec![(iv(0, 9), iv(5, 5), true), (iv(0, 9), iv(5, 5), false)];
+
+        assert_eq!(check_memory_consistency(&ops), MayBeFlag::True);
+    }
+
+    #[test]
+    fn read_wrong_value_false() {
+        let ops = vec![(iv(0, 9), iv(5, 5), true), (iv(0, 9), iv(6, 6), false)];
+
+        assert_eq!(check_memory_consistency(&ops), MayBeFlag::False);
+    }
+
+    #[test]
+    fn read_possible_value_maybe() {
+        let ops = vec![(iv(0, 9), iv(5, 10), true), (iv(0, 9), iv(8, 20), false)];
+
+        assert_eq!(check_memory_consistency(&ops), MayBeFlag::MayBe);
+    }
+
+    #[test]
+    fn multiple_writes_last_one_counts() {
+        let ops = vec![
+            (iv(0, 9), iv(1, 1), true),
+            (iv(0, 9), iv(2, 2), true),
+            (iv(0, 9), iv(2, 2), false),
+        ];
+
+        assert_eq!(check_memory_consistency(&ops), MayBeFlag::True);
+    }
+
+    #[test]
+    fn read_uninitialized_maybe() {
+        let ops = vec![(iv(0, 9), iv(5, 5), false)];
+
+        assert_eq!(check_memory_consistency(&ops), MayBeFlag::False);
+    }
+
+    #[test]
+    fn mixed_reads_true_overall() {
+        let ops = vec![
+            (iv(0, 9), iv(1, 1), true),
+            (iv(0, 9), iv(1, 1), false),
+            (iv(0, 9), iv(1, 1), false),
+        ];
+
+        assert_eq!(check_memory_consistency(&ops), MayBeFlag::True);
+    }
+
+    #[test]
+    fn mixed_reads_with_maybe() {
+        let ops = vec![
+            (iv(0, 9), iv(1, 10), true),
+            (iv(0, 9), iv(5, 5), false),
+            (iv(0, 9), iv(20, 30), false), // impossible
+        ];
+
+        assert_eq!(check_memory_consistency(&ops), MayBeFlag::False);
+    }
+
+    #[test]
+    fn complex_sequence() {
+        let ops = vec![
+            (iv(0, 49), iv(1, 1), true),
+            (iv(50, 99), iv(2, 2), true),
+            (iv(0, 99), iv(0, 5), false),  // both valid
+            (iv(25, 75), iv(1, 2), false), // both valid
+        ];
+
+        assert_eq!(check_memory_consistency(&ops), MayBeFlag::True);
     }
 }
