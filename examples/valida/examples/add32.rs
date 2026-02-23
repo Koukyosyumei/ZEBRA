@@ -29,12 +29,23 @@ use latticevm_valida::utils::{
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let _bytes_per_instr = BYTES_PER_INSTR as i32;
+    let a_bytes = a.to_le_bytes();
 
     let mut program = vec![];
     program.extend([
         InstructionWord {
+            opcode: <Imm32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            operands: Operands([
+                -4,
+                a_bytes[0] as i32,
+                a_bytes[1] as i32,
+                a_bytes[2] as i32,
+                a_bytes[3] as i32,
+            ]),
+        },
+        InstructionWord {
             opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-8, a, b, 1, 1]),
+            operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
             opcode: <StopInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,

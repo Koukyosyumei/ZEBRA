@@ -73,12 +73,19 @@ fn final_check(
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
+    let a_bytes = a.to_le_bytes();
 
     let mut program = vec![];
     program.extend([
         InstructionWord {
             opcode: <Imm32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-4, a, 0, 0, 0]),
+            operands: Operands([
+                -4,
+                a_bytes[0] as i32,
+                a_bytes[1] as i32,
+                a_bytes[2] as i32,
+                a_bytes[3] as i32,
+            ]),
         },
         InstructionWord {
             opcode: <Lt32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,

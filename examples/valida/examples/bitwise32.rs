@@ -32,12 +32,19 @@ use latticevm_valida::utils::{
 
 fn get_target_program<Val: StarkField>(opcode: u32, a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let _bytes_per_instr = BYTES_PER_INSTR as i32;
+    let a_bytes = a.to_le_bytes();
 
     let mut program = vec![];
     program.extend([
         InstructionWord {
             opcode: <Imm32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-4, a, 0, 0, 0]),
+            operands: Operands([
+                -4,
+                a_bytes[0] as i32,
+                a_bytes[1] as i32,
+                a_bytes[2] as i32,
+                a_bytes[3] as i32,
+            ]),
         },
         InstructionWord {
             opcode: opcode,
@@ -96,8 +103,8 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..30 {
-        let x: u8 = rng.r#gen();
-        let y: u8 = rng.r#gen();
+        let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
+        let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
 
         // ######################## Program Initialization ###########################
         let program = get_target_program::<BabyBear>(

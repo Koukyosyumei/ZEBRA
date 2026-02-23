@@ -305,6 +305,12 @@ where
         general_lookup_info.op_a.extend([*i, *j, *k, *el]);
     }
 
+    if let [a, b, c, d, e, f, g, h, i] = received_vars_from_cpu.as_slice() {
+        general_lookup_info.op_b.extend([*a, *b, *c, *d]);
+        general_lookup_info.op_c.extend([*e, *f, *g, *h]);
+        general_lookup_info.op_a.extend([*i]);
+    }
+
     let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));

@@ -17,15 +17,16 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
+use latticevm::canonicalizer::generate_alu_final_checker;
+use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::save_repr_if_unique;
+use latticevm::trace::trace_fmt_with_idxs;
+use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
-use latticevm::utils::trace_fmt_with_idxs;
 
 use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::{
@@ -52,12 +53,19 @@ fn final_check(
 
 fn get_target_program<Val: StarkField>(opcode: u32, a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let _bytes_per_instr = BYTES_PER_INSTR as i32;
+    let a_bytes = a.to_le_bytes();
 
     let mut program = vec![];
     program.extend([
         InstructionWord {
             opcode: <Imm32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-4, a, 0, 0, 0]),
+            operands: Operands([
+                -4,
+                a_bytes[0] as i32,
+                a_bytes[1] as i32,
+                a_bytes[2] as i32,
+                a_bytes[3] as i32,
+            ]),
         },
         InstructionWord {
             opcode: opcode,
@@ -99,10 +107,11 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 9;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (mut constraint_info, _general_lookup_info) =
+    let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
+    let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info.refinable_cols.extend(&[11]);
     constraint_info.output_columns.push(11);
     if search_config.minimum_num_taregt_cols == 0 {
