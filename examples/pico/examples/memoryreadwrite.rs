@@ -37,12 +37,16 @@ pub fn target_program_load(
     opcode: Opcode,
     pc_start: u32,
     pc_base: u32,
-    reg: u32,
+    r1: u32,
+    r2: u32,
     x: u32,
+    y: u32,
+    z: u32,
 ) -> Program {
     let instructions = vec![
-        Instruction::new(Opcode::SW, reg, 0, x, false, true),
-        Instruction::new(opcode, reg, 0, x, false, true),
+        Instruction::new(Opcode::ADD, r1, 0, x, false, true),
+        Instruction::new(Opcode::SW, r1, 0, y, false, true),
+        Instruction::new(opcode, r1, 0, y, false, true),
     ];
     Program::new(instructions, pc_start, pc_base)
 }
@@ -51,12 +55,16 @@ pub fn target_program_store(
     opcode: Opcode,
     pc_start: u32,
     pc_base: u32,
-    reg: u32,
+    r1: u32,
+    r2: u32,
     x: u32,
+    y: u32,
+    z: u32,
 ) -> Program {
     let instructions = vec![
-        Instruction::new(Opcode::ADD, reg, 0, x, false, true),
-        Instruction::new(opcode, reg, 0, x, false, true),
+        Instruction::new(Opcode::ADD, r1, 0, x, false, true),
+        Instruction::new(Opcode::ADD, r2, 0, y, false, true),
+        Instruction::new(opcode, r1, r2, z, false, true),
     ];
     Program::new(instructions, pc_start, pc_base)
 }
@@ -131,14 +139,17 @@ fn main() -> Result<(), io::Error> {
     for i in 0..30 {
         search_config.seed += i;
 
-        let reg: u32 = rng.random_range(0..32);
-        let x: u32 = rng.random_range(0..32513);
+        let r1: u32 = rng.random_range(0..32);
+        let r2: u32 = rng.random_range(0..32);
+        let x: u32 = rng.random();
+        let y: u32 = rng.random_range(0..32513);
+        let z: u32 = rng.random_range(0..32513);
 
         // ######################## Program Initialization ###########################
         let program = if is_load {
-            target_program_load(opcode, 4, 4, reg, x)
+            target_program_load(opcode, 4, 4, r1, r2, x, y, z)
         } else {
-            target_program_store(opcode, 4, 4, reg, x)
+            target_program_store(opcode, 4, 4, r1, r2, x, y, z)
         };
         let num_extracted_rows = if is_load { 2 } else { 1 };
         let base_abs_main_trace_data =
@@ -166,7 +177,7 @@ fn main() -> Result<(), io::Error> {
             &final_check,
             &args.method,
         );
-        println!("({} {}), {:?}", reg, x, result);
+        println!("({} {} {} {} {}), {:?}", r1, r2, x, y, z, result);
         ds.push(result.unwrap());
     }
     let report = generate_report(&ds);
