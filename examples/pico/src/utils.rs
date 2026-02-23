@@ -44,7 +44,12 @@ pub fn run_pico_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInter
         None,
     );
     // runtime.state.input_stream.push(vec![2, 0, 0, 0]);
-    let batch_records = runtime.run(None).unwrap().0;
+    let batch_records_result = runtime.run(None);
+    if batch_records_result.is_err() {
+        return vec![];
+    }
+
+    let batch_records = batch_records_result.unwrap().0;
     let chunk = &batch_records[0];
 
     let mut chips_and_main_traces = riscv_machine
