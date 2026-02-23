@@ -8,13 +8,13 @@ use sp1_core_executor::{Instruction, Opcode, Program};
 use sp1_core_machine::alu::NUM_SHIFT_RIGHT_COLS;
 use sp1_core_machine::riscv::ShiftRightChip;
 
+use latticevm::canonicalizer::generate_alu_final_checker;
+use latticevm::constraint::eval_constraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::eval_constraints;
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::generate_alu_final_checker;
+use latticevm::trace::AbstractTrace;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_sp1::utils::{
@@ -38,7 +38,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -87,7 +87,6 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_program_counter_refine_fn,
             dummy_adjust_pc_program,
             &final_check,
             &args.method,

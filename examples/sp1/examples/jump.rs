@@ -50,8 +50,23 @@ const fn make_col_map() -> JumpColumns<usize> {
     unsafe { transmute::<[usize; NUM_JUMP_COLS], JumpColumns<usize>>(indices_arr) }
 }
 
-pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::JAL, x, y, 0, true, true)];
+pub fn target_program(
+    opcode: Opcode,
+    pc_start: u32,
+    pc_base: u32,
+    r1: u8,
+    r2: u8,
+    x: u32,
+    y: u32,
+) -> Program {
+    let mut instructions = if let Opcode::JAL = opcode {
+        vec![Instruction::new(Opcode::JAL, r1, x, 0, true, true)]
+    } else {
+        vec![
+            Instruction::new(Opcode::ADD, r1, 0, x, false, true),
+            Instruction::new(Opcode::JALR, r2, r1 as u32, y, false, true),
+        ]
+    };
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -102,11 +117,13 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..30 {
-        let x: u8 = rng.random_range(0..32);
-        let y: u32 = rng.random_range(0..prime);
+        let r1: u8 = rng.random_range(0..32);
+        let r2: u8 = rng.random_range(0..32);
+        let x: u32 = rng.random_range(0..10000); //1006632960
+        let y: u32 = rng.random_range(0..10000);
 
         // ######################## Program Initialization ###########################
-        let program = target_program(get_opcode(&opcode_str), 8, 8, x, y);
+        let program = target_program(get_opcode(&opcode_str), 8, 8, r1, r2, x, y);
         let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
         // ######################## Set Info ##########################################
@@ -127,7 +144,7 @@ fn main() -> Result<(), io::Error> {
             &final_check,
             &args.method,
         );
-        println!("({} {}), {:?}", x, y, result);
+        println!("({} {} {} {}), {:?}", r1, r2, x, y, result);
         ds.push(result.unwrap());
     }
     let report = generate_report(&ds);
