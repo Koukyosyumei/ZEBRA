@@ -33,12 +33,8 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
     let mut program = vec![];
     program.extend([
         InstructionWord {
-            opcode: <Imm32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-4, a, 0, 0, 0]),
-        },
-        InstructionWord {
             opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-8, -4, b, 0, 1]),
+            operands: Operands([-8, a, b, 1, 1]),
         },
         InstructionWord {
             opcode: <StopInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
@@ -84,8 +80,8 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..30 {
-        let x: u8 = rng.r#gen();
-        let y: u8 = rng.r#gen();
+        let x: i32 = rng.r#gen_range(0..0x3C000000);
+        let y: i32 = rng.r#gen();
 
         // ######################## Program Initialization ###########################
         let program = get_target_program::<BabyBear>(x as i32, y as i32);

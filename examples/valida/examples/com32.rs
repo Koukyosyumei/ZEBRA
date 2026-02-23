@@ -84,7 +84,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -105,39 +105,53 @@ fn main() -> Result<(), io::Error> {
         );
     constraint_info.refinable_cols.extend(&[11]);
     constraint_info.output_columns.push(11);
-
-    // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>(get_opcode_addsub::<BabyBear>(&opcode_str), 3, 4);
-    let program_str = program
-        .iter()
-        .map(|inst| format!("{}\n", inst))
-        .collect::<String>();
-    let base_abs_main_trace_data =
-        generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
-
-    // ######################## Set Info ##########################################
-    let program_info = ProgramInfo {
-        program_str: program_str,
-        program_len: program.len(),
-    };
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 2; //constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
-    // ######################## Solve ############################################
-    let result = experiment_harness(
-        &program_info,
-        &mut constraint_info,
-        &search_config,
-        &base_abs_main_trace_data,
-        vec![],
-        &vec![], // vec![0],
-        dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
-        final_check,
-        &args.method,
-    );
-    println!("{:?}", result);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
+    let mut ds = vec![];
+    for _ in 0..30 {
+        let x: u8 = rng.r#gen();
+        let y: u8 = rng.r#gen();
+
+        // ######################## Program Initialization ###########################
+        let program = get_target_program::<BabyBear>(
+            get_opcode_addsub::<BabyBear>(&opcode_str),
+            x as i32,
+            y as i32,
+        );
+        let program_str = program
+            .iter()
+            .map(|inst| format!("{}\n", inst))
+            .collect::<String>();
+        let base_abs_main_trace_data =
+            generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
+
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: program_str,
+            program_len: program.len(),
+        };
+
+        // ######################## Solve ############################################
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            vec![],
+            &vec![], // vec![0],
+            dummy_adjust_pc_program,
+            &final_check,
+            &args.method,
+        );
+        println!("({} {}), {:?}", x, y, result);
+        ds.push(result.unwrap());
+    }
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }
