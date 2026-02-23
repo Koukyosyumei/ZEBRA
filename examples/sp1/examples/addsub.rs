@@ -11,14 +11,15 @@ use sp1_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
 use sp1_core_machine::riscv::AddSubChip;
 use sp1_stark::MachineProver;
 
+use latticevm::canonicalizer::save_repr_if_unique;
+use latticevm::constraint::LatticeVMConstraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::ui::save_repr_if_unique;
+use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
-use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -72,7 +73,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -133,9 +134,8 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_program_counter_refine_fn,
             dummy_adjust_pc_program,
-            final_check,
+            &final_check,
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);
