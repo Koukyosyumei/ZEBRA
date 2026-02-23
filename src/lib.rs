@@ -1,5 +1,6 @@
 pub mod canonicalizer;
 pub mod constraint;
+pub mod controlflowop;
 pub mod interval;
 pub mod macros;
 pub mod quick;

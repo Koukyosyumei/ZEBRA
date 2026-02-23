@@ -54,34 +54,45 @@ fn main() -> Result<(), io::Error> {
         .refinable_cols
         .extend(&general_lookup_info.op_a);
     constraint_info.output_columns = general_lookup_info.op_a;
-
-    // ######################## Program Initialization ###########################
-    let program = target_program(4, 4, 1, 2);
-    let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
-
-    // ######################## Set Info ##########################################
-    let program_info = ProgramInfo {
-        program_str: get_program_str(&program),
-        program_len: program.instructions.len(),
-    };
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
     }
 
-    // ######################## Solve ############################################
-    let result = experiment_harness(
-        &program_info,
-        &mut constraint_info,
-        &search_config,
-        &base_abs_main_trace_data,
-        vec![],
-        &vec![], // vec![0],
-        dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
-        final_check,
-        &args.method,
-    );
-    println!("{:?}", result);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
+    let mut ds = vec![];
+    for _ in 0..30 {
+        let x: u32 = rng.random();
+        let y: u32 = rng.random();
+
+        // ######################## Program Initialization ###########################
+        let program = target_program(4, 4, x, y);
+        let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: get_program_str(&program),
+            program_len: program.instructions.len(),
+        };
+
+        // ######################## Solve ############################################
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            vec![],
+            &vec![], // vec![0],
+            dummy_program_counter_refine_fn,
+            dummy_adjust_pc_program,
+            final_check,
+            &args.method,
+        );
+        println!("({} {}), {:?}", x, y, result);
+        ds.push(result.unwrap());
+    }
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }

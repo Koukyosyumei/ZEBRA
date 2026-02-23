@@ -1,7 +1,6 @@
 use clap::Parser;
 use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::HashSet;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -12,8 +11,10 @@ use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
 use latticevm::canonicalizer::generate_alu_final_checker;
-use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
+use latticevm::solver::dummy_adjust_pc_program;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_pico::utils::{
@@ -43,7 +44,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -91,15 +92,16 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_program_counter_refine_fn,
             dummy_adjust_pc_program,
             &final_check,
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap().execution_time);
+        ds.push(result.unwrap());
     }
-    println!("{:?}", mean_variance(&ds));
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }

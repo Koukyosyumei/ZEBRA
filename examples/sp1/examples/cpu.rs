@@ -113,7 +113,7 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = CpuChip::default();
     let air_name = "Cpu";
-    //println!("{:?}", CPU_COL_MAP);
+    println!("{:?}", CPU_COL_MAP);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, CpuChip>(&air, NUM_CPU_COLS, prime);
@@ -156,7 +156,6 @@ fn main() -> Result<(), io::Error> {
         &base_abs_main_trace_data,
         public_vals,
         &vec![], // vec![0],
-        dummy_program_counter_refine_fn,
         adjust_pc_program,
         final_check,
         &args.method,

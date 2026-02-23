@@ -381,6 +381,13 @@ impl AbstractInterval {
         }
     }
 
+    pub fn clear_lsb(self) -> Self {
+        Self {
+            lo: self.lo & !1,
+            hi: self.hi & !1,
+        }
+    }
+
     pub fn shr_carry(self, rhs: Self) -> (Self, Self) {
         if self.lo < 0 || rhs.lo < 0 {
             //panic!("LTU for negative region is not supported. {}", self);

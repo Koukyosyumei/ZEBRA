@@ -11,6 +11,7 @@ use priority_queue::PriorityQueue;
 use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
 use ratatui::{backend::CrosstermBackend, Terminal};
+use serde::{Deserialize, Serialize};
 
 use crate::shrinker::{
     apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
@@ -202,6 +203,42 @@ pub enum VerificationStatus {
     Interrupted,
 }
 
+#[derive(Debug, Deserialize, Clone, Serialize)]
+#[serde(default)]
+pub struct SearchConfig {
+    pub num_workers: usize,
+    pub time_out_ms: u64,
+    pub minimum_num_taregt_cols: usize,
+    pub max_expansions: usize,
+    pub min_row_id: usize,
+    pub max_row_id: usize,
+    pub seed: u64,
+}
+
+impl Default for SearchConfig {
+    fn default() -> Self {
+        SearchConfig {
+            num_workers: 8,
+            time_out_ms: 10000,
+            minimum_num_taregt_cols: 0,
+            max_expansions: 1000000000,
+            min_row_id: 0,
+            max_row_id: 0,
+            seed: 41,
+        }
+    }
+}
+
+pub struct ConstraintInfo {
+    pub constraints: LatticeVMConstraints,
+    pub num_total_columns: usize,
+    pub num_pv_columns: usize,
+    pub output_columns: Vec<usize>,
+    pub refinable_cols: Vec<usize>,
+    pub range_types: HashMap<usize, RangeType>,
+    pub prime: u32,
+}
+
 /// Processes a single search node by applying refinements, generating children,
 /// and evaluating constraints.
 ///
@@ -385,10 +422,7 @@ fn process_single_node(
 /// * `refinable_cols` — Column indices allowed to be refined in this subset.
 /// * `range_types` — Domain specifications for columns.
 /// * `align_pc_to_program` — Callback that adjusts traces to valid program counters.
-/// * `min_row_id`, `max_row_id` — Inclusive row bounds eligible for refinement.
-/// * `max_expansions` — Per-subset limit on node expansions before forced shutdown.
-/// * `num_workers` — Number of worker threads to spawn.
-/// * `seed` — Base RNG seed (worker seeds are derived deterministically).
+/// * `search_config` - Search config
 /// * `prime` — Field modulus.
 /// * `ui` — Mutable UI state for rendering progress and logs.
 /// * `terminal` — Terminal backend used for drawing the UI.
@@ -481,11 +515,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     refinable_cols: Arc<Vec<usize>>, // Specific to this subset
     range_types: Arc<HashMap<usize, RangeType>>,
     align_pc_to_program: AlignPcToProgramFn,
-    min_row_id: usize,
-    max_row_id: usize,
-    max_expansions: usize,
-    num_workers: usize,
-    seed: u64,
+    search_config: SearchConfig,
     prime: u32,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
@@ -494,18 +524,18 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
     global_total_trials: Arc<AtomicUsize>,
     sleep_time: &mut Duration,
     start_time: &std::time::Instant,
-    time_out: Duration,
 ) -> (VerificationStatus, bool, bool)
 // (Found, Quit)
 where
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
 {
+    let time_out = Duration::from_millis(search_config.time_out_ms);
     let mut conditional_bool_target_indices = Vec::<(usize, usize)>::new();
 
     for t in &constraints.air_constraints {
         if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = t {
-            for i in min_row_id..(max_row_id + 1) {
+            for i in search_config.min_row_id..(search_config.max_row_id + 1) {
                 let lv = lhs.eval(
                     &initial_node.main_trace.data[i],
                     if i >= initial_node.main_trace.data.len() - 1 {
@@ -538,7 +568,7 @@ where
     for c in conditional_bool_target_indices {
         if !bool_target_indices.contains(&c.1) {
             bool_target_indices.push(c.1.clone());
-            for i in min_row_id..(max_row_id + 1) {
+            for i in search_config.min_row_id..(search_config.max_row_id + 1) {
                 if !initial_node.main_trace.data[i][c.1].is_singleton() {
                     initial_node.main_trace.data[i][c.1] = AbstractInterval::bool();
                 }
@@ -568,7 +598,7 @@ where
         .push(initial_node.clone(), (0, i32::MAX));
 
     // --- 3. SPAWN WORKERS ---
-    for wid in 0..num_workers {
+    for wid in 0..search_config.num_workers {
         let q = queue.clone();
         let aw = active_workers.clone();
         let l_tr = local_trials.clone();
@@ -588,7 +618,7 @@ where
         let c_align = align_pc_to_program.clone();
 
         thread::spawn(move || {
-            let mut rng = StdRng::seed_from_u64(seed + wid as u64);
+            let mut rng = StdRng::seed_from_u64(search_config.seed + wid as u64);
             // Time-based throttling to prevent freezing
             let mut last_ui_update = std::time::Instant::now();
 
@@ -601,7 +631,7 @@ where
                 }
 
                 // Check Max Expansions
-                if l_tr.load(Ordering::Relaxed) >= max_expansions {
+                if l_tr.load(Ordering::Relaxed) >= search_config.max_expansions {
                     sd.store(true, Ordering::Relaxed);
                     let _ = tx.send(SolverMsg::Finished); // Signal main thread
                     aw.fetch_sub(1, Ordering::SeqCst);
@@ -644,8 +674,8 @@ where
                     &c_align,
                     &c_rp,
                     &c_bool,
-                    min_row_id,
-                    max_row_id,
+                    search_config.min_row_id,
+                    search_config.max_row_id,
                     &c_cvsc,
                     &c_cvsv,
                     &c_abir,
@@ -739,7 +769,7 @@ where
                 }
             }
 
-            if local_trials.load(Ordering::SeqCst) >= max_expansions {
+            if local_trials.load(Ordering::SeqCst) >= search_config.max_expansions {
                 shutdown.store(true, Ordering::SeqCst);
                 return (
                     VerificationStatus::ResourceLimitReached,
@@ -783,7 +813,7 @@ where
         // --------------------------------------------------------
         // 4. Check whether all workers finished
         // --------------------------------------------------------
-        if local_trials.load(Ordering::SeqCst) >= max_expansions {
+        if local_trials.load(Ordering::SeqCst) >= search_config.max_expansions {
             return (
                 VerificationStatus::ResourceLimitReached,
                 solution_found,
@@ -827,20 +857,12 @@ where
 ///
 /// # Parameters
 ///
-/// * `constraints` — VM constraint system to satisfy.
-/// * `refinable_cols` — Full list of columns eligible for refinement.
-/// * `range_types` — Domain specifications for columns.
+/// * `constraints_info` — VM constraint system to satisfy.
 /// * `base_abs_main_trace_data` — Baseline abstract trace data used as a template.
 /// * `public_vals` — Public input values (single-row trace).
-/// * `max_expansions` — Maximum node expansions per subset search.
-/// * `minimum_num_taregt_cols` — Minimum subset size to consider.
-/// * `min_row_id`, `max_row_id` — Inclusive row bounds for refinement.
-/// * `program_len` — Length of the program (used for PC refinement).
-/// * `program_counter_refine_fn` — Callback that refines program counter domains.
+/// * `search_config` - Search config
 /// * `align_pc_to_program` — Callback to align traces to valid program counters.
 /// * `final_check` — Callback invoked when candidate solutions are found.
-/// * `prime` — Field modulus.
-/// * `seed` — RNG seed for deterministic subset ordering.
 /// * `known_solution` — Set used to deduplicate discovered solutions.
 /// * `ui` — Mutable UI state for progress reporting.
 /// * `terminal` — Terminal backend for rendering.
@@ -888,45 +910,40 @@ where
 /// * [`parallel_solve`] — Performs the per-subset parallel search.
 /// * [`make_init_val`] — Initializes column domains.
 /// * [`SearchNode`] — Root node representation.
-pub fn run_parallel_solver<ProgramCounterRefinFn, FinalCheckFn, AlignPcToProgramFn>(
-    constraints: &LatticeVMConstraints,
-    refinable_cols: &Vec<usize>, // Full plan
-    range_types: &HashMap<usize, RangeType>,
+pub fn run_parallel_solver<FinalCheckFn, AlignPcToProgramFn>(
+    constraint_info: &ConstraintInfo,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
-    max_expansions: usize,
-    minimum_num_taregt_cols: usize,
-    min_row_id: usize,
-    max_row_id: usize,
-    program_len: usize,
-    program_counter_refine_fn: ProgramCounterRefinFn,
+    search_config: &SearchConfig,
     align_pc_to_program: AlignPcToProgramFn,
     final_check: FinalCheckFn,
-    prime: u32,
-    seed: u64,
     known_solution: &mut HashSet<String>,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     sleep_time: &mut Duration,
-    time_out: Duration,
-) -> VerificationStatus
+) -> (VerificationStatus, usize)
 where
-    ProgramCounterRefinFn: Fn(&mut Vec<Vec<AbstractInterval>>, usize, usize, usize),
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
     AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
 {
     // Arc wrappers for constant data shared across all subsets
-    let shared_constraints = Arc::new(constraints.clone());
-    let shared_range_types = Arc::new(range_types.clone());
+    let shared_constraints = Arc::new(constraint_info.constraints.clone());
+    let shared_range_types = Arc::new(constraint_info.range_types.clone());
     let global_count = Arc::new(AtomicUsize::new(0));
     let start_time = std::time::Instant::now();
 
-    let mut rng = StdRng::seed_from_u64(seed);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut last_verification_status = VerificationStatus::Interrupted;
 
     // --- OUTER LOOP: Subset Sizes ---
-    'outer: for k in minimum_num_taregt_cols..(refinable_cols.len() + 1) {
-        let mut column_subsets: Vec<_> = refinable_cols.iter().combinations(k).collect();
+    'outer: for k in
+        search_config.minimum_num_taregt_cols..(constraint_info.refinable_cols.len() + 1)
+    {
+        let mut column_subsets: Vec<_> = constraint_info
+            .refinable_cols
+            .iter()
+            .combinations(k)
+            .collect();
         column_subsets.shuffle(&mut rng);
 
         // --- MIDDLE LOOP: Specific Subsets ---
@@ -935,10 +952,10 @@ where
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
             let subset_indices: Vec<usize> = column_subset.iter().cloned().cloned().collect();
 
-            for i in min_row_id..(max_row_id + 1) {
+            for i in search_config.min_row_id..(search_config.max_row_id + 1) {
                 for c in &subset_indices {
-                    abs_main_trace_data[i][*c] = make_init_val(*c, range_types, prime);
-                    program_counter_refine_fn(&mut abs_main_trace_data, program_len, i, *c);
+                    abs_main_trace_data[i][*c] =
+                        make_init_val(*c, &constraint_info.range_types, constraint_info.prime);
                 }
             }
 
@@ -957,12 +974,8 @@ where
                 Arc::new(subset_indices), // Subset specific plan
                 shared_range_types.clone(),
                 align_pc_to_program.clone(),
-                min_row_id,
-                max_row_id,
-                max_expansions,
-                8, // Number of workers (adjust as needed)
-                seed,
-                prime,
+                search_config.clone(),
+                constraint_info.prime,
                 ui,
                 terminal,
                 final_check.clone(),
@@ -970,11 +983,10 @@ where
                 global_count.clone(),
                 sleep_time,
                 &start_time,
-                time_out,
             );
             last_verification_status = status;
 
-            if start_time.elapsed() >= time_out {
+            if let VerificationStatus::TimedOut = last_verification_status {
                 break 'outer;
             }
 
@@ -986,7 +998,10 @@ where
         }
     }
 
-    last_verification_status
+    (
+        last_verification_status,
+        global_count.load(Ordering::SeqCst),
+    )
 }
 
 /// Preprocesses symbolic constraints to determine refinable columns and their

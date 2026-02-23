@@ -13,8 +13,9 @@ use sp1_stark::{
 };
 
 use latticevm::{
-    constraint::LatticeVMConstraints, interval::AbstractInterval, quick::ConstraintInfo,
-    solver::prepare_constraints_and_range_type, symbolic::GeneralLookupInfo,
+    constraint::LatticeVMConstraints, interval::AbstractInterval,
+    solver::prepare_constraints_and_range_type, solver::ConstraintInfo,
+    symbolic::GeneralLookupInfo,
 };
 
 use crate::lookup::get_symbolic_lookup_constraints;
