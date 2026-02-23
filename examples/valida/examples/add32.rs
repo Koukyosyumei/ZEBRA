@@ -15,11 +15,11 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
+use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
@@ -53,7 +53,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let _opcode_str = args.opcode_str;
+    let _opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -84,11 +84,11 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..30 {
-        let x: u32 = rng.random();
-        let y: u32 = rng.random();
+        let x: u8 = rng.r#gen();
+        let y: u8 = rng.r#gen();
 
         // ######################## Program Initialization ###########################
-        let program = get_target_program::<BabyBear>(x, y);
+        let program = get_target_program::<BabyBear>(x as i32, y as i32);
         let program_str = program
             .iter()
             .map(|inst| format!("{}\n", inst))
@@ -111,7 +111,7 @@ fn main() -> Result<(), io::Error> {
             vec![],
             &vec![], // vec![0],
             dummy_adjust_pc_program,
-            final_check,
+            &final_check,
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);

@@ -15,13 +15,14 @@ use valida_machine::{
 use valida_opcodes::Opcode;
 use valida_program::{MachineWithProgramROM, ProgramTableType};
 
-use latticevm::alu::{get_alu_constraint, WordOp};
+use latticevm::constraint::LatticeVMConstraints;
 use latticevm::interval::AbstractInterval;
-use latticevm::quick::ConstraintInfo;
 use latticevm::solver::prepare_constraints_and_range_type;
-use latticevm::symbolic::LatticeVMConstraints;
-use latticevm::symbolic::{make_impl_constraint, AbstractTrace, LatticeVMSymbolicExpr as LVSExpr};
-use latticevm::utils::GeneralLookupInfo;
+use latticevm::solver::ConstraintInfo;
+use latticevm::symbolic::GeneralLookupInfo;
+use latticevm::symbolic::{make_impl_constraint, LatticeVMSymbolicExpr as LVSExpr};
+use latticevm::trace::AbstractTrace;
+use latticevm::wordop::{get_alu_constraint, WordOp};
 
 use crate::config::{get_machine_config, prover_options};
 use crate::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col as cv};
