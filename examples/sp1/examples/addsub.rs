@@ -11,7 +11,9 @@ use sp1_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
 use sp1_core_machine::riscv::AddSubChip;
 use sp1_stark::MachineProver;
 
-use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
+use latticevm::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
@@ -137,9 +139,11 @@ fn main() -> Result<(), io::Error> {
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap().execution_time);
+        ds.push(result.unwrap());
     }
-    println!("{:?}", mean_variance(&ds));
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }

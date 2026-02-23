@@ -10,7 +10,9 @@ use sp1_core_machine::alu::{DivRemCols, NUM_DIVREM_COLS};
 use sp1_core_machine::riscv::DivRemChip;
 
 use latticevm::canonicalizer::{generate_alu_final_checker, save_repr_if_unique};
-use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
+use latticevm::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;

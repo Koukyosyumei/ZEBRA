@@ -18,7 +18,9 @@ use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
 use latticevm::constraint::eval_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
-use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
+use latticevm::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
 use latticevm::solver::dummy_program_counter_refine_fn;
 use latticevm::state::AbstractState;
 use latticevm::trace::AbstractTrace;

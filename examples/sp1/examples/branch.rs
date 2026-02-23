@@ -12,7 +12,9 @@ use sp1_core_machine::control_flow::BranchColumns;
 use sp1_core_machine::control_flow::NUM_BRANCH_COLS;
 use sp1_stark::MachineProver;
 
-use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
+use latticevm::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
 use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
 use latticevm::symbolic::AbstractTrace;
@@ -139,9 +141,11 @@ fn main() -> Result<(), io::Error> {
             &args.method,
         );
         println!("({} {} {}), {:?}", x, y, z, result);
-        ds.push(result.unwrap().execution_time);
+        ds.push(result.unwrap());
     }
-    println!("{:?}", mean_variance(&ds));
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }
