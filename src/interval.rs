@@ -495,6 +495,18 @@ impl AbstractInterval {
         }
     }
 
+    pub fn is_intersects(&self, other: &Self) -> bool {
+        self.lo <= other.hi && other.lo <= self.hi
+    }
+
+    pub fn is_contains(&self, other: &Self) -> bool {
+        self.lo <= other.lo && self.hi >= other.hi
+    }
+
+    pub fn is_disjoint(&self, other: &Self) -> bool {
+        self.hi < other.lo || other.hi < self.lo
+    }
+
     pub fn is_singleton(&self) -> bool {
         self.lo == self.hi
     }

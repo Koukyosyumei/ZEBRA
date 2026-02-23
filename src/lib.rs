@@ -3,6 +3,7 @@ pub mod constraint;
 pub mod controlflowop;
 pub mod interval;
 pub mod macros;
+pub mod memory;
 pub mod quick;
 pub mod shrinker;
 pub mod smt;
