@@ -87,7 +87,7 @@ pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInte
             let row = mt.1.row_mut(i);
             rows.push(
                 row.iter()
-                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .map(|v| AbstractInterval::from_i128(v.as_canonical_u32() as i128))
                     .collect(),
             );
         }
@@ -235,7 +235,7 @@ where
                 ] {
                     let alu_constraint = get_alu_constraint(&a, &b, &c, &hi, &t.1);
                     let impl_constraint =
-                        make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+                        make_impl_constraint(t.0 as i128, &opcode, alu_constraint, prime);
 
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 7..19 {
@@ -251,11 +251,11 @@ where
                         Box::new(next_next_pc.clone()),
                         Box::new(LVSExpr::Add(
                             Box::new(next_pc.clone()),
-                            Box::new(LVSExpr::Constant(AbstractInterval::from_i64(4))),
+                            Box::new(LVSExpr::Constant(AbstractInterval::from_i128(4))),
                         )),
                     );
                     let impl_pc_constraint =
-                        make_impl_constraint(t.0 as i64, &opcode, pc_constraint, prime);
+                        make_impl_constraint(t.0 as i128, &opcode, pc_constraint, prime);
                     if let Some(impl_pc_constraint) = impl_pc_constraint {
                         air_constraints.push(LVSExpr::Mul(
                             Box::new(multiplicities.clone()),
@@ -281,7 +281,8 @@ where
                         get_control_flow_constraint(&next_pc, &next_next_pc, &a, &b, &c, &t.1, 4);
 
                     for cfc in cf_constraints {
-                        let impl_constraint = make_impl_constraint(t.0 as i64, &opcode, cfc, prime);
+                        let impl_constraint =
+                            make_impl_constraint(t.0 as i128, &opcode, cfc, prime);
                         if let Some(impl_constraint) = impl_constraint {
                             air_constraints.push(LVSExpr::Mul(
                                 Box::new(multiplicities.clone()),

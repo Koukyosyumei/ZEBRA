@@ -43,8 +43,8 @@ use crate::{
 /// * `U8`    — Unsigned 8-bit integer domain `[0, 255]`.
 /// * `U16`   — Unsigned 16-bit integer domain `[0, 65535]`.
 /// * `Top`   — Unconstrained domain over the full field (bounded by the modulus).
-/// * `Const(i64)` — A single constant value.
-/// * `Any(i64, i64)` — Explicit inclusive interval `[lo, hi]`.
+/// * `Const(i128)` — A single constant value.
+/// * `Any(i128, i128)` — Explicit inclusive interval `[lo, hi]`.
 ///
 /// # Notes
 ///
@@ -59,8 +59,8 @@ pub enum RangeType {
     U16,
     U7,
     Top,
-    Const(i64),
-    Any(i64, i64),
+    Const(i128),
+    Any(i128, i128),
 }
 
 /// Constructs the initial abstract interval for a given column.
@@ -107,7 +107,7 @@ pub fn make_init_val(
             RangeType::U7 => AbstractInterval { lo: 0, hi: 126 },
             RangeType::U4 => AbstractInterval::u4(),
             RangeType::Top => AbstractInterval::top(prime),
-            RangeType::Const(val) => AbstractInterval::from_i64(*val),
+            RangeType::Const(val) => AbstractInterval::from_i128(*val),
             RangeType::Any(lo, hi) => AbstractInterval { lo: *lo, hi: *hi },
         }
     } else {
@@ -304,7 +304,7 @@ fn process_single_node(
     bool_target_indices: &[usize],
     min_row_id: usize,
     max_row_id: usize,
-    conditional_var_sub_const_constraints: &[(usize, usize, i64)],
+    conditional_var_sub_const_constraints: &[(usize, usize, i128)],
     eq_constraints: &[(usize, usize, usize)],
     abir_constraints: &[AbirConstraint],
 ) -> NodeProcessingResult {

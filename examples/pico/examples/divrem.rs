@@ -70,7 +70,7 @@ fn main() -> Result<(), io::Error> {
         .extend(&general_lookup_info.op_a);
     constraint_info.output_columns = general_lookup_info.op_a;
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
@@ -80,7 +80,7 @@ fn main() -> Result<(), io::Error> {
         let y: u32 = rng.random();
 
         // ######################## Program Initialization ###########################
-        let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, 13, 3);
+        let program = target_program(get_opcode_addsub(&opcode_str), 4, 4, x, y);
         let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
         // ######################## Set Info ##########################################

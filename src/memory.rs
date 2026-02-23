@@ -151,7 +151,7 @@ fn combine(a: &MayBeFlag, b: &MayBeFlag) -> MayBeFlag {
 mod tests {
     use super::*;
 
-    fn iv(lo: i64, hi: i64) -> AbstractInterval {
+    fn iv(lo: i128, hi: i128) -> AbstractInterval {
         AbstractInterval { lo, hi }
     }
 

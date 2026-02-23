@@ -61,7 +61,7 @@ pub fn run_sp1_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterv
             let row = mt.1.row_mut(i);
             rows.push(
                 row.iter()
-                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .map(|v| AbstractInterval::from_i128(v.as_canonical_u32() as i128))
                     .collect(),
             );
         }

@@ -14,12 +14,12 @@ pub enum MayBeFlag {
 
 #[derive(Clone, Hash, Debug, PartialEq, Eq, Serialize)]
 pub struct AbstractInterval {
-    pub lo: i64,
-    pub hi: i64,
+    pub lo: i128,
+    pub hi: i128,
 }
 
 // Helper: Find the mask of bits that vary within the interval [lo, hi]
-pub fn varying_bits(lo: i64, hi: i64) -> u64 {
+pub fn varying_bits(lo: i128, hi: i128) -> u64 {
     if lo == hi {
         return 0;
     }
@@ -27,11 +27,11 @@ pub fn varying_bits(lo: i64, hi: i64) -> u64 {
     if diff == 0 {
         return 0;
     }
-    let msb = 63 - diff.leading_zeros();
+    let msb = 127 - diff.leading_zeros();
     (1u64 << (msb + 1)) - 1
 }
 
-fn div_floor_i64(x: i64, k: i64) -> i64 {
+fn div_floor_i128(x: i128, k: i128) -> i128 {
     debug_assert!(k > 0);
     if x >= 0 {
         x / k
@@ -142,8 +142,8 @@ impl BitAnd<Self> for AbstractInterval {
         };
 
         Self {
-            lo: res_lo as i64,
-            hi: tight_hi as i64,
+            lo: res_lo as i128,
+            hi: tight_hi as i128,
         }
     }
 }
@@ -165,8 +165,8 @@ impl BitOr<Self> for AbstractInterval {
         let res_hi = max_val | var_result;
 
         Self {
-            lo: res_lo as i64,
-            hi: res_hi as i64,
+            lo: res_lo as i128,
+            hi: res_hi as i128,
         }
     }
 }
@@ -188,8 +188,8 @@ impl BitXor<Self> for AbstractInterval {
         let res_hi = base | var_result;
 
         Self {
-            lo: res_lo as i64,
-            hi: res_hi as i64,
+            lo: res_lo as i128,
+            hi: res_hi as i128,
         }
     }
 }
@@ -257,77 +257,77 @@ impl Shr<AbstractInterval> for AbstractInterval {
 impl AbstractInterval {
     pub fn top(prime: u32) -> Self {
         Self {
-            lo: 0,                  //-(prime as i64) / 2,
-            hi: (prime - 1) as i64, //(prime as i64) / 2,
+            lo: 0,                   //-(prime as i128) / 2,
+            hi: (prime - 1) as i128, //(prime as i128) / 2,
         }
     }
 
     pub fn bool() -> Self {
         Self {
-            lo: 0_i64,
-            hi: 1_i64,
+            lo: 0_i128,
+            hi: 1_i128,
         }
     }
 
     pub fn u4() -> Self {
         Self {
-            lo: 0_i64,
-            hi: 15_i64,
+            lo: 0_i128,
+            hi: 15_i128,
         }
     }
 
     pub fn u8() -> Self {
         Self {
-            lo: 0_i64,
-            hi: 255_i64,
+            lo: 0_i128,
+            hi: 255_i128,
         }
     }
 
     pub fn u16() -> Self {
         Self {
-            lo: 0_i64,
-            hi: 65535_i64,
+            lo: 0_i128,
+            hi: 65535_i128,
         }
     }
 
     pub fn i4() -> Self {
         Self {
-            lo: -8_i64,
-            hi: 8_i64,
+            lo: -8_i128,
+            hi: 8_i128,
         }
     }
 
     pub fn i8() -> Self {
         Self {
-            lo: -255_i64,
-            hi: 255_i64,
+            lo: -255_i128,
+            hi: 255_i128,
         }
     }
 
     pub fn zero() -> Self {
         Self {
-            lo: 0_i64,
-            hi: 0_i64,
+            lo: 0_i128,
+            hi: 0_i128,
         }
     }
 
     pub fn one() -> Self {
         Self {
-            lo: 1_i64,
-            hi: 1_i64,
+            lo: 1_i128,
+            hi: 1_i128,
         }
     }
 
-    pub fn from_i64(v: i64) -> Self {
+    pub fn from_i128(v: i128) -> Self {
         Self { lo: v, hi: v }
     }
 
     pub fn as_canonical_u32(&self, prime: u32) -> u32 {
-        let prime_i64 = prime as i64;
-        (((self.lo % prime_i64) + prime_i64) % prime_i64) as u32
+        let prime_i128 = prime as i128;
+        (((self.lo % prime_i128) + prime_i128) % prime_i128) as u32
     }
 
-    pub fn has_multiple_in_range(&self, k: i64) -> bool {
+    pub fn has_multiple_in_range(&self, k: i128) -> bool {
         if self.lo <= 0 && 0 <= self.hi {
             true
         } else {
@@ -337,13 +337,13 @@ impl AbstractInterval {
 
     pub fn is_zero(&self, p: u32) -> MayBeFlag {
         if self.is_singleton() {
-            if self.lo % (p as i64) == 0 {
+            if self.lo % (p as i128) == 0 {
                 return MayBeFlag::True;
             } else {
                 return MayBeFlag::False;
             }
         }
-        if self.has_multiple_in_range(p as i64) {
+        if self.has_multiple_in_range(p as i128) {
             return MayBeFlag::MayBe;
         } else {
             return MayBeFlag::False;
@@ -368,13 +368,13 @@ impl AbstractInterval {
 
     pub fn is_non_zero(&self, p: u32) -> MayBeFlag {
         if self.is_singleton() {
-            if self.lo % (p as i64) != 0 {
+            if self.lo % (p as i128) != 0 {
                 return MayBeFlag::True;
             } else {
                 return MayBeFlag::False;
             }
         }
-        if self.has_multiple_in_range(p as i64) {
+        if self.has_multiple_in_range(p as i128) {
             return MayBeFlag::MayBe;
         } else {
             return MayBeFlag::True;
@@ -392,8 +392,8 @@ impl AbstractInterval {
         if self.lo < 0 || rhs.lo < 0 {
             //panic!("LTU for negative region is not supported. {}", self);
             return (
-                AbstractInterval::from_i64(123456),
-                AbstractInterval::from_i64(123456),
+                AbstractInterval::from_i128(123456),
+                AbstractInterval::from_i128(123456),
             );
             //return AbstractInterval::bool();
         }
@@ -409,8 +409,8 @@ impl AbstractInterval {
         let d = rhs.hi as u32;
 
         // ---- shifted result ----
-        let shift_lo = (a >> d) as i64;
-        let shift_hi = (b >> c) as i64;
+        let shift_lo = (a >> d) as i128;
+        let shift_hi = (b >> c) as i128;
 
         // ---- carry ----
         let carry = if a == b && c == d {
@@ -424,18 +424,18 @@ impl AbstractInterval {
                 a & ((1u64 << s) - 1)
             };
 
-            AbstractInterval::from_i64(carry_val as i64)
+            AbstractInterval::from_i128(carry_val as i128)
         } else if c >= 64 {
             // always full drop
             AbstractInterval {
-                lo: a as i64,
-                hi: b as i64,
+                lo: a as i128,
+                hi: b as i128,
             }
         } else if d >= 64 {
             // may fully drop
             AbstractInterval {
-                lo: a as i64,
-                hi: b as i64,
+                lo: a as i128,
+                hi: b as i128,
             }
         } else if d == 0 {
             AbstractInterval { lo: 0, hi: 0 }
@@ -445,7 +445,7 @@ impl AbstractInterval {
 
             AbstractInterval {
                 lo: 0,
-                hi: hi as i64,
+                hi: hi as i128,
             }
         };
 
@@ -461,7 +461,7 @@ impl AbstractInterval {
     pub fn ltu(&self, rhs: Self) -> AbstractInterval {
         if self.lo < 0 {
             //panic!("LTU for negative region is not supported. {}", self);
-            return AbstractInterval::from_i64(123456);
+            return AbstractInterval::from_i128(123456);
             //return AbstractInterval::bool();
         }
 
@@ -475,11 +475,11 @@ impl AbstractInterval {
         }
     }
 
-    pub fn div_floor(&self, k: i64) -> Self {
+    pub fn div_floor(&self, k: i128) -> Self {
         debug_assert!(k > 0);
 
-        let lo = div_floor_i64(self.lo, k);
-        let hi = div_floor_i64(self.hi, k);
+        let lo = div_floor_i128(self.lo, k);
+        let hi = div_floor_i128(self.hi, k);
 
         AbstractInterval { lo, hi }
     }
@@ -537,7 +537,7 @@ impl AbstractInterval {
         }
     }
 
-    pub fn modulo(&self, m: i64) -> Self {
+    pub fn modulo(&self, m: i128) -> Self {
         if self.lo >= 0 && self.hi < m {
             self.clone()
         } else if self.lo == self.hi {
@@ -551,7 +551,7 @@ impl AbstractInterval {
     }
 
     pub fn to_signed(&self, bits: u32) -> Self {
-        let bound = 1_i64 << bits;
+        let bound = 1_i128 << bits;
         let half = bound >> 1;
 
         if self.lo == self.hi {
@@ -601,12 +601,12 @@ mod tests {
         }
 
         // min以上 max以下の値を返す
-        fn range(&mut self, min: i64, max: i64) -> i64 {
+        fn range(&mut self, min: i128, max: i128) -> i128 {
             let width = (max - min + 1) as u64;
-            (min as u64 + (self.next_u64() % width)) as i64
+            (min as u64 + (self.next_u64() % width)) as i128
         }
 
-        fn gen_positive_interval(&mut self, max_val: i64, max_width: i64) -> AbstractInterval {
+        fn gen_positive_interval(&mut self, max_val: i128, max_width: i128) -> AbstractInterval {
             let lo = self.range(0, max_val);
             let width = self.range(0, max_width);
             AbstractInterval { lo, hi: lo + width }
@@ -621,7 +621,7 @@ mod tests {
         op_conc: FConc,
     ) where
         FAbs: Fn(AbstractInterval, AbstractInterval) -> AbstractInterval,
-        FConc: Fn(i64, i64) -> i64,
+        FConc: Fn(i128, i128) -> i128,
     {
         let res = op_abs(a.clone(), b.clone());
 
@@ -654,7 +654,7 @@ mod tests {
         op_conc: FConc,
     ) where
         FAbs: Fn(AbstractInterval) -> AbstractInterval,
-        FConc: Fn(i64) -> i64,
+        FConc: Fn(i128) -> i128,
     {
         let res = op_abs(a.clone());
         for x in a.lo..=a.hi {
@@ -756,8 +756,8 @@ mod tests {
         // 手動で設定する特定のコーナーケース
 
         // ケース1: シングルトン同士 (2 & 3 = 2)
-        let a = AbstractInterval::from_i64(2);
-        let b = AbstractInterval::from_i64(3);
+        let a = AbstractInterval::from_i128(2);
+        let b = AbstractInterval::from_i128(3);
         assert_eq!((a.clone() & b.clone()).lo, 2);
         assert_eq!((a & b).hi, 2);
 

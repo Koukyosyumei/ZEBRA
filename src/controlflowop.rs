@@ -24,7 +24,7 @@ pub fn get_control_flow_constraint(
     b: &[LExpr; 4],
     c: &[LExpr; 4],
     op: &ControFLowOp,
-    default_step: i64,
+    default_step: i128,
 ) -> Vec<LExpr> {
     let a_box = a.clone().map(|f| Box::new(f));
     let b_box = b.clone().map(|f| Box::new(f));
@@ -48,7 +48,7 @@ pub fn get_control_flow_constraint(
                     Box::new(next_pc.clone()),
                     Box::new(LExpr::Add(
                         Box::new(pc.clone()),
-                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i128(default_step))),
                     )),
                 )),
             ),
@@ -67,7 +67,7 @@ pub fn get_control_flow_constraint(
                     Box::new(next_pc.clone()),
                     Box::new(LExpr::Add(
                         Box::new(pc.clone()),
-                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i128(default_step))),
                     )),
                 )),
             ),
@@ -86,7 +86,7 @@ pub fn get_control_flow_constraint(
                     Box::new(next_pc.clone()),
                     Box::new(LExpr::Add(
                         Box::new(pc.clone()),
-                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i128(default_step))),
                     )),
                 )),
             ),
@@ -105,7 +105,7 @@ pub fn get_control_flow_constraint(
                     Box::new(next_pc.clone()),
                     Box::new(LExpr::Add(
                         Box::new(pc.clone()),
-                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i128(default_step))),
                     )),
                 )),
             ),
@@ -124,7 +124,7 @@ pub fn get_control_flow_constraint(
                     Box::new(next_pc.clone()),
                     Box::new(LExpr::Add(
                         Box::new(pc.clone()),
-                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i128(default_step))),
                     )),
                 )),
             ),
@@ -143,7 +143,7 @@ pub fn get_control_flow_constraint(
                     Box::new(next_pc.clone()),
                     Box::new(LExpr::Add(
                         Box::new(pc.clone()),
-                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i128(default_step))),
                     )),
                 )),
             ),
@@ -162,7 +162,7 @@ pub fn get_control_flow_constraint(
                     Box::new(next_pc.clone()),
                     Box::new(LExpr::Add(
                         Box::new(pc.clone()),
-                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i128(default_step))),
                     )),
                 )),
             ),
@@ -181,7 +181,7 @@ pub fn get_control_flow_constraint(
                     Box::new(next_pc.clone()),
                     Box::new(LExpr::Add(
                         Box::new(pc.clone()),
-                        Box::new(LExpr::Constant(AbstractInterval::from_i64(default_step))),
+                        Box::new(LExpr::Constant(AbstractInterval::from_i128(default_step))),
                     )),
                 )),
             ),

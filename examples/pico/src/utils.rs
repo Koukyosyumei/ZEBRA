@@ -60,7 +60,7 @@ pub fn run_pico_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInter
             let row = mt.1.row_mut(i);
             rows.push(
                 row.iter()
-                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .map(|v| AbstractInterval::from_i128(v.as_canonical_u32() as i128))
                     .collect::<Vec<_>>(),
             );
         }
@@ -201,7 +201,7 @@ where
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
                     let impl_constraint =
-                        make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+                        make_impl_constraint(t.0 as i128, &opcode, alu_constraint, prime);
 
                     if let Some(impl_constraint) = impl_constraint {
                         lookup_constraints.push(LVSExpr::Mul(
@@ -228,15 +228,6 @@ where
                 }
 
                 let opcode_condition = cv(&opcode);
-
-                /*
-                                   (5, cv(&a1), LVSExpr::SRL(Box::new(cv(&b)), Box::new(cv(&c)))),
-                   (
-                       5,
-                       cv(&a2),
-                       LVSExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
-                   ),
-                */
 
                 let ops = [
                     (0, cv(&a1), LVSExpr::And(Box::new(cv(&b)), Box::new(cv(&c)))),
