@@ -11,15 +11,15 @@ use sp1_core_machine::control_flow::JumpChip;
 use sp1_core_machine::control_flow::JumpColumns;
 use sp1_core_machine::control_flow::NUM_JUMP_COLS;
 
+use latticevm::canonicalizer::generate_alu_final_checker;
+use latticevm::canonicalizer::save_repr_if_unique;
+use latticevm::constraint::LatticeVMConstraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::symbolic::eval_constraints;
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::save_repr_if_unique;
+use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
-use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_sp1::utils::{
@@ -35,10 +35,10 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let string_representation = format!(
-        "pc: [{}], next_pc: [{}], op_b_value: [{}], op_c_value: [{}]",
+        "pc: [{}], next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
         trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
         trace_fmt_with_idxs(trace, 0, &[5, 6, 7, 8]),
-        //trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+        trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
         trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
         trace_fmt_with_idxs(trace, 0, &[18, 19, 20, 21]),
     );
@@ -51,10 +51,7 @@ const fn make_col_map() -> JumpColumns<usize> {
 }
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
-    let mut instructions = vec![
-        //Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
-        Instruction::new(Opcode::JAL, x, y, 0, true, true),
-    ];
+    let mut instructions = vec![Instruction::new(Opcode::JAL, x, y, 0, true, true)];
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -70,7 +67,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -97,13 +94,6 @@ fn main() -> Result<(), io::Error> {
         .extend(&output_columns.clone());
     constraint_info.output_columns = output_columns.clone();
 
-    for t in &constraint_info.constraints.air_constraints {
-        println!("# {}", t);
-    }
-    for t in &constraint_info.constraints.lookup_constraints {
-        println!("* {}", t);
-    }
-
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
@@ -113,7 +103,7 @@ fn main() -> Result<(), io::Error> {
     let mut ds = vec![];
     for _ in 0..30 {
         let x: u8 = rng.random_range(0..32);
-        let y: u32 = rng.random_range(0..256); //rng.random(); // rng.random_range(0..prime);
+        let y: u32 = rng.random_range(0..prime);
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 8, 8, x, y);
@@ -133,9 +123,8 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![],
-            dummy_program_counter_refine_fn,
             dummy_adjust_pc_program,
-            final_check,
+            &final_check,
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);

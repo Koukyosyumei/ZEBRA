@@ -562,21 +562,21 @@ impl LatticeVMSymbolicExpr {
             }
             Self::Msb(a) => msb_maybe(&rec(a)),
             Self::KoalaBearRange(a) => {
-                let e = LatticeVMSymbolicExpr::Lt(
+                let e = LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
                     a.clone(),
                     Box::new(LatticeVMSymbolicExpr::Constant(
                         AbstractInterval::from_i128(2130706433),
                     )),
-                );
+                )));
                 rec(&e)
             }
             Self::BabyBearRange(a) => {
-                let e = LatticeVMSymbolicExpr::Lt(
+                let e = LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
                     a.clone(),
                     Box::new(LatticeVMSymbolicExpr::Constant(
                         AbstractInterval::from_i128(2013265921),
                     )),
-                );
+                )));
                 rec(&e)
             }
             Self::WordAdd(b, c) => {
