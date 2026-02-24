@@ -16,15 +16,15 @@ use zkm_core_machine::{
     CpuChip,
 };
 
+use latticevm::canonicalizer::save_repr_if_unique;
+use latticevm::constraint::eval_constraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::symbolic::eval_constraints;
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::save_repr_if_unique;
+use latticevm::trace::trace_fmt_with_idxs;
+use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
-use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use zkm_core_executor::syscalls::SyscallCode;
 
@@ -93,13 +93,6 @@ fn main() -> Result<(), io::Error> {
         extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
     let output_columns = vec![19, 20, 21, 22, 37, 38, 39, 40];
 
-    for t in &constraint_info.constraints.air_constraints {
-        println!("# {}", t);
-    }
-    for t in &constraint_info.constraints.lookup_constraints {
-        println!("* {}", t);
-    }
-
     constraint_info
         .refinable_cols
         .extend(&output_columns.clone());
@@ -139,7 +132,7 @@ fn main() -> Result<(), io::Error> {
             vec![],
             &vec![],
             dummy_adjust_pc_program,
-            final_check,
+            &final_check,
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);

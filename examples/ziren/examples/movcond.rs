@@ -131,7 +131,7 @@ fn main() -> Result<(), io::Error> {
             vec![],
             &vec![], // vec![0],
             dummy_adjust_pc_program,
-            final_check,
+            &final_check,
             &args.method,
         );
         println!("({} {} {}), {:?}", x, y, z, result);
