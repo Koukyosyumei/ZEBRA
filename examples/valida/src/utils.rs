@@ -15,13 +15,14 @@ use valida_machine::{
 use valida_opcodes::Opcode;
 use valida_program::{MachineWithProgramROM, ProgramTableType};
 
-use latticevm::alu::{get_alu_constraint, WordOp};
+use latticevm::constraint::LatticeVMConstraints;
 use latticevm::interval::AbstractInterval;
-use latticevm::quick::ConstraintInfo;
 use latticevm::solver::prepare_constraints_and_range_type;
-use latticevm::symbolic::LatticeVMConstraints;
-use latticevm::symbolic::{make_impl_constraint, AbstractTrace, LatticeVMSymbolicExpr as LVSExpr};
-use latticevm::utils::GeneralLookupInfo;
+use latticevm::solver::ConstraintInfo;
+use latticevm::symbolic::GeneralLookupInfo;
+use latticevm::symbolic::{make_impl_constraint, LatticeVMSymbolicExpr as LVSExpr};
+use latticevm::trace::AbstractTrace;
+use latticevm::wordop::{get_alu_constraint, WordOp};
 
 use crate::config::{get_machine_config, prover_options};
 use crate::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col as cv};
@@ -98,7 +99,7 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
                         for t in tmps {
                             let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
                             let impl_constraint =
-                                make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+                                make_impl_constraint(t.0 as i128, &opcode, alu_constraint, prime);
 
                             if let Some(impl_constraint) = impl_constraint {
                                 for i in 1..13 {
@@ -254,7 +255,7 @@ pub fn generate_bootstrap_trace_from_program(
             let row = traces.row_mut(i);
             rows.push(
                 row.iter()
-                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .map(|v| AbstractInterval::from_i128(v.as_canonical_u32() as i128))
                     .collect(),
             );
         }
@@ -304,6 +305,12 @@ where
         general_lookup_info.op_a.extend([*i, *j, *k, *el]);
     }
 
+    if let [a, b, c, d, e, f, g, h, i] = received_vars_from_cpu.as_slice() {
+        general_lookup_info.op_b.extend([*a, *b, *c, *d]);
+        general_lookup_info.op_c.extend([*e, *f, *g, *h]);
+        general_lookup_info.op_a.extend([*i]);
+    }
+
     let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
@@ -349,18 +356,18 @@ pub fn make_pc_adjuster(
                 let pc = row[1].as_canonical_u32(prime) as usize;
                 if pc < program.len() {
                     let instr = program[pc];
-                    row[3] = AbstractInterval::from_i64(instr.opcode.into());
-                    row[4] = AbstractInterval::from_i64(instr.operands.0[0].into());
-                    row[5] = AbstractInterval::from_i64(instr.operands.0[1].into());
-                    row[6] = AbstractInterval::from_i64(instr.operands.0[2].into());
-                    row[7] = AbstractInterval::from_i64(instr.operands.0[3].into());
-                    row[8] = AbstractInterval::from_i64(instr.operands.0[4].into());
+                    row[3] = AbstractInterval::from_i128(instr.opcode.into());
+                    row[4] = AbstractInterval::from_i128(instr.operands.0[0].into());
+                    row[5] = AbstractInterval::from_i128(instr.operands.0[1].into());
+                    row[6] = AbstractInterval::from_i128(instr.operands.0[2].into());
+                    row[7] = AbstractInterval::from_i128(instr.operands.0[3].into());
+                    row[8] = AbstractInterval::from_i128(instr.operands.0[4].into());
 
                     if row[3].as_canonical_u32(prime) == 8 {
                         for i in 4..57 {
                             row[i] = AbstractInterval::zero();
                         }
-                        row[24] = AbstractInterval::from_i64(1);
+                        row[24] = AbstractInterval::from_i128(1);
                     }
                 }
             } else {
@@ -381,7 +388,7 @@ pub fn refine_pc_interval(
     if j == 1 {
         abs_main_trace_data[i][j] = AbstractInterval {
             lo: 0,
-            hi: (program_len - 1) as i64,
+            hi: (program_len - 1) as i128,
         };
     }
 }

@@ -12,12 +12,14 @@ use zkm_core_machine::control_flow::NUM_BRANCH_COLS;
 use zkm_core_machine::BranchChip;
 use zkm_stark::MachineProver;
 
-use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
+use latticevm::canonicalizer::save_repr_if_unique;
+use latticevm::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::save_repr_if_unique;
+use latticevm::trace::trace_fmt_with_idxs;
+use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
-use latticevm::utils::trace_fmt_with_idxs;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_ziren::utils::{
@@ -81,7 +83,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -109,7 +111,7 @@ fn main() -> Result<(), io::Error> {
     for _ in 0..30 {
         let x: u32 = rng.random();
         let y: u32 = rng.random();
-        let z: u32 = rng.random();
+        let z: u32 = rng.random_range(0..prime);
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 4, 4, x, y, z);
@@ -128,15 +130,16 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![],
-            dummy_program_counter_refine_fn,
             dummy_adjust_pc_program,
             final_check,
             &args.method,
         );
         println!("({} {} {}), {:?}", x, y, z, result);
-        ds.push(result.unwrap().execution_time);
+        ds.push(result.unwrap());
     }
-    println!("{:?}", mean_variance(&ds));
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }

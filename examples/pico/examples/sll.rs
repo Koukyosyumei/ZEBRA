@@ -35,7 +35,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let _opcode_str = args.opcode_str;
+    //let _opcode_str = args.opcode_str;
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -81,7 +81,6 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_program_counter_refine_fn,
             dummy_adjust_pc_program,
             &final_check,
             &args.method,

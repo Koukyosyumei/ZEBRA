@@ -44,7 +44,12 @@ pub fn run_pico_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInter
         None,
     );
     // runtime.state.input_stream.push(vec![2, 0, 0, 0]);
-    let batch_records = runtime.run(None).unwrap().0;
+    let batch_records_result = runtime.run(None);
+    if batch_records_result.is_err() {
+        return vec![];
+    }
+
+    let batch_records = batch_records_result.unwrap().0;
     let chunk = &batch_records[0];
 
     let mut chips_and_main_traces = riscv_machine
@@ -60,7 +65,7 @@ pub fn run_pico_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInter
             let row = mt.1.row_mut(i);
             rows.push(
                 row.iter()
-                    .map(|v| AbstractInterval::from_i64(v.as_canonical_u32() as i64))
+                    .map(|v| AbstractInterval::from_i128(v.as_canonical_u32() as i128))
                     .collect::<Vec<_>>(),
             );
         }
@@ -201,7 +206,7 @@ where
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
                     let impl_constraint =
-                        make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+                        make_impl_constraint(t.0 as i128, &opcode, alu_constraint, prime);
 
                     if let Some(impl_constraint) = impl_constraint {
                         lookup_constraints.push(LVSExpr::Mul(
@@ -235,7 +240,7 @@ where
                     (2, cv(&a1), LVSExpr::Xor(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (3, cv(&a1), LVSExpr::SRL(Box::new(cv(&b)), Box::new(cv(&c)))),
                     (
-                        4,
+                        3,
                         cv(&a2),
                         LVSExpr::SRLCarry(Box::new(cv(&b)), Box::new(cv(&c))),
                     ),

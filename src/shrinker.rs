@@ -54,7 +54,7 @@ use crate::trace::AbstractTrace;
 pub fn detect_conditional_var_sub_const_constraints(
     constraints: &[LatticeVMSymbolicExpr],
     prime: u32,
-) -> Vec<(usize, usize, i64)> {
+) -> Vec<(usize, usize, i128)> {
     let mut const_constraints = Vec::new();
 
     for c in constraints {
@@ -124,14 +124,14 @@ pub fn detect_conditional_var_sub_const_constraints(
 /// * Abstract interpretation
 pub fn refine_conditional_constraints_var_sub_const(
     trace: &mut AbstractTrace,
-    const_constraints: &[(usize, usize, i64)], // (selector_idx, value_idx, target_constant)
+    const_constraints: &[(usize, usize, i128)], // (selector_idx, value_idx, target_constant)
 ) -> MayBeFlag {
     let num_rows = trace.data.len();
 
     for r in 0..num_rows {
         for &(sel_idx, val_idx, target) in const_constraints {
             let selector = &trace.data[r][sel_idx];
-            let target_interval = AbstractInterval::from_i64(target);
+            let target_interval = AbstractInterval::from_i128(target);
 
             // selector is one
             if selector.is_singleton() && selector.lo == 1 {
@@ -561,7 +561,7 @@ pub fn apply_abir_refinement(
 
             // Weak ABIR:
             //   e ∈ floor((L - a) / d)
-            let inferred_e = (rhs_interval - row[*lhs_var].clone()).div_floor(*stride as i64);
+            let inferred_e = (rhs_interval - row[*lhs_var].clone()).div_floor(*stride as i128);
 
             if let Some(refined) = row[*quotient_var].intersect(&inferred_e) {
                 logs.push((row[*quotient_var].clone(), refined.clone()));

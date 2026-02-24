@@ -10,9 +10,11 @@ use sp1_core_machine::alu::LtCols;
 use sp1_core_machine::alu::NUM_LT_COLS;
 use sp1_core_machine::riscv::LtChip;
 
-use latticevm::quick::{experiment_harness, load_config, mean_variance, Args, ProgramInfo};
+use latticevm::canonicalizer::generate_alu_final_checker;
+use latticevm::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::ui::generate_alu_final_checker;
 use latticevm::utils::create_or_clear_dir;
 use latticevm::utils::indices_arr;
 
@@ -42,7 +44,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -68,7 +70,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..100 {
+    for _ in 0..30 {
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 
@@ -90,15 +92,16 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_program_counter_refine_fn,
             dummy_adjust_pc_program,
             &final_check,
             &args.method,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap().execution_time);
+        ds.push(result.unwrap());
     }
-    println!("{:?}", mean_variance(&ds));
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }

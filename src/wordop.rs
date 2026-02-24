@@ -3,7 +3,7 @@ use crate::symbolic::LatticeVMSymbolicExpr;
 
 pub type Word = [AbstractInterval; 4];
 pub const WORD_BITS: u32 = 32;
-pub const WORD_BOUND: i64 = 1 << WORD_BITS;
+pub const WORD_BOUND: i128 = 1 << WORD_BITS;
 
 #[derive(Debug)]
 pub enum WordOp {
@@ -36,13 +36,13 @@ pub fn reconstruct_symbolic_word(
     base: usize,
 ) -> LatticeVMSymbolicExpr {
     let mut val = LatticeVMSymbolicExpr::Constant(AbstractInterval::zero());
-    let mut mul = 1_i64;
+    let mut mul = 1_i128;
     for i in 0..4 {
         let rm = LatticeVMSymbolicExpr::Mul(
             Box::new(row[base + i].clone()),
-            Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                mul,
-            ))),
+            Box::new(LatticeVMSymbolicExpr::Constant(
+                AbstractInterval::from_i128(mul),
+            )),
         );
         val = LatticeVMSymbolicExpr::Add(Box::new(val.clone()), Box::new(rm));
         mul *= 256;
@@ -226,8 +226,8 @@ pub fn full_word() -> AbstractInterval {
 }
 
 pub fn word_to_unsigned(word: &Word) -> AbstractInterval {
-    let mut lo = 0i64;
-    let mut hi = 0i64;
+    let mut lo = 0i128;
+    let mut hi = 0i128;
     for (i, limb) in word.iter().enumerate() {
         let shift = 8 * i;
         lo += limb.lo << shift;
@@ -356,8 +356,8 @@ pub fn word_mulhu(a: &Word, b: &Word) -> AbstractInterval {
     let hi = (a.hi as i128 * b.hi as i128) >> WORD_BITS;
 
     AbstractInterval {
-        lo: lo as i64,
-        hi: hi as i64,
+        lo: lo as i128,
+        hi: hi as i128,
     }
 }
 
@@ -389,13 +389,13 @@ pub fn word_mult(a: &Word, b: &Word) -> (AbstractInterval, AbstractInterval) {
     let max = *candidates.iter().max().unwrap();
 
     let lo = AbstractInterval {
-        lo: (min & ((1i128 << WORD_BITS) - 1)) as i64,
-        hi: (max & ((1i128 << WORD_BITS) - 1)) as i64,
+        lo: (min & ((1i128 << WORD_BITS) - 1)) as i128,
+        hi: (max & ((1i128 << WORD_BITS) - 1)) as i128,
     };
 
     let hi = AbstractInterval {
-        lo: (min >> WORD_BITS) as i64,
-        hi: (max >> WORD_BITS) as i64,
+        lo: (min >> WORD_BITS) as i128,
+        hi: (max >> WORD_BITS) as i128,
     };
 
     (lo, hi)
@@ -409,13 +409,13 @@ pub fn word_multu(a: &Word, b: &Word) -> (AbstractInterval, AbstractInterval) {
     let hi_prod = a.hi as i128 * b.hi as i128;
 
     let lo = AbstractInterval {
-        lo: (lo_prod & ((1i128 << WORD_BITS) - 1)) as i64,
-        hi: (hi_prod & ((1i128 << WORD_BITS) - 1)) as i64,
+        lo: (lo_prod & ((1i128 << WORD_BITS) - 1)) as i128,
+        hi: (hi_prod & ((1i128 << WORD_BITS) - 1)) as i128,
     };
 
     let hi = AbstractInterval {
-        lo: (lo_prod >> WORD_BITS) as i64,
-        hi: (hi_prod >> WORD_BITS) as i64,
+        lo: (lo_prod >> WORD_BITS) as i128,
+        hi: (hi_prod >> WORD_BITS) as i128,
     };
 
     (lo, hi)
@@ -527,7 +527,7 @@ pub fn word_or(a: &Word, b: &Word) -> AbstractInterval {
     } else {
         // OR can at most set all bits up to the highest bit present in either operand.
         // We find the smallest power of 2 minus 1 that covers both.
-        let max_possible = (1i64 << (64 - (a.hi | b.hi).leading_zeros())) - 1;
+        let max_possible = (1i128 << (128 - (a.hi | b.hi).leading_zeros())) - 1;
         AbstractInterval {
             lo: a.lo.max(b.lo),
             hi: max_possible.min(WORD_BOUND - 1),
@@ -549,7 +549,7 @@ pub fn word_xor(a: &Word, b: &Word) -> AbstractInterval {
         let hi_bound = if max_val == 0 {
             0
         } else {
-            (1i64 << (64 - max_val.leading_zeros())) - 1
+            (1i128 << (128 - max_val.leading_zeros())) - 1
         };
         AbstractInterval {
             lo: 0,
@@ -590,12 +590,12 @@ pub fn word_srl(a: &Word, b: &Word) -> AbstractInterval {
     let b = word_to_unsigned(b);
 
     // シフト量が32ビット以上の場合、結果は常に0
-    if b.lo >= WORD_BITS as i64 {
+    if b.lo >= WORD_BITS as i128 {
         return AbstractInterval::zero();
     }
 
     // 最小値: aの最小値を最大のシフト量でシフトしたもの
-    let lo = if b.hi >= WORD_BITS as i64 {
+    let lo = if b.hi >= WORD_BITS as i128 {
         0
     } else {
         a.lo >> b.hi
@@ -612,7 +612,7 @@ mod tests {
     use crate::interval::AbstractInterval;
     use crate::wordop::Word;
 
-    fn signed_word(val_lo: i64, val_hi: i64) -> Word {
+    fn signed_word(val_lo: i128, val_hi: i128) -> Word {
         let top = if val_lo < 0 { 255 } else { 0 };
         [
             ai(val_lo & 0xFF, val_hi & 0xFF),
@@ -622,15 +622,15 @@ mod tests {
         ]
     }
 
-    fn ai(lo: i64, hi: i64) -> AbstractInterval {
+    fn ai(lo: i128, hi: i128) -> AbstractInterval {
         AbstractInterval { lo, hi }
     }
 
-    fn byte(v: i64) -> AbstractInterval {
+    fn byte(v: i128) -> AbstractInterval {
         ai(v, v)
     }
 
-    fn word_range(lo: i64, hi: i64) -> Word {
+    fn word_range(lo: i128, hi: i128) -> Word {
         [ai(lo, hi), byte(0), byte(0), byte(0)]
     }
 

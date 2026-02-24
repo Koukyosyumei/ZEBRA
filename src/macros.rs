@@ -34,9 +34,9 @@ macro_rules! impl_p3_to_tv_conversion {
         ) -> LatticeVMSymbolicExpr {
             LatticeVMSymbolicExpr::Mul(
                 Box::new(LatticeVMSymbolicExpr::Variable(convert_p3_paircol(paircol))),
-                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                    weight.as_canonical_u32() as i64,
-                ))),
+                Box::new(LatticeVMSymbolicExpr::Constant(
+                    AbstractInterval::from_i128(weight.as_canonical_u32() as i128),
+                )),
             )
         }
 
@@ -45,13 +45,13 @@ macro_rules! impl_p3_to_tv_conversion {
         ) -> LatticeVMSymbolicExpr {
             if vpair.column_weights.is_empty() {
                 LatticeVMSymbolicExpr::Constant(AbstractInterval {
-                    lo: vpair.constant.as_canonical_u32() as i64,
-                    hi: vpair.constant.as_canonical_u32() as i64,
+                    lo: vpair.constant.as_canonical_u32() as i128,
+                    hi: vpair.constant.as_canonical_u32() as i128,
                 })
             } else {
                 let mut expr = LatticeVMSymbolicExpr::Constant(AbstractInterval {
-                    lo: vpair.constant.as_canonical_u32() as i64,
-                    hi: vpair.constant.as_canonical_u32() as i64,
+                    lo: vpair.constant.as_canonical_u32() as i128,
+                    hi: vpair.constant.as_canonical_u32() as i128,
                 });
                 let one: F = $one_expr;
                 for (paircol, w) in vpair.column_weights.iter() {
@@ -85,8 +85,8 @@ macro_rules! impl_p3_to_tv_conversion {
                 GenericSymbolicExpression::IsTransition => LatticeVMSymbolicExpr::IsTransition,
                 GenericSymbolicExpression::Constant(v) => {
                     LatticeVMSymbolicExpr::Constant(AbstractInterval {
-                        lo: v.as_canonical_u32() as i64,
-                        hi: v.as_canonical_u32() as i64,
+                        lo: v.as_canonical_u32() as i128,
+                        hi: v.as_canonical_u32() as i128,
                     })
                 }
                 GenericSymbolicExpression::Add { x, y, .. } => LatticeVMSymbolicExpr::Add(

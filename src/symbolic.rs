@@ -562,21 +562,21 @@ impl LatticeVMSymbolicExpr {
             }
             Self::Msb(a) => msb_maybe(&rec(a)),
             Self::KoalaBearRange(a) => {
-                let e = LatticeVMSymbolicExpr::Lt(
+                let e = LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
                     a.clone(),
-                    Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                        2130706433,
-                    ))),
-                );
+                    Box::new(LatticeVMSymbolicExpr::Constant(
+                        AbstractInterval::from_i128(2130706433),
+                    )),
+                )));
                 rec(&e)
             }
             Self::BabyBearRange(a) => {
-                let e = LatticeVMSymbolicExpr::Lt(
+                let e = LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
                     a.clone(),
-                    Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                        2013265921,
-                    ))),
-                );
+                    Box::new(LatticeVMSymbolicExpr::Constant(
+                        AbstractInterval::from_i128(2013265921),
+                    )),
+                )));
                 rec(&e)
             }
             Self::WordAdd(b, c) => {
@@ -831,7 +831,7 @@ pub fn get_curr_i_sub_cur_j(expr: &LatticeVMSymbolicExpr) -> Option<(usize, usiz
     None
 }
 
-pub fn get_curr_i_sub_const(expr: &LatticeVMSymbolicExpr, _prime: u32) -> Option<(usize, i64)> {
+pub fn get_curr_i_sub_const(expr: &LatticeVMSymbolicExpr, _prime: u32) -> Option<(usize, i128)> {
     if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = expr {
         // Case: Variable - Constant
         if let Some(v_idx) = get_curr_i(lhs) {
@@ -1261,13 +1261,13 @@ pub fn gather_boolean_variables(
 /// * Opcode-specific constraint enforcement
 /// * Modular constraint generation in Lattice VM
 pub fn make_impl_constraint(
-    opcode_val: i64,
+    opcode_val: i128,
     opcode_var: &LatticeVMSymbolicExpr,
     expr: LatticeVMSymbolicExpr,
     prime: u32,
 ) -> Option<LatticeVMSymbolicExpr> {
     if let LatticeVMSymbolicExpr::Constant(c) = opcode_var {
-        if c.as_canonical_u32(prime) as i64 == opcode_val {
+        if c.as_canonical_u32(prime) as i128 == opcode_val {
             Some(expr)
         } else {
             None
@@ -1276,9 +1276,9 @@ pub fn make_impl_constraint(
         Some(LatticeVMSymbolicExpr::WhenZero(
             Box::new(LatticeVMSymbolicExpr::Sub(
                 Box::new(opcode_var.clone()),
-                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::from_i64(
-                    opcode_val,
-                ))),
+                Box::new(LatticeVMSymbolicExpr::Constant(
+                    AbstractInterval::from_i128(opcode_val),
+                )),
             )),
             Box::new(expr),
         ))

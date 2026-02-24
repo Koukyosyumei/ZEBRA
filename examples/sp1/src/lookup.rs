@@ -130,7 +130,7 @@ where
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
                     let impl_constraint =
-                        make_impl_constraint(t.0 as i64, &opcode, alu_constraint, prime);
+                        make_impl_constraint(t.0 as i128, &opcode, alu_constraint, prime);
                     if let Some(impl_constraint) = impl_constraint {
                         for i in 6..18 {
                             try_add_single_var_col(&s.values[i], u8_cols);
@@ -146,11 +146,11 @@ where
                         Box::new(next_pc.clone()),
                         Box::new(LExpr::Add(
                             Box::new(pc.clone()),
-                            Box::new(LExpr::Constant(AbstractInterval::from_i64(4))),
+                            Box::new(LExpr::Constant(AbstractInterval::from_i128(4))),
                         )),
                     );
                     let impl_pc_constraint =
-                        make_impl_constraint(t.0 as i64, &opcode, pc_constraint, prime);
+                        make_impl_constraint(t.0 as i128, &opcode, pc_constraint, prime);
                     if let Some(impl_pc_constraint) = impl_pc_constraint {
                         air_constraints.push(LExpr::Mul(
                             Box::new(multiplicities.clone()),
@@ -175,7 +175,8 @@ where
                         get_control_flow_constraint(&pc, &next_pc, &a, &b, &c, &t.1, 4);
 
                     for cfc in cf_constraints {
-                        let impl_constraint = make_impl_constraint(t.0 as i64, &opcode, cfc, prime);
+                        let impl_constraint =
+                            make_impl_constraint(t.0 as i128, &opcode, cfc, prime);
                         if let Some(impl_constraint) = impl_constraint {
                             air_constraints.push(LExpr::Mul(
                                 Box::new(multiplicities.clone()),
