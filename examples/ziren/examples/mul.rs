@@ -11,7 +11,7 @@ use zkm_core_machine::alu::NUM_MUL_COLS;
 use zkm_core_machine::MulChip;
 
 use latticevm::canonicalizer::generate_alu_final_checker;
-use latticevm::constraints::eval_constraints;
+use latticevm::constraint::eval_constraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
