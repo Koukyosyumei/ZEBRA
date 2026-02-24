@@ -69,7 +69,9 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..100 {
+    for i in 0..100 {
+        search_config.seed += i;
+
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 
@@ -91,7 +93,6 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_program_counter_refine_fn,
             dummy_adjust_pc_program,
             &final_check,
             &args.method,
