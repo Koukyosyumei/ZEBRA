@@ -26,35 +26,6 @@ use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn final_check(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    _prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let mut string_representation = String::new();
-    for i in 0..trace.data.len() {
-        let row_string_representation = format!(
-            "clk: {}\nprev_value: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nop_a_access: {}\nmem_access: [{}]",
-            trace.data[i][3],
-            trace_fmt_with_idxs(trace, i, &[53, 54, 55, 56]),
-            trace_fmt_with_idxs(trace, i, &[8, 9, 10, 11]),
-            trace_fmt_with_idxs(trace, i, &[12, 13, 14, 15]),
-            format!(
-                "prev_value: [{}], value: [{}]",
-                trace_fmt_with_idxs(trace, i, &[66, 67, 68, 69]),
-                trace_fmt_with_idxs(trace, i, &[4, 5, 6, 7])
-            ),
-            trace_fmt_with_idxs(trace, i, &[57, 58, 59, 60]),
-        );
-        string_representation.push_str(&row_string_representation);
-        string_representation.push_str("\n--------------\n");
-    }
-
-    save_repr_if_unique(&string_representation, known_reprt, ui);
-}
-
 const fn make_col_map() -> MemoryInstructionsColumns<usize> {
     let indices_arr = indices_arr::<{ NUM_MEMORY_INSTRUCTIONS_COLUMNS }>();
     unsafe {
@@ -120,6 +91,14 @@ fn main() -> Result<(), io::Error> {
             NUM_MEMORY_INSTRUCTIONS_COLUMNS,
             prime,
         );
+
+    let final_check = generate_memory_op_final_checker(
+        3,                    // clk
+        vec![4, 5, 6, 7],     // op_a
+        vec![8, 9, 10, 11],   // op_b
+        vec![12, 13, 14, 15], // op_c
+        vec![57, 58, 59, 60], // mem
+    );
     let mut semantic_inputs = vec![
         0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15, 53, 54, 55, 56, 66, 67, 68, 69,
     ];
