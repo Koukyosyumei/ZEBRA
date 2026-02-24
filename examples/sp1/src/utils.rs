@@ -24,7 +24,11 @@ use crate::p3_to_tv::convert_p3_expr;
 pub fn run_sp1_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), SP1CoreOpts::default());
-    let (checkpoint, _pv, _done) = runtime.execute_state(false).unwrap();
+    let result = runtime.execute_state(false);
+    if result.is_err() {
+        return vec![];
+    }
+    let (checkpoint, _pv, _done) = result.unwrap();
 
     let mut checkpoint_file = tempfile::tempfile()
         .map_err(SP1CoreProverError::IoError)
