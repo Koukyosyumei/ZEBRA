@@ -10,15 +10,15 @@ use zkm_core_machine::alu::MulCols;
 use zkm_core_machine::alu::NUM_MUL_COLS;
 use zkm_core_machine::MulChip;
 
+use latticevm::canonicalizer::generate_alu_final_checker;
+use latticevm::constraints::eval_constraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::make_init_val;
 use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
-use latticevm::symbolic::eval_constraints;
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::generate_alu_final_checker;
+use latticevm::trace::AbstractTrace;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_ziren::utils::{

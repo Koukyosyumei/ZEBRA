@@ -10,13 +10,15 @@ use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::{CloClzCols, NUM_CLOCLZ_COLS};
 use zkm_core_machine::CloClzChip;
 
+use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::{save_repr_if_unique, UiState};
-use latticevm::utils::{create_or_clear_dir, indices_arr, trace_fmt_with_idxs};
+use latticevm::trace::trace_fmt_with_idxs;
+use latticevm::trace::AbstractTrace;
+use latticevm::ui::UiState;
+use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -75,10 +77,6 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CloClzChip>(&air, NUM_CLOCLZ_COLS, prime);
     let output_columns = vec![2, 3, 4, 5];
-    /*
-    for i in &output_columns {
-        constraint_info.range_types.insert(*i, RangeType::U8);
-    }*/
 
     constraint_info
         .refinable_cols
@@ -90,8 +88,10 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
-        let x: u32 = rng.random_range(0..256);
+    for i in 0..30 {
+        search_config.seed += i;
+
+        let x: u32 = rng.random();
         let y: u32 = rng.random_range(0..256);
 
         // ######################## Program Initialization ###########################
