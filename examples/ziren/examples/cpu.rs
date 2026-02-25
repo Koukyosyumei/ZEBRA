@@ -20,8 +20,8 @@ use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::constraint::eval_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
-use latticevm::memory::check_memory_consistency;
 use latticevm::memory::IntervalMemory;
+use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
@@ -49,28 +49,18 @@ pub fn ziren_abstract_trace_to_abstract_state(
     }
 }
 
-fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
-    let mut val = AbstractInterval::from_i128(0);
-    let mut mul = 1_i128;
-    for i in 0..4 {
-        val = val + row[base + i].clone() * AbstractInterval::from_i128(mul);
-        mul *= 256;
-    }
-    val
-}
-
 fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
     let mut ops = vec![];
     for row in &trace.data {
         if MayBeFlag::True != row[65].is_zero(prime) {
             if MayBeFlag::True != row[18].is_non_zero(prime) {
-                ops.push((row[9].clone(), reconstruct_word(row, 26), true));
+                ops.push((row[9].clone(), rec_word(row, 26, 4), true));
             }
             if MayBeFlag::True != row[19].is_non_zero(prime) {
-                ops.push((reconstruct_word(row, 10), reconstruct_word(row, 47), false));
+                ops.push((rec_word(row, 10, 4), rec_word(row, 47, 4), false));
             }
             if MayBeFlag::True != row[20].is_non_zero(prime) {
-                ops.push((reconstruct_word(row, 14), reconstruct_word(row, 56), false));
+                ops.push((rec_word(row, 14, 4), rec_word(row, 56, 4), false));
             }
         }
     }
@@ -97,8 +87,7 @@ fn final_check(
     for rs in &recovered_states {
         string_representation.push_str(&format!("\t{}\n", rs));
     }
-    string_representation.push_str("-----------------\n");
-    string_representation.push_str("**Memory**:\n");
+    string_representation.push_str("\n**Memory**:\n");
     string_representation.push_str(&format!("{}", memory_check(trace, prime).0).to_string());
 
     save_repr_if_unique(&string_representation, known_reprt, ui);
