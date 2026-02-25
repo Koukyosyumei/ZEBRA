@@ -48,6 +48,85 @@ pub fn ziren_abstract_trace_to_abstract_state(
     }
 }
 
+fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
+    let mut val = AbstractInterval::from_i128(0);
+    let mut mul = 1_i128;
+    for i in 0..4 {
+        val = val + row[base + i].clone() * AbstractInterval::from_i128(mul);
+        mul *= 256;
+    }
+    val
+}
+
+fn memory_check(trace: &AbstractTrace, prime: u32) -> MayBeFlag {
+    let mut ops = vec![];
+    for row in &trace.data {
+        if let MayBeFlag::True = row[65].is_zero(prime) {
+        } else {
+            if let MayBeFlag::True = row[18].is_non_zero(prime) {
+            } else {
+                let addr = row[9].clone();
+                let val = reconstruct_word(
+                    &[
+                        row[26].clone(),
+                        row[27].clone(),
+                        row[28].clone(),
+                        row[29].clone(),
+                    ],
+                    0,
+                );
+                ops.push((addr, val, true));
+            }
+            if let MayBeFlag::True = row[19].is_non_zero(prime) {
+            } else {
+                let addr = reconstruct_word(
+                    &[
+                        row[10].clone(),
+                        row[11].clone(),
+                        row[12].clone(),
+                        row[13].clone(),
+                    ],
+                    0,
+                );
+                let val = reconstruct_word(
+                    &[
+                        row[47].clone(),
+                        row[48].clone(),
+                        row[49].clone(),
+                        row[50].clone(),
+                    ],
+                    0,
+                );
+                ops.push((addr, val, false));
+            }
+            if let MayBeFlag::True = row[20].is_non_zero(prime) {
+            } else {
+                let addr = reconstruct_word(
+                    &[
+                        row[14].clone(),
+                        row[15].clone(),
+                        row[16].clone(),
+                        row[17].clone(),
+                    ],
+                    0,
+                );
+                let val = reconstruct_word(
+                    &[
+                        row[56].clone(),
+                        row[57].clone(),
+                        row[58].clone(),
+                        row[59].clone(),
+                    ],
+                    0,
+                );
+                ops.push((addr, val, false));
+            }
+        }
+    }
+
+    check_memory_consistency(&ops)
+}
+
 // ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
@@ -133,8 +212,7 @@ fn main() -> Result<(), io::Error> {
     let pad_fn = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
     let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
         pad_fn(trace, prime);
-        //memory_check(trace, prime)
-        MayBeFlag::True
+        memory_check(trace, prime)
     };
 
     // ######################## Set Info ##########################################
