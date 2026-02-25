@@ -152,8 +152,6 @@ fn final_check(
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    // this program is expected to invalid according to the semantics of ziren, while
-    // we can find the satisfying solution.
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
     instructions.extend(vec![
         Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
