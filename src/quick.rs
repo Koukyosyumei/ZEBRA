@@ -15,6 +15,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use serde::Serialize;
 
+use crate::interval::MayBeFlag;
 use crate::smt::expr_to_smt_bv;
 use crate::solver::{run_parallel_solver, ConstraintInfo, SearchConfig, VerificationStatus};
 use crate::ui::UiState;
@@ -53,20 +54,20 @@ pub struct VerificationResult {
     pub execution_time: std::time::Duration,
 }
 
-pub fn experiment_harness<FinalCheckFn, AlignPcToProgramFn>(
+pub fn experiment_harness<FinalCheckFn, PostProcessFn>(
     program_info: &ProgramInfo,
     constraint_info: &mut ConstraintInfo,
     search_config: &SearchConfig,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     blocked_rows: &Vec<usize>,
-    align_pc_to_program: AlignPcToProgramFn,
+    post_process: PostProcessFn,
     final_check: FinalCheckFn,
     verification_method: &String,
 ) -> Result<VerificationResult, io::Error>
 where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
-    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
+    PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
     let mut sleep_time = Duration::from_millis(0);
 
@@ -88,7 +89,7 @@ where
             &base_abs_main_trace_data,
             public_vals,
             &search_config,
-            align_pc_to_program,
+            post_process,
             final_check,
             &mut sleep_time,
         )
@@ -144,19 +145,19 @@ where
     }
 }
 
-pub fn quick_api<FinalCheckFn, AlignPcToProgramFn>(
+pub fn quick_api<FinalCheckFn, PostProcessFn>(
     program_str: String,
     constraint_info: &ConstraintInfo,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     search_config: &SearchConfig,
-    align_pc_to_program: AlignPcToProgramFn,
+    align_pc_to_program: PostProcessFn,
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
 ) -> Result<VerificationResult, io::Error>
 where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
-    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
+    PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
     enable_raw_mode()?;
     let mut stdout = io::stdout();

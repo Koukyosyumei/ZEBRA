@@ -15,6 +15,7 @@ use sp1_core_machine::{
 };
 use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
 
+use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::constraint::eval_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
@@ -56,23 +57,11 @@ fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
     val
 }
 
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    _num_trial: usize,
-    prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let mut string_representation = String::new();
-    let mut recovered_states = vec![];
+fn memory_check(trace: &AbstractTrace, prime: u32) -> MayBeFlag {
     let mut ops = vec![];
-
     for row in &trace.data {
         if let MayBeFlag::True = row[56].is_zero(prime) {
         } else {
-            recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
-
             if let MayBeFlag::True = row[17].is_non_zero(prime) {
             } else {
                 let addr = row[8].clone();
@@ -134,30 +123,32 @@ fn final_check(
         }
     }
 
-    let mem_val = check_memory_consistency(&ops);
-    if let MayBeFlag::True = mem_val {
-        string_representation.push_str("Malicious States:\n");
-        for rs in &recovered_states {
-            string_representation.push_str(&format!("\t{}\n", rs));
-        }
-        string_representation.push_str("-----------------\n");
+    check_memory_consistency(&ops)
+}
 
-        if !known_reprt.contains(&string_representation) {
-            known_reprt.insert(string_representation.clone());
-            ui.recovered = string_representation;
-
-            fs::write(
-                format!("voutput/{}_states.txt", known_reprt.len()),
-                ui.recovered.clone(),
-            )
-            .unwrap();
-            fs::write(
-                format!("voutput/{}_assignments.txt", known_reprt.len()),
-                ui.logs.clone(),
-            )
-            .unwrap();
+// ############## Final Check Function ##############################
+fn final_check(
+    trace: &AbstractTrace,
+    _num_trial: usize,
+    prime: u32,
+    known_reprt: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    let mut string_representation = String::new();
+    let mut recovered_states = vec![];
+    for row in &trace.data {
+        if let MayBeFlag::True = row[56].is_zero(prime) {
+        } else {
+            recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
         }
     }
+
+    string_representation.push_str("Malicious States:\n");
+    for rs in &recovered_states {
+        string_representation.push_str(&format!("\t{}\n", rs));
+    }
+    string_representation.push_str("-----------------\n");
+    save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
@@ -207,7 +198,11 @@ fn main() -> Result<(), io::Error> {
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
-    let adjust_pc_program = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
+    let pad_fn = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
+    let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
+        pad_fn(trace, prime);
+        memory_check(trace, prime)
+    };
 
     // ######################## Public Values ####################################
     let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
@@ -235,7 +230,7 @@ fn main() -> Result<(), io::Error> {
         &base_abs_main_trace_data,
         public_vals,
         &vec![], // vec![0],
-        adjust_pc_program,
+        post_process,
         final_check,
         &args.method,
     );

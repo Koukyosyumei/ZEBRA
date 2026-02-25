@@ -372,7 +372,7 @@ pub fn make_pc_adjuster(
                 }
             } else {
                 for i in 3..9 {
-                    row[i] = AbstractInterval::i4();
+                    row[i] = AbstractInterval::top();
                 }
             }
         }
