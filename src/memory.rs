@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::interval::{AbstractInterval, MayBeFlag};
 
 #[derive(Clone, Debug)]
@@ -8,6 +10,37 @@ struct Segment {
 
 pub struct IntervalMemory {
     segs: Vec<Segment>, // 常に non-overlapping
+}
+
+impl fmt::Display for IntervalMemory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let rows: Vec<(String, String)> = self
+            .segs
+            .iter()
+            .map(|s| (s.addr.to_string(), s.value.to_string()))
+            .collect();
+
+        let addr_w = rows
+            .iter()
+            .map(|(a, _)| a.len())
+            .chain(std::iter::once("Address Interval".len()))
+            .max()
+            .unwrap_or(0);
+
+        //writeln!(f, "IntervalMemory {{")?;
+        writeln!(
+            f,
+            "  {:<addr_w$} | {}",
+            "Address Interval", "Value Interval"
+        )?;
+        writeln!(f, "  {:-<addr_w$}-+-{:-<20}", "", "")?;
+
+        for (addr, value) in rows {
+            writeln!(f, "  {:<addr_w$} | {}", addr, value)?;
+        }
+
+        write!(f, "\n")
+    }
 }
 
 impl IntervalMemory {
@@ -120,7 +153,9 @@ impl IntervalMemory {
     }
 }
 
-pub fn check_memory_consistency(ops: &[(AbstractInterval, AbstractInterval, bool)]) -> MayBeFlag {
+pub fn check_memory_consistency(
+    ops: &[(AbstractInterval, AbstractInterval, bool)],
+) -> (IntervalMemory, MayBeFlag) {
     let mut mem = IntervalMemory::new();
     let mut result = MayBeFlag::True;
 
@@ -131,12 +166,12 @@ pub fn check_memory_consistency(ops: &[(AbstractInterval, AbstractInterval, bool
             let r = mem.check_read(addr, val);
             result = combine(&result, &r);
             if r == MayBeFlag::False {
-                return MayBeFlag::False;
+                return (mem, MayBeFlag::False);
             }
         }
     }
 
-    result
+    (mem, result)
 }
 
 fn combine(a: &MayBeFlag, b: &MayBeFlag) -> MayBeFlag {
@@ -329,21 +364,21 @@ mod tests {
     fn simple_write_then_read_true() {
         let ops = vec![(iv(0, 9), iv(5, 5), true), (iv(0, 9), iv(5, 5), false)];
 
-        assert_eq!(check_memory_consistency(&ops), MayBeFlag::True);
+        assert_eq!(check_memory_consistency(&ops).1, MayBeFlag::True);
     }
 
     #[test]
     fn read_wrong_value_false() {
         let ops = vec![(iv(0, 9), iv(5, 5), true), (iv(0, 9), iv(6, 6), false)];
 
-        assert_eq!(check_memory_consistency(&ops), MayBeFlag::False);
+        assert_eq!(check_memory_consistency(&ops).1, MayBeFlag::False);
     }
 
     #[test]
     fn read_possible_value_maybe() {
         let ops = vec![(iv(0, 9), iv(5, 10), true), (iv(0, 9), iv(8, 20), false)];
 
-        assert_eq!(check_memory_consistency(&ops), MayBeFlag::MayBe);
+        assert_eq!(check_memory_consistency(&ops).1, MayBeFlag::MayBe);
     }
 
     #[test]
@@ -354,14 +389,14 @@ mod tests {
             (iv(0, 9), iv(2, 2), false),
         ];
 
-        assert_eq!(check_memory_consistency(&ops), MayBeFlag::True);
+        assert_eq!(check_memory_consistency(&ops).1, MayBeFlag::True);
     }
 
     #[test]
     fn read_uninitialized_maybe() {
         let ops = vec![(iv(0, 9), iv(5, 5), false)];
 
-        assert_eq!(check_memory_consistency(&ops), MayBeFlag::False);
+        assert_eq!(check_memory_consistency(&ops).1, MayBeFlag::False);
     }
 
     #[test]
@@ -372,7 +407,7 @@ mod tests {
             (iv(0, 9), iv(1, 1), false),
         ];
 
-        assert_eq!(check_memory_consistency(&ops), MayBeFlag::True);
+        assert_eq!(check_memory_consistency(&ops).1, MayBeFlag::True);
     }
 
     #[test]
@@ -383,7 +418,7 @@ mod tests {
             (iv(0, 9), iv(20, 30), false), // impossible
         ];
 
-        assert_eq!(check_memory_consistency(&ops), MayBeFlag::False);
+        assert_eq!(check_memory_consistency(&ops).1, MayBeFlag::False);
     }
 
     #[test]
@@ -395,6 +430,6 @@ mod tests {
             (iv(25, 75), iv(1, 2), false), // both valid
         ];
 
-        assert_eq!(check_memory_consistency(&ops), MayBeFlag::True);
+        assert_eq!(check_memory_consistency(&ops).1, MayBeFlag::True);
     }
 }
