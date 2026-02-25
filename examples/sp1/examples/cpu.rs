@@ -176,8 +176,8 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     let min_row_id = 0;
-    let max_row_id = 3;
-    let num_extracted_rows = 5;
+    let max_row_id = 6;
+    let num_extracted_rows = 8;
 
     // ######################## Extract CPU Constraints ##########################
     let air = CpuChip::default();
@@ -216,7 +216,8 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.max_expansions = 10000;
+        search_config.time_out_ms = 100000;
+        search_config.max_expansions = 50000;
         search_config.minimum_num_taregt_cols = 1; //constraint_info.refinable_cols.len();
         search_config.min_row_id = min_row_id;
         search_config.max_row_id = max_row_id;
