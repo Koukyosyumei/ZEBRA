@@ -18,6 +18,7 @@ use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
 use latticevm::constraint::eval_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
+use latticevm::memory::check_memory_consistency;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
@@ -38,11 +39,21 @@ pub fn sp1_abstract_trace_to_abstract_state(
 ) -> AbstractState {
     AbstractState {
         clk: abstract_row[1].clone()
-            + abstract_row[2].clone() * AbstractInterval::from_i64(2_usize.pow(16) as i64),
+            + abstract_row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
         pc: abstract_row[5].clone(),
         is_done: abstract_row[5].clone().is_zero(prime),
         memory_ops: Vec::new(),
     }
+}
+
+fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
+    let mut val = AbstractInterval::from_i128(0);
+    let mut mul = 1_i128;
+    for i in 0..4 {
+        val = val + row[base + i].clone() * AbstractInterval::from_i128(mul);
+        mul *= 256;
+    }
+    val
 }
 
 // ############## Final Check Function ##############################
@@ -55,32 +66,97 @@ fn final_check(
 ) {
     let mut string_representation = String::new();
     let mut recovered_states = vec![];
+    let mut ops = vec![];
+
     for row in &trace.data {
-        if let MayBeFlag::False = row[56].is_zero(prime) {
+        if let MayBeFlag::True = row[56].is_zero(prime) {
+        } else {
             recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
+
+            if let MayBeFlag::True = row[17].is_non_zero(prime) {
+            } else {
+                let addr = row[8].clone();
+                let val = reconstruct_word(
+                    &[
+                        row[29].clone(),
+                        row[30].clone(),
+                        row[31].clone(),
+                        row[32].clone(),
+                    ],
+                    0,
+                );
+                ops.push((addr, val, true));
+            }
+            if let MayBeFlag::True = row[18].is_non_zero(prime) {
+            } else {
+                let addr = reconstruct_word(
+                    &[
+                        row[9].clone(),
+                        row[10].clone(),
+                        row[11].clone(),
+                        row[12].clone(),
+                    ],
+                    0,
+                );
+                let val = reconstruct_word(
+                    &[
+                        row[38].clone(),
+                        row[39].clone(),
+                        row[40].clone(),
+                        row[41].clone(),
+                    ],
+                    0,
+                );
+                ops.push((addr, val, false));
+            }
+            if let MayBeFlag::True = row[19].is_non_zero(prime) {
+            } else {
+                let addr = reconstruct_word(
+                    &[
+                        row[13].clone(),
+                        row[14].clone(),
+                        row[15].clone(),
+                        row[16].clone(),
+                    ],
+                    0,
+                );
+                let val = reconstruct_word(
+                    &[
+                        row[47].clone(),
+                        row[48].clone(),
+                        row[49].clone(),
+                        row[50].clone(),
+                    ],
+                    0,
+                );
+                ops.push((addr, val, false));
+            }
         }
     }
 
-    string_representation.push_str("Malicious States:\n");
-    for rs in &recovered_states {
-        string_representation.push_str(&format!("\t{}\n", rs));
-    }
-    string_representation.push_str("-----------------\n");
+    let mem_val = check_memory_consistency(&ops);
+    if let MayBeFlag::True = mem_val {
+        string_representation.push_str("Malicious States:\n");
+        for rs in &recovered_states {
+            string_representation.push_str(&format!("\t{}\n", rs));
+        }
+        string_representation.push_str("-----------------\n");
 
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
+        if !known_reprt.contains(&string_representation) {
+            known_reprt.insert(string_representation.clone());
+            ui.recovered = string_representation;
 
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
+            fs::write(
+                format!("voutput/{}_states.txt", known_reprt.len()),
+                ui.recovered.clone(),
+            )
+            .unwrap();
+            fs::write(
+                format!("voutput/{}_assignments.txt", known_reprt.len()),
+                ui.logs.clone(),
+            )
+            .unwrap();
+        }
     }
 }
 
@@ -135,7 +211,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Public Values ####################################
     let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::from_i64(2013265921 - 8);
+    public_vals[40] = AbstractInterval::from_i128(2013265921 - 8);
     public_vals[41] = AbstractInterval::zero();
     public_vals[44] = AbstractInterval::one();
 
@@ -145,6 +221,7 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     if search_config.minimum_num_taregt_cols == 0 {
+        search_config.max_expansions = 10000;
         search_config.minimum_num_taregt_cols = 1; //constraint_info.refinable_cols.len();
         search_config.min_row_id = min_row_id;
         search_config.max_row_id = max_row_id;
