@@ -13,34 +13,48 @@ use sp1_stark::MachineProver;
 
 use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::constraint::LatticeVMConstraints;
+use latticevm::interval::MayBeFlag;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
+use latticevm::utils::PrettySet;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn cr_add(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[8, 9, 10, 11]),
-        trace_fmt_with_idxs(trace, 0, &[12, 13, 14, 15]),
-        trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
-    )
+fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        if trace.data[i][17].is_zero(prime) != MayBeFlag::True {
+            record_reprs.insert(format!(
+                "input0: [{}], input1: [{}], output: [{}]",
+                trace_fmt_with_idxs(trace, 0, &[8, 9, 10, 11]),
+                trace_fmt_with_idxs(trace, 0, &[12, 13, 14, 15]),
+                trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
+            ));
+        };
+    }
+    PrettySet(record_reprs)
 }
 
-fn cr_sub(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 1, &[1, 2, 3, 4]),
-        trace_fmt_with_idxs(trace, 1, &[11, 12, 13, 14]),
-        trace_fmt_with_idxs(trace, 1, &[8, 9, 10, 11]),
-    )
+fn cr_sub(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        if trace.data[i][18].is_zero(prime) != MayBeFlag::True {
+            record_reprs.insert(format!(
+                "input0: [{}], input1: [{}], output: [{}]",
+                trace_fmt_with_idxs(trace, 1, &[1, 2, 3, 4]),
+                trace_fmt_with_idxs(trace, 1, &[12, 13, 14, 15]),
+                trace_fmt_with_idxs(trace, 1, &[8, 9, 10, 11]),
+            ));
+        };
+    }
+    PrettySet(record_reprs)
 }
 
 const fn make_col_map() -> AddSubCols<usize> {
@@ -82,14 +96,15 @@ fn main() -> Result<(), io::Error> {
     // ######################## Canonicalization ##################################
     let cr = if opcode_str == "ADD" { cr_add } else { cr_sub };
     let final_check =
-        |at: &AbstractTrace, _n: usize, _p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
-            save_repr_if_unique(&cr(at), kr, ui);
+        |at: &AbstractTrace, _n: usize, p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
+            save_repr_if_unique(&cr(at, p), kr, ui);
         };
 
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
     let air_name = "AddSub";
     let colmap = make_col_map();
+    println!("{:?}", colmap.is_add);
 
     let (output_columns, num_extracted_rows, min_row_id, max_row_id) = if opcode_str == "ADD" {
         (vec![1, 2, 3, 4], 1, 0, 0)
