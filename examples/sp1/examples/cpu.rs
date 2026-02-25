@@ -19,7 +19,8 @@ use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::constraint::eval_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
-use latticevm::memory::check_memory_consistency;
+use latticevm::memory::IntervalMemory;
+use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
@@ -47,78 +48,18 @@ pub fn sp1_abstract_trace_to_abstract_state(
     }
 }
 
-fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
-    let mut val = AbstractInterval::from_i128(0);
-    let mut mul = 1_i128;
-    for i in 0..4 {
-        val = val + row[base + i].clone() * AbstractInterval::from_i128(mul);
-        mul *= 256;
-    }
-    val
-}
-
-fn memory_check(trace: &AbstractTrace, prime: u32) -> MayBeFlag {
+fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
     let mut ops = vec![];
     for row in &trace.data {
-        if let MayBeFlag::True = row[56].is_zero(prime) {
-        } else {
-            if let MayBeFlag::True = row[17].is_non_zero(prime) {
-            } else {
-                let addr = row[8].clone();
-                let val = reconstruct_word(
-                    &[
-                        row[29].clone(),
-                        row[30].clone(),
-                        row[31].clone(),
-                        row[32].clone(),
-                    ],
-                    0,
-                );
-                ops.push((addr, val, true));
+        if MayBeFlag::True != row[56].is_zero(prime) {
+            if MayBeFlag::True != row[17].is_non_zero(prime) {
+                ops.push((row[8].clone(), rec_word(row, 29, 4), true));
             }
-            if let MayBeFlag::True = row[18].is_non_zero(prime) {
-            } else {
-                let addr = reconstruct_word(
-                    &[
-                        row[9].clone(),
-                        row[10].clone(),
-                        row[11].clone(),
-                        row[12].clone(),
-                    ],
-                    0,
-                );
-                let val = reconstruct_word(
-                    &[
-                        row[38].clone(),
-                        row[39].clone(),
-                        row[40].clone(),
-                        row[41].clone(),
-                    ],
-                    0,
-                );
-                ops.push((addr, val, false));
+            if MayBeFlag::True != row[18].is_non_zero(prime) {
+                ops.push((rec_word(row, 9, 4), rec_word(row, 38, 4), false));
             }
-            if let MayBeFlag::True = row[19].is_non_zero(prime) {
-            } else {
-                let addr = reconstruct_word(
-                    &[
-                        row[13].clone(),
-                        row[14].clone(),
-                        row[15].clone(),
-                        row[16].clone(),
-                    ],
-                    0,
-                );
-                let val = reconstruct_word(
-                    &[
-                        row[47].clone(),
-                        row[48].clone(),
-                        row[49].clone(),
-                        row[50].clone(),
-                    ],
-                    0,
-                );
-                ops.push((addr, val, false));
+            if MayBeFlag::True != row[19].is_non_zero(prime) {
+                ops.push((rec_word(row, 13, 4), rec_word(row, 47, 4), false));
             }
         }
     }
@@ -142,12 +83,13 @@ fn final_check(
             recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
         }
     }
-
-    string_representation.push_str("Malicious States:\n");
+    string_representation.push_str("**PC Transition**:\n");
     for rs in &recovered_states {
         string_representation.push_str(&format!("\t{}\n", rs));
     }
-    string_representation.push_str("-----------------\n");
+    string_representation.push_str("\n**Memory**:\n");
+    string_representation.push_str(&format!("{}", memory_check(trace, prime).0).to_string());
+
     save_repr_if_unique(&string_representation, known_reprt, ui);
 }
 
@@ -199,7 +141,7 @@ fn main() -> Result<(), io::Error> {
     let pad_fn = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
     let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
         pad_fn(trace, prime);
-        memory_check(trace, prime)
+        memory_check(trace, prime).1
     };
 
     // ######################## Public Values ####################################
