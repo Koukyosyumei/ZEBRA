@@ -47,7 +47,7 @@ fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
     val
 }
 
-fn memory_check(trace: &AbstractTrace, prime: u32) -> MayBeFlag {
+fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
     let mut ops = vec![];
     for row in &trace.data {
         if MayBeFlag::True != row[65].is_zero(prime) {

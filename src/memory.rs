@@ -2,6 +2,16 @@ use std::fmt;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 
+pub fn reconstruct_word(row: &[AbstractInterval], base: usize, len: usize) -> AbstractInterval {
+    let mut val = AbstractInterval::from_i128(0);
+    let mut mul = 1_i128;
+    for i in 0..len {
+        val = val + row[base + i].clone() * AbstractInterval::from_i128(mul);
+        mul *= 256;
+    }
+    val
+}
+
 #[derive(Clone, Debug)]
 struct Segment {
     addr: AbstractInterval,
