@@ -29,6 +29,7 @@ use latticevm::state::AbstractState;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
 use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::PrettySet;
 
 use latticevm_sp1::pv_constraints::get_pv_constraints;
 use latticevm_sp1::utils::{
@@ -90,7 +91,11 @@ fn final_check(
     string_representation.push_str("\n**Memory**:\n");
     string_representation.push_str(&format!("\t{}", memory_check(trace, prime).0).to_string());
 
-    save_repr_if_unique(&string_representation, known_reprt, ui);
+    // TODO: fix
+    let mut record_reprs = HashSet::new();
+    record_reprs.insert(string_representation);
+
+    save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
