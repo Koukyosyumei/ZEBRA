@@ -17,7 +17,7 @@ use valida_opcodes::BYTES_PER_INSTR;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
 use latticevm::symbolic::AbstractTrace;
 use latticevm::symbolic::LatticeVMConstraints;
 use latticevm::ui::generate_alu_final_checker;
@@ -155,7 +155,7 @@ fn main() -> Result<(), io::Error> {
         vec![],
         &vec![], // vec![0],
         dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
+        nop_post_process,
         final_check,
         &args.method,
     );

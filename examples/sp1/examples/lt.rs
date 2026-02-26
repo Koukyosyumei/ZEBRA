@@ -14,7 +14,7 @@ use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::utils::create_or_clear_dir;
 use latticevm::utils::indices_arr;
 
@@ -92,7 +92,7 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_adjust_pc_program,
+            nop_post_process,
             &final_check,
             &args.method,
         );

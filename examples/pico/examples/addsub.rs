@@ -11,11 +11,13 @@ use pico_vm::chips::chips::alu::add_sub::AddSubChip;
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
+use latticevm::interval::MayBeFlag;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::dummy_adjust_pc_program;
+use latticevm::solver::nop_post_process;
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
+use latticevm::utils::PrettySet;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{canonicalizer::save_repr_if_unique, ui::UiState};
 
@@ -23,22 +25,34 @@ use latticevm_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn cr_add(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[7, 8, 9, 10]),
-        trace_fmt_with_idxs(trace, 0, &[11, 12, 13, 14]),
-        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
-    )
+fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        if trace.data[i][15].is_zero(prime) != MayBeFlag::True {
+            record_reprs.insert(format!(
+                "input0: [{}], input1: [{}], output: [{}]",
+                trace_fmt_with_idxs(trace, 0, &[7, 8, 9, 10]),
+                trace_fmt_with_idxs(trace, 0, &[11, 12, 13, 14]),
+                trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
+            ));
+        };
+    }
+    PrettySet(record_reprs)
 }
 
-fn cr_sub(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
-        trace_fmt_with_idxs(trace, 0, &[11, 12, 13, 14]),
-        trace_fmt_with_idxs(trace, 0, &[7, 8, 9, 10]),
-    )
+fn cr_sub(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        if trace.data[i][16].is_zero(prime) != MayBeFlag::True {
+            record_reprs.insert(format!(
+                "input0: [{}], input1: [{}], output: [{}]",
+                trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
+                trace_fmt_with_idxs(trace, 0, &[11, 12, 13, 14]),
+                trace_fmt_with_idxs(trace, 0, &[7, 8, 9, 10]),
+            ));
+        };
+    }
+    PrettySet(record_reprs)
 }
 
 const fn make_col_map() -> AddSubCols<usize> {
@@ -72,14 +86,15 @@ fn main() -> Result<(), io::Error> {
     // ######################## Canonicalization ##################################
     let cr = if opcode_str == "ADD" { cr_add } else { cr_sub };
     let final_check =
-        |at: &AbstractTrace, _n: usize, _p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
-            save_repr_if_unique(&cr(at), kr, ui);
+        |at: &AbstractTrace, _n: usize, p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
+            save_repr_if_unique(&cr(at, p), kr, ui);
         };
 
     // ######################## Extract CPU Constraints ##########################
     let air: AddSubChip<KoalaBear> = AddSubChip::default();
     let air_name = "AddSub";
     let _colmap = make_col_map();
+    //println!("{:?}", colmap);
 
     let output_columns = if opcode_str == "ADD" {
         vec![0, 1, 2, 3]
@@ -131,7 +146,7 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_adjust_pc_program,
+            nop_post_process,
             final_check,
             &args.method,
         );

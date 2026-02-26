@@ -137,8 +137,11 @@ where
 
     for r in &receives {
         match r.kind {
-            LookupType::Memory => {}
+            LookupType::Memory => {
+                general_lookup_info.is_real.push(cv(&r.mult));
+            }
             LookupType::Alu => {
+                general_lookup_info.is_real.push(cv(&r.mult));
                 for rv in &r.values {
                     for c in &rv.column_weights {
                         if let PairCol::Main(index) = c.0 {

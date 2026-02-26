@@ -17,7 +17,7 @@ use latticevm::quick::{
 };
 use latticevm::solver::make_init_val;
 use latticevm::solver::RangeType;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::trace::AbstractTrace;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
@@ -103,7 +103,7 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_adjust_pc_program,
+            nop_post_process,
             &final_check,
             &args.method,
         );

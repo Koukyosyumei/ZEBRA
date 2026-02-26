@@ -1167,7 +1167,7 @@ pub fn dummy_program_counter_refine_fn(
 ) {
 }
 
-pub fn dummy_adjust_pc_program(_main_trace: &mut AbstractTrace, _prime: u32) -> MayBeFlag {
+pub fn nop_post_process(_main_trace: &mut AbstractTrace, _prime: u32) -> MayBeFlag {
     MayBeFlag::True
 }
 
