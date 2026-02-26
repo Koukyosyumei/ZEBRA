@@ -84,17 +84,17 @@ pub fn generate_memory_op_final_checker(
     op_b_columns: Vec<usize>,
     op_c_columns: Vec<usize>,
     memory_columns: Vec<usize>,
-    is_real: usize,
-    prime: u32,
+    general_lookup_info: GeneralLookupInfo,
 ) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone {
     move |trace: &AbstractTrace,
           _num_trial: usize,
-          _prime: u32,
+          prime: u32,
           known_reprt: &mut HashSet<String>,
           ui: &mut UiState| {
         let mut record_reprs = HashSet::new();
+        let n = trace.data.len();
         for i in 0..trace.data.len() {
-            if trace.data[i][is_real].is_zero(prime) != MayBeFlag::False {
+            if is_maybe_real_wo_pubval(&trace.data[i], &general_lookup_info, prime, n, i) {
                 let row_string_representation = format!(
                 "clk: {}\nop_a_access: [{}]\nop_b_access: [{}]\nop_c_access: [{}]\nmem_access: [{}]\n--------------\n",
                 trace.data[i][clk_column],

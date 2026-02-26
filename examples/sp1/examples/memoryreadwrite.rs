@@ -103,12 +103,13 @@ fn main() -> Result<(), io::Error> {
     let colmap = make_col_map();
     println!("{:?}", colmap);
 
-    let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<BabyBear, MemoryInstructionsChip>(
-            &air,
-            NUM_MEMORY_INSTRUCTIONS_COLUMNS,
-            prime,
-        );
+    let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
+        BabyBear,
+        MemoryInstructionsChip,
+    >(
+        &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime
+    );
+    println!("{:?}", general_lookup_info);
 
     let final_check = generate_memory_op_final_checker(
         2,                    // clk
@@ -116,6 +117,7 @@ fn main() -> Result<(), io::Error> {
         vec![7, 8, 9, 10],    // op_b
         vec![11, 12, 13, 14], // op_c
         vec![38, 39, 40, 41], // mem
+        general_lookup_info,
     );
     let mut semantic_inputs = vec![
         0, 1, 2, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
