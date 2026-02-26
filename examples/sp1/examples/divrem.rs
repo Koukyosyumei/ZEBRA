@@ -59,16 +59,18 @@ fn main() -> Result<(), io::Error> {
     let air = DivRemChip::default();
     let air_name = "DivRem";
     let colmap = make_col_map();
+    println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
+    println!("{:?}", general_lookup_info);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
         .refinable_cols
         .extend(&general_lookup_info.op_a.clone());
     constraint_info.output_columns = general_lookup_info.op_a.clone();
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);

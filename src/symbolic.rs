@@ -1290,5 +1290,5 @@ pub struct GeneralLookupInfo {
     pub op_a: Vec<usize>,
     pub op_b: Vec<usize>,
     pub op_c: Vec<usize>,
-    pub pc_table_is_real: LatticeVMSymbolicExpr,
+    pub is_real: Vec<LatticeVMSymbolicExpr>,
 }

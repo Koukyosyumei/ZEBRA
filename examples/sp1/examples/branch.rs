@@ -21,6 +21,7 @@ use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn
 use latticevm::trace::trace_fmt_with_idxs;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
+use latticevm::utils::PrettySet;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_sp1::utils::{
@@ -35,15 +36,19 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let string_representation = format!(
-        "pc: [{}], next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
-        trace_fmt_with_idxs(trace, 0, &[5, 6, 7, 8]),
-        trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
-        trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
-        trace_fmt_with_idxs(trace, 0, &[18, 19, 20, 21]),
-    );
-    save_repr_if_unique(&string_representation, known_reprt, ui);
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        let string_representation = format!(
+            "pc: [{}], next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
+            trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
+            trace_fmt_with_idxs(trace, 0, &[5, 6, 7, 8]),
+            trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+            trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
+            trace_fmt_with_idxs(trace, 0, &[18, 19, 20, 21]),
+        );
+        record_reprs.insert(string_representation);
+    }
+    save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
 
 const fn make_col_map() -> BranchColumns<usize> {
@@ -95,6 +100,7 @@ fn main() -> Result<(), io::Error> {
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
+    println!("{:?}", general_lookup_info);
     let output_columns = vec![5, 6, 7, 8];
     for i in vec![5, 6, 7] {
         constraint_info.range_types.insert(i, RangeType::U8);

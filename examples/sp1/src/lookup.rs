@@ -59,6 +59,7 @@ where
     for r in &receives {
         match r.kind {
             InteractionKind::Instruction => {
+                general_lookup_info.is_real.push(cv(&r.multiplicity));
                 for rv in &r.values {
                     for c in &rv.column_weights {
                         if let PairCol::Main(index) = c.0 {
@@ -85,7 +86,7 @@ where
 
         match s.kind {
             InteractionKind::Program => {
-                general_lookup_info.pc_table_is_real = multiplicities.clone();
+                general_lookup_info.is_real.push(multiplicities.clone());
             }
             InteractionKind::Instruction => {
                 let _shard = &s.values[0];

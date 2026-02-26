@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fs};
 
-use crate::interval::MayBeFlag;
+use crate::interval::{AbstractInterval, MayBeFlag};
 use crate::symbolic::GeneralLookupInfo;
 use crate::trace::{trace_fmt_with_idxs, AbstractTrace};
 use crate::ui::UiState;
@@ -11,6 +11,10 @@ pub fn save_repr_if_unique(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
+    if record_reprs.0.is_empty() {
+        return;
+    }
+
     let string_representation = format!("{}", record_reprs);
     if !known_reprt.contains(&string_representation) {
         known_reprt.insert(string_representation.clone());
@@ -29,6 +33,26 @@ pub fn save_repr_if_unique(
     }
 }
 
+fn is_maybe_real_wo_pubval(
+    row: &Vec<AbstractInterval>,
+    info: &GeneralLookupInfo,
+    p: u32,
+    n: usize,
+    i: usize,
+) -> bool {
+    let mut is_may_real = false;
+    for gri in &info.is_real {
+        is_may_real = gri
+            .eval(&row, None, None, i == 0, i < n - 1, i == n - 1, p)
+            .is_zero(p)
+            != MayBeFlag::True;
+        if is_may_real {
+            break;
+        }
+    }
+    is_may_real
+}
+
 pub fn generate_alu_final_checker(
     general_lookup_info: GeneralLookupInfo,
 ) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone {
@@ -40,12 +64,7 @@ pub fn generate_alu_final_checker(
         let mut record_reprs = HashSet::new();
         let n = trace.data.len();
         for (i, curr_row) in trace.data.iter().enumerate() {
-            let is_may_real = general_lookup_info
-                .pc_table_is_real
-                .eval(&curr_row, None, None, i == 0, i < n - 1, i == n - 1, prime)
-                .is_zero(prime)
-                != MayBeFlag::False;
-            if is_may_real {
+            if is_maybe_real_wo_pubval(curr_row, &general_lookup_info, prime, n, i) {
                 record_reprs.insert(format!(
                     "input0: [{}], input1: [{}], output: [{}]",
                     trace_fmt_with_idxs(trace, 0, &general_lookup_info.op_b),

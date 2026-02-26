@@ -88,7 +88,7 @@ fn final_check(
         string_representation.push_str(&format!("\t{}\n", rs));
     }
     string_representation.push_str("\n**Memory**:\n");
-    string_representation.push_str(&format!("{}", memory_check(trace, prime).0).to_string());
+    string_representation.push_str(&format!("\t{}", memory_check(trace, prime).0).to_string());
 
     save_repr_if_unique(&string_representation, known_reprt, ui);
 }
