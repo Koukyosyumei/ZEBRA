@@ -25,21 +25,29 @@ use latticevm_ziren::utils::{
 };
 
 fn canonical_repr_div(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-        trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
-    )
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        record_reprs.insert(format!(
+            "input0: [{}], input1: [{}], output: [{}]",
+            trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+            trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
+            trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+        ));
+    }
+    PrettySet(record_reprs)
 }
 
 fn canonical_repr_rem(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-        trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
-    )
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        record_reprs.insert(format!(
+            "input0: [{}], input1: [{}], output: [{}]",
+            trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+            trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
+            trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
+        ));
+    }
+    PrettySet(record_reprs)
 }
 
 const fn make_col_map() -> DivRemCols<usize> {

@@ -18,6 +18,7 @@ use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, Range
 use latticevm::trace::trace_fmt_with_idxs;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
+use latticevm::utils::PrettySet;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_ziren::utils::{
@@ -32,13 +33,16 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let string_representation = format!(
-        "input0: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-    );
-
-    save_repr_if_unique(&string_representation, known_reprt, ui);
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        let string_representation = format!(
+            "input0: [{}], output: [{}]",
+            trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
+            trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+        );
+        record_reprs.insert(string_representation);
+    }
+    save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
 
 const fn make_col_map() -> CloClzCols<usize> {
