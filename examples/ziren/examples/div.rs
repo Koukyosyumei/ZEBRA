@@ -18,13 +18,14 @@ use latticevm::solver::RangeType;
 use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
+use latticevm::utils::PrettySet;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn canonical_repr_div(trace: &AbstractTrace) -> String {
+fn canonical_repr_div(trace: &AbstractTrace) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
     for i in 0..trace.data.len() {
         record_reprs.insert(format!(
@@ -37,7 +38,7 @@ fn canonical_repr_div(trace: &AbstractTrace) -> String {
     PrettySet(record_reprs)
 }
 
-fn canonical_repr_rem(trace: &AbstractTrace) -> String {
+fn canonical_repr_rem(trace: &AbstractTrace) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
     for i in 0..trace.data.len() {
         record_reprs.insert(format!(

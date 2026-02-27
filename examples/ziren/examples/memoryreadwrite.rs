@@ -88,12 +88,12 @@ fn main() -> Result<(), io::Error> {
     let air_name = "MemoryInstrs";
     let _colmap = make_col_map();
 
-    let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, MemoryInstructionsChip>(
-            &air,
-            NUM_MEMORY_INSTRUCTIONS_COLUMNS,
-            prime,
-        );
+    let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
+        KoalaBear,
+        MemoryInstructionsChip,
+    >(
+        &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime
+    );
 
     let final_check = generate_memory_op_final_checker(
         3,                    // clk
@@ -101,6 +101,7 @@ fn main() -> Result<(), io::Error> {
         vec![8, 9, 10, 11],   // op_b
         vec![12, 13, 14, 15], // op_c
         vec![57, 58, 59, 60], // mem
+        general_lookup_info,
     );
     let mut semantic_inputs = vec![
         0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15, 53, 54, 55, 56, 66, 67, 68, 69,
