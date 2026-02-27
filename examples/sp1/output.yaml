@@ -9,9 +9,9 @@ config:
 args:
   config: ./configs/alu.config
   ouptput_path: output.yaml
-  method: bb
+  method: z3
   opcode_str: JAL
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.07205806916666666
-  exe_time_variance: 0.0015381626169221607
+  exe_time_mean: 0.0535859679
+  exe_time_variance: 0.0010471915983655113

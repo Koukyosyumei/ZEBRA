@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{collections::HashSet, fmt, fs, path::Path};
 
 #[derive(Debug)]
 pub struct BitCombinationsDictOrder {
@@ -59,4 +59,22 @@ pub const fn indices_arr<const N: usize>() -> [usize; N] {
         i += 1;
     }
     indices_arr
+}
+
+pub struct PrettySet<T>(pub HashSet<T>);
+
+impl<T: Ord + fmt::Display> fmt::Display for PrettySet<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut v: Vec<&T> = self.0.iter().collect();
+        v.sort();
+
+        write!(f, "{{")?;
+        for (i, x) in v.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", x)?;
+        }
+        write!(f, "}}")
+    }
 }

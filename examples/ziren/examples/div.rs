@@ -15,31 +15,40 @@ use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::RangeType;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
+use latticevm::utils::PrettySet;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn canonical_repr_div(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-        trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
-    )
+fn canonical_repr_div(trace: &AbstractTrace) -> PrettySet<String> {
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        record_reprs.insert(format!(
+            "input0: [{}], input1: [{}], output: [{}]",
+            trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+            trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
+            trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+        ));
+    }
+    PrettySet(record_reprs)
 }
 
-fn canonical_repr_rem(trace: &AbstractTrace) -> String {
-    format!(
-        "input0: [{}], input1: [{}], output: [{}]",
-        trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-        trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-        trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
-    )
+fn canonical_repr_rem(trace: &AbstractTrace) -> PrettySet<String> {
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        record_reprs.insert(format!(
+            "input0: [{}], input1: [{}], output: [{}]",
+            trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+            trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
+            trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
+        ));
+    }
+    PrettySet(record_reprs)
 }
 
 const fn make_col_map() -> DivRemCols<usize> {
@@ -130,7 +139,7 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_adjust_pc_program,
+            nop_post_process,
             final_check,
             &args.method,
         );

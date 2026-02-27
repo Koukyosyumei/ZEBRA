@@ -15,9 +15,12 @@ use sp1_core_machine::{
 };
 use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
 
+use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::constraint::eval_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
+use latticevm::memory::IntervalMemory;
+use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
@@ -26,6 +29,7 @@ use latticevm::state::AbstractState;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
 use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::PrettySet;
 
 use latticevm_sp1::pv_constraints::get_pv_constraints;
 use latticevm_sp1::utils::{
@@ -38,11 +42,30 @@ pub fn sp1_abstract_trace_to_abstract_state(
 ) -> AbstractState {
     AbstractState {
         clk: abstract_row[1].clone()
-            + abstract_row[2].clone() * AbstractInterval::from_i64(2_usize.pow(16) as i64),
+            + abstract_row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
         pc: abstract_row[5].clone(),
         is_done: abstract_row[5].clone().is_zero(prime),
         memory_ops: Vec::new(),
     }
+}
+
+fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
+    let mut ops = vec![];
+    for row in &trace.data {
+        if MayBeFlag::True != row[56].is_zero(prime) {
+            if MayBeFlag::True != row[17].is_non_zero(prime) {
+                ops.push((row[8].clone(), rec_word(row, 29, 4), true));
+            }
+            if MayBeFlag::True != row[18].is_non_zero(prime) {
+                ops.push((rec_word(row, 9, 4), rec_word(row, 38, 4), false));
+            }
+            if MayBeFlag::True != row[19].is_non_zero(prime) {
+                ops.push((rec_word(row, 13, 4), rec_word(row, 47, 4), false));
+            }
+        }
+    }
+
+    check_memory_consistency(&ops)
 }
 
 // ############## Final Check Function ##############################
@@ -56,37 +79,26 @@ fn final_check(
     let mut string_representation = String::new();
     let mut recovered_states = vec![];
     for row in &trace.data {
-        if let MayBeFlag::False = row[56].is_zero(prime) {
+        if let MayBeFlag::True = row[56].is_zero(prime) {
+        } else {
             recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
         }
     }
-
-    string_representation.push_str("Malicious States:\n");
+    string_representation.push_str("**PC Transition**:\n");
     for rs in &recovered_states {
         string_representation.push_str(&format!("\t{}\n", rs));
     }
-    string_representation.push_str("-----------------\n");
+    string_representation.push_str("\n**Memory**:\n");
+    string_representation.push_str(&format!("\t{}", memory_check(trace, prime).0).to_string());
 
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
+    // TODO: fix
+    let mut record_reprs = HashSet::new();
+    record_reprs.insert(string_representation);
 
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
+    save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    // this program is expected to invalid according to the semantics of ziren, while
-    // we can find the satisfying solution.
     let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
     instructions.extend(vec![
         Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
@@ -109,8 +121,8 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     let min_row_id = 0;
-    let max_row_id = 3;
-    let num_extracted_rows = 5;
+    let max_row_id = 6;
+    let num_extracted_rows = 8;
 
     // ######################## Extract CPU Constraints ##########################
     let air = CpuChip::default();
@@ -131,11 +143,15 @@ fn main() -> Result<(), io::Error> {
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
-    let adjust_pc_program = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
+    let pad_fn = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
+    let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
+        pad_fn(trace, prime);
+        memory_check(trace, prime).1
+    };
 
     // ######################## Public Values ####################################
     let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::from_i64(2013265921 - 8);
+    public_vals[40] = AbstractInterval::from_i128(2013265921 - 8);
     public_vals[41] = AbstractInterval::zero();
     public_vals[44] = AbstractInterval::one();
 
@@ -145,6 +161,8 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     if search_config.minimum_num_taregt_cols == 0 {
+        search_config.time_out_ms = 100000;
+        search_config.max_expansions = 50000;
         search_config.minimum_num_taregt_cols = 1; //constraint_info.refinable_cols.len();
         search_config.min_row_id = min_row_id;
         search_config.max_row_id = max_row_id;
@@ -158,7 +176,7 @@ fn main() -> Result<(), io::Error> {
         &base_abs_main_trace_data,
         public_vals,
         &vec![], // vec![0],
-        adjust_pc_program,
+        post_process,
         final_check,
         &args.method,
     );

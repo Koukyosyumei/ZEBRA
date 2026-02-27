@@ -1,4 +1,6 @@
-use itertools::Itertools;
+use clap::Parser;
+use core::mem::transmute;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::fs;
 use std::io;
@@ -14,16 +16,20 @@ use zkm_core_machine::{
 use zkm_stark::MachineProver;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
+use latticevm::canonicalizer::save_repr_if_unique;
+use latticevm::constraint::eval_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
-use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::memory::IntervalMemory;
+use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
+use latticevm::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
+use latticevm::solver::dummy_program_counter_refine_fn;
 use latticevm::state::AbstractState;
-use latticevm::ui::pad_dummy_rows_with_last_dummy;
-use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::UiState;
-use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{symbolic::AbstractTrace, symbolic::LatticeVMConstraints};
+use latticevm::trace::AbstractTrace;
+use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
+use latticevm::utils::create_or_clear_dir;
 
 use latticevm_ziren::utils::get_pv_constraints;
 use latticevm_ziren::utils::{
@@ -36,11 +42,30 @@ pub fn ziren_abstract_trace_to_abstract_state(
 ) -> AbstractState {
     AbstractState {
         clk: abstract_row[1].clone()
-            + abstract_row[2].clone() * AbstractInterval::from_i64(2_usize.pow(16) as i64),
+            + abstract_row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
         pc: abstract_row[5].clone(),
         is_done: abstract_row[5].clone().is_zero(prime),
         memory_ops: Vec::new(),
     }
+}
+
+fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
+    let mut ops = vec![];
+    for row in &trace.data {
+        if MayBeFlag::True != row[65].is_zero(prime) {
+            if MayBeFlag::True != row[18].is_non_zero(prime) {
+                ops.push((row[9].clone(), rec_word(row, 26, 4), true));
+            }
+            if MayBeFlag::True != row[19].is_non_zero(prime) {
+                ops.push((rec_word(row, 10, 4), rec_word(row, 47, 4), false));
+            }
+            if MayBeFlag::True != row[20].is_non_zero(prime) {
+                ops.push((rec_word(row, 14, 4), rec_word(row, 56, 4), false));
+            }
+        }
+    }
+
+    check_memory_consistency(&ops)
 }
 
 // ############## Final Check Function ##############################
@@ -58,11 +83,12 @@ fn final_check(
             recovered_states.push(ziren_abstract_trace_to_abstract_state(&row, prime));
         }
     }
-    string_representation.push_str("Malicious States:\n");
+    string_representation.push_str("**PC Transition**:\n");
     for rs in &recovered_states {
         string_representation.push_str(&format!("\t{}\n", rs));
     }
-    string_representation.push_str("-----------------\n");
+    string_representation.push_str("\n**Memory**:\n");
+    string_representation.push_str(&format!("{}", memory_check(trace, prime).0).to_string());
 
     save_repr_if_unique(&string_representation, known_reprt, ui);
 }
@@ -83,6 +109,9 @@ pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
+    let args = Args::parse();
+    let mut search_config = load_config(&args.config).unwrap();
+
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
     let program_cols = (8..35).collect::<Vec<_>>();
@@ -99,19 +128,16 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Cpu";
     println!("{:?}", CPU_COL_MAP);
 
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, prime);
-    refinable_cols.retain(|x| !program_cols.contains(x));
-    refinable_cols.push(65);
+    constraint_info
+        .refinable_cols
+        .retain(|x| !program_cols.contains(x));
+    constraint_info.refinable_cols.push(65);
 
     let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
-    let constraints = LatticeVMConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints,
-        pv_neg_constraints,
-    };
-    let minimum_num_taregt_cols = 1; //refinable_cols.len();
+    constraint_info.constraints.pv_pos_constraints = pv_pos_constraints;
+    constraint_info.constraints.pv_neg_constraints = pv_neg_constraints;
 
     // ######################## Program Initialization ###########################
     let program = target_program(2130706433 - 8, 2130706433 - 8);
@@ -120,31 +146,43 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Public Values ####################################
     let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::from_i64(2130706433 - 8);
+    public_vals[40] = AbstractInterval::from_i128(2130706433 - 8);
     public_vals[41] = AbstractInterval::zero();
     public_vals[44] = AbstractInterval::one();
     let refinment_target_indicies_pv: Vec<usize> = vec![];
 
-    let adjust_pc_program = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
+    let pad_fn = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
+    let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
+        pad_fn(trace, prime);
+        memory_check(trace, prime).1
+    };
+
+    // ######################## Set Info ##########################################
+    let program_info = ProgramInfo {
+        program_str: get_program_str(&program),
+        program_len: program.instructions.len(),
+    };
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.time_out_ms = 100000;
+        search_config.max_expansions = 50000;
+        search_config.minimum_num_taregt_cols = 1; //constraint_info.refinable_cols.len();
+        search_config.min_row_id = min_row_id;
+        search_config.max_row_id = max_row_id;
+    }
 
     // ######################## Solve ############################################
-    quick_api(
-        get_program_str(&program),
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &refinment_target_indicies_pv,
+    let result = experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         public_vals,
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.instructions.len(),
-        dummy_program_counter_refine_fn,
-        adjust_pc_program,
+        &vec![], // vec![0],
+        post_process,
         final_check,
-        prime,
-        seed,
-    )
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }

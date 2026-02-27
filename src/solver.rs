@@ -253,7 +253,7 @@ pub struct ConstraintInfo {
 /// * `constraints` — Global VM constraints to be satisfied.
 /// * `prime` — Field modulus.
 /// * `rng` — Random number generator for stochastic refinement.
-/// * `align_pc_to_program` — Callback that aligns program counters to valid locations.
+/// * `post_process` — Callback that performs post-processes.
 /// * `refinment_target_indicies_main` — Preferred indices for general refinement.
 /// * `bool_target_indices` — Indices prioritized for boolean refinement.
 /// * `min_row_id`, `max_row_id` — Row bounds eligible for refinement.
@@ -299,7 +299,7 @@ fn process_single_node(
     constraints: &LatticeVMConstraints,
     prime: u32,
     rng: &mut StdRng,
-    align_pc_to_program: &impl Fn(&mut AbstractTrace, u32),
+    post_process: &impl Fn(&mut AbstractTrace, u32) -> MayBeFlag,
     refinment_target_indicies_main: &Vec<usize>,
     bool_target_indices: &[usize],
     min_row_id: usize,
@@ -376,14 +376,16 @@ fn process_single_node(
 
     let mut results = Vec::new();
     for mut kid_trace in children {
-        align_pc_to_program(&mut kid_trace, prime);
+        let post_res = post_process(&mut kid_trace, prime);
         let (res, pot, _) =
             eval_constraints(&kid_trace, Some(&public_trace.data[0]), constraints, prime);
 
-        match res {
-            MayBeFlag::True => return NodeProcessingResult::Success(kid_trace),
-            MayBeFlag::False => {}
-            MayBeFlag::MayBe => {
+        match (res, post_res) {
+            (MayBeFlag::True, MayBeFlag::True) => return NodeProcessingResult::Success(kid_trace),
+            (MayBeFlag::False, _) | (_, MayBeFlag::False) => {}
+            (MayBeFlag::MayBe, MayBeFlag::MayBe)
+            | (MayBeFlag::MayBe, MayBeFlag::True)
+            | (MayBeFlag::True, MayBeFlag::MayBe) => {
                 results.push((
                     SearchNode {
                         main_trace: kid_trace,
@@ -421,7 +423,7 @@ fn process_single_node(
 /// * `constraints` — Shared VM constraint system.
 /// * `refinable_cols` — Column indices allowed to be refined in this subset.
 /// * `range_types` — Domain specifications for columns.
-/// * `align_pc_to_program` — Callback that adjusts traces to valid program counters.
+/// * `post_process` — Callback that adjusts traces to valid program counters.
 /// * `search_config` - Search config
 /// * `prime` — Field modulus.
 /// * `ui` — Mutable UI state for rendering progress and logs.
@@ -508,13 +510,13 @@ fn process_single_node(
 /// * [`process_single_node`] — Core node expansion routine.
 /// * [`SolverMsg`] — Messages exchanged between workers and UI thread.
 /// * [`SearchNode`] — Representation of search states.
-pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
+pub fn parallel_solve<PostProcessFn, FinalCheckFn>(
     initial_node: &mut SearchNode,
     public_trace: AbstractTrace,
     constraints: Arc<LatticeVMConstraints>,
     refinable_cols: Arc<Vec<usize>>, // Specific to this subset
     range_types: Arc<HashMap<usize, RangeType>>,
-    align_pc_to_program: AlignPcToProgramFn,
+    post_process: PostProcessFn,
     search_config: SearchConfig,
     prime: u32,
     ui: &mut UiState,
@@ -527,7 +529,7 @@ pub fn parallel_solve<AlignPcToProgramFn, FinalCheckFn>(
 ) -> (VerificationStatus, bool, bool)
 // (Found, Quit)
 where
-    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
+    PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
 {
     let time_out = Duration::from_millis(search_config.time_out_ms);
@@ -615,7 +617,7 @@ where
         let c_cvsc = conditional_var_sub_const_constraints.clone();
         let c_cvsv = conditional_var_sub_var_constraints.clone();
         let c_abir = abir_constraints.clone();
-        let c_align = align_pc_to_program.clone();
+        let c_align = post_process.clone();
 
         thread::spawn(move || {
             let mut rng = StdRng::seed_from_u64(search_config.seed + wid as u64);
@@ -861,7 +863,7 @@ where
 /// * `base_abs_main_trace_data` — Baseline abstract trace data used as a template.
 /// * `public_vals` — Public input values (single-row trace).
 /// * `search_config` - Search config
-/// * `align_pc_to_program` — Callback to align traces to valid program counters.
+/// * `post_process` — Callback to align traces to valid program counters.
 /// * `final_check` — Callback invoked when candidate solutions are found.
 /// * `known_solution` — Set used to deduplicate discovered solutions.
 /// * `ui` — Mutable UI state for progress reporting.
@@ -910,12 +912,12 @@ where
 /// * [`parallel_solve`] — Performs the per-subset parallel search.
 /// * [`make_init_val`] — Initializes column domains.
 /// * [`SearchNode`] — Root node representation.
-pub fn run_parallel_solver<FinalCheckFn, AlignPcToProgramFn>(
+pub fn run_parallel_solver<FinalCheckFn, PostProcessFn>(
     constraint_info: &ConstraintInfo,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     public_vals: Vec<AbstractInterval>,
     search_config: &SearchConfig,
-    align_pc_to_program: AlignPcToProgramFn,
+    post_process: PostProcessFn,
     final_check: FinalCheckFn,
     known_solution: &mut HashSet<String>,
     ui: &mut UiState,
@@ -924,7 +926,7 @@ pub fn run_parallel_solver<FinalCheckFn, AlignPcToProgramFn>(
 ) -> (VerificationStatus, usize)
 where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
-    AlignPcToProgramFn: Fn(&mut AbstractTrace, u32) + Clone + Send + Sync + 'static,
+    PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
     // Arc wrappers for constant data shared across all subsets
     let shared_constraints = Arc::new(constraint_info.constraints.clone());
@@ -973,7 +975,7 @@ where
                 shared_constraints.clone(),
                 Arc::new(subset_indices), // Subset specific plan
                 shared_range_types.clone(),
-                align_pc_to_program.clone(),
+                post_process.clone(),
                 search_config.clone(),
                 constraint_info.prime,
                 ui,
@@ -1165,7 +1167,9 @@ pub fn dummy_program_counter_refine_fn(
 ) {
 }
 
-pub fn dummy_adjust_pc_program(_main_trace: &mut AbstractTrace, _prime: u32) {}
+pub fn nop_post_process(_main_trace: &mut AbstractTrace, _prime: u32) -> MayBeFlag {
+    MayBeFlag::True
+}
 
 pub fn dummy_table_deriver(
     _cpu_main_trace: &Vec<Vec<AbstractInterval>>,

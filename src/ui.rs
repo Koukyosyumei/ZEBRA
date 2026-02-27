@@ -100,8 +100,7 @@ pub fn pad_dummy_rows_with_last_dummy(
     move |main_trace: &mut AbstractTrace, prime: u32| {
         let num_steps = main_trace.data.len();
 
-        if general_lookup_info
-            .pc_table_is_real
+        if general_lookup_info.is_real[0]
             .eval(
                 &main_trace.data[num_steps - 1],
                 None,
@@ -116,8 +115,7 @@ pub fn pad_dummy_rows_with_last_dummy(
         {
             let pad_ref_data = main_trace.data[num_steps - 1].clone();
             for i in 0..num_steps {
-                if general_lookup_info
-                    .pc_table_is_real
+                if general_lookup_info.is_real[0]
                     .eval(
                         &main_trace.data[i],
                         if i + 1 < num_steps {

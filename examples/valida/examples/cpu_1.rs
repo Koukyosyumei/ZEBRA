@@ -47,6 +47,31 @@ fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
     val
 }
 
+fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
+    let mut ops = vec![];
+    for row in &trace.data {
+        if MayBeFlag::True != row[65].is_zero(prime) {
+            if MayBeFlag::False != row[42].is_non_zero(prime) {
+                let addr = row[43].clone();
+                let val = reconstruct_word(row, 44);
+                ops.push((addr, val, true));
+            }
+            if MayBeFlag::False != row[30].is_non_zero(prime) {
+                let addr = row[31].clone();
+                let val = reconstruct_word(row, 32);
+                ops.push((addr, val, false));
+            }
+            if MayBeFlag::False != row[36].is_non_zero(prime) {
+                let addr = row[37].clone();
+                let val = reconstruct_word(row, 38);
+                ops.push((addr, val, false));
+            }
+        }
+    }
+
+    check_memory_consistency(&ops)
+}
+
 pub fn valida_abstract_trace_to_abstract_state(
     abstract_row: &Vec<AbstractInterval>,
     prime: u32,

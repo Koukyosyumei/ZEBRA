@@ -16,7 +16,7 @@ use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::interval::{AbstractInterval, MayBeFlag};
 use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
 use latticevm::ui::save_repr_if_unique;
 use latticevm::ui::UiState;
@@ -178,7 +178,7 @@ fn main() -> Result<(), io::Error> {
         max_row_id,
         program.len(),
         dummy_program_counter_refine_fn,
-        dummy_adjust_pc_program,
+        nop_post_process,
         final_check,
         prime,
         seed,

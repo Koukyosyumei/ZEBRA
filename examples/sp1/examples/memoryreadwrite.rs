@@ -15,7 +15,7 @@ use latticevm::canonicalizer::{generate_memory_op_final_checker, save_repr_if_un
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn};
+use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::ui::UiState;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use latticevm::{
@@ -103,12 +103,13 @@ fn main() -> Result<(), io::Error> {
     let colmap = make_col_map();
     println!("{:?}", colmap);
 
-    let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<BabyBear, MemoryInstructionsChip>(
-            &air,
-            NUM_MEMORY_INSTRUCTIONS_COLUMNS,
-            prime,
-        );
+    let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
+        BabyBear,
+        MemoryInstructionsChip,
+    >(
+        &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime
+    );
+    println!("{:?}", general_lookup_info);
 
     let final_check = generate_memory_op_final_checker(
         2,                    // clk
@@ -116,6 +117,7 @@ fn main() -> Result<(), io::Error> {
         vec![7, 8, 9, 10],    // op_b
         vec![11, 12, 13, 14], // op_c
         vec![38, 39, 40, 41], // mem
+        general_lookup_info,
     );
     let mut semantic_inputs = vec![
         0, 1, 2, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
@@ -176,7 +178,7 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![], // vec![0],
-            dummy_adjust_pc_program,
+            nop_post_process,
             &final_check,
             &args.method,
         );

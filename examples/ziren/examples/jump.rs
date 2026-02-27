@@ -21,10 +21,11 @@ use latticevm::constraint::eval_constraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_adjust_pc_program, dummy_program_counter_refine_fn, RangeType};
+use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
 use latticevm::trace::trace_fmt_with_idxs;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
+use latticevm::utils::PrettySet;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 use zkm_core_executor::syscalls::SyscallCode;
 
@@ -40,7 +41,9 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let string_representation = format!(
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        let string_representation = format!(
         "pc: {}, next_pc: [{}], next_next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
         trace.data[0][0],
         trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
@@ -49,7 +52,9 @@ fn final_check(
         trace_fmt_with_idxs(trace, 0, &[41, 42, 43, 44]),
         trace_fmt_with_idxs(trace, 0, &[45, 46, 47, 48]),
     );
-    save_repr_if_unique(&string_representation, known_reprt, ui);
+        record_reprs.insert(string_representation);
+    }
+    save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
 
 const fn make_col_map() -> JumpColumns<usize> {
@@ -131,7 +136,7 @@ fn main() -> Result<(), io::Error> {
             &base_abs_main_trace_data,
             vec![],
             &vec![],
-            dummy_adjust_pc_program,
+            nop_post_process,
             &final_check,
             &args.method,
         );
