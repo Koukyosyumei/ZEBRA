@@ -43,6 +43,7 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
     counter_cols: &mut Vec<usize>,
     lookup_constraints: &mut Vec<LVSExpr>,
     prime: u32,
+    general_lookup_info: &mut GeneralLookupInfo,
 ) where
     M: Machine<SC::Val>,
     C: ChipWithPersistence<M, SC> + Air<AB>,
@@ -165,6 +166,8 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
             InteractionType::GlobalReceive => match e_interaction.argument_index {
                 BusArgument::Local(_) => {}
                 BusArgument::Global(id) => {
+                    general_lookup_info.is_real.push(cv(&e_interaction.count));
+
                     // Lookup with CPU
                     if id == 0 {
                         for pair in e_interaction.fields.iter() {
@@ -199,6 +202,7 @@ pub fn get_lookup_interactions<M, SC, C>(
     counter_cols: &mut Vec<usize>,
     lookup_constraints: &mut Vec<LVSExpr>,
     prime: u32,
+    general_lookup_info: &mut GeneralLookupInfo,
 ) where
     M: Machine<SC::Val>,
     SC: StarkConfig,
@@ -220,6 +224,7 @@ pub fn get_lookup_interactions<M, SC, C>(
         counter_cols,
         lookup_constraints,
         prime,
+        general_lookup_info,
     );
 }
 
@@ -290,6 +295,7 @@ where
         &mut multiplicities,
         &mut lookup_constraints,
         prime,
+        &mut general_lookup_info,
     );
 
     let received_vars_from_cpu: Vec<_> = nested_received_vars_from_cpu
@@ -372,7 +378,7 @@ pub fn make_pc_adjuster(
                 }
             } else {
                 for i in 3..9 {
-                    row[i] = AbstractInterval::top();
+                    row[i] = AbstractInterval::top(prime);
                 }
             }
         }
