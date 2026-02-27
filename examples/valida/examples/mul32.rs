@@ -1,6 +1,7 @@
 use clap::Parser;
+use core::mem::transmute;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_baby_bear::BabyBear;
@@ -14,13 +15,13 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
+use latticevm::canonicalizer::generate_alu_final_checker;
+use latticevm::constraint::LatticeVMConstraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
-use latticevm::symbolic::AbstractTrace;
-use latticevm::symbolic::LatticeVMConstraints;
-use latticevm::ui::generate_alu_final_checker;
+use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
 
@@ -28,46 +29,6 @@ use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
-
-fn final_check(
-    trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
-    known_reprt: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
-    let string_representation = format!(
-        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][8],
-        trace.data[0][9],
-        trace.data[0][10],
-        trace.data[0][11],
-    );
-
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
-    }
-}
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
@@ -102,7 +63,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let _opcode_str = args.opcode_str;
+    let _opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -117,49 +78,64 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 5;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (mut constraint_info, general_lookup_info) =
+    let (mut constraint_info, mut general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
-    constraint_info.refinable_cols.extend(&[8, 9, 10, 11]);
+    general_lookup_info.op_a.extend(&[8, 9, 10, 11]);
+    general_lookup_info.op_b.extend(&[0, 1, 2, 3]);
+    general_lookup_info.op_c.extend(&[4, 5, 6, 7]);
     println!("{:?}", general_lookup_info);
+    println!("{:?}", constraint_info.range_types);
 
-    for t in &constraint_info.constraints.air_constraints {
-        println!("{}", t);
-    }
-
-    // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>(3, 4);
-    let program_str = program
-        .iter()
-        .map(|inst| format!("{}\n", inst))
-        .collect::<String>();
-    let base_abs_main_trace_data =
-        generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
-
-    // ######################## Set Info ##########################################
-    let program_info = ProgramInfo {
-        program_str: program_str,
-        program_len: program.len(),
-    };
+    let final_check = generate_alu_final_checker(general_lookup_info.clone());
+    constraint_info
+        .refinable_cols
+        .extend(&general_lookup_info.op_a);
+    constraint_info.output_columns = general_lookup_info.op_a;
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
-    // ######################## Solve ############################################
-    let result = experiment_harness(
-        &program_info,
-        &mut constraint_info,
-        &search_config,
-        &base_abs_main_trace_data,
-        vec![],
-        &vec![], // vec![0],
-        dummy_program_counter_refine_fn,
-        nop_post_process,
-        final_check,
-        &args.method,
-    );
-    println!("{:?}", result);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
+    let mut ds = vec![];
+    for _ in 0..30 {
+        let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
+        let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
+
+        // ######################## Program Initialization ###########################
+        let program = get_target_program::<BabyBear>(x, y);
+        let program_str = program
+            .iter()
+            .map(|inst| format!("{}\n", inst))
+            .collect::<String>();
+        let base_abs_main_trace_data =
+            generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
+
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: program_str,
+            program_len: program.len(),
+        };
+
+        // ######################## Solve ############################################
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            vec![],
+            &vec![], // vec![0],
+            nop_post_process,
+            &final_check,
+            &args.method,
+        );
+        println!("({} {}), {:?}", x, y, result);
+        ds.push(result.unwrap());
+    }
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }
