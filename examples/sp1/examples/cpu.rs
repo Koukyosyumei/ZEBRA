@@ -111,23 +111,17 @@ fn final_check(
             recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
         }
     }
-    // string_representation.push_str("**PC Transition**:\n");
+
     for rs in &recovered_states {
-        record_reprs.insert(format!("cpu: {}", rs).to_string());
-        //string_representation.push_str(&format!("\t{}\n", rs));
+        record_reprs.insert(format!("\tpc: {}", rs).to_string());
     }
 
     for ms in &get_memory(trace, prime) {
         if ms.3 {
-            record_reprs.insert(format!("mem: <{} {} {} {}>", ms.0, ms.1, ms.2, ms.3).to_string());
+            record_reprs
+                .insert(format!("\tmem: <clk:{}, addr:{}, val:{}>", ms.0, ms.1, ms.2).to_string());
         }
     }
-
-    //string_representation.push_str("\n**Memory**:\n");
-    //string_representation.push_str(&format!("\t{}", memory_check(trace, prime).0).to_string());
-
-    // TODO: fix
-    // record_reprs.insert(format!("{}", memory_check(trace, prime).0).to_string());
 
     save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
