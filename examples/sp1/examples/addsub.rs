@@ -102,7 +102,7 @@ fn main() -> Result<(), io::Error> {
     let air = AddSubChip::default();
     let air_name = "AddSub";
     let colmap = make_col_map();
-    println!("{:?}", colmap.is_add);
+    //println!("{:?}", colmap.is_add);
 
     let (output_columns, num_extracted_rows, min_row_id, max_row_id) = if opcode_str == "ADD" {
         (vec![1, 2, 3, 4], 1, 0, 0)
