@@ -1,0 +1,2 @@
+cargo run --release --example addsub -- --config ./configs/alu.config --opcode-str "ADD" --method "bb" --num-trial 1
+cargo run --release --example addsub -- --config ./configs/alu.config --opcode-str "SUB" --method "bb" --num-trial 1
