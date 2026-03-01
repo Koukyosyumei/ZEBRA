@@ -42,6 +42,38 @@ pub fn sp1_abstract_trace_to_abstract_state(
     }
 }
 
+fn get_memory(
+    trace: &AbstractTrace,
+    prime: u32,
+) -> Vec<(AbstractInterval, AbstractInterval, AbstractInterval, bool)> {
+    let mut ops = vec![];
+    for row in &trace.data {
+        if MayBeFlag::True != row[56].is_zero(prime) {
+            if MayBeFlag::True != row[17].is_non_zero(prime) {
+                ops.push((row[1].clone(), row[8].clone(), rec_word(row, 29, 4), true));
+            }
+            if MayBeFlag::True != row[18].is_non_zero(prime) {
+                ops.push((
+                    row[1].clone(),
+                    rec_word(row, 9, 4),
+                    rec_word(row, 38, 4),
+                    false,
+                ));
+            }
+            if MayBeFlag::True != row[19].is_non_zero(prime) {
+                ops.push((
+                    row[1].clone(),
+                    rec_word(row, 13, 4),
+                    rec_word(row, 47, 4),
+                    false,
+                ));
+            }
+        }
+    }
+
+    ops
+}
+
 fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
     let mut ops = vec![];
     for row in &trace.data {
@@ -81,14 +113,21 @@ fn final_check(
     }
     // string_representation.push_str("**PC Transition**:\n");
     for rs in &recovered_states {
-        record_reprs.insert(format!("{}\n", rs).to_string());
+        record_reprs.insert(format!("cpu: {}", rs).to_string());
         //string_representation.push_str(&format!("\t{}\n", rs));
     }
+
+    for ms in &get_memory(trace, prime) {
+        if ms.3 {
+            record_reprs.insert(format!("mem: <{} {} {} {}>", ms.0, ms.1, ms.2, ms.3).to_string());
+        }
+    }
+
     //string_representation.push_str("\n**Memory**:\n");
     //string_representation.push_str(&format!("\t{}", memory_check(trace, prime).0).to_string());
 
     // TODO: fix
-    record_reprs.insert(format!("{}", memory_check(trace, prime).0).to_string());
+    // record_reprs.insert(format!("{}", memory_check(trace, prime).0).to_string());
 
     save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
