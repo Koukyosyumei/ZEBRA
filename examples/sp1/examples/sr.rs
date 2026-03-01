@@ -51,7 +51,7 @@ fn main() -> Result<(), io::Error> {
         ShiftRightChip,
     >(&air, NUM_SHIFT_RIGHT_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
-    println!("{:?}", general_lookup_info);
+    //println!("{:?}", general_lookup_info);
 
     constraint_info
         .refinable_cols

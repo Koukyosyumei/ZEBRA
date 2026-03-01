@@ -94,12 +94,12 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = BranchChip::default();
     let air_name = "Branch";
-    let colmap = make_col_map();
-    println!("{:?}", colmap);
+    let _colmap = make_col_map();
+    //println!("{:?}", colmap);
 
-    let (mut constraint_info, general_lookup_info) =
+    let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BabyBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
-    println!("{:?}", general_lookup_info);
+    //println!("{:?}", general_lookup_info);
     let output_columns = vec![5, 6, 7, 8];
     for i in vec![5, 6, 7] {
         constraint_info.range_types.insert(i, RangeType::U8);

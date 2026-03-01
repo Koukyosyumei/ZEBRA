@@ -212,7 +212,7 @@ pub fn mean_variance(durations: &[std::time::Duration]) -> (std::time::Duration,
     (std::time::Duration::from_secs_f64(mean), variance)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Default, Debug, Serialize)]
 pub struct ResultReport {
     pub success_ratio: f64,
     pub exe_time_mean: f64,
@@ -220,7 +220,11 @@ pub struct ResultReport {
 }
 
 pub fn generate_report(results: &[VerificationResult]) -> ResultReport {
-    assert!(!results.is_empty());
+    //assert!(!results.is_empty());
+    if results.is_empty() {
+        return ResultReport::default();
+    }
+
     let n = results.len() as f64;
 
     let success_ratio = results

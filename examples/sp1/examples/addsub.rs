@@ -101,7 +101,7 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
     let air_name = "AddSub";
-    let colmap = make_col_map();
+    let _colmap = make_col_map();
     //println!("{:?}", colmap.is_add);
 
     let (output_columns, num_extracted_rows, min_row_id, max_row_id) = if opcode_str == "ADD" {
