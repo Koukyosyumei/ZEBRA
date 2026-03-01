@@ -102,7 +102,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
+    for _ in 0..args.num_trial {
         let x: u8 = rng.r#gen();
         let y: u8 = rng.r#gen();
 

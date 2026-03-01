@@ -121,7 +121,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
+    for _ in 0..args.num_trial {
         let r1: u8 = rng.random_range(0..32);
         let r2: u8 = rng.random_range(0..32);
         let x: u32 = rng.random_range(0..2_u32.pow(21)); //1006632960
