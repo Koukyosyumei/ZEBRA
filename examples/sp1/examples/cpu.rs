@@ -76,7 +76,9 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let mut string_representation = String::new();
+    let mut record_reprs = HashSet::new();
+
+    //let mut string_representation = String::new();
     let mut recovered_states = vec![];
     for row in &trace.data {
         if let MayBeFlag::True = row[56].is_zero(prime) {
@@ -84,16 +86,16 @@ fn final_check(
             recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
         }
     }
-    string_representation.push_str("**PC Transition**:\n");
+    // string_representation.push_str("**PC Transition**:\n");
     for rs in &recovered_states {
-        string_representation.push_str(&format!("\t{}\n", rs));
+        record_reprs.insert(format!("\t{}\n", rs).to_string());
+        //string_representation.push_str(&format!("\t{}\n", rs));
     }
-    string_representation.push_str("\n**Memory**:\n");
-    string_representation.push_str(&format!("\t{}", memory_check(trace, prime).0).to_string());
+    //string_representation.push_str("\n**Memory**:\n");
+    //string_representation.push_str(&format!("\t{}", memory_check(trace, prime).0).to_string());
 
     // TODO: fix
-    let mut record_reprs = HashSet::new();
-    record_reprs.insert(string_representation);
+    record_reprs.insert(format!("\t{}", memory_check(trace, prime).0).to_string());
 
     save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
