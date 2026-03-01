@@ -53,12 +53,12 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = DivRemChip::default();
     let air_name = "DivRem";
-    let colmap = make_col_map();
-    println!("{:?}", colmap);
+    let _colmap = make_col_map();
+    //println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
-    println!("{:?}", general_lookup_info);
+    //println!("{:?}", general_lookup_info);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
         .refinable_cols

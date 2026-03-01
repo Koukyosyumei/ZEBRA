@@ -58,7 +58,7 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, LtChip>(&air, NUM_LT_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
-    println!("{:?}", general_lookup_info);
+    //println!("{:?}", general_lookup_info);
 
     constraint_info
         .refinable_cols
