@@ -17,9 +17,7 @@ use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
 use latticevm::memory::IntervalMemory;
 use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
-use latticevm::quick::{
-    experiment_harness, load_config, Args, ProgramInfo,
-};
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
 use latticevm::state::AbstractState;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
@@ -83,14 +81,14 @@ fn final_check(
     }
     // string_representation.push_str("**PC Transition**:\n");
     for rs in &recovered_states {
-        record_reprs.insert(format!("\t{}\n", rs).to_string());
+        record_reprs.insert(format!("{}\n", rs).to_string());
         //string_representation.push_str(&format!("\t{}\n", rs));
     }
     //string_representation.push_str("\n**Memory**:\n");
     //string_representation.push_str(&format!("\t{}", memory_check(trace, prime).0).to_string());
 
     // TODO: fix
-    record_reprs.insert(format!("\t{}", memory_check(trace, prime).0).to_string());
+    record_reprs.insert(format!("{}", memory_check(trace, prime).0).to_string());
 
     save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
