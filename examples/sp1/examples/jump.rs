@@ -11,13 +11,11 @@ use sp1_core_machine::control_flow::JumpChip;
 use sp1_core_machine::control_flow::JumpColumns;
 use sp1_core_machine::control_flow::NUM_JUMP_COLS;
 
-use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::constraint::LatticeVMConstraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
+use latticevm::solver::{nop_post_process, RangeType};
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
 use latticevm::utils::PrettySet;
@@ -64,7 +62,7 @@ pub fn target_program(
     x: u32,
     y: u32,
 ) -> Program {
-    let mut instructions = if let Opcode::JAL = opcode {
+    let instructions = if let Opcode::JAL = opcode {
         vec![Instruction::new(Opcode::JAL, r1, x, 0, true, true)]
     } else {
         vec![
