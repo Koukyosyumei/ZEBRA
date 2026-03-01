@@ -38,6 +38,8 @@ pub fn load_config(path: &std::path::Path) -> anyhow::Result<SearchConfig> {
 pub struct Args {
     #[arg(long)]
     pub config: PathBuf,
+    #[arg(long, default_value = "30")]
+    pub num_trial: usize,
     #[arg(long, default_value = "output.yaml")]
     pub ouptput_path: PathBuf,
     #[arg(long, default_value = "bb")]
