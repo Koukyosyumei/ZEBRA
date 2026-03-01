@@ -50,11 +50,18 @@ fn get_memory(
     for row in &trace.data {
         if MayBeFlag::True != row[56].is_zero(prime) {
             if MayBeFlag::True != row[17].is_non_zero(prime) {
-                ops.push((row[1].clone(), row[8].clone(), rec_word(row, 29, 4), true));
+                ops.push((
+                    row[1].clone()
+                        + row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
+                    row[8].clone(),
+                    rec_word(row, 29, 4),
+                    true,
+                ));
             }
             if MayBeFlag::True != row[18].is_non_zero(prime) {
                 ops.push((
-                    row[1].clone(),
+                    row[1].clone()
+                        + row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
                     rec_word(row, 9, 4),
                     rec_word(row, 38, 4),
                     false,
@@ -62,7 +69,8 @@ fn get_memory(
             }
             if MayBeFlag::True != row[19].is_non_zero(prime) {
                 ops.push((
-                    row[1].clone(),
+                    row[1].clone()
+                        + row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
                     rec_word(row, 13, 4),
                     rec_word(row, 47, 4),
                     false,
@@ -75,22 +83,10 @@ fn get_memory(
 }
 
 fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
-    let mut ops = vec![];
-    for row in &trace.data {
-        if MayBeFlag::True != row[56].is_zero(prime) {
-            if MayBeFlag::True != row[17].is_non_zero(prime) {
-                ops.push((row[8].clone(), rec_word(row, 29, 4), true));
-            }
-            if MayBeFlag::True != row[18].is_non_zero(prime) {
-                ops.push((rec_word(row, 9, 4), rec_word(row, 38, 4), false));
-            }
-            if MayBeFlag::True != row[19].is_non_zero(prime) {
-                ops.push((rec_word(row, 13, 4), rec_word(row, 47, 4), false));
-            }
-        }
-    }
-
-    check_memory_consistency(&ops)
+    let ops = get_memory(trace, prime);
+    let rw_ops_wo_clk: Vec<(AbstractInterval, AbstractInterval, bool)> =
+        ops.into_iter().map(|x| (x.1, x.2, x.3)).clone().collect();
+    check_memory_consistency(&rw_ops_wo_clk)
 }
 
 // ############## Final Check Function ##############################
@@ -103,23 +99,25 @@ fn final_check(
 ) {
     let mut record_reprs = HashSet::new();
 
-    //let mut string_representation = String::new();
-    let mut recovered_states = vec![];
     for row in &trace.data {
-        if let MayBeFlag::True = row[56].is_zero(prime) {
-        } else {
-            recovered_states.push(sp1_abstract_trace_to_abstract_state(&row, prime));
+        if MayBeFlag::True != row[56].is_zero(prime) {
+            record_reprs.insert(
+                format!(
+                    "\tins: (clk: {}, pc: {})",
+                    row[1].clone()
+                        + row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
+                    row[5].clone()
+                )
+                .to_string(),
+            );
         }
-    }
-
-    for rs in &recovered_states {
-        record_reprs.insert(format!("\tpc: {}", rs).to_string());
     }
 
     for ms in &get_memory(trace, prime) {
         if ms.3 {
-            record_reprs
-                .insert(format!("\tmem: <clk:{}, addr:{}, val:{}>", ms.0, ms.1, ms.2).to_string());
+            record_reprs.insert(
+                format!("\tmem: (clk: {}, addr: {}, val: {})", ms.0, ms.1, ms.2).to_string(),
+            );
         }
     }
 
