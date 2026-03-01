@@ -11,17 +11,12 @@ use sp1_core_machine::memory::{
     columns::MemoryInstructionsColumns, columns::NUM_MEMORY_INSTRUCTIONS_COLUMNS,
 };
 
-use latticevm::canonicalizer::{generate_memory_op_final_checker, save_repr_if_unique};
+use latticevm::canonicalizer::generate_memory_op_final_checker;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
-use latticevm::ui::UiState;
+use latticevm::solver::nop_post_process;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{
-    constraint::LatticeVMConstraints,
-    trace::{trace_fmt_with_idxs, AbstractTrace},
-};
 
 use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
