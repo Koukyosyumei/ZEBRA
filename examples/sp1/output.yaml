@@ -14,5 +14,5 @@ args:
   opcode_str: SUB
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.0025621
+  exe_time_mean: 0.0019536
   exe_time_variance: 0.0
