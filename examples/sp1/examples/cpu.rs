@@ -1,8 +1,5 @@
 use clap::Parser;
-use core::mem::transmute;
-use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_baby_bear::BabyBear;
@@ -16,15 +13,13 @@ use sp1_core_machine::{
 use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
 
 use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::constraint::eval_constraints;
 use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
 use latticevm::memory::IntervalMemory;
 use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
 use latticevm::quick::{
-    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+    experiment_harness, load_config, Args, ProgramInfo,
 };
-use latticevm::solver::dummy_program_counter_refine_fn;
 use latticevm::state::AbstractState;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
