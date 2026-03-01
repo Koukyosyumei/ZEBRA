@@ -37,11 +37,11 @@ fn final_check(
     for i in 0..trace.data.len() {
         let string_representation = format!(
             "pc: [{}], next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
-            trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
-            trace_fmt_with_idxs(trace, 0, &[5, 6, 7, 8]),
-            trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
-            trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
-            trace_fmt_with_idxs(trace, 0, &[18, 19, 20, 21]),
+            trace_fmt_with_idxs(trace, i, &[0, 1, 2, 3]),
+            trace_fmt_with_idxs(trace, i, &[5, 6, 7, 8]),
+            trace_fmt_with_idxs(trace, i, &[10, 11, 12, 13]),
+            trace_fmt_with_idxs(trace, i, &[14, 15, 16, 17]),
+            trace_fmt_with_idxs(trace, i, &[18, 19, 20, 21]),
         );
         record_reprs.insert(string_representation);
     }

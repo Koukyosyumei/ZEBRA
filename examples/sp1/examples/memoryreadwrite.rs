@@ -36,10 +36,10 @@ pub fn target_program_load(
     pc_start: u32,
     pc_base: u32,
     r1: u8,
-    r2: u8,
+    _r2: u8,
     x: u32,
     y: u32,
-    z: u32,
+    _z: u32,
 ) -> Program {
     let instructions = vec![
         Instruction::new(Opcode::ADD, r1, 0, x, false, true),
