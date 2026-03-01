@@ -10,14 +10,13 @@ use sp1_core_executor::{Instruction, Opcode, Program};
 use sp1_core_machine::control_flow::BranchChip;
 use sp1_core_machine::control_flow::BranchColumns;
 use sp1_core_machine::control_flow::NUM_BRANCH_COLS;
-use sp1_stark::MachineProver;
 
 use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
+use latticevm::solver::nop_post_process;
 use latticevm::solver::RangeType;
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::trace::trace_fmt_with_idxs;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
