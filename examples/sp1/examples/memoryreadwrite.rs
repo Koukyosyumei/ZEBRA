@@ -131,7 +131,7 @@ fn main() -> Result<(), io::Error> {
     search_config.min_row_id = if is_load { 1 } else { 0 };
     search_config.max_row_id = if is_load { 1 } else { 0 };
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
