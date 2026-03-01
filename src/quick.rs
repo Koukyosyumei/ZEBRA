@@ -124,22 +124,23 @@ where
         // ######################### Query SMT solver ###############################
         let start_time = time::Instant::now();
         let output = Command::new(verification_method)
+            .arg(format!("-T:{}", search_config.time_out_ms / 1000))
             .arg(smt_file_path)
             .output()
             .expect("Failed to execute SMT solver");
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         // ######################### Check the solutions ############################
-        let num_solutions = if stdout.contains("unsat") {
-            0
+        let (status, num_solutions) = if stdout.contains("unsat") {
+            (VerificationStatus::Verified, 0)
         } else if stdout.contains("sat") {
-            1
+            (VerificationStatus::Verified, 1)
         } else {
-            panic!("error: {}", stdout)
+            (VerificationStatus::TimedOut, 0)
         };
 
         Ok(VerificationResult {
-            status: VerificationStatus::Verified,
+            status: status,
             num_total_trials: 0,
             num_solutions,
             execution_time: start_time.elapsed() - sleep_time,
