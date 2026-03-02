@@ -3,8 +3,6 @@ use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::io;
 
-use itertools::Itertools;
-
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
@@ -13,17 +11,12 @@ use zkm_core_machine::memory::{
 };
 use zkm_core_machine::MemoryInstructionsChip;
 
-use latticevm::canonicalizer::{generate_memory_op_final_checker, save_repr_if_unique};
+use latticevm::canonicalizer::generate_memory_op_final_checker;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::nop_post_process;
-use latticevm::ui::UiState;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{
-    constraint::LatticeVMConstraints,
-    trace::{trace_fmt_with_idxs, AbstractTrace},
-};
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
