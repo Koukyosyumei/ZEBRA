@@ -65,7 +65,10 @@ pub fn target_program(
     y: u32,
 ) -> Program {
     let instructions = if let Opcode::Jump = opcode {
-        vec![Instruction::new(Opcode::Jump, r1, x, 0, true, true)]
+        vec![
+            Instruction::new(Opcode::ADD, r1, x, 0, true, true), // initialize the register
+            Instruction::new(Opcode::Jump, r2, r1 as u32, 0, false, true),
+        ]
     } else {
         vec![
             Instruction::new(Opcode::ADD, r1, 0, x, false, true),
@@ -123,12 +126,14 @@ fn main() -> Result<(), io::Error> {
         let r1: u8 = rng.random_range(0..36);
         let r2: u8 = rng.random_range(0..36);
         let x: u32 = rng.random_range(0..2_u32.pow(21)); //1006632960
-        let y: u32 = rng.random_range(0..10000);
-        println!("{} {} {} {}", r1, r2, x, y);
+        let y: u32 = rng.random_range(0..2_u32.pow(21));
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 4, 4, r1, r2, x, y);
         let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
+        if base_abs_main_trace_data.is_empty() {
+            continue;
+        }
 
         // ######################## Set Info ##########################################
         let program_info = ProgramInfo {

@@ -50,7 +50,11 @@ pub fn get_pv_constraints() -> (Vec<LVSExpr>, Vec<LVSExpr>) {
 pub fn run_ziren_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     // # Execute the Target Program
     let mut runtime = Executor::new(program.clone(), ZKMCoreOpts::default());
-    let (checkpoint, _done) = runtime.execute_state(false).unwrap();
+    let result = runtime.execute_state(false);
+    if result.is_err() {
+        return vec![];
+    }
+    let (checkpoint, _done) = result.unwrap();
 
     let mut checkpoint_file = tempfile::tempfile()
         .map_err(ZKMCoreProverError::IoError)

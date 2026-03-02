@@ -10,9 +10,9 @@ args:
   config: ./configs/alu.config
   num_trial: 30
   ouptput_path: output.yaml
-  method: bb
-  opcode_str: JumpDirect
+  method: z3
+  opcode_str: Jump
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.019416197333333333
-  exe_time_variance: 0.00006296279202967378
+  exe_time_mean: 0.07569210517241379
+  exe_time_variance: 0.0005128019865101867
