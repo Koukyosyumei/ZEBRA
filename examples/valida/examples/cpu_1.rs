@@ -102,14 +102,6 @@ fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
             operands: Operands([-4, 2, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-8, -8, 1, 0, 1]),
-        },
-        InstructionWord {
-            opcode: <BneInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([1 * bytes_per_instr, -8, -4, 0, 0]),
-        },
-        InstructionWord {
             opcode: <StopInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
             operands: Operands::default(),
         },
@@ -131,7 +123,8 @@ fn main() -> Result<(), io::Error> {
     // ######################## Solver Parameters ###############################
     search_config.max_expansions = 30000;
     search_config.min_row_id = 0;
-    search_config.max_row_id = 5;
+    search_config.max_row_id = 1;
+    search_config.time_out_ms = 100000;
     search_config.seed = 41;
 
     println!("CPU AIR MAP");
@@ -156,7 +149,7 @@ fn main() -> Result<(), io::Error> {
     public_vals[1] = AI::from_i128(4096);
     public_vals[2] = AI::from_i128(1);
 
-    search_config.minimum_num_taregt_cols = 1;
+    search_config.minimum_num_taregt_cols = 3;
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>();
@@ -181,6 +174,9 @@ fn main() -> Result<(), io::Error> {
         program_str: program_str,
         program_len: program.len(),
     };
+    constraint_info
+        .range_types
+        .insert(1, RangeType::Any(0, program.len() as i128 - 1));
 
     // ######################## Solve ############################################
     let result = experiment_harness(
