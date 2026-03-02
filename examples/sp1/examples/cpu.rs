@@ -15,7 +15,7 @@ use sp1_core_machine::{
 use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
 
 use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::interval::AbstractInterval;
+use latticevm::interval::AbstractInterval as AI;
 use latticevm::interval::MayBeFlag;
 use latticevm::memory::IntervalMemory;
 use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
@@ -31,39 +31,22 @@ use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn get_memory(
-    trace: &AbstractTrace,
-    prime: u32,
-) -> Vec<(AbstractInterval, AbstractInterval, AbstractInterval, bool)> {
+fn get_memory(trace: &AbstractTrace, prime: u32) -> Vec<(AI, AI, AI, bool)> {
+    fn clk(row: &[AI]) -> AI {
+        row[1].clone() + row[2].clone() * AI::from_i128(2_usize.pow(16) as i128)
+    }
+
     let mut ops = vec![];
     for row in &trace.data {
         if MayBeFlag::True != row[56].is_zero(prime) {
             if MayBeFlag::True != row[17].is_non_zero(prime) {
-                ops.push((
-                    row[1].clone()
-                        + row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
-                    row[8].clone(),
-                    rec_word(row, 29, 4),
-                    true,
-                ));
+                ops.push((clk(row), row[8].clone(), rec_word(row, 29, 4), true));
             }
             if MayBeFlag::True != row[18].is_non_zero(prime) {
-                ops.push((
-                    row[1].clone()
-                        + row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
-                    rec_word(row, 9, 4),
-                    rec_word(row, 38, 4),
-                    false,
-                ));
+                ops.push((clk(row), rec_word(row, 9, 4), rec_word(row, 38, 4), false));
             }
             if MayBeFlag::True != row[19].is_non_zero(prime) {
-                ops.push((
-                    row[1].clone()
-                        + row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
-                    rec_word(row, 13, 4),
-                    rec_word(row, 47, 4),
-                    false,
-                ));
+                ops.push((clk(row), rec_word(row, 13, 4), rec_word(row, 47, 4), false));
             }
         }
     }
@@ -86,8 +69,7 @@ fn final_check(
             record_reprs.insert(
                 format!(
                     "\tins: (clk: {}, pc: {})",
-                    row[1].clone()
-                        + row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
+                    row[1].clone() + row[2].clone() * AI::from_i128(2_usize.pow(16) as i128),
                     row[5].clone()
                 )
                 .to_string(),
@@ -108,7 +90,7 @@ fn final_check(
 
 fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
     let ops = get_memory(trace, prime);
-    let rw_ops_wo_clk: Vec<(AbstractInterval, AbstractInterval, bool)> =
+    let rw_ops_wo_clk: Vec<(AI, AI, bool)> =
         ops.into_iter().map(|x| (x.1, x.2, x.3)).clone().collect();
     check_memory_consistency(&rw_ops_wo_clk)
 }
@@ -206,10 +188,10 @@ fn main() -> Result<(), io::Error> {
         };
 
         // ######################## Public Values ####################################
-        let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
-        public_vals[40] = AbstractInterval::from_i128(pc_offset as i128);
-        public_vals[41] = AbstractInterval::zero();
-        public_vals[44] = AbstractInterval::one();
+        let mut public_vals = vec![AI::zero(); SP1_PROOF_NUM_PV_ELTS];
+        public_vals[40] = AI::from_i128(pc_offset as i128);
+        public_vals[41] = AI::zero();
+        public_vals[44] = AI::one();
 
         // ######################## Set Info ##########################################
         let program_info = ProgramInfo {
