@@ -1,7 +1,7 @@
 config:
   num_workers: 8
   time_out_ms: 10000
-  minimum_num_taregt_cols: 18
+  minimum_num_taregt_cols: 32
   max_expansions: 1000000000
   min_row_id: 0
   max_row_id: 0
@@ -14,5 +14,5 @@ args:
   opcode_str: DIV
 report:
   success_ratio: 0.0
-  exe_time_mean: 0.7666789615666669
-  exe_time_variance: 6.1271054325705565
+  exe_time_mean: 0.17463972233333339
+  exe_time_variance: 0.3690416155187846

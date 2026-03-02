@@ -1,6 +1,6 @@
 use clap::Parser;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_baby_bear::BabyBear;
@@ -87,7 +87,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let opcode_str = args.opcode_str;
+    let _opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -112,38 +112,49 @@ fn main() -> Result<(), io::Error> {
         .retain(|e| !is_reals.contains(e));
     constraint_info.refinable_cols.extend(&[21]);
     constraint_info.output_columns.extend(&[21]);
-
-    // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>(3, 4);
-    let program_str = program
-        .iter()
-        .map(|inst| format!("{}\n", inst))
-        .collect::<String>();
-    let base_abs_main_trace_data =
-        generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
-
-    // ######################## Set Info ##########################################
-    let program_info = ProgramInfo {
-        program_str: program_str,
-        program_len: program.len(),
-    };
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
-    // ######################## Solve ############################################
-    let result = experiment_harness(
-        &program_info,
-        &mut constraint_info,
-        &search_config,
-        &base_abs_main_trace_data,
-        vec![],
-        &vec![], // vec![0],
-        nop_post_process,
-        final_check,
-        &args.method,
-    );
-    println!("{:?}", result);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
+    let mut ds = vec![];
+    for _ in 0..args.num_trial {
+        let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
+        let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
+
+        // ######################## Program Initialization ###########################
+        let program = get_target_program::<BabyBear>(x, y);
+        let program_str = program
+            .iter()
+            .map(|inst| format!("{}\n", inst))
+            .collect::<String>();
+        let base_abs_main_trace_data =
+            generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
+
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: program_str,
+            program_len: program.len(),
+        };
+
+        // ######################## Solve ############################################
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            vec![],
+            &vec![], // vec![0],
+            nop_post_process,
+            final_check,
+            &args.method,
+        );
+        println!("({} {}), {:?}", x, y, result);
+        ds.push(result.unwrap());
+    }
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
 
     Ok(())
 }
