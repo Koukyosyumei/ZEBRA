@@ -54,13 +54,13 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = MulChip::default();
     let air_name = "Mul";
-    let colmap = make_col_map();
-    println!("{:?}", colmap);
+    let _colmap = make_col_map();
+    // println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, MulChip>(&air, NUM_MUL_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
-    println!("{:?}", general_lookup_info);
+    //println!("{:?}", general_lookup_info);
 
     constraint_info
         .refinable_cols
@@ -83,8 +83,7 @@ fn main() -> Result<(), io::Error> {
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
-        let base_abs_main_trace_data =
-            generate_abstract_trace(&program, air_name.to_string(), 1);
+        let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
         // ######################## Set Info ##########################################
         let program_info = ProgramInfo {

@@ -14,7 +14,7 @@ use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{nop_post_process, RangeType};
+use latticevm::solver::nop_post_process;
 use latticevm::trace::trace_fmt_with_idxs;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
@@ -76,7 +76,7 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = CloClzChip::default();
     let air_name = "CloClz";
-    let colmap = make_col_map();
+    let _colmap = make_col_map();
     //println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
