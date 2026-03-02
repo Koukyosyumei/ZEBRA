@@ -10,7 +10,6 @@ use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::control_flow::BranchColumns;
 use zkm_core_machine::control_flow::NUM_BRANCH_COLS;
 use zkm_core_machine::BranchChip;
-use zkm_stark::MachineProver;
 
 use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::quick::{
