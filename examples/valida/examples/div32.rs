@@ -95,12 +95,11 @@ fn main() -> Result<(), io::Error> {
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
-
-    println!("{:?}", constraint_info.range_types);
+    //println!("{:?}", constraint_info.range_types);
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..1 {
+    for _ in 0..args.num_trial {
         let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
         let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
 
@@ -116,26 +115,6 @@ fn main() -> Result<(), io::Error> {
             .collect::<String>();
         let base_abs_main_trace_data =
             generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
-
-        use latticevm::constraint::eval_constraints;
-        use latticevm::solver::make_init_val;
-        use latticevm::trace::AbstractTrace;
-        let mut at = AbstractTrace::new(base_abs_main_trace_data.clone());
-        for c in &constraint_info.refinable_cols {
-            at.data[0][*c] = make_init_val(*c, &constraint_info.range_types, constraint_info.prime);
-        }
-
-        let result = eval_constraints(&at, None, &constraint_info.constraints, prime);
-        println!("{:?}", result);
-        println!("{}", at);
-        /*
-                pub fn eval_constraints(
-            trace: &AbstractTrace,
-            public_vals: Option<&[AbstractInterval]>,
-            constraints: &LatticeVMConstraints,
-            prime: u32,
-        )
-                 */
 
         // ######################## Set Info ##########################################
         let program_info = ProgramInfo {
