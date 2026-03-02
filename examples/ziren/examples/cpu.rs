@@ -18,7 +18,7 @@ use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
 use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::constraint::eval_constraints;
-use latticevm::interval::AbstractInterval;
+use latticevm::interval::AbstractInterval as AI;
 use latticevm::interval::MayBeFlag;
 use latticevm::memory::IntervalMemory;
 use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
@@ -30,42 +30,34 @@ use latticevm::state::AbstractState;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
 use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::PrettySet;
 
 use latticevm_ziren::utils::get_pv_constraints;
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-pub fn ziren_abstract_trace_to_abstract_state(
-    abstract_row: &Vec<AbstractInterval>,
-    prime: u32,
-) -> AbstractState {
-    AbstractState {
-        clk: abstract_row[1].clone()
-            + abstract_row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
-        pc: abstract_row[5].clone(),
-        is_done: abstract_row[5].clone().is_zero(prime),
-        memory_ops: Vec::new(),
-    }
+fn clk(row: &[AI]) -> AI {
+    row[1].clone() + row[2].clone() * AI::from_i128(2_usize.pow(16) as i128)
 }
 
-fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
+fn get_memory(trace: &AbstractTrace, prime: u32) -> Vec<(AI, AI, AI, bool)> {
     let mut ops = vec![];
     for row in &trace.data {
         if MayBeFlag::True != row[65].is_zero(prime) {
             if MayBeFlag::True != row[18].is_non_zero(prime) {
-                ops.push((row[9].clone(), rec_word(row, 26, 4), true));
+                ops.push((clk(row), row[9].clone(), rec_word(row, 26, 4), true));
             }
             if MayBeFlag::True != row[19].is_non_zero(prime) {
-                ops.push((rec_word(row, 10, 4), rec_word(row, 47, 4), false));
+                ops.push((clk(row), rec_word(row, 10, 4), rec_word(row, 47, 4), false));
             }
             if MayBeFlag::True != row[20].is_non_zero(prime) {
-                ops.push((rec_word(row, 14, 4), rec_word(row, 56, 4), false));
+                ops.push((clk(row), rec_word(row, 14, 4), rec_word(row, 56, 4), false));
             }
         }
     }
 
-    check_memory_consistency(&ops)
+    ops
 }
 
 // ############## Final Check Function ##############################
@@ -76,21 +68,29 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let mut string_representation = String::new();
-    let mut recovered_states = vec![];
+    let mut record_reprs = HashSet::new();
     for row in &trace.data {
-        if let MayBeFlag::False = row[65].is_zero(prime) {
-            recovered_states.push(ziren_abstract_trace_to_abstract_state(&row, prime));
+        if MayBeFlag::True != row[65].is_zero(prime) {
+            record_reprs
+                .insert(format!("\tins: (clk: {}, pc: {})", clk(row), row[5].clone()).to_string());
         }
     }
-    string_representation.push_str("**PC Transition**:\n");
-    for rs in &recovered_states {
-        string_representation.push_str(&format!("\t{}\n", rs));
+    for ms in &get_memory(trace, prime) {
+        if ms.3 {
+            record_reprs.insert(
+                format!("\tmem: (clk: {}, addr: {}, val: {})", ms.0, ms.1, ms.2).to_string(),
+            );
+        }
     }
-    string_representation.push_str("\n**Memory**:\n");
-    string_representation.push_str(&format!("{}", memory_check(trace, prime).0).to_string());
 
-    save_repr_if_unique(&string_representation, known_reprt, ui);
+    save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
+}
+
+fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
+    let ops = get_memory(trace, prime);
+    let rw_ops_wo_clk: Vec<(AI, AI, bool)> =
+        ops.into_iter().map(|x| (x.1, x.2, x.3)).clone().collect();
+    check_memory_consistency(&rw_ops_wo_clk)
 }
 
 pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
@@ -145,10 +145,10 @@ fn main() -> Result<(), io::Error> {
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
     // ######################## Public Values ####################################
-    let mut public_vals = vec![AbstractInterval::zero(); ZKM_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::from_i128(2130706433 - 8);
-    public_vals[41] = AbstractInterval::zero();
-    public_vals[44] = AbstractInterval::one();
+    let mut public_vals = vec![AI::zero(); ZKM_PROOF_NUM_PV_ELTS];
+    public_vals[40] = AI::from_i128(2130706433 - 8);
+    public_vals[41] = AI::zero();
+    public_vals[44] = AI::one();
     let refinment_target_indicies_pv: Vec<usize> = vec![];
 
     let pad_fn = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
