@@ -15,12 +15,11 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{nop_post_process, RangeType};
+use latticevm::solver::nop_post_process;
 use latticevm::trace::trace_fmt_with_idxs;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
@@ -35,8 +34,8 @@ use latticevm_valida::utils::{
 // ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
+    _num_trial: usize,
+    _prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
