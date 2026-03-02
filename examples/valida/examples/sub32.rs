@@ -1,14 +1,9 @@
 use clap::Parser;
-use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::HashSet;
 use std::io;
 
 use p3_baby_bear::BabyBear;
 
-use valida_alu_u32::add::columns::ADD_COL_MAP;
-use valida_alu_u32::add::Add32Chip;
-use valida_alu_u32::add::{columns::NUM_ADD_COLS, Add32Instruction};
 use valida_alu_u32::sub::columns::NUM_SUB_COLS;
 use valida_alu_u32::sub::columns::SUB_COL_MAP;
 use valida_alu_u32::sub::Sub32Chip;
@@ -23,7 +18,7 @@ use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
+use latticevm::solver::nop_post_process;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
@@ -32,7 +27,7 @@ use latticevm_valida::utils::{
 };
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
-    let bytes_per_instr = BYTES_PER_INSTR as i32;
+    let _bytes_per_instr = BYTES_PER_INSTR as i32;
     let a_bytes = a.to_le_bytes();
 
     let mut program = vec![];
