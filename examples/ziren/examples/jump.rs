@@ -11,13 +11,8 @@ use zkm_core_machine::control_flow::JumpColumns;
 use zkm_core_machine::control_flow::NUM_JUMP_COLS;
 use zkm_core_machine::JumpChip;
 
-use zkm_core_machine::{
-    cpu::columns::{CPU_COL_MAP, NUM_CPU_COLS},
-    CpuChip,
-};
 
 use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::constraint::eval_constraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
@@ -27,7 +22,6 @@ use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
 use latticevm::utils::PrettySet;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use zkm_core_executor::syscalls::SyscallCode;
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -63,7 +57,7 @@ const fn make_col_map() -> JumpColumns<usize> {
 }
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
-    let mut instructions = vec![
+    let instructions = vec![
         Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
         Instruction::new(Opcode::Jumpi, x, y, 0, true, true),
     ];
