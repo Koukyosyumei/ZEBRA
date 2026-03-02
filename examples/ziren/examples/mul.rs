@@ -16,8 +16,8 @@ use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
 use latticevm::solver::make_init_val;
+use latticevm::solver::nop_post_process;
 use latticevm::solver::RangeType;
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::trace::AbstractTrace;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 

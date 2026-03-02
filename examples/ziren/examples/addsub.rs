@@ -15,7 +15,7 @@ use latticevm::interval::MayBeFlag;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
+use latticevm::solver::nop_post_process;
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
 use latticevm::utils::PrettySet;
@@ -31,9 +31,9 @@ fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
         if trace.data[i][17].is_zero(prime) != MayBeFlag::True {
             record_reprs.insert(format!(
                 "input0: [{}], input1: [{}], output: [{}]",
-                trace_fmt_with_idxs(trace, 0, &[9, 10, 11, 12]),
-                trace_fmt_with_idxs(trace, 0, &[13, 14, 15, 16]),
-                trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
+                trace_fmt_with_idxs(trace, i, &[9, 10, 11, 12]),
+                trace_fmt_with_idxs(trace, i, &[13, 14, 15, 16]),
+                trace_fmt_with_idxs(trace, i, &[2, 3, 4, 5]),
             ));
         };
     }

@@ -21,7 +21,7 @@ use latticevm::constraint::eval_constraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
+use latticevm::solver::{nop_post_process, RangeType};
 use latticevm::trace::trace_fmt_with_idxs;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
@@ -46,11 +46,11 @@ fn final_check(
         let string_representation = format!(
         "pc: {}, next_pc: [{}], next_next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
         trace.data[0][0],
-        trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
-        trace_fmt_with_idxs(trace, 0, &[19, 20, 21, 22]),
-        trace_fmt_with_idxs(trace, 0, &[37, 38, 39, 40]),
-        trace_fmt_with_idxs(trace, 0, &[41, 42, 43, 44]),
-        trace_fmt_with_idxs(trace, 0, &[45, 46, 47, 48]),
+        trace_fmt_with_idxs(trace, i, &[1, 2, 3, 4]),
+        trace_fmt_with_idxs(trace, i, &[19, 20, 21, 22]),
+        trace_fmt_with_idxs(trace, i, &[37, 38, 39, 40]),
+        trace_fmt_with_idxs(trace, i, &[41, 42, 43, 44]),
+        trace_fmt_with_idxs(trace, i, &[45, 46, 47, 48]),
     );
         record_reprs.insert(string_representation);
     }
