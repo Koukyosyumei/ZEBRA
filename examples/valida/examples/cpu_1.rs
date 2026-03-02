@@ -1,5 +1,7 @@
+use clap::Parser;
+use core::mem::transmute;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
-use std::fs;
 use std::io;
 
 use p3_baby_bear::BabyBear;
@@ -18,18 +20,18 @@ use valida_cpu::{
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::interval::{AbstractInterval, MayBeFlag};
-use latticevm::quick::quick_api;
-use latticevm::solver::{
-    dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver,
-};
+use latticevm::canonicalizer::save_repr_if_unique;
+use latticevm::interval::AbstractInterval as AI;
+use latticevm::interval::MayBeFlag;
+use latticevm::memory::IntervalMemory;
+use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
+use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
+use latticevm::solver::RangeType;
 use latticevm::state::AbstractState;
-use latticevm::state::MemoryOp;
-use latticevm::state::MemoryOpKind;
-use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
-use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::UiState;
+use latticevm::trace::AbstractTrace;
+use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
 use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::PrettySet;
 
 use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::{
@@ -37,81 +39,31 @@ use latticevm_valida::utils::{
     refine_pc_interval,
 };
 
-fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
-    let mut val = AbstractInterval::from_i64(0);
-    let mut mul = 1_i64;
-    for i in 0..4 {
-        val = val + row[base + i].clone() * AbstractInterval::from_i64(mul);
-        mul *= 256;
-    }
-    val
-}
-
-fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
+fn get_memory(trace: &AbstractTrace, prime: u32) -> Vec<(AI, AI, AI, bool)> {
     let mut ops = vec![];
     for row in &trace.data {
-        if MayBeFlag::True != row[65].is_zero(prime) {
+        if MayBeFlag::True != row[58].is_zero(prime) {
             if MayBeFlag::False != row[42].is_non_zero(prime) {
-                let addr = row[43].clone();
-                let val = reconstruct_word(row, 44);
-                ops.push((addr, val, true));
+                ops.push((row[0].clone(), row[43].clone(), rec_word(row, 44, 4), true));
             }
             if MayBeFlag::False != row[30].is_non_zero(prime) {
-                let addr = row[31].clone();
-                let val = reconstruct_word(row, 32);
-                ops.push((addr, val, false));
+                ops.push((row[0].clone(), row[31].clone(), rec_word(row, 32, 4), false));
             }
             if MayBeFlag::False != row[36].is_non_zero(prime) {
-                let addr = row[37].clone();
-                let val = reconstruct_word(row, 38);
-                ops.push((addr, val, false));
+                ops.push((row[0].clone(), row[37].clone(), rec_word(row, 38, 4), false));
             }
         }
     }
 
-    check_memory_consistency(&ops)
+    ops
 }
 
-pub fn valida_abstract_trace_to_abstract_state(
-    abstract_row: &Vec<AbstractInterval>,
-    prime: u32,
-) -> AbstractState {
-    let mut memory_ops = Vec::new();
+fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
+    let ops = get_memory(trace, prime);
+    let rw_ops_wo_clk: Vec<(AI, AI, bool)> =
+        ops.into_iter().map(|x| (x.1, x.2, x.3)).clone().collect();
 
-    if abstract_row[30].is_non_zero(prime) != MayBeFlag::False {
-        memory_ops.push(MemoryOp {
-            kind: MemoryOpKind::Read,
-            addr: abstract_row[31].clone(),
-            value: reconstruct_word(abstract_row, 32),
-        });
-    }
-
-    if abstract_row[36].is_non_zero(prime) != MayBeFlag::False {
-        memory_ops.push(MemoryOp {
-            kind: MemoryOpKind::Read,
-            addr: abstract_row[37].clone(),
-            value: reconstruct_word(abstract_row, 38),
-        });
-    }
-
-    if abstract_row[42].is_non_zero(prime) != MayBeFlag::False {
-        memory_ops.push(MemoryOp {
-            kind: MemoryOpKind::Write,
-            addr: abstract_row[43].clone(),
-            value: reconstruct_word(abstract_row, 44),
-        });
-    }
-
-    AbstractState {
-        clk: abstract_row[0].clone(),
-        pc: abstract_row[1].clone(),
-        is_done: match abstract_row[24].clone().is_zero(prime) {
-            MayBeFlag::True => MayBeFlag::False,
-            MayBeFlag::False => MayBeFlag::True,
-            MayBeFlag::MayBe => MayBeFlag::MayBe,
-        },
-        memory_ops,
-    }
+    check_memory_consistency(&rw_ops_wo_clk)
 }
 
 // ############## Final Check Function ##############################
@@ -122,22 +74,22 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let mut output = String::new();
-
-    let mut recovered_states = vec![];
+    let mut record_reprs = HashSet::new();
     for row in &trace.data {
-        recovered_states.push(valida_abstract_trace_to_abstract_state(row, prime));
+        if MayBeFlag::True != row[58].is_zero(prime) {
+            record_reprs
+                .insert(format!("\tins: (clk: {}, pc: {})", row[0], row[1].clone()).to_string());
+        }
     }
-
-    let mut string_representation = String::new();
-    for state in &recovered_states {
-        string_representation.push_str(&format!("{}\n", state));
-        if state.is_done != MayBeFlag::False {
-            break;
+    for ms in &get_memory(trace, prime) {
+        if ms.3 {
+            record_reprs.insert(
+                format!("\tmem: (clk: {}, addr: {}, val: {})", ms.0, ms.1, ms.2).to_string(),
+            );
         }
     }
 
-    save_repr_if_unique(&string_representation, known_reprt, ui);
+    save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
 
 fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
@@ -169,18 +121,18 @@ fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
+    let args = Args::parse();
+    let mut search_config = load_config(&args.config).unwrap();
+
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
+    let program_cols = (3..8).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    let max_iteration = 3000;
-    let min_row_id = 0;
-    let max_row_id = 5;
-    let seed = 41;
-
-    // ######################## Extract Add Constraints ##########################
-    // Columns reserved for program counters / instructions
-    let program_cols = (3..8).collect::<Vec<_>>();
+    search_config.max_expansions = 30000;
+    search_config.min_row_id = 0;
+    search_config.max_row_id = 5;
+    search_config.seed = 41;
 
     println!("CPU AIR MAP");
     println!("  {:?}", CPU_COL_MAP);
@@ -190,25 +142,21 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 0;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (air_constraints, lookup_constraints, mut refinable_cols, range_types, general_lookup_info) =
+    let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
-    refinable_cols.retain(|x| !program_cols.contains(x));
+    constraint_info
+        .refinable_cols
+        .retain(|x| !program_cols.contains(x));
+    constraint_info.range_types.insert(19, RangeType::Bool);
 
-    let mut public_vals = vec![AbstractInterval::zero(); 3];
-    public_vals[0] = AbstractInterval::from_i64(0);
-    public_vals[1] = AbstractInterval::from_i64(4096);
-    public_vals[2] = AbstractInterval::from_i64(1);
-    //let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
+    let mut public_vals = vec![AI::zero(); 3];
+    public_vals[0] = AI::from_i128(0);
+    public_vals[1] = AI::from_i128(4096);
+    public_vals[2] = AI::from_i128(1);
 
-    let constraints = LatticeVMConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
-    let minimum_num_taregt_cols = 1; //refinable_cols.len();
+    search_config.minimum_num_taregt_cols = 1;
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>();
@@ -221,24 +169,32 @@ fn main() -> Result<(), io::Error> {
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
     let adjust_pc_program = make_pc_adjuster(program.clone());
 
+    let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
+        adjust_pc_program(trace, prime);
+        //memory_check(trace, prime).1
+        use latticevm::interval::MayBeFlag::True;
+        MayBeFlag::True
+    };
+
+    // ######################## Set Info ##########################################
+    let program_info = ProgramInfo {
+        program_str: program_str,
+        program_len: program.len(),
+    };
+
     // ######################## Solve ############################################
-    quick_api(
-        program_str,
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &vec![],
+    let result = experiment_harness(
+        &program_info,
+        &mut constraint_info,
+        &search_config,
         &base_abs_main_trace_data,
         public_vals,
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.len(),
-        refine_pc_interval,
-        adjust_pc_program,
+        &vec![], // vec![0],
+        post_process,
         final_check,
-        prime,
-        seed,
-    )
+        &args.method,
+    );
+    println!("{:?}", result);
+
+    Ok(())
 }
