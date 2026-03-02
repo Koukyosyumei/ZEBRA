@@ -280,7 +280,7 @@ where
     C: ChipWithPersistence<M, SC>,
 {
     let mut u8_cols = vec![];
-    let _u16_cols = vec![];
+    let u16_cols = vec![];
     let mut multiplicities = Vec::new();
     let mut lookup_constraints = Vec::new();
     let mut nested_received_vars_from_cpu = Vec::new();
