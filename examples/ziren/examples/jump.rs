@@ -55,11 +55,23 @@ const fn make_col_map() -> JumpColumns<usize> {
     unsafe { transmute::<[usize; NUM_JUMP_COLS], JumpColumns<usize>>(indices_arr) }
 }
 
-pub fn target_program(_opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
-    let instructions = vec![
-        Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
-        Instruction::new(Opcode::Jumpi, x, y, 0, true, true),
-    ];
+pub fn target_program(
+    opcode: Opcode,
+    pc_start: u32,
+    pc_base: u32,
+    r1: u8,
+    r2: u8,
+    x: u32,
+    y: u32,
+) -> Program {
+    let instructions = if let Opcode::Jump = opcode {
+        vec![Instruction::new(Opcode::Jump, r1, x, 0, true, true)]
+    } else {
+        vec![
+            Instruction::new(Opcode::ADD, r1, 0, x, false, true),
+            Instruction::new(opcode, r2, r1 as u32, y, false, true),
+        ]
+    };
     Program::new(instructions, pc_start, pc_base)
 }
 
@@ -108,11 +120,14 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..args.num_trial {
-        let x: u8 = rng.random_range(0..36);
-        let y: u32 = rng.random_range(0..prime); //rng.random(); // rng.random_range(0..prime);
+        let r1: u8 = rng.random_range(0..36);
+        let r2: u8 = rng.random_range(0..36);
+        let x: u32 = rng.random_range(0..2_u32.pow(21)); //1006632960
+        let y: u32 = rng.random_range(0..10000);
+        println!("{} {} {} {}", r1, r2, x, y);
 
         // ######################## Program Initialization ###########################
-        let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
+        let program = target_program(get_opcode(&opcode_str), 4, 4, r1, r2, x, y);
         let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
         // ######################## Set Info ##########################################
