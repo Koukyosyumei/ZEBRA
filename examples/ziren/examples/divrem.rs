@@ -14,8 +14,8 @@ use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
+use latticevm::solver::nop_post_process;
 use latticevm::solver::RangeType;
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
 use latticevm::utils::PrettySet;
@@ -30,9 +30,9 @@ fn canonical_repr_div(trace: &AbstractTrace) -> PrettySet<String> {
     for i in 0..trace.data.len() {
         record_reprs.insert(format!(
             "input0: [{}], input1: [{}], output: [{}]",
-            trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-            trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-            trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+            trace_fmt_with_idxs(trace, i, &[2, 3, 4, 5]),
+            trace_fmt_with_idxs(trace, i, &[6, 7, 8, 9]),
+            trace_fmt_with_idxs(trace, i, &[10, 11, 12, 13]),
         ));
     }
     PrettySet(record_reprs)
@@ -43,9 +43,9 @@ fn canonical_repr_rem(trace: &AbstractTrace) -> PrettySet<String> {
     for i in 0..trace.data.len() {
         record_reprs.insert(format!(
             "input0: [{}], input1: [{}], output: [{}]",
-            trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-            trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-            trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
+            trace_fmt_with_idxs(trace, i, &[2, 3, 4, 5]),
+            trace_fmt_with_idxs(trace, i, &[6, 7, 8, 9]),
+            trace_fmt_with_idxs(trace, i, &[14, 15, 16, 17]),
         ));
     }
     PrettySet(record_reprs)
@@ -112,12 +112,12 @@ fn main() -> Result<(), io::Error> {
         constraint_info.range_types.insert(*i, RangeType::U8);
     }
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
+    for _ in 0..args.num_trial {
         let x: u32 = rng.random();
         let y: u32 = rng.random_range(1..u32::MAX);
 

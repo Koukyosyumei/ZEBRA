@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -38,6 +38,8 @@ pub fn load_config(path: &std::path::Path) -> anyhow::Result<SearchConfig> {
 pub struct Args {
     #[arg(long)]
     pub config: PathBuf,
+    #[arg(long, default_value = "30")]
+    pub num_trial: usize,
     #[arg(long, default_value = "output.yaml")]
     pub ouptput_path: PathBuf,
     #[arg(long, default_value = "bb")]
@@ -122,22 +124,23 @@ where
         // ######################### Query SMT solver ###############################
         let start_time = time::Instant::now();
         let output = Command::new(verification_method)
+            .arg(format!("-T:{}", search_config.time_out_ms / 1000))
             .arg(smt_file_path)
             .output()
             .expect("Failed to execute SMT solver");
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         // ######################### Check the solutions ############################
-        let num_solutions = if stdout.contains("unsat") {
-            0
+        let (status, num_solutions) = if stdout.contains("unsat") {
+            (VerificationStatus::Verified, 0)
         } else if stdout.contains("sat") {
-            1
+            (VerificationStatus::Verified, 1)
         } else {
-            panic!("error: {}", stdout)
+            (VerificationStatus::TimedOut, 0)
         };
 
         Ok(VerificationResult {
-            status: VerificationStatus::Verified,
+            status: status,
             num_total_trials: 0,
             num_solutions,
             execution_time: start_time.elapsed() - sleep_time,
@@ -210,7 +213,7 @@ pub fn mean_variance(durations: &[std::time::Duration]) -> (std::time::Duration,
     (std::time::Duration::from_secs_f64(mean), variance)
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Default, Debug, Serialize)]
 pub struct ResultReport {
     pub success_ratio: f64,
     pub exe_time_mean: f64,
@@ -218,7 +221,11 @@ pub struct ResultReport {
 }
 
 pub fn generate_report(results: &[VerificationResult]) -> ResultReport {
-    assert!(!results.is_empty());
+    //assert!(!results.is_empty());
+    if results.is_empty() {
+        return ResultReport::default();
+    }
+
     let n = results.len() as f64;
 
     let success_ratio = results

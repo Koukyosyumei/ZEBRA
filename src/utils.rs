@@ -68,12 +68,9 @@ impl<T: Ord + fmt::Display> fmt::Display for PrettySet<T> {
         let mut v: Vec<&T> = self.0.iter().collect();
         v.sort();
 
-        write!(f, "{{")?;
-        for (i, x) in v.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{}", x)?;
+        write!(f, "{{\n")?;
+        for (_i, x) in v.iter().enumerate() {
+            write!(f, "{},\n", x)?;
         }
         write!(f, "}}")
     }

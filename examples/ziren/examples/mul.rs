@@ -11,14 +11,11 @@ use zkm_core_machine::alu::NUM_MUL_COLS;
 use zkm_core_machine::MulChip;
 
 use latticevm::canonicalizer::generate_alu_final_checker;
-use latticevm::constraint::eval_constraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::make_init_val;
+use latticevm::solver::nop_post_process;
 use latticevm::solver::RangeType;
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
-use latticevm::trace::AbstractTrace;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_ziren::utils::{
@@ -57,13 +54,13 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = MulChip::default();
     let air_name = "Mul";
-    let colmap = make_col_map();
-    println!("{:?}", colmap);
+    let _colmap = make_col_map();
+    // println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, MulChip>(&air, NUM_MUL_COLS, prime);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
-    println!("{:?}", general_lookup_info);
+    //println!("{:?}", general_lookup_info);
 
     constraint_info
         .refinable_cols
@@ -80,14 +77,13 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
+    for _ in 0..args.num_trial {
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
-        let mut base_abs_main_trace_data =
-            generate_abstract_trace(&program, air_name.to_string(), 1);
+        let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
         // ######################## Set Info ##########################################
         let program_info = ProgramInfo {

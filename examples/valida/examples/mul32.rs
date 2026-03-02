@@ -1,7 +1,5 @@
 use clap::Parser;
-use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::HashSet;
 use std::io;
 
 use p3_baby_bear::BabyBear;
@@ -16,13 +14,10 @@ use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::canonicalizer::generate_alu_final_checker;
-use latticevm::constraint::LatticeVMConstraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
-use latticevm::trace::AbstractTrace;
-use latticevm::ui::UiState;
+use latticevm::solver::nop_post_process;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
@@ -31,7 +26,7 @@ use latticevm_valida::utils::{
 };
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
-    let bytes_per_instr = BYTES_PER_INSTR as i32;
+    let _bytes_per_instr = BYTES_PER_INSTR as i32;
     let a_bytes = a.to_le_bytes();
 
     let mut program = vec![];
@@ -94,12 +89,12 @@ fn main() -> Result<(), io::Error> {
         .extend(&general_lookup_info.op_a);
     constraint_info.output_columns = general_lookup_info.op_a;
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
+    for _ in 0..args.num_trial {
         let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
         let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
 

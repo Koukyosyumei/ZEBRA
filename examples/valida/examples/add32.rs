@@ -1,7 +1,5 @@
 use clap::Parser;
-use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::HashSet;
 use std::io;
 
 use p3_baby_bear::BabyBear;
@@ -19,7 +17,7 @@ use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
+use latticevm::solver::nop_post_process;
 use latticevm::utils::create_or_clear_dir;
 
 use latticevm_valida::config::MyConfig;
@@ -90,7 +88,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
+    for _ in 0..args.num_trial {
         let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
         let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
 

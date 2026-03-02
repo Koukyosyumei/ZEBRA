@@ -11,13 +11,11 @@ use sp1_core_machine::control_flow::JumpChip;
 use sp1_core_machine::control_flow::JumpColumns;
 use sp1_core_machine::control_flow::NUM_JUMP_COLS;
 
-use latticevm::canonicalizer::generate_alu_final_checker;
 use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::constraint::LatticeVMConstraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
+use latticevm::solver::{nop_post_process, RangeType};
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
 use latticevm::utils::PrettySet;
@@ -39,11 +37,11 @@ fn final_check(
     for i in 0..trace.data.len() {
         let string_representation = format!(
             "pc: [{}], next_pc: [{}], op_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
-            trace_fmt_with_idxs(trace, 0, &[0, 1, 2, 3]),
-            trace_fmt_with_idxs(trace, 0, &[5, 6, 7, 8]),
-            trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
-            trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
-            trace_fmt_with_idxs(trace, 0, &[18, 19, 20, 21]),
+            trace_fmt_with_idxs(trace, i, &[0, 1, 2, 3]),
+            trace_fmt_with_idxs(trace, i, &[5, 6, 7, 8]),
+            trace_fmt_with_idxs(trace, i, &[10, 11, 12, 13]),
+            trace_fmt_with_idxs(trace, i, &[14, 15, 16, 17]),
+            trace_fmt_with_idxs(trace, i, &[18, 19, 20, 21]),
         );
         record_reprs.insert(string_representation);
     }
@@ -64,7 +62,7 @@ pub fn target_program(
     x: u32,
     y: u32,
 ) -> Program {
-    let mut instructions = if let Opcode::JAL = opcode {
+    let instructions = if let Opcode::JAL = opcode {
         vec![Instruction::new(Opcode::JAL, r1, x, 0, true, true)]
     } else {
         vec![
@@ -96,8 +94,8 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = JumpChip::default();
     let air_name = "Jump";
-    let colmap = make_col_map();
-    println!("{:?}", colmap);
+    let _colmap = make_col_map();
+    //println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BabyBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
@@ -121,7 +119,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
+    for _ in 0..args.num_trial {
         let r1: u8 = rng.random_range(0..32);
         let r2: u8 = rng.random_range(0..32);
         let x: u32 = rng.random_range(0..2_u32.pow(21)); //1006632960

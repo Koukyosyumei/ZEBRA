@@ -3,8 +3,6 @@ use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::io;
 
-use itertools::Itertools;
-
 use p3_koala_bear::KoalaBear;
 
 use zkm_core_executor::{Instruction, Opcode, Program};
@@ -13,17 +11,12 @@ use zkm_core_machine::memory::{
 };
 use zkm_core_machine::MemoryInstructionsChip;
 
-use latticevm::canonicalizer::{generate_memory_op_final_checker, save_repr_if_unique};
+use latticevm::canonicalizer::generate_memory_op_final_checker;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
-use latticevm::ui::UiState;
+use latticevm::solver::nop_post_process;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{
-    constraint::LatticeVMConstraints,
-    trace::{trace_fmt_with_idxs, AbstractTrace},
-};
 
 use latticevm_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -124,8 +117,8 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for i in 0..30 {
-        search_config.seed += i;
+    for i in 0..args.num_trial {
+        search_config.seed += i as u64;
 
         let r1: u8 = rng.random_range(0..32);
         let r2: u8 = rng.random_range(0..32);

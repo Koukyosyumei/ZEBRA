@@ -11,17 +11,12 @@ use sp1_core_machine::memory::{
     columns::MemoryInstructionsColumns, columns::NUM_MEMORY_INSTRUCTIONS_COLUMNS,
 };
 
-use latticevm::canonicalizer::{generate_memory_op_final_checker, save_repr_if_unique};
+use latticevm::canonicalizer::generate_memory_op_final_checker;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
-use latticevm::ui::UiState;
+use latticevm::solver::nop_post_process;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{
-    constraint::LatticeVMConstraints,
-    trace::{trace_fmt_with_idxs, AbstractTrace},
-};
 
 use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
@@ -41,10 +36,10 @@ pub fn target_program_load(
     pc_start: u32,
     pc_base: u32,
     r1: u8,
-    r2: u8,
+    _r2: u8,
     x: u32,
     y: u32,
-    z: u32,
+    _z: u32,
 ) -> Program {
     let instructions = vec![
         Instruction::new(Opcode::ADD, r1, 0, x, false, true),
@@ -100,8 +95,8 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = MemoryInstructionsChip::default();
     let air_name = "MemoryInstrs";
-    let colmap = make_col_map();
-    println!("{:?}", colmap);
+    let _colmap = make_col_map();
+    //println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
         BabyBear,
@@ -109,7 +104,7 @@ fn main() -> Result<(), io::Error> {
     >(
         &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime
     );
-    println!("{:?}", general_lookup_info);
+    //  println!("{:?}", general_lookup_info);
 
     let final_check = generate_memory_op_final_checker(
         2,                    // clk
@@ -136,13 +131,13 @@ fn main() -> Result<(), io::Error> {
     search_config.min_row_id = if is_load { 1 } else { 0 };
     search_config.max_row_id = if is_load { 1 } else { 0 };
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for i in 0..30 {
-        search_config.seed += i;
+    for i in 0..args.num_trial {
+        search_config.seed += i as u64;
 
         let r1: u8 = rng.random_range(0..32);
         let r2: u8 = rng.random_range(0..32);

@@ -9,15 +9,13 @@ use p3_baby_bear::BabyBear;
 use sp1_core_executor::{Instruction, Opcode, Program};
 use sp1_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
 use sp1_core_machine::riscv::AddSubChip;
-use sp1_stark::MachineProver;
 
 use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::constraint::LatticeVMConstraints;
 use latticevm::interval::MayBeFlag;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
+use latticevm::solver::nop_post_process;
 use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
 use latticevm::ui::UiState;
 use latticevm::utils::PrettySet;
@@ -103,8 +101,8 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
     let air_name = "AddSub";
-    let colmap = make_col_map();
-    println!("{:?}", colmap.is_add);
+    let _colmap = make_col_map();
+    //println!("{:?}", colmap.is_add);
 
     let (output_columns, num_extracted_rows, min_row_id, max_row_id) = if opcode_str == "ADD" {
         (vec![1, 2, 3, 4], 1, 0, 0)
@@ -121,7 +119,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
+    for _ in 0..args.num_trial {
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 

@@ -1,7 +1,6 @@
 use clap::Parser;
 use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::HashSet;
 use std::io;
 
 use p3_baby_bear::BabyBear;
@@ -11,14 +10,10 @@ use sp1_core_machine::alu::{DivRemCols, NUM_DIVREM_COLS};
 use sp1_core_machine::riscv::DivRemChip;
 
 use latticevm::canonicalizer::generate_alu_final_checker;
-use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::constraint::LatticeVMConstraints;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
-use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
-use latticevm::ui::UiState;
+use latticevm::solver::nop_post_process;
 use latticevm::utils::{create_or_clear_dir, indices_arr};
 
 use latticevm_sp1::utils::{
@@ -58,25 +53,25 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = DivRemChip::default();
     let air_name = "DivRem";
-    let colmap = make_col_map();
-    println!("{:?}", colmap);
+    let _colmap = make_col_map();
+    //println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
-    println!("{:?}", general_lookup_info);
+    //println!("{:?}", general_lookup_info);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
         .refinable_cols
         .extend(&general_lookup_info.op_a.clone());
     constraint_info.output_columns = general_lookup_info.op_a.clone();
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for i in 0..30 {
-        search_config.seed += i;
+    for i in 0..args.num_trial {
+        search_config.seed += i as u64;
 
         let x: u32 = rng.random();
         let y: u32 = rng.random_range(1..u32::MAX);

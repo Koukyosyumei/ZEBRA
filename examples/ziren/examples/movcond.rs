@@ -15,8 +15,8 @@ use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
+use latticevm::solver::nop_post_process;
 use latticevm::solver::RangeType;
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use latticevm::trace::trace_fmt_with_idxs;
 use latticevm::trace::AbstractTrace;
 use latticevm::ui::UiState;
@@ -39,10 +39,10 @@ fn final_check(
     for i in 0..trace.data.len() {
         let string_representation = format!(
             "op_a_value: [{}], prev_a_value: [{}], op_b_value: [{}], op_c_value: [{}]",
-            trace_fmt_with_idxs(trace, 0, &[2, 3, 4, 5]),
-            trace_fmt_with_idxs(trace, 0, &[6, 7, 8, 9]),
-            trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
-            trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
+            trace_fmt_with_idxs(trace, i, &[2, 3, 4, 5]),
+            trace_fmt_with_idxs(trace, i, &[6, 7, 8, 9]),
+            trace_fmt_with_idxs(trace, i, &[10, 11, 12, 13]),
+            trace_fmt_with_idxs(trace, i, &[14, 15, 16, 17]),
         );
         record_reprs.insert(string_representation);
     }
@@ -109,7 +109,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..30 {
+    for _ in 0..args.num_trial {
         let x: u32 = rng.random();
         let y: u32 = rng.random();
         let z: u32 = rng.random();
