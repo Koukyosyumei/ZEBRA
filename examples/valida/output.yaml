@@ -1,7 +1,7 @@
 config:
   num_workers: 8
   time_out_ms: 10000
-  minimum_num_taregt_cols: 8
+  minimum_num_taregt_cols: 3
   max_expansions: 1000000000
   min_row_id: 0
   max_row_id: 0
@@ -13,6 +13,6 @@ args:
   method: bb
   opcode_str: EQ
 report:
-  success_ratio: 1.0
-  exe_time_mean: 0.0013669734
-  exe_time_variance: 9.234687233250666e-8
+  success_ratio: 0.0
+  exe_time_mean: 1.8857438762333334
+  exe_time_variance: 13.792254455257593
