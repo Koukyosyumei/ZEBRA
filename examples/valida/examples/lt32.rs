@@ -54,7 +54,7 @@ fn final_check(
 }
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
-    let bytes_per_instr = BYTES_PER_INSTR as i32;
+    let _num_trialbytes_per_instr = BYTES_PER_INSTR as i32;
     let a_bytes = a.to_le_bytes();
 
     let mut program = vec![];
@@ -101,7 +101,7 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 8;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (mut constraint_info, general_lookup_info) =
+    let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
             &machine, &air, num_col, prime,
         );
