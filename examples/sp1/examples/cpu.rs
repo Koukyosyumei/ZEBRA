@@ -1,4 +1,6 @@
 use clap::Parser;
+use core::mem::transmute;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
 
@@ -28,19 +30,6 @@ use latticevm_sp1::pv_constraints::get_pv_constraints;
 use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
-
-pub fn sp1_abstract_trace_to_abstract_state(
-    abstract_row: &Vec<AbstractInterval>,
-    prime: u32,
-) -> AbstractState {
-    AbstractState {
-        clk: abstract_row[1].clone()
-            + abstract_row[2].clone() * AbstractInterval::from_i128(2_usize.pow(16) as i128),
-        pc: abstract_row[5].clone(),
-        is_done: abstract_row[5].clone().is_zero(prime),
-        memory_ops: Vec::new(),
-    }
-}
 
 fn get_memory(
     trace: &AbstractTrace,
@@ -82,13 +71,6 @@ fn get_memory(
     ops
 }
 
-fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
-    let ops = get_memory(trace, prime);
-    let rw_ops_wo_clk: Vec<(AbstractInterval, AbstractInterval, bool)> =
-        ops.into_iter().map(|x| (x.1, x.2, x.3)).clone().collect();
-    check_memory_consistency(&rw_ops_wo_clk)
-}
-
 // ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
@@ -124,8 +106,45 @@ fn final_check(
     save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
 
-pub fn target_program(pc_start: u32, pc_base: u32) -> Program {
-    let mut instructions = vec![Instruction::new(Opcode::ADD, 1, 5, 3, false, true)];
+fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag) {
+    let ops = get_memory(trace, prime);
+    let rw_ops_wo_clk: Vec<(AbstractInterval, AbstractInterval, bool)> =
+        ops.into_iter().map(|x| (x.1, x.2, x.3)).clone().collect();
+    check_memory_consistency(&rw_ops_wo_clk)
+}
+
+fn opcode_from_u8(value: u8) -> Option<Opcode> {
+    match value {
+        0 => Some(Opcode::ADD),
+        1 => Some(Opcode::SUB),
+        2 => Some(Opcode::XOR),
+        3 => Some(Opcode::OR),
+        4 => Some(Opcode::AND),
+        5 => Some(Opcode::SLL),
+        6 => Some(Opcode::SRL),
+        7 => Some(Opcode::SRA),
+        8 => Some(Opcode::SLT),
+        9 => Some(Opcode::SLTU),
+        10 => Some(Opcode::MUL),
+        11 => Some(Opcode::MULH),
+        12 => Some(Opcode::MULHU),
+        13 => Some(Opcode::MULHSU),
+        14 => Some(Opcode::DIV),
+        15 => Some(Opcode::DIVU),
+        16 => Some(Opcode::REM),
+        17 => Some(Opcode::REMU),
+        _ => None,
+    }
+}
+pub fn get_random_target_program(pc_start: u32, pc_base: u32, rng: &mut StdRng) -> Program {
+    let mut instructions = vec![Instruction::new(
+        opcode_from_u8(rng.random_range(0..18)).unwrap(),
+        rng.random_range(0..32),
+        rng.random(),
+        rng.random(),
+        false,
+        true,
+    )];
     instructions.extend(vec![
         Instruction::new(Opcode::ADD, 2, 0, SyscallCode::HALT as u32, false, true),
         Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
@@ -165,7 +184,9 @@ fn main() -> Result<(), io::Error> {
     constraint_info.constraints.pv_neg_constraints = pv_neg_constraints;
 
     // ######################## Program Initialization ###########################
-    let program = target_program(2013265921 - 8, 2013265921 - 8);
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
+
+    let program = get_random_target_program(2013265921 - 8, 2013265921 - 8, &mut rng);
     let base_abs_main_trace_data =
         generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
