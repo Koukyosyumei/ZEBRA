@@ -5,8 +5,6 @@ use std::io;
 
 use p3_baby_bear::BabyBear;
 
-use latticevm::symbolic::AbstractTrace;
-use latticevm::ui::UiState;
 use valida_alu_u32::lt::columns::LT_COL_MAP;
 use valida_alu_u32::lt::columns::NUM_LT_COLS;
 use valida_alu_u32::lt::Lt32Chip;
@@ -17,13 +15,17 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
+use latticevm::canonicalizer::generate_alu_final_checker;
+use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process, RangeType};
-use latticevm::symbolic::LatticeVMConstraints;
-use latticevm::ui::generate_alu_final_checker;
+use latticevm::solver::{nop_post_process, RangeType};
+use latticevm::trace::trace_fmt_with_idxs;
+use latticevm::trace::AbstractTrace;
+use latticevm::ui::UiState;
 use latticevm::utils::create_or_clear_dir;
+use latticevm::utils::PrettySet;
 
 use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::{
@@ -38,37 +40,18 @@ fn final_check(
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
-    let string_representation = format!(
-        "input0: [{}, {}, {}, {}], input1: [{}, {}, {}, {}], output: [{}, {}, {}, {}]",
-        trace.data[0][0],
-        trace.data[0][1],
-        trace.data[0][2],
-        trace.data[0][3],
-        trace.data[0][4],
-        trace.data[0][5],
-        trace.data[0][6],
-        trace.data[0][7],
-        trace.data[0][21],
-        0,
-        0,
-        0,
-    );
-
-    if !known_reprt.contains(&string_representation) {
-        known_reprt.insert(string_representation.clone());
-        ui.recovered = string_representation;
-
-        fs::write(
-            format!("voutput/{}_states.txt", known_reprt.len()),
-            ui.recovered.clone(),
-        )
-        .unwrap();
-        fs::write(
-            format!("voutput/{}_assignments.txt", known_reprt.len()),
-            ui.logs.clone(),
-        )
-        .unwrap();
+    let mut record_reprs = HashSet::new();
+    for i in 0..trace.data.len() {
+        let string_representation = format!(
+            "input0: [{}], input1: [{}], output: {}",
+            trace_fmt_with_idxs(trace, i, &[0, 1, 2, 3]),
+            trace_fmt_with_idxs(trace, i, &[4, 5, 6, 7]),
+            trace.data[i][21],
+        );
+        record_reprs.insert(string_representation);
     }
+
+    save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
@@ -156,7 +139,6 @@ fn main() -> Result<(), io::Error> {
         &base_abs_main_trace_data,
         vec![],
         &vec![], // vec![0],
-        dummy_program_counter_refine_fn,
         nop_post_process,
         final_check,
         &args.method,
