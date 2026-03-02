@@ -99,7 +99,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Branch";
     let _colmap = make_col_map();
 
-    let (mut constraint_info, general_lookup_info) =
+    let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
     let output_columns = vec![23, 24, 25, 26];
 
