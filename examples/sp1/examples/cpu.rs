@@ -31,11 +31,11 @@ use latticevm_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
-fn get_memory(trace: &AbstractTrace, prime: u32) -> Vec<(AI, AI, AI, bool)> {
-    fn clk(row: &[AI]) -> AI {
-        row[1].clone() + row[2].clone() * AI::from_i128(2_usize.pow(16) as i128)
-    }
+fn clk(row: &[AI]) -> AI {
+    row[1].clone() + row[2].clone() * AI::from_i128(2_usize.pow(16) as i128)
+}
 
+fn get_memory(trace: &AbstractTrace, prime: u32) -> Vec<(AI, AI, AI, bool)> {
     let mut ops = vec![];
     for row in &trace.data {
         if MayBeFlag::True != row[56].is_zero(prime) {
@@ -63,20 +63,12 @@ fn final_check(
     ui: &mut UiState,
 ) {
     let mut record_reprs = HashSet::new();
-
     for row in &trace.data {
         if MayBeFlag::True != row[56].is_zero(prime) {
-            record_reprs.insert(
-                format!(
-                    "\tins: (clk: {}, pc: {})",
-                    row[1].clone() + row[2].clone() * AI::from_i128(2_usize.pow(16) as i128),
-                    row[5].clone()
-                )
-                .to_string(),
-            );
+            record_reprs
+                .insert(format!("\tins: (clk: {}, pc: {})", clk(row), row[5].clone()).to_string());
         }
     }
-
     for ms in &get_memory(trace, prime) {
         if ms.3 {
             record_reprs.insert(
