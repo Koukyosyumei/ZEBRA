@@ -142,7 +142,7 @@ pub fn get_random_target_program(pc_start: u32, pc_base: u32, rng: &mut StdRng) 
         rng.random_range(0..32),
         rng.random(),
         rng.random(),
-        false,
+        true,
         true,
     )];
     instructions.extend(vec![
@@ -154,6 +154,17 @@ pub fn get_random_target_program(pc_start: u32, pc_base: u32, rng: &mut StdRng) 
     Program::new(instructions, pc_start, pc_base)
 }
 
+pub fn get_random_offset(prime: u32, rng: &mut StdRng) -> u32 {
+    let random_value: f64 = rng.random();
+    if random_value < 0.4 {
+        rng.random_range(0..16)
+    } else if random_value < 0.8 {
+        rng.random_range((prime - 16)..prime)
+    } else {
+        rng.random()
+    }
+}
+
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
@@ -163,10 +174,6 @@ fn main() -> Result<(), io::Error> {
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
     let program_cols = (8..35).collect::<Vec<_>>();
-
-    // ######################## Solver Parameters ###############################
-    let min_row_id = 0;
-    let max_row_id = 6;
     let num_extracted_rows = 8;
 
     // ######################## Extract CPU Constraints ##########################
@@ -185,42 +192,45 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let mut rng = StdRng::seed_from_u64(search_config.seed);
+    for _ in 0..args.num_trial {
+        let pc_offset = get_random_offset(prime, &mut rng);
+        let program = get_random_target_program(pc_offset, pc_offset, &mut rng);
 
-    let program = get_random_target_program(2013265921 - 8, 2013265921 - 8, &mut rng);
-    let base_abs_main_trace_data =
-        generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+        let base_abs_main_trace_data =
+            generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
 
-    let pad_fn = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
-    let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
-        pad_fn(trace, prime);
-        memory_check(trace, prime).1
-    };
+        let pad_fn = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
+        let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
+            pad_fn(trace, prime);
+            memory_check(trace, prime).1
+        };
 
-    // ######################## Public Values ####################################
-    let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
-    public_vals[40] = AbstractInterval::from_i128(2013265921 - 8);
-    public_vals[41] = AbstractInterval::zero();
-    public_vals[44] = AbstractInterval::one();
+        // ######################## Public Values ####################################
+        let mut public_vals = vec![AbstractInterval::zero(); SP1_PROOF_NUM_PV_ELTS];
+        public_vals[40] = AbstractInterval::from_i128(pc_offset as i128);
+        public_vals[41] = AbstractInterval::zero();
+        public_vals[44] = AbstractInterval::one();
 
-    // ######################## Set Info ##########################################
-    let program_info = ProgramInfo {
-        program_str: get_program_str(&program),
-        program_len: program.instructions.len(),
-    };
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: get_program_str(&program),
+            program_len: program.instructions.len(),
+        };
 
-    // ######################## Solve ############################################
-    let result = experiment_harness(
-        &program_info,
-        &mut constraint_info,
-        &search_config,
-        &base_abs_main_trace_data,
-        public_vals,
-        &vec![], // vec![0],
-        post_process,
-        final_check,
-        &args.method,
-    );
-    println!("{:?}", result);
+        // ######################## Solve ############################################
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            public_vals,
+            &vec![], // vec![0],
+            post_process,
+            final_check,
+            &args.method,
+        );
+        println!("{:?}", result);
+    }
 
     Ok(())
 }
