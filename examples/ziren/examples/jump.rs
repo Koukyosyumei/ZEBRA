@@ -55,7 +55,7 @@ const fn make_col_map() -> JumpColumns<usize> {
     unsafe { transmute::<[usize; NUM_JUMP_COLS], JumpColumns<usize>>(indices_arr) }
 }
 
-pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
+pub fn target_program(_opcode: Opcode, pc_start: u32, pc_base: u32, x: u8, y: u32) -> Program {
     let instructions = vec![
         Instruction::new(Opcode::ADD, x, 0, 0, false, true), // initialize the register
         Instruction::new(Opcode::Jumpi, x, y, 0, true, true),
