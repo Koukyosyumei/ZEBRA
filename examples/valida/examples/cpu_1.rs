@@ -169,9 +169,7 @@ fn main() -> Result<(), io::Error> {
 
     let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
         adjust_pc_program(trace, prime);
-        //memory_check(trace, prime).1
-        use latticevm::interval::MayBeFlag::True;
-        MayBeFlag::True
+        memory_check(trace, prime).1
     };
 
     // ######################## Set Info ##########################################
