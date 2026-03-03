@@ -464,7 +464,22 @@ impl LatticeVMSymbolicExpr {
                 if let MayBeFlag::True = cond.is_zero(prime) {
                     AbstractInterval::zero()
                 } else {
-                    rec(b)
+                    let val = rec(b);
+                    match val.is_zero(prime) {
+                        MayBeFlag::True => val,
+                        MayBeFlag::False => {
+                            if let MayBeFlag::MayBe = cond.is_zero(prime) {
+                                if 0 < val.lo {
+                                    AbstractInterval { lo: 0, hi: val.hi }
+                                } else {
+                                    AbstractInterval { lo: val.lo, hi: 0 }
+                                }
+                            } else {
+                                val
+                            }
+                        }
+                        MayBeFlag::MayBe => val,
+                    }
                 }
             }
             Self::WhenZero(a, b) => {
@@ -472,7 +487,22 @@ impl LatticeVMSymbolicExpr {
                 if let MayBeFlag::False = cond.is_zero(prime) {
                     AbstractInterval::zero()
                 } else {
-                    rec(b)
+                    let val = rec(b);
+                    match val.is_zero(prime) {
+                        MayBeFlag::True => val,
+                        MayBeFlag::False => {
+                            if let MayBeFlag::MayBe = cond.is_zero(prime) {
+                                if 0 < val.lo {
+                                    AbstractInterval { lo: 0, hi: val.hi }
+                                } else {
+                                    AbstractInterval { lo: val.lo, hi: 0 }
+                                }
+                            } else {
+                                val
+                            }
+                        }
+                        MayBeFlag::MayBe => val,
+                    }
                 }
             }
             Self::Constant(c) => c.clone(),

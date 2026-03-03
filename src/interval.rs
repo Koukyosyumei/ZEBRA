@@ -524,16 +524,31 @@ impl AbstractInterval {
                 },
             ]
         } else {
-            vec![
-                Self {
-                    lo: self.lo,
-                    hi: (self.lo + self.hi) / 2,
-                },
-                Self {
-                    lo: (self.lo + self.hi) / 2 + 1,
-                    hi: self.hi,
-                },
-            ]
+            if self.lo == 0 {
+                vec![
+                    Self { lo: 0, hi: 0 },
+                    Self { lo: 1, hi: 1 },
+                    Self {
+                        lo: 2,
+                        hi: (self.lo + 2 + self.hi) / 2,
+                    },
+                    Self {
+                        lo: (self.lo + 2 + self.hi) / 2 + 1,
+                        hi: self.hi,
+                    },
+                ]
+            } else {
+                vec![
+                    Self {
+                        lo: self.lo,
+                        hi: (self.lo + self.hi) / 2,
+                    },
+                    Self {
+                        lo: (self.lo + self.hi) / 2 + 1,
+                        hi: self.hi,
+                    },
+                ]
+            }
         }
     }
 
