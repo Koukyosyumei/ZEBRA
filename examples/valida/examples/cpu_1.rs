@@ -88,6 +88,9 @@ fn final_check(
             );
         }
     }
+    if record_reprs.is_empty() {
+        record_reprs.insert("\tempty".to_string());
+    }
 
     save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
 }
@@ -121,7 +124,7 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (3..8).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    search_config.max_expansions = 30000;
+    search_config.max_expansions = 3000;
     search_config.min_row_id = 0;
     search_config.max_row_id = 1;
     search_config.time_out_ms = 100000;
@@ -142,7 +145,9 @@ fn main() -> Result<(), io::Error> {
     constraint_info
         .refinable_cols
         .retain(|x| !program_cols.contains(x));
-    constraint_info.range_types.insert(19, RangeType::Bool);
+    constraint_info.refinable_cols.push(58);
+    //constraint_info.range_types.insert(19, RangeType::Bool);
+    println!("{:?}", constraint_info.refinable_cols);
 
     let mut public_vals = vec![AI::zero(); 3];
     public_vals[0] = AI::from_i128(0);
