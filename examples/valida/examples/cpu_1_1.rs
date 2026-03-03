@@ -133,7 +133,7 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (3..8).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    search_config.max_expansions = 10000;
+    search_config.max_expansions = 5000000;
     search_config.min_row_id = 2;
     search_config.max_row_id = 5;
     search_config.time_out_ms = 100000;
@@ -155,7 +155,8 @@ fn main() -> Result<(), io::Error> {
         .refinable_cols
         .retain(|x| !program_cols.contains(x));
     constraint_info.refinable_cols.push(58);
-    //constraint_info.range_types.insert(19, RangeType::Bool);
+    // constraint_info.range_types.insert(18, RangeType::Bool);
+    // constraint_info.range_types.insert(19, RangeType::Bool);
     println!("{:?}", constraint_info.refinable_cols);
 
     let mut public_vals = vec![AI::zero(); 3];
@@ -163,7 +164,7 @@ fn main() -> Result<(), io::Error> {
     public_vals[1] = AI::from_i128(4096);
     public_vals[2] = AI::from_i128(1);
 
-    search_config.minimum_num_taregt_cols = 3;
+    search_config.minimum_num_taregt_cols = 1;
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>();
@@ -172,7 +173,9 @@ fn main() -> Result<(), io::Error> {
         .map(|inst| format!("{}\n", inst))
         .collect::<String>();
 
-    let base_abs_main_trace_data =
+    use latticevm::constraint::eval_constraints;
+    use latticevm::solver::make_init_val;
+    let mut base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
     let adjust_pc_program = make_pc_adjuster(program.clone());
 
@@ -184,10 +187,10 @@ fn main() -> Result<(), io::Error> {
             }
         }
     }
-    constraint_info.refinable_cols.clear();
-    for j in rs.iter() {
-        constraint_info.refinable_cols.push(*j);
-    }
+    // constraint_info.refinable_cols.clear();
+    // for j in rs.iter() {
+    //     constraint_info.refinable_cols.push(*j);
+    // }
     println!("{:?}", constraint_info.refinable_cols);
 
     let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
