@@ -97,7 +97,7 @@ fn main() -> Result<(), io::Error> {
         search_config.seed += i as u64;
 
         let x: u32 = rng.random();
-        let y: u32 = rng.random_range(0..256);
+        let y: u32 = rng.random();
 
         // ######################## Program Initialization ###########################
         let program = target_program(get_opcode(&opcode_str), 4, 4, x, y);
