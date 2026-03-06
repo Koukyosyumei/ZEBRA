@@ -67,6 +67,18 @@ fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag
     check_memory_consistency(&rw_ops_wo_clk)
 }
 
+/*
+
+>>> xs[44]
+50
+>>> xs[45]
+0
+>>> xs[46]
+0
+>>> xs[47]
+240
+*/
+
 // ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
@@ -112,6 +124,16 @@ fn final_check(
             if i > 0 {
                 if MayBeFlag::False == trace.data[i - 1][24].is_zero(prime) {
                     bug_types.insert("ContinueAfterStop".to_string());
+                }
+            }
+
+            if MayBeFlag::True != trace.data[i][42].is_zero(prime) {
+                let v = trace.data[i][44].clone()
+                    + trace.data[i][45].clone()
+                    + trace.data[i][46].clone()
+                    + trace.data[i][47].clone();
+                if v.lo > prime as i128 {
+                    bug_types.insert("OverFlowWord".to_string());
                 }
             }
         }
@@ -168,8 +190,8 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     search_config.max_expansions = 3000;
-    search_config.min_row_id = 0;
-    search_config.max_row_id = 1;
+    search_config.min_row_id = 1;
+    search_config.max_row_id = 3;
     search_config.time_out_ms = 100000;
     search_config.seed = 41;
 
