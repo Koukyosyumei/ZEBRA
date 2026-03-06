@@ -10,6 +10,7 @@ use p3_field::AbstractField;
 
 use valida_alu_u32::add::Add32Instruction;
 use valida_basic_api::BasicMachine;
+use valida_cpu::BeqInstruction;
 use valida_cpu::BneInstruction;
 use valida_cpu::Imm32Instruction;
 use valida_cpu::StopInstruction;
@@ -102,7 +103,15 @@ fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     program.extend([
         InstructionWord {
             opcode: <Imm32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-4, 2, 0, 0, 0]),
+            operands: Operands([-4, 1, 0, 0, 0]),
+        },
+        InstructionWord {
+            opcode: <Add32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            operands: Operands([-8, -8, 1, 0, 1]),
+        },
+        InstructionWord {
+            opcode: <BeqInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            operands: Operands([1 * bytes_per_instr, -8, -4, 0, 0]),
         },
         InstructionWord {
             opcode: <StopInstruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
@@ -124,9 +133,9 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (3..8).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    search_config.max_expansions = 3000;
-    search_config.min_row_id = 0;
-    search_config.max_row_id = 1;
+    search_config.max_expansions = 10000;
+    search_config.min_row_id = 2;
+    search_config.max_row_id = 5;
     search_config.time_out_ms = 100000;
     search_config.seed = 41;
 
@@ -146,7 +155,8 @@ fn main() -> Result<(), io::Error> {
         .refinable_cols
         .retain(|x| !program_cols.contains(x));
     constraint_info.refinable_cols.push(58);
-    //constraint_info.range_types.insert(19, RangeType::Bool);
+    // constraint_info.range_types.insert(18, RangeType::Bool);
+    // constraint_info.range_types.insert(19, RangeType::Bool);
     println!("{:?}", constraint_info.refinable_cols);
 
     let mut public_vals = vec![AI::zero(); 3];
@@ -163,13 +173,31 @@ fn main() -> Result<(), io::Error> {
         .map(|inst| format!("{}\n", inst))
         .collect::<String>();
 
-    let base_abs_main_trace_data =
+    use latticevm::constraint::eval_constraints;
+    use latticevm::solver::make_init_val;
+    let mut base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
     let adjust_pc_program = make_pc_adjuster(program.clone());
 
+    let mut rs: HashSet<usize> = HashSet::new();
+    for i in 0..base_abs_main_trace_data.len() {
+        for j in 0..base_abs_main_trace_data[i].len() {
+            if base_abs_main_trace_data[i][j].as_canonical_u32(prime) != 0 {
+                rs.insert(j);
+            }
+        }
+    }
+    // constraint_info.refinable_cols.clear();
+    // for j in rs.iter() {
+    //     constraint_info.refinable_cols.push(*j);
+    // }
+    println!("{:?}", constraint_info.refinable_cols);
+
     let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
         adjust_pc_program(trace, prime);
-        memory_check(trace, prime).1
+        //memory_check(trace, prime).1
+        use latticevm::interval::MayBeFlag::True;
+        MayBeFlag::True
     };
 
     // ######################## Set Info ##########################################

@@ -151,6 +151,7 @@ pub fn refine_trace(
     max_row_id: usize,
     prime: u32,
     rng: &mut StdRng,
+    is_balanced: bool,
 ) -> (Option<Vec<AbstractTrace>>, bool) {
     if trace.singleton_positions.len() == trace.data.len() * trace.data[0].len() {
         return (None, false);
@@ -168,7 +169,11 @@ pub fn refine_trace(
         j += 1;
     }
     if !trace.data[i][c_refinment_target_indicies[j]].is_singleton() {
-        let vs = trace.data[i][c_refinment_target_indicies[j]].split(prime);
+        let vs = if is_balanced {
+            trace.data[i][c_refinment_target_indicies[j]].split(prime)
+        } else {
+            trace.data[i][c_refinment_target_indicies[j]].unbalanced_split(prime)
+        };
         let mut results = vec![];
         for v in vs {
             let mut new_trace = trace.clone();
