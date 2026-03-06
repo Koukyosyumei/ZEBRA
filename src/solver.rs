@@ -307,6 +307,7 @@ fn process_single_node(
     conditional_var_sub_const_constraints: &[(usize, usize, i128)],
     eq_constraints: &[(usize, usize, usize)],
     abir_constraints: &[AbirConstraint],
+    is_balanced: bool,
 ) -> NodeProcessingResult {
     let mut main_trace = head.main_trace;
 
@@ -338,6 +339,7 @@ fn process_single_node(
             max_row_id,
             prime,
             rng,
+            is_balanced,
         );
         if refined_flag {
             refined_main_candidates
@@ -349,6 +351,7 @@ fn process_single_node(
                 max_row_id,
                 prime,
                 rng,
+                is_balanced,
             )
             .0
         }
@@ -526,6 +529,7 @@ pub fn parallel_solve<PostProcessFn, FinalCheckFn>(
     global_total_trials: Arc<AtomicUsize>,
     sleep_time: &mut Duration,
     start_time: &std::time::Instant,
+    is_balanced: bool,
 ) -> (VerificationStatus, bool, bool)
 // (Found, Quit)
 where
@@ -681,6 +685,7 @@ where
                     &c_cvsc,
                     &c_cvsv,
                     &c_abir,
+                    is_balanced,
                 );
 
                 match result {
@@ -985,6 +990,7 @@ where
                 global_count.clone(),
                 sleep_time,
                 &start_time,
+                column_subset.len() == constraint_info.refinable_cols.len(),
             );
             last_verification_status = status;
 

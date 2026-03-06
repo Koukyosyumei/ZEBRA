@@ -133,7 +133,7 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (3..8).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    search_config.max_expansions = 5000000;
+    search_config.max_expansions = 10000;
     search_config.min_row_id = 2;
     search_config.max_row_id = 5;
     search_config.time_out_ms = 100000;
@@ -164,7 +164,7 @@ fn main() -> Result<(), io::Error> {
     public_vals[1] = AI::from_i128(4096);
     public_vals[2] = AI::from_i128(1);
 
-    search_config.minimum_num_taregt_cols = 1;
+    search_config.minimum_num_taregt_cols = 3;
 
     // ######################## Program Initialization ###########################
     let program = get_target_program::<BabyBear>();

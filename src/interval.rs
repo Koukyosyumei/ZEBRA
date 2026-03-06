@@ -524,7 +524,32 @@ impl AbstractInterval {
                 },
             ]
         } else {
-            /*
+            vec![
+                Self {
+                    lo: self.lo,
+                    hi: (self.lo + self.hi) / 2,
+                },
+                Self {
+                    lo: (self.lo + self.hi) / 2 + 1,
+                    hi: self.hi,
+                },
+            ]
+        }
+    }
+
+    pub fn unbalanced_split(&self, _p: u32) -> Vec<Self> {
+        if self.hi == self.lo || self.hi == self.lo + 1 {
+            vec![
+                Self {
+                    lo: self.lo,
+                    hi: self.lo,
+                },
+                Self {
+                    lo: self.hi,
+                    hi: self.hi,
+                },
+            ]
+        } else {
             if self.lo == 0 {
                 vec![
                     Self { lo: 0, hi: 0 },
@@ -538,18 +563,18 @@ impl AbstractInterval {
                         hi: self.hi,
                     },
                 ]
-            } else {*/
-            vec![
-                Self {
-                    lo: self.lo,
-                    hi: (self.lo + self.hi) / 2,
-                },
-                Self {
-                    lo: (self.lo + self.hi) / 2 + 1,
-                    hi: self.hi,
-                },
-            ]
-            //}
+            } else {
+                vec![
+                    Self {
+                        lo: self.lo,
+                        hi: (self.lo + self.hi) / 2,
+                    },
+                    Self {
+                        lo: (self.lo + self.hi) / 2 + 1,
+                        hi: self.hi,
+                    },
+                ]
+            }
         }
     }
 
