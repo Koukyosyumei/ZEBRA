@@ -1,5 +1,6 @@
 use clap::Parser;
 use core::mem::transmute;
+use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
@@ -33,6 +34,7 @@ use latticevm::trace::AbstractTrace;
 use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
 use latticevm::utils::create_or_clear_dir;
 use latticevm::utils::PrettySet;
+use valida_opcodes::Opcode;
 
 use latticevm_valida::config::MyConfig;
 use latticevm_valida::utils::{
@@ -175,6 +177,75 @@ fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
     program
 }
 
+pub fn generate_random_program(length: usize, rng: &mut StdRng) -> Vec<InstructionWord<i32>> {
+    let mut program = Vec::with_capacity(length);
+
+    // Subset of opcodes to use for the random program
+    let available_opcodes = [
+        Opcode::ADD32,
+        Opcode::SUB32,
+        Opcode::MUL32,
+        Opcode::DIV32,
+        Opcode::IMM32,
+        Opcode::LOAD32,
+        Opcode::STORE32,
+        Opcode::JAL,
+        Opcode::BEQ,
+        Opcode::BNE,
+        Opcode::LOADFP,
+        Opcode::STOP,
+    ];
+
+    for i in 0..length {
+        // Typically, a program should terminate with a STOP opcode
+        let opcode = if i == length - 1 {
+            &Opcode::STOP
+        } else {
+            available_opcodes.choose(rng).unwrap_or(&Opcode::STOP)
+        };
+
+        let mut ops = [0i32; 5]; // Each instruction has 5 operands
+
+        match opcode {
+            Opcode::IMM32 => {
+                // IMM32 format: [dest_offset, byte0, byte1, byte2, byte3]
+                ops[0] = rng.gen_range(-20..20) * 4; // Stack offsets are usually multiples of 4
+                for b in 1..5 {
+                    ops[b] = rng.gen_range(0..256); // Individual bytes of the immediate value
+                }
+            }
+            Opcode::ADD32 | Opcode::SUB32 | Opcode::MUL32 | Opcode::DIV32 => {
+                // ALU format: [dest, src1, src2/imm, ?, is_imm_flag]
+                ops[0] = rng.gen_range(-20..20) * 4; // Destination stack offset
+                ops[1] = rng.gen_range(-20..20) * 4; // Source 1 stack offset
+                ops[4] = rng.gen_range(0..2); // is_imm flag (0 or 1)
+
+                if ops[4] == 1 {
+                    ops[2] = rng.gen_range(0..1000); // Direct immediate value
+                } else {
+                    ops[2] = rng.gen_range(-20..20) * 4; // Source 2 stack offset
+                }
+            }
+            Opcode::STOP => {
+                // STOP usually takes no operands
+            }
+            _ => {
+                // Default: fill with small random offsets
+                for op in ops.iter_mut() {
+                    *op = rng.gen_range(-40..40);
+                }
+            }
+        }
+
+        program.push(InstructionWord {
+            opcode: opcode.clone() as u32,
+            operands: Operands(ops),
+        });
+    }
+
+    program
+}
+
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
@@ -219,45 +290,57 @@ fn main() -> Result<(), io::Error> {
     search_config.minimum_num_taregt_cols = 3;
 
     // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>();
-    let program_str = program
-        .iter()
-        .map(|inst| format!("{}\n", inst))
-        .collect::<String>();
+    //    let program = get_target_program::<BabyBear>();
 
-    let base_abs_main_trace_data =
-        generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
-    let adjust_pc_program = make_pc_adjuster(program.clone());
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
 
-    let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
-        adjust_pc_program(trace, prime);
-        memory_check(trace, prime).1
-    };
+    for _ in 0..10 {
+        let program = generate_random_program(2, &mut rng);
+        let program_str = program
+            .iter()
+            .map(|inst| format!("{}\n", inst))
+            .collect::<String>();
 
-    // ######################## Set Info ##########################################
-    let program_info = ProgramInfo {
-        program_str: program_str,
-        program_len: program.len(),
-    };
-    constraint_info
-        .range_types
-        .insert(1, RangeType::Any(0, program.len() as i128 - 1));
+        let result = std::panic::catch_unwind(|| {
+            generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000)
+        });
+        if result.is_err() {
+            continue;
+        }
 
-    // ######################## Solve ############################################
-    let mut known_solution = HashSet::new();
-    let result = experiment_harness(
-        &program_info,
-        &mut constraint_info,
-        &search_config,
-        &base_abs_main_trace_data,
-        public_vals,
-        &vec![], // vec![0],
-        post_process,
-        final_check,
-        &args.method,
-        &mut known_solution,
-    );
-    println!("{:?}", result);
+        let base_abs_main_trace_data = result.unwrap();
+        let adjust_pc_program = make_pc_adjuster(program.clone());
+
+        let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
+            adjust_pc_program(trace, prime);
+            memory_check(trace, prime).1
+        };
+
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: program_str,
+            program_len: program.len(),
+        };
+        constraint_info
+            .range_types
+            .insert(1, RangeType::Any(0, program.len() as i128 - 1));
+
+        // ######################## Solve ############################################
+        let mut known_solution = HashSet::new();
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            public_vals.clone(),
+            &vec![], // vec![0],
+            post_process,
+            final_check,
+            &args.method,
+            &mut known_solution,
+        );
+        println!("{:?}", result);
+    }
 
     Ok(())
 }
