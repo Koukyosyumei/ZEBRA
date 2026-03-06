@@ -244,6 +244,7 @@ fn main() -> Result<(), io::Error> {
         .insert(1, RangeType::Any(0, program.len() as i128 - 1));
 
     // ######################## Solve ############################################
+    let mut known_solution = HashSet::new();
     let result = experiment_harness(
         &program_info,
         &mut constraint_info,
@@ -254,6 +255,7 @@ fn main() -> Result<(), io::Error> {
         post_process,
         final_check,
         &args.method,
+        &mut known_solution,
     );
     println!("{:?}", result);
 

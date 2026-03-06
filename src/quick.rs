@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fs::File;
+use std::hash::Hash;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -66,6 +67,7 @@ pub fn experiment_harness<FinalCheckFn, PostProcessFn>(
     post_process: PostProcessFn,
     final_check: FinalCheckFn,
     verification_method: &String,
+    known_solution: &mut HashSet<String>,
 ) -> Result<VerificationResult, io::Error>
 where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -94,6 +96,7 @@ where
             post_process,
             final_check,
             &mut sleep_time,
+            known_solution,
         )
     } else {
         // ######################## Generating SMT Formula ##########################
@@ -157,6 +160,7 @@ pub fn quick_api<FinalCheckFn, PostProcessFn>(
     align_pc_to_program: PostProcessFn,
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
+    known_solution: &mut HashSet<String>,
 ) -> Result<VerificationResult, io::Error>
 where
     FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
@@ -171,7 +175,6 @@ where
     ui.program = program_str;
 
     // ######################## Run Solver ######################################
-    let mut known_solution = HashSet::<String>::new();
     let start_time = time::Instant::now();
 
     let (verification_status, global_count) = run_parallel_solver(
@@ -181,7 +184,7 @@ where
         search_config,
         align_pc_to_program,
         final_check,
-        &mut known_solution,
+        known_solution,
         &mut ui,
         &mut terminal,
         sleep_time,
