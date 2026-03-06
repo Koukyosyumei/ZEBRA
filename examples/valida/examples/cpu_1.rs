@@ -22,6 +22,7 @@ use valida_opcodes::BYTES_PER_INSTR;
 
 use latticevm::canonicalizer::save_repr_if_unique;
 use latticevm::interval::AbstractInterval as AI;
+use latticevm::interval::AbstractInterval;
 use latticevm::interval::MayBeFlag;
 use latticevm::memory::IntervalMemory;
 use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
@@ -71,7 +72,7 @@ fn final_check(
     trace: &AbstractTrace,
     num_trial: usize,
     prime: u32,
-    known_reprt: &mut HashSet<String>,
+    known_report: &mut HashSet<String>,
     ui: &mut UiState,
 ) {
     let mut record_reprs = HashSet::new();
@@ -88,11 +89,53 @@ fn final_check(
             );
         }
     }
+
+    let mut bug_types: HashSet<String> = HashSet::new();
+
     if record_reprs.is_empty() {
-        record_reprs.insert("\tempty".to_string());
+        record_reprs.insert("\tEmpty".to_string());
+        bug_types.insert("Empty".to_string());
     }
 
-    save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
+    for i in 0..trace.data.len() {
+        let mut ai = AbstractInterval::zero();
+        for j in 9..27 {
+            ai = ai.clone() + trace.data[i][j].clone();
+        }
+        if MayBeFlag::True != trace.data[i][58].is_zero(prime) {
+            if MayBeFlag::True == ai.is_zero(prime) {
+                bug_types.insert("UnassignedOpcodeFlags".to_string());
+            } else if MayBeFlag::False == (ai - AbstractInterval::one()).is_zero(prime) {
+                bug_types.insert("NonExclusiveOpcodeFlags".to_string());
+            }
+
+            if i > 0 {
+                if MayBeFlag::False == trace.data[i - 1][24].is_zero(prime) {
+                    bug_types.insert("ContinueAfterStop".to_string());
+                }
+            }
+        }
+
+        if MayBeFlag::True == trace.data[i][58].is_zero(prime) {
+            if i > 0 {
+                if MayBeFlag::True == trace.data[i - 1][24].is_zero(prime) {
+                    bug_types.insert("TerminateBeforeStop".to_string());
+                }
+            }
+        }
+    }
+    let mut is_new = bug_types.is_empty();
+    for bt in &bug_types {
+        if !known_report.contains(bt) {
+            is_new = true;
+            known_report.insert(bt.clone());
+        }
+    }
+    if !is_new {
+        return;
+    }
+
+    save_repr_if_unique(&PrettySet(record_reprs), known_report, ui);
 }
 
 fn get_target_program<Val: StarkField>() -> Vec<InstructionWord<i32>> {
