@@ -67,43 +67,12 @@ fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag
     check_memory_consistency(&rw_ops_wo_clk)
 }
 
-/*
-
->>> xs[44]
-50
->>> xs[45]
-0
->>> xs[46]
-0
->>> xs[47]
-240
-*/
-
-// ############## Final Check Function ##############################
-fn final_check(
+fn check_bug_type(
     trace: &AbstractTrace,
-    num_trial: usize,
+    record_reprs: &mut HashSet<String>,
+    bug_types: &mut HashSet<String>,
     prime: u32,
-    known_report: &mut HashSet<String>,
-    ui: &mut UiState,
 ) {
-    let mut record_reprs = HashSet::new();
-    for row in &trace.data {
-        if MayBeFlag::True != row[58].is_zero(prime) {
-            record_reprs
-                .insert(format!("\tins: (clk: {}, pc: {})", row[0], row[1].clone()).to_string());
-        }
-    }
-    for ms in &get_memory(trace, prime) {
-        if ms.3 {
-            record_reprs.insert(
-                format!("\tmem: (clk: {}, addr: {}, val: {})", ms.0, ms.1, ms.2).to_string(),
-            );
-        }
-    }
-
-    let mut bug_types: HashSet<String> = HashSet::new();
-
     if record_reprs.is_empty() {
         record_reprs.insert("\tEmpty".to_string());
         bug_types.insert("Empty".to_string());
@@ -146,6 +115,34 @@ fn final_check(
             }
         }
     }
+}
+
+// ############## Final Check Function ##############################
+fn final_check(
+    trace: &AbstractTrace,
+    num_trial: usize,
+    prime: u32,
+    known_report: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    let mut record_reprs = HashSet::new();
+    for row in &trace.data {
+        if MayBeFlag::True != row[58].is_zero(prime) {
+            record_reprs
+                .insert(format!("\tins: (clk: {}, pc: {})", row[0], row[1].clone()).to_string());
+        }
+    }
+    for ms in &get_memory(trace, prime) {
+        if ms.3 {
+            record_reprs.insert(
+                format!("\tmem: (clk: {}, addr: {}, val: {})", ms.0, ms.1, ms.2).to_string(),
+            );
+        }
+    }
+
+    let mut bug_types: HashSet<String> = HashSet::new();
+    check_bug_type(&trace, &mut record_reprs, &mut bug_types, prime);
+
     let mut is_new = bug_types.is_empty();
     for bt in &bug_types {
         if !known_report.contains(bt) {
@@ -190,8 +187,8 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Solver Parameters ###############################
     search_config.max_expansions = 3000;
-    search_config.min_row_id = 1;
-    search_config.max_row_id = 3;
+    search_config.min_row_id = 0;
+    search_config.max_row_id = 1;
     search_config.time_out_ms = 100000;
     search_config.seed = 41;
 
