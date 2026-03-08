@@ -1,15 +1,3 @@
-cargo build --release --example addsub
-cargo build --release --example bitwise
-cargo build --release --example branch
-cargo build --release --example cloclz
-cargo build --release --example divrem
-cargo build --release --example jump
-cargo build --release --example lt
-cargo build --release --example memoryreadwrite
-cargo build --release --example movcond
-cargo build --release --example mul
-cargo build --release --example shiftleft
-
 echo "addsub"
 ./target/release/examples/addsub --config ./configs/alu.config --opcode-str "ADD" --method "bb" --num-trial 1
 ./target/release/examples/addsub --config ./configs/alu.config --opcode-str "SUB" --method "bb" --num-trial 1
