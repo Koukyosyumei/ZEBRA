@@ -96,7 +96,8 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = BranchChip::default();
     let air_name = "Branch";
-    let _colmap = make_col_map();
+    let colmap = make_col_map();
+    println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
