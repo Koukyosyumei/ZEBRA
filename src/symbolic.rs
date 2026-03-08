@@ -7,9 +7,9 @@ use serde::Serialize;
 
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 use crate::wordop::{
-    reconstruct_symbolic_word, word_add, word_addu, word_and, word_div, word_eq, word_ltu,
+    reconstruct_symbolic_word, word_addu, word_and, word_div, word_eq, word_ltu,
     word_mul, word_mulhs, word_mulhu, word_mult, word_multu, word_neq, word_or, word_sdiv,
-    word_sle, word_slt, word_srl, word_sub, word_subu, word_xor,
+    word_sle, word_slt, word_srl, word_subu, word_xor,
 };
 
 /// Identifies the source and temporal position of a symbolic value within the
