@@ -487,7 +487,7 @@ pub fn expr_to_smt_bv(
                     rec(a),
                 )
             }
-            LatticeVMSymbolicExpr::WordAdd(a_vec, b_vec) => {
+            LatticeVMSymbolicExpr::WordAddU(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvadd {} {})", a_val, b_val)
@@ -614,11 +614,6 @@ pub fn expr_to_smt_bv(
                     acc = format!("(bvadd {} (bvmul {} #x{:08x}))", acc, limb, factor);
                 }
                 acc
-            }
-            LatticeVMSymbolicExpr::WordSub(a_vec, b_vec) => {
-                let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
-                let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
-                format!("(bvsub {} {})", a_val, b_val)
             }
             LatticeVMSymbolicExpr::WordDiv(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);

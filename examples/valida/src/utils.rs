@@ -84,7 +84,7 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
                         let multiplicities = cv(&e_interaction.count);
 
                         let tmps = vec![
-                            (Opcode::ADD32 as u8, WordOp::Add),
+                            (Opcode::ADD32 as u8, WordOp::AddU),
                             (Opcode::SUB32 as u8, WordOp::SubU),
                             (Opcode::MUL32 as u8, WordOp::Mul),
                             (Opcode::LT32 as u8, WordOp::Lt),

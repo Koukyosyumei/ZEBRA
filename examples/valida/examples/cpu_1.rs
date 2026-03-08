@@ -186,11 +186,13 @@ fn alu_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
 
     let alu_opcodes = [
         Opcode::ADD32,
+        /*
         Opcode::SUB32,
         Opcode::MUL32,
         Opcode::DIV32,
         Opcode::EQ32,
         Opcode::NE32,
+        */
     ];
     let opcode = alu_opcodes.choose(rng).unwrap_or(&Opcode::STOP);
 
@@ -283,7 +285,7 @@ fn branch_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
 
 pub fn generate_random_program(rng: &mut StdRng) -> Vec<IW<i32>> {
     let fs = vec![
-        imm_program::<BabyBear>,
+        // imm_program::<BabyBear>,
         alu_program::<BabyBear>,
         //  jal_program::<BabyBear>,
         //  branch_program::<BabyBear>,
@@ -329,7 +331,7 @@ fn main() -> Result<(), io::Error> {
     public_vals[1] = AI::from_i128(4096);
     public_vals[2] = AI::from_i128(1);
 
-    search_config.minimum_num_taregt_cols = 3;
+    search_config.minimum_num_taregt_cols = 1;
 
     // ######################## Program Initialization ###########################
     //    let program = get_target_program::<BabyBear>();

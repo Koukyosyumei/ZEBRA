@@ -7,8 +7,7 @@ pub const WORD_BOUND: i128 = 1 << WORD_BITS;
 
 #[derive(Debug)]
 pub enum WordOp {
-    Add,
-    Sub,
+    AddU,
     SubU,
     Mul,
     MulH,
@@ -61,16 +60,9 @@ pub fn get_alu_constraint(
     let hi_word = reconstruct_symbolic_word(hi, 0);
 
     match op {
-        WordOp::Add => LatticeVMSymbolicExpr::Sub(
+        WordOp::AddU => LatticeVMSymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordAdd(
-                b.clone().map(|f| Box::new(f)),
-                c.clone().map(|f| Box::new(f)),
-            )),
-        ),
-        WordOp::Sub => LatticeVMSymbolicExpr::Sub(
-            Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordSub(
+            Box::new(LatticeVMSymbolicExpr::WordAddU(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),

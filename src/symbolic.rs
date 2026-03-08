@@ -7,9 +7,9 @@ use serde::Serialize;
 
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 use crate::wordop::{
-    reconstruct_symbolic_word, word_add, word_and, word_div, word_eq, word_ltu, word_mul,
-    word_mulhs, word_mulhu, word_mult, word_multu, word_neq, word_or, word_sdiv, word_sle,
-    word_slt, word_srl, word_sub, word_subu, word_xor,
+    reconstruct_symbolic_word, word_add, word_addu, word_and, word_div, word_eq, word_ltu,
+    word_mul, word_mulhs, word_mulhu, word_mult, word_multu, word_neq, word_or, word_sdiv,
+    word_sle, word_slt, word_srl, word_sub, word_subu, word_xor,
 };
 
 /// Identifies the source and temporal position of a symbolic value within the
@@ -215,8 +215,7 @@ pub enum LatticeVMSymbolicExpr {
     Flip(Box<Self>),
     KoalaBearRange(Box<Self>),
     BabyBearRange(Box<Self>),
-    WordAdd([Box<Self>; 4], [Box<Self>; 4]),
-    WordSub([Box<Self>; 4], [Box<Self>; 4]),
+    WordAddU([Box<Self>; 4], [Box<Self>; 4]),
     WordSubU([Box<Self>; 4], [Box<Self>; 4]),
     WordMul([Box<Self>; 4], [Box<Self>; 4]),
     WordMulhu([Box<Self>; 4], [Box<Self>; 4]),
@@ -271,14 +270,9 @@ impl fmt::Display for LatticeVMSymbolicExpr {
             Self::Flip(x) => write!(f, "~{}", x),
             Self::KoalaBearRange(x) => write!(f, "🐨{}🐨", x),
             Self::BabyBearRange(x) => write!(f, "👶{}👶", x),
-            Self::WordAdd(b, c) => write!(
+            Self::WordAddU(b, c) => write!(
                 f,
-                "[{}, {}, {}, {}] + [{}, {}, {}, {}]",
-                b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
-            ),
-            Self::WordSub(b, c) => write!(
-                f,
-                "[{}, {}, {}, {}] - [{}, {}, {}, {}]",
+                "[{}, {}, {}, {}] +u [{}, {}, {}, {}]",
                 b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3]
             ),
             Self::WordSubU(b, c) => write!(
@@ -609,17 +603,11 @@ impl LatticeVMSymbolicExpr {
                 )));
                 rec(&e)
             }
-            Self::WordAdd(b, c) => {
+            Self::WordAddU(b, c) => {
                 let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
                 let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
 
-                word_add(&b_ais, &c_ais)
-            }
-            Self::WordSub(b, c) => {
-                let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));
-                let c_ais: [AbstractInterval; 4] = c.clone().map(|x| rec(&x));
-
-                word_sub(&b_ais, &c_ais)
+                word_addu(&b_ais, &c_ais)
             }
             Self::WordSubU(b, c) => {
                 let b_ais: [AbstractInterval; 4] = b.clone().map(|x| rec(&x));

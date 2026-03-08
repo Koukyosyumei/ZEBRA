@@ -193,7 +193,7 @@ pub fn get_control_flow_constraint(
         )],
         ControFLowOp::JALR => vec![LExpr::Sub(
             Box::new(next_pc.clone()),
-            Box::new(LExpr::WordAdd(b_box, c_box)),
+            Box::new(LExpr::WordAddU(b_box, c_box)),
         )],
     }
 }

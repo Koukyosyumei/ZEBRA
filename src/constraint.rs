@@ -84,7 +84,7 @@ pub fn eval_base_constraints(
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {
-                    //println!("{}: {}", _j, tc);
+                    // println!("({}, {}): {}, {} ^^{}", i, _j, tc, prime, is_strict);
                     gather_vars(i, tc, memo);
                     is_all_true = false;
                     *potential += 1;
