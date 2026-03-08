@@ -331,7 +331,11 @@ impl AbstractInterval {
         if self.lo <= 0 && 0 <= self.hi {
             true
         } else {
-            (self.hi / k) - ((self.lo - 1) / k) >= 1
+            if self.hi % k == 0 || self.lo % k == 0 {
+                true
+            } else {
+                (self.hi / k) - ((self.lo - 1) / k) >= 1
+            }
         }
     }
 
@@ -821,5 +825,13 @@ mod tests {
         let or_res = e | f;
         assert_eq!(or_res.lo, 16);
         assert_eq!(or_res.hi, 17);
+    }
+
+    #[test]
+    fn test_overflow_iszero() {
+        let a = AbstractInterval::from_i128(60706);
+        let b = AbstractInterval::from_i128(95877702);
+        let c = AbstractInterval::bool();
+        assert_eq!((c - (a * b)).is_zero(2013265921), MayBeFlag::MayBe);
     }
 }

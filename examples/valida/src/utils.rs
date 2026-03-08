@@ -85,7 +85,7 @@ pub fn inspect_lookup_interactions<M, C, SC, AB>(
 
                         let tmps = vec![
                             (Opcode::ADD32 as u8, WordOp::Add),
-                            (Opcode::SUB32 as u8, WordOp::Sub),
+                            (Opcode::SUB32 as u8, WordOp::SubU),
                             (Opcode::MUL32 as u8, WordOp::Mul),
                             (Opcode::LT32 as u8, WordOp::Lt),
                             (Opcode::SLT32 as u8, WordOp::SLt),
@@ -233,7 +233,7 @@ pub fn generate_bootstrap_trace_from_program(
     chip_id: usize,
     pc: u32,
     fp: u32,
-) -> Vec<Vec<AbstractInterval>> {
+) -> (Vec<Vec<AbstractInterval>>, Vec<Vec<AbstractInterval>>) {
     let config = get_machine_config();
     let (prover_opts, _show_preprocessed, _show_preprocessed_dims, _show_public_verifier) =
         prover_options();
@@ -265,7 +265,21 @@ pub fn generate_bootstrap_trace_from_program(
             );
         }
     }
-    rows
+
+    let mut programs = vec![];
+    if let Some(ptraces) = &mut traces.0[1] {
+        let mut trace = ptraces.into_matrix();
+        let nrows = trace.values.len() / trace.width();
+        for i in 0..nrows {
+            let row = trace.row_mut(i);
+            programs.push(
+                row.iter()
+                    .map(|v| AbstractInterval::from_i128(v.as_canonical_u32() as i128))
+                    .collect(),
+            );
+        }
+    }
+    (programs, rows)
 }
 
 pub fn extract_constraints_and_range<M, SC, C>(
@@ -354,20 +368,16 @@ where
 }
 
 pub fn make_pc_adjuster(
-    program: Vec<InstructionWord<i32>>,
+    program: Vec<Vec<AbstractInterval>>,
 ) -> impl Fn(&mut AbstractTrace, u32) + Clone {
     move |main_trace: &mut AbstractTrace, prime: u32| {
         for row in &mut main_trace.data {
             if row[1].is_singleton() {
                 let pc = row[1].as_canonical_u32(prime) as usize;
                 if pc < program.len() {
-                    let instr = program[pc];
-                    row[3] = AbstractInterval::from_i128(instr.opcode.into());
-                    row[4] = AbstractInterval::from_i128(instr.operands.0[0].into());
-                    row[5] = AbstractInterval::from_i128(instr.operands.0[1].into());
-                    row[6] = AbstractInterval::from_i128(instr.operands.0[2].into());
-                    row[7] = AbstractInterval::from_i128(instr.operands.0[3].into());
-                    row[8] = AbstractInterval::from_i128(instr.operands.0[4].into());
+                    for i in 3..9 {
+                        row[i] = program[pc][i + 2].clone();
+                    }
 
                     if row[3].as_canonical_u32(prime) == 8 {
                         for i in 4..57 {
