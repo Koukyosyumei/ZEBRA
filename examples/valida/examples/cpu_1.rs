@@ -185,12 +185,12 @@ fn alu_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
     let b: i32 = rng.gen_range(-0x3C000000..0x3C000000);
 
     let alu_opcodes = [
-        //Opcode::ADD32,
+        Opcode::ADD32,
         Opcode::SUB32,
-        // Opcode::MUL32,
-        // Opcode::DIV32,
-        // Opcode::EQ32,
-        // Opcode::NE32,
+        Opcode::MUL32,
+        Opcode::DIV32,
+        Opcode::EQ32,
+        Opcode::NE32,
     ];
     let opcode = alu_opcodes.choose(rng).unwrap_or(&Opcode::STOP);
 
@@ -283,7 +283,7 @@ fn branch_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
 
 pub fn generate_random_program(rng: &mut StdRng) -> Vec<IW<i32>> {
     let fs = vec![
-        //imm_program::<BabyBear>,
+        imm_program::<BabyBear>,
         alu_program::<BabyBear>,
         //  jal_program::<BabyBear>,
         //  branch_program::<BabyBear>,
@@ -303,10 +303,8 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (3..8).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    search_config.max_expansions = 300000;
-    search_config.min_row_id = 0;
-    search_config.max_row_id = 0;
-    search_config.time_out_ms = 100000;
+    search_config.max_expansions = 30000;
+    search_config.time_out_ms = 10000;
     search_config.seed = 41;
 
     println!("CPU AIR MAP");
@@ -331,14 +329,14 @@ fn main() -> Result<(), io::Error> {
     public_vals[1] = AI::from_i128(4096);
     public_vals[2] = AI::from_i128(1);
 
-    search_config.minimum_num_taregt_cols = 1;
+    search_config.minimum_num_taregt_cols = 3;
 
     // ######################## Program Initialization ###########################
     //    let program = get_target_program::<BabyBear>();
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
 
-    for _ in 0..1 {
+    for i in 0..10 {
         println!("\n\n===========");
         let program = generate_random_program(&mut rng);
         let program_str = program
@@ -357,6 +355,10 @@ fn main() -> Result<(), io::Error> {
 
         let program_table = result.as_ref().unwrap().0.clone();
         let base_abs_main_trace_data = &result.unwrap().1;
+
+        search_config.seed = i as u64;
+        search_config.min_row_id = 0;
+        search_config.max_row_id = base_abs_main_trace_data.len() - 1;
 
         let adjust_pc_program = make_pc_adjuster(&program_table);
         let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {

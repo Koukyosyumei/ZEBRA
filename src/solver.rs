@@ -958,7 +958,6 @@ where
             // 1. Prepare Initial Trace for this subset
             let mut abs_main_trace_data = base_abs_main_trace_data.clone();
             let subset_indices: Vec<usize> = column_subset.iter().cloned().cloned().collect();
-            let subset_indices = vec![0];
 
             for i in search_config.min_row_id..(search_config.max_row_id + 1) {
                 for c in &subset_indices {
