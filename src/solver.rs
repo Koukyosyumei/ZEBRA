@@ -14,9 +14,11 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use serde::{Deserialize, Serialize};
 
 use crate::shrinker::{
-    apply_abir_refinement, detect_abir_constraints, detect_conditional_var_sub_const_constraints,
-    detect_conditional_var_sub_var_constraints, refine_conditional_constraints_var_sub_const,
-    refine_conditional_constraints_var_sub_var, AbirConstraint,
+    apply_abir_refinement, detect_abir_constraints,
+    detect_conditional_addvars_sub_const_constraints, detect_conditional_var_sub_const_constraints,
+    detect_conditional_var_sub_var_constraints, refine_conditional_constraints_addvars_sub_const,
+    refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
+    AbirConstraint,
 };
 use crate::symbolic::{
     gather_boolean_variables, gather_vars, is_babybear_word_range, is_boolean_constraint,
@@ -305,6 +307,7 @@ fn process_single_node(
     min_row_id: usize,
     max_row_id: usize,
     conditional_var_sub_const_constraints: &[(usize, usize, i128)],
+    conditional_addvars_sub_const_constraints: &[(usize, Vec<usize>, i128)],
     eq_constraints: &[(usize, usize, usize)],
     abir_constraints: &[AbirConstraint],
     is_balanced: bool,
@@ -318,6 +321,12 @@ fn process_single_node(
     if let MayBeFlag::False = refine_conditional_constraints_var_sub_const(
         &mut main_trace,
         &conditional_var_sub_const_constraints,
+    ) {
+        return NodeProcessingResult::Pruned;
+    }
+    if let MayBeFlag::False = refine_conditional_constraints_addvars_sub_const(
+        &mut main_trace,
+        &conditional_addvars_sub_const_constraints,
     ) {
         return NodeProcessingResult::Pruned;
     }
@@ -584,6 +593,8 @@ where
 
     let conditional_var_sub_const_constraints =
         detect_conditional_var_sub_const_constraints(&constraints.air_constraints, prime);
+    let conditional_addvars_sub_const_constraints =
+        detect_conditional_addvars_sub_const_constraints(&constraints.air_constraints, prime);
     let conditional_var_sub_var_constraints =
         detect_conditional_var_sub_var_constraints(&constraints.air_constraints);
     let abir_constraints = detect_abir_constraints(&constraints.air_constraints, prime);
@@ -619,6 +630,7 @@ where
         let c_rp = refinable_cols.clone();
         let c_bool = bool_target_indices.clone();
         let c_cvsc = conditional_var_sub_const_constraints.clone();
+        let c_casc = conditional_addvars_sub_const_constraints.clone();
         let c_cvsv = conditional_var_sub_var_constraints.clone();
         let c_abir = abir_constraints.clone();
         let c_align = post_process.clone();
@@ -683,6 +695,7 @@ where
                     search_config.min_row_id,
                     search_config.max_row_id,
                     &c_cvsc,
+                    &c_casc,
                     &c_cvsv,
                     &c_abir,
                     is_balanced,

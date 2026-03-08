@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 use crate::symbolic::{
-    gather_vars_simple, get_curr_i, get_curr_i_sub_const, get_curr_i_sub_cur_j,
-    LatticeVMSymbolicExpr,
+    gather_vars_simple, get_curr_add_vars_sub_const, get_curr_i, get_curr_i_sub_const,
+    get_curr_i_sub_cur_j, LatticeVMSymbolicExpr,
 };
 use crate::trace::AbstractTrace;
 
@@ -85,6 +85,41 @@ pub fn detect_conditional_var_sub_const_constraints(
     const_constraints
 }
 
+pub fn detect_conditional_addvars_sub_const_constraints(
+    constraints: &[LatticeVMSymbolicExpr],
+    prime: u32,
+) -> Vec<(usize, Vec<usize>, i128)> {
+    let mut const_constraints = Vec::new();
+
+    for c in constraints {
+        // Mul(selector, Sub(lhs, rhs))
+        if let LatticeVMSymbolicExpr::Mul(lhs_expr, rhs_expr) = c {
+            // 1. the left is selector, and the right is Sub expr
+            if let Some(s_idx) = get_curr_i(lhs_expr) {
+                if let Some((vs, target)) = get_curr_add_vars_sub_const(rhs_expr, prime) {
+                    if !vs.contains(&s_idx) && vs.len() == 2 {
+                        // ToDO remove len condition
+                        const_constraints.push((s_idx, vs, target));
+                        continue;
+                    }
+                }
+            }
+
+            // 2. the left is Sub expr, and the right is the selector
+            if let Some(s_idx) = get_curr_i(rhs_expr) {
+                if let Some((vs, target)) = get_curr_add_vars_sub_const(lhs_expr, prime) {
+                    if !vs.contains(&s_idx) && vs.len() == 2 {
+                        const_constraints.push((s_idx, vs, target));
+                        continue;
+                    }
+                }
+            }
+        }
+    }
+
+    const_constraints
+}
+
 /// Applies interval refinement for selector-controlled constant assignments.
 ///
 /// Implements refinement for constraints of the form:
@@ -140,6 +175,51 @@ pub fn refine_conditional_constraints_var_sub_const(
                     trace.data[r][val_idx] = refined;
                 } else {
                     return MayBeFlag::False;
+                }
+            }
+
+            // TODO: if the interval does not contain the target, the selector must be zero.
+        }
+    }
+
+    MayBeFlag::MayBe
+}
+
+// detect_conditional_addvars_sub_const_constraints
+pub fn refine_conditional_constraints_addvars_sub_const(
+    trace: &mut AbstractTrace,
+    const_constraints: &[(usize, Vec<usize>, i128)], // (selector_idx, value_idx, target_constant)
+) -> MayBeFlag {
+    let num_rows = trace.data.len();
+
+    for r in 0..num_rows {
+        for &(sel_idx, ref vs, target) in const_constraints {
+            let selector = &trace.data[r][sel_idx];
+            let target_interval = AbstractInterval::from_i128(target);
+
+            // selector is one
+            if selector.is_singleton() && selector.lo == 1 {
+                let mut singletons = vec![];
+                let mut non_singletons = vec![];
+                for v_idx in vs {
+                    if trace.data[r][*v_idx].is_singleton() {
+                        singletons.push(v_idx.clone());
+                    } else {
+                        non_singletons.push(v_idx.clone());
+                    }
+                }
+                if non_singletons.len() == 1 && singletons.len() >= 1 {
+                    let mut ai = AbstractInterval::zero();
+                    for v_idx in singletons {
+                        ai = ai + trace.data[r][v_idx].clone();
+                    }
+
+                    let current_val = &trace.data[r][non_singletons[0]];
+                    if let Some(refined) = current_val.intersect(&(target_interval - ai)) {
+                        trace.data[r][non_singletons[0]] = refined;
+                    } else {
+                        return MayBeFlag::False;
+                    }
                 }
             }
 
