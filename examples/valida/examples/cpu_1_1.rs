@@ -44,14 +44,14 @@ fn get_memory(trace: &AbstractTrace, prime: u32) -> Vec<(AI, AI, AI, bool)> {
     let mut ops = vec![];
     for row in &trace.data {
         if MayBeFlag::True != row[58].is_zero(prime) {
-            if MayBeFlag::False != row[42].is_non_zero(prime) {
-                ops.push((row[0].clone(), row[43].clone(), rec_word(row, 44, 4), true));
-            }
             if MayBeFlag::False != row[30].is_non_zero(prime) {
                 ops.push((row[0].clone(), row[31].clone(), rec_word(row, 32, 4), false));
             }
             if MayBeFlag::False != row[36].is_non_zero(prime) {
                 ops.push((row[0].clone(), row[37].clone(), rec_word(row, 38, 4), false));
+            }
+            if MayBeFlag::False != row[42].is_non_zero(prime) {
+                ops.push((row[0].clone(), row[43].clone(), rec_word(row, 44, 4), true));
             }
         }
     }
@@ -66,6 +66,10 @@ fn memory_check(trace: &AbstractTrace, prime: u32) -> (IntervalMemory, MayBeFlag
 
     check_memory_consistency(&rw_ops_wo_clk)
 }
+
+// s_bus_op: 9, is_pointer_op: 10, is_imm_op: 11, is_left_imm_op: 12, is_load: 13, is_load_u8: 14, is_load_s8: 15, is_store: 16, is_store_u8: 17, is_beq: 18, is_bne: 19, is_jal: 20, is_jalv: 21, is_imm32: 22, is_advice: 23, is_stop: 24, is_loadfp: 25, is_write: 26
+
+struct DeDuplicator {}
 
 // ############## Final Check Function ##############################
 fn final_check(
@@ -91,6 +95,19 @@ fn final_check(
     }
     if record_reprs.is_empty() {
         record_reprs.insert("\tempty".to_string());
+    }
+
+    use latticevm::interval::AbstractInterval;
+    for i in 0..trace.data.len() {
+        let mut ai = AbstractInterval::zero();
+        for j in 9..27 {
+            ai = ai.clone() + trace.data[i][j].clone();
+        }
+        if MayBeFlag::True != trace.data[i][58].is_zero(prime) {
+            if MayBeFlag::True == ai.is_zero(prime) {
+                return;
+            }
+        }
     }
 
     save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
@@ -133,7 +150,7 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (3..8).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    search_config.max_expansions = 10000;
+    search_config.max_expansions = 300000;
     search_config.min_row_id = 2;
     search_config.max_row_id = 5;
     search_config.time_out_ms = 100000;
@@ -195,9 +212,7 @@ fn main() -> Result<(), io::Error> {
 
     let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
         adjust_pc_program(trace, prime);
-        //memory_check(trace, prime).1
-        use latticevm::interval::MayBeFlag::True;
-        MayBeFlag::True
+        memory_check(trace, prime).1
     };
 
     // ######################## Set Info ##########################################

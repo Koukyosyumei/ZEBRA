@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 
 use crate::interval::AbstractInterval;
 
@@ -190,4 +190,25 @@ pub fn refine_trace(
         (Some(vec![trace.clone(), trace.clone()]), false)
     }
     //}
+}
+
+pub fn refine_trace_with_seed(
+    trace: &AbstractTrace,
+    refinment_target_indicies: &Vec<usize>,
+    min_row_id: usize,
+    max_row_id: usize,
+    prime: u32,
+    seed: u64,
+    is_balanced: bool,
+) -> (Option<Vec<AbstractTrace>>, bool) {
+    let mut rng = StdRng::seed_from_u64(seed);
+    refine_trace(
+        trace,
+        refinment_target_indicies,
+        min_row_id,
+        max_row_id,
+        prime,
+        &mut rng,
+        is_balanced,
+    )
 }
