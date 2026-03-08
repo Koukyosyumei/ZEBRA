@@ -1,7 +1,7 @@
 config:
-  num_workers: 8
+  num_workers: 16
   time_out_ms: 100000
-  minimum_num_taregt_cols: 13
+  minimum_num_taregt_cols: 24
   max_expansions: 1000000000
   min_row_id: 0
   max_row_id: 0
@@ -11,8 +11,8 @@ args:
   num_trial: 30
   ouptput_path: output.yaml
   method: bb
-  opcode_str: CLO
+  opcode_str: MUL
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.008011598466666667
-  exe_time_variance: 0.000017774948737588985
+  exe_time_mean: 0.13834264440000002
+  exe_time_variance: 0.01601255221051619
