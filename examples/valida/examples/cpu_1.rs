@@ -325,8 +325,6 @@ fn main() -> Result<(), io::Error> {
         .refinable_cols
         .retain(|x| !program_cols.contains(x));
     constraint_info.refinable_cols.push(58);
-    //constraint_info.range_types.insert(19, RangeType::Bool);
-    println!("{:?}", constraint_info.refinable_cols);
 
     let mut public_vals = vec![AI::zero(); 3];
     public_vals[0] = AI::from_i128(0);
@@ -343,33 +341,27 @@ fn main() -> Result<(), io::Error> {
     for _ in 0..1 {
         println!("\n\n===========");
         let program = generate_random_program(&mut rng);
-        println!("a: {:?}", program);
-
         let program_str = program
             .iter()
             .map(|inst| format!("{}\n", inst))
             .collect::<String>();
+        println!("{}", program_str);
 
         let result = std::panic::catch_unwind(|| {
             generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000)
         });
-        let aresult = std::panic::catch_unwind(|| {
-            generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000)
-        });
-        println!("{}", program_str);
         if result.is_err() {
             println!("=============\n\n");
             continue;
         }
 
-        let program_table = aresult.unwrap().clone().clone().0;
-        let base_abs_main_trace_data = result.unwrap().1;
+        let program_table = result.as_ref().unwrap().0.clone();
+        let base_abs_main_trace_data = &result.unwrap().1;
 
-        let adjust_pc_program = make_pc_adjuster(program_table.clone());
+        let adjust_pc_program = make_pc_adjuster(&program_table);
         let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
             adjust_pc_program(trace, prime);
             memory_check(trace, prime).1
-            //MayBeFlag::True
         };
 
         // ######################## Set Info ##########################################

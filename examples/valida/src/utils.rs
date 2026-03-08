@@ -368,8 +368,9 @@ where
 }
 
 pub fn make_pc_adjuster(
-    program: Vec<Vec<AbstractInterval>>,
+    program: &Vec<Vec<AbstractInterval>>,
 ) -> impl Fn(&mut AbstractTrace, u32) + Clone {
+    let program = program.clone();
     move |main_trace: &mut AbstractTrace, prime: u32| {
         for row in &mut main_trace.data {
             if row[1].is_singleton() {
