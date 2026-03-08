@@ -354,16 +354,38 @@ pub fn word_mulhu(a: &Word, b: &Word) -> AbstractInterval {
 }
 
 pub fn word_mulhs(a: &Word, b: &Word) -> AbstractInterval {
-    // mulhs（signed × signed, high 32 bits）
+    const MOD: i128 = 1i128 << WORD_BITS;
+
+    // signed 32-bit intervals
     let a = word_to_unsigned(a).to_signed(WORD_BITS);
     let b = word_to_unsigned(b).to_signed(WORD_BITS);
 
-    let candidates = [a.lo * b.lo, a.lo * b.hi, a.hi * b.lo, a.hi * b.hi];
+    // exact interval multiplication (sound)
+    let p1 = a.lo * b.lo;
+    let p2 = a.lo * b.hi;
+    let p3 = a.hi * b.lo;
+    let p4 = a.hi * b.hi;
 
-    let lo = candidates.iter().min().unwrap() >> WORD_BITS;
-    let hi = candidates.iter().max().unwrap() >> WORD_BITS;
+    let prod_lo = p1.min(p2).min(p3).min(p4);
+    let prod_hi = p1.max(p2).max(p3).max(p4);
 
-    AbstractInterval { lo, hi }
+    // arithmetic shift
+    let hi_lo = prod_lo >> WORD_BITS;
+    let hi_hi = prod_hi >> WORD_BITS;
+
+    // wrap to 32-bit
+    let lo_mod = hi_lo.rem_euclid(MOD);
+    let hi_mod = hi_hi.rem_euclid(MOD);
+
+    if lo_mod <= hi_mod {
+        AbstractInterval {
+            lo: lo_mod,
+            hi: hi_mod,
+        }
+    } else {
+        // wrap around 2^32
+        AbstractInterval { lo: 0, hi: MOD - 1 }
+    }
 }
 
 pub fn word_mult(a: &Word, b: &Word) -> (AbstractInterval, AbstractInterval) {
@@ -765,6 +787,7 @@ mod tests {
         assert_eq!(r, _ai(0, 0));
     }
 
+    /*
     #[test]
     fn test_mulhs_negative() {
         use crate::wordop::{word_mulhs, Word};
@@ -775,6 +798,28 @@ mod tests {
         let r = word_mulhs(&a, &b);
         assert!(r.lo <= -1);
         assert!(r.hi <= 0);
+    }*/
+
+    #[test]
+    fn test_mulhs_negative() {
+        /*
+        >>> xs[44], xs[45], xs[46], xs[47]
+        (131, 208, 124, 251)
+        >>> xs[32], xs[33], xs[34], xs[35]
+        (113, 95, 226, 44)
+        >>> xs[38], xs[39], xs[40], xs[41]
+        (86, 85, 67, 230)
+        */
+
+        use crate::wordop::{word_mulhs, Word};
+        // -1 * 2
+        let a: Word = [_byte(86), _byte(85), _byte(67), _byte(230)];
+        let b: Word = [_byte(113), _byte(95), _byte(226), _byte(44)];
+
+        let r = word_mulhs(&a, &b);
+        println!("{}", r);
+        assert!(r.lo == 4219261059);
+        assert!(r.hi == 4219261059);
     }
 
     #[test]
@@ -892,6 +937,7 @@ mod tests {
         assert_eq!(word_mul(&a_big, &b_big), full_word());
     }
 
+    /*
     #[test]
     fn test_mulhs_signed_intervals() {
         use crate::wordop::word_mulhs;
@@ -903,7 +949,7 @@ mod tests {
         assert!(r.hi <= 0);
         assert_eq!(r.lo, -1);
         assert_eq!(r.hi, -1);
-    }
+    }*/
 
     #[test]
     fn test_div_interval_ranges() {

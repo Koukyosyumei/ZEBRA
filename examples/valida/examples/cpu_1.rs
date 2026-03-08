@@ -119,14 +119,7 @@ fn check_bug_type(
     }
 }
 
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
-    known_report: &mut HashSet<String>,
-    ui: &mut UiState,
-) {
+fn cpu_canonicalizer(trace: &AbstractTrace, prime: u32) -> HashSet<String> {
     let mut record_reprs = HashSet::new();
     for row in &trace.data {
         if MayBeFlag::True != row[58].is_zero(prime) {
@@ -141,6 +134,19 @@ fn final_check(
             );
         }
     }
+
+    record_reprs
+}
+
+// ############## Final Check Function ##############################
+fn final_check(
+    trace: &AbstractTrace,
+    num_trial: usize,
+    prime: u32,
+    known_report: &mut HashSet<String>,
+    ui: &mut UiState,
+) {
+    let mut record_reprs = cpu_canonicalizer(trace, prime);
 
     let mut bug_types: HashSet<String> = HashSet::new();
     check_bug_type(&trace, &mut record_reprs, &mut bug_types, prime);
@@ -186,13 +192,13 @@ fn alu_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
 
     let alu_opcodes = [
         Opcode::ADD32,
-        /*
         Opcode::SUB32,
-        Opcode::MUL32,
+        //Opcode::MUL32,
+        Opcode::MULHU32,
+        Opcode::MULHS32,
         Opcode::DIV32,
         Opcode::EQ32,
         Opcode::NE32,
-        */
     ];
     let opcode = alu_opcodes.choose(rng).unwrap_or(&Opcode::STOP);
 
@@ -247,15 +253,12 @@ fn jal_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
 
 fn branch_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
     let bytes_per_instr = BYTES_PER_INSTR as i32;
-    let x = rng.gen_range(-20..20) * 4;
-    let y = rng.gen_range(-20..20) * 4;
-    let a: i32 = rng.gen_range(-0x3C000000..0x3C000000);
-    let ab = a.to_le_bytes();
-    let b: i32 = if rng.r#gen::<f64>() < 0.2 {
-        a
-    } else {
-        rng.gen_range(-0x3C000000..0x3C000000)
-    };
+    let x = rng.gen_range(-20..1) * 4;
+    let mut y = rng.gen_range(-20..1) * 4;
+    if x == y {
+        y = y - 4;
+    }
+    let a: i32 = rng.gen_range(1..5);
 
     let branch_opcodes = [Opcode::BEQ, Opcode::BNE];
     let opcode = branch_opcodes.choose(rng).unwrap_or(&Opcode::STOP);
@@ -264,15 +267,15 @@ fn branch_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
     program.extend([
         IW {
             opcode: Opcode::IMM32 as u32,
-            operands: Operands([x, ab[0] as i32, ab[1] as i32, ab[2] as i32, ab[3] as i32]),
+            operands: Operands([x, a as i32, 0, 0, 0]),
         },
         IW {
             opcode: Opcode::ADD32 as u32,
-            operands: Operands([y, y, b, 0, 1]),
+            operands: Operands([y, y, 1, 0, 1]),
         },
         IW {
             opcode: opcode.clone() as u32,
-            operands: Operands([1 * bytes_per_instr, x, y, 0, 0]),
+            operands: Operands([1 * bytes_per_instr, y, x, 0, 0]),
         },
         IW {
             opcode: Opcode::STOP as u32,
@@ -285,10 +288,10 @@ fn branch_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
 
 pub fn generate_random_program(rng: &mut StdRng) -> Vec<IW<i32>> {
     let fs = vec![
-        // imm_program::<BabyBear>,
+        imm_program::<BabyBear>,
         alu_program::<BabyBear>,
-        //  jal_program::<BabyBear>,
-        //  branch_program::<BabyBear>,
+        jal_program::<BabyBear>,
+        branch_program::<BabyBear>,
     ];
     let f = fs.choose(rng).unwrap();
     f(rng)
@@ -305,7 +308,7 @@ fn main() -> Result<(), io::Error> {
     let program_cols = (3..8).collect::<Vec<_>>();
 
     // ######################## Solver Parameters ###############################
-    search_config.max_expansions = 30000;
+    search_config.max_expansions = 3000;
     search_config.time_out_ms = 10000;
     search_config.seed = 41;
 
@@ -331,7 +334,7 @@ fn main() -> Result<(), io::Error> {
     public_vals[1] = AI::from_i128(4096);
     public_vals[2] = AI::from_i128(1);
 
-    search_config.minimum_num_taregt_cols = 1;
+    search_config.minimum_num_taregt_cols = 3;
 
     // ######################## Program Initialization ###########################
     //    let program = get_target_program::<BabyBear>();
@@ -358,6 +361,19 @@ fn main() -> Result<(), io::Error> {
         let program_table = result.as_ref().unwrap().0.clone();
         let base_abs_main_trace_data = &result.unwrap().1;
 
+        /*
+        println!("{:?}", program);
+        use latticevm::constraint::eval_constraints;
+        let res = eval_constraints(
+            &AbstractTrace::new(base_abs_main_trace_data.clone()),
+            Some(&public_vals),
+            &constraint_info.constraints,
+            prime,
+        );
+        println!("{}", AbstractTrace::new(base_abs_main_trace_data.clone()));
+        println!("{:?}", res);
+        */
+
         search_config.seed = i as u64;
         search_config.min_row_id = 0;
         search_config.max_row_id = base_abs_main_trace_data.len() - 1;
@@ -379,6 +395,10 @@ fn main() -> Result<(), io::Error> {
 
         // ######################## Solve ############################################
         let mut known_solution = HashSet::new();
+        let repr_sets =
+            cpu_canonicalizer(&AbstractTrace::new(base_abs_main_trace_data.clone()), prime);
+        known_solution.insert(format!("{}", PrettySet(repr_sets)));
+
         let result = experiment_harness(
             &program_info,
             &mut constraint_info,
