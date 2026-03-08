@@ -193,7 +193,6 @@ fn alu_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
     let alu_opcodes = [
         Opcode::ADD32,
         Opcode::SUB32,
-        //Opcode::MUL32,
         Opcode::MULHU32,
         Opcode::MULHS32,
         Opcode::DIV32,
