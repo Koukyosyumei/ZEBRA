@@ -324,18 +324,18 @@ fn process_single_node(
     ) {
         return NodeProcessingResult::Pruned;
     }
-    if let MayBeFlag::False = refine_conditional_constraints_addvars_sub_const(
-        &mut main_trace,
-        &conditional_addvars_sub_const_constraints,
-    ) {
-        return NodeProcessingResult::Pruned;
-    }
     if let MayBeFlag::False =
         refine_conditional_constraints_var_sub_var(&mut main_trace, &eq_constraints)
     {
         return NodeProcessingResult::Pruned;
     }
     if let MayBeFlag::False = apply_abir_refinement(&mut main_trace, &abir_constraints, prime).0 {
+        return NodeProcessingResult::Pruned;
+    }
+    if let MayBeFlag::False = refine_conditional_constraints_addvars_sub_const(
+        &mut main_trace,
+        &conditional_addvars_sub_const_constraints,
+    ) {
         return NodeProcessingResult::Pruned;
     }
 
