@@ -14,5 +14,5 @@ args:
   opcode_str: SRA
 report:
   success_ratio: 0.0
-  exe_time_mean: 1.008104823
+  exe_time_mean: 1.00951391
   exe_time_variance: 0.0

@@ -100,13 +100,6 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BabyBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
     let output_columns = vec![5, 6, 7, 8];
-    for i in vec![5, 6, 7, 8, 0, 1, 2] {
-        constraint_info.range_types.insert(i, RangeType::U8);
-    }
-    for i in vec![8] {
-        constraint_info.range_types.insert(i, RangeType::U8);
-    }
-
     constraint_info
         .refinable_cols
         .extend(&output_columns.clone());
@@ -115,7 +108,6 @@ fn main() -> Result<(), io::Error> {
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
-    search_config.seed = 1;
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
