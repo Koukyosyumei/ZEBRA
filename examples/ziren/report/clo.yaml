@@ -1,5 +1,5 @@
 config:
-  num_workers: 8
+  num_workers: 1
   time_out_ms: 100000
   minimum_num_taregt_cols: 13
   max_expansions: 1000000000
@@ -10,9 +10,9 @@ args:
   config: ./configs/alu.config
   num_trial: 30
   ouptput_path: report/clo.yaml
-  method: bb
+  method: z3
   opcode_str: CLO
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.01816801313333333
-  exe_time_variance: 0.003567689076522171
+  exe_time_mean: 5.3499631957
+  exe_time_variance: 23.35640873086326

@@ -1,5 +1,5 @@
 config:
-  num_workers: 8
+  num_workers: 1
   time_out_ms: 100000
   minimum_num_taregt_cols: 4
   max_expansions: 1000000000
@@ -10,9 +10,9 @@ args:
   config: ./configs/alu.config
   num_trial: 30
   ouptput_path: report/and.yaml
-  method: bb
+  method: z3
   opcode_str: AND
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.008979284766666666
-  exe_time_variance: 0.00004476019081373151
+  exe_time_mean: 0.0520873347
+  exe_time_variance: 0.00005876649054381695
