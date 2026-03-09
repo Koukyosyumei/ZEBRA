@@ -116,13 +116,13 @@ where
 
                 // ALU Constraints
                 let tmps = vec![
-                    (Opcode::ADD as u8, WordOp::Add),
+                    (Opcode::ADD as u8, WordOp::AddU),
                     (Opcode::SUB as u8, WordOp::SubU),
                     (Opcode::MUL as u8, WordOp::Mul),
                     (Opcode::MULH as u8, WordOp::MulH),
                     (Opcode::MULHU as u8, WordOp::MulHU),
                     (Opcode::SLT as u8, WordOp::SLt),
-                    (Opcode::SLTU as u8, WordOp::SLt),
+                    (Opcode::SLTU as u8, WordOp::Lt),
                     (Opcode::AND as u8, WordOp::And),
                     (Opcode::OR as u8, WordOp::Or),
                     (Opcode::XOR as u8, WordOp::Xor),

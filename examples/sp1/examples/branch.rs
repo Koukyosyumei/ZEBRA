@@ -101,11 +101,8 @@ fn main() -> Result<(), io::Error> {
         extract_constraints_and_range::<BabyBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
     //println!("{:?}", general_lookup_info);
     let output_columns = vec![5, 6, 7, 8];
-    for i in vec![5, 6, 7] {
+    for i in vec![5, 6, 7, 8] {
         constraint_info.range_types.insert(i, RangeType::U8);
-    }
-    for i in vec![8] {
-        constraint_info.range_types.insert(i, RangeType::U7);
     }
 
     constraint_info
@@ -135,6 +132,7 @@ fn main() -> Result<(), io::Error> {
             program_len: program.instructions.len(),
         };
         // ######################## Solve ############################################
+        let mut known_solution = HashSet::new();
         let result = experiment_harness(
             &program_info,
             &mut constraint_info,
@@ -145,6 +143,7 @@ fn main() -> Result<(), io::Error> {
             nop_post_process,
             final_check,
             &args.method,
+            &mut known_solution,
         );
         println!("({} {} {}), {:?}", x, y, z, result);
         ds.push(result.unwrap());
