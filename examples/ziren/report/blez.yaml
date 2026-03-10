@@ -1,7 +1,7 @@
 config:
   num_workers: 1
   time_out_ms: 1000000
-  minimum_num_taregt_cols: 13
+  minimum_num_taregt_cols: 11
   max_expansions: 1000000000
   min_row_id: 0
   max_row_id: 0
@@ -9,10 +9,10 @@ config:
 args:
   config: ./configs/alu.config
   num_trial: 30
-  ouptput_path: report/clz.yaml
+  ouptput_path: report/blez.yaml
   method: z3
-  opcode_str: CLZ
+  opcode_str: BLEZ
 report:
   success_ratio: 1.0
-  exe_time_mean: 5.126876381866666
-  exe_time_variance: 16.674399426480452
+  exe_time_mean: 12.777489945966666
+  exe_time_variance: 164.73965263232412

@@ -1,7 +1,7 @@
 config:
   num_workers: 8
-  time_out_ms: 100000
-  minimum_num_taregt_cols: 4
+  time_out_ms: 1000000
+  minimum_num_taregt_cols: 7
   max_expansions: 1000000000
   min_row_id: 0
   max_row_id: 0
@@ -11,8 +11,8 @@ args:
   num_trial: 1
   ouptput_path: output.yaml
   method: z3
-  opcode_str: JALR
+  opcode_str: ADD
 report:
-  success_ratio: 1.0
-  exe_time_mean: 0.068792005
+  success_ratio: 0.0
+  exe_time_mean: 1000.021285756
   exe_time_variance: 0.0

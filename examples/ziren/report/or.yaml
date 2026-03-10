@@ -1,6 +1,6 @@
 config:
   num_workers: 1
-  time_out_ms: 100000
+  time_out_ms: 1000000
   minimum_num_taregt_cols: 4
   max_expansions: 1000000000
   min_row_id: 0
@@ -14,5 +14,5 @@ args:
   opcode_str: OR
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.051944989433333345
-  exe_time_variance: 0.00003876992362608479
+  exe_time_mean: 0.05432753956666668
+  exe_time_variance: 0.00006433268552549911
