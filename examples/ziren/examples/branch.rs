@@ -103,6 +103,13 @@ fn main() -> Result<(), io::Error> {
         extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
     let output_columns = vec![23, 24, 25, 26];
 
+    use latticevm::solver::RangeType;
+    constraint_info.range_types.insert(60, RangeType::Bool);
+    constraint_info.range_types.insert(61, RangeType::Bool);
+    constraint_info.range_types.insert(26, RangeType::U7);
+    let a = vec![19, 20, 21, 22];
+    constraint_info.refinable_cols.retain(|x| !a.contains(x));
+
     constraint_info
         .refinable_cols
         .extend(&output_columns.clone());
