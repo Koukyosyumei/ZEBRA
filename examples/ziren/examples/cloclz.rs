@@ -94,8 +94,6 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for i in 0..args.num_trial {
-        search_config.seed += i as u64;
-
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 
@@ -109,6 +107,7 @@ fn main() -> Result<(), io::Error> {
             program_len: program.instructions.len(),
         };
         // ######################## Solve ############################################
+        let mut known_solution = HashSet::new();
         let result = experiment_harness(
             &program_info,
             &mut constraint_info,
@@ -119,6 +118,7 @@ fn main() -> Result<(), io::Error> {
             nop_post_process,
             final_check,
             &args.method,
+            &mut known_solution,
         );
         println!("({} {}), {:?}", x, y, result);
         ds.push(result.unwrap());

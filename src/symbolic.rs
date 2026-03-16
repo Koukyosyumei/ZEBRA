@@ -7,9 +7,9 @@ use serde::Serialize;
 
 use crate::interval::{msb_maybe, AbstractInterval, MayBeFlag};
 use crate::wordop::{
-    reconstruct_symbolic_word, word_add, word_addu, word_and, word_div, word_eq, word_ltu,
-    word_mul, word_mulhs, word_mulhu, word_mult, word_multu, word_neq, word_or, word_sdiv,
-    word_sle, word_slt, word_srl, word_sub, word_subu, word_xor,
+    reconstruct_symbolic_word, word_addu, word_and, word_div, word_eq, word_ltu, word_mul,
+    word_mulhs, word_mulhu, word_mult, word_multu, word_neq, word_or, word_sdiv, word_sle,
+    word_slt, word_srl, word_subu, word_xor,
 };
 
 /// Identifies the source and temporal position of a symbolic value within the
@@ -849,6 +849,8 @@ pub fn get_curr_i_sub_cur_j(expr: &LatticeVMSymbolicExpr) -> Option<(usize, usiz
     None
 }
 
+// collect_add_vars
+
 pub fn get_curr_i_sub_const(expr: &LatticeVMSymbolicExpr, _prime: u32) -> Option<(usize, i128)> {
     if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = expr {
         // Case: Variable - Constant
@@ -864,6 +866,31 @@ pub fn get_curr_i_sub_const(expr: &LatticeVMSymbolicExpr, _prime: u32) -> Option
             if let Some(v_idx) = get_curr_i(rhs) {
                 if c.is_singleton() {
                     return Some((v_idx, c.lo));
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn get_curr_add_vars_sub_const(
+    expr: &LatticeVMSymbolicExpr,
+    _prime: u32,
+) -> Option<(Vec<usize>, i128)> {
+    if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = expr {
+        // Case: Addition of Variables - Constant
+        if let Some(vs) = collect_add_vars(lhs) {
+            if let LatticeVMSymbolicExpr::Constant(c) = &**rhs {
+                if c.is_singleton() {
+                    return Some((vs.into_iter().collect::<Vec<_>>(), c.lo));
+                }
+            }
+        }
+        // Case: Constant - Addition of Variables
+        if let LatticeVMSymbolicExpr::Constant(c) = &**lhs {
+            if let Some(vs) = collect_add_vars(rhs) {
+                if c.is_singleton() {
+                    return Some((vs.into_iter().collect::<Vec<_>>(), c.lo));
                 }
             }
         }

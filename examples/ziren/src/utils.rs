@@ -225,7 +225,7 @@ where
 
                 // ALU constraints
                 for t in [
-                    (Opcode::ADD as u8, WordOp::Add),
+                    (Opcode::ADD as u8, WordOp::AddU),
                     (Opcode::SUB as u8, WordOp::SubU),
                     (Opcode::MUL as u8, WordOp::Mul),
                     (Opcode::MULT as u8, WordOp::MulTL),

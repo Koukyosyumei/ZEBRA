@@ -96,11 +96,19 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = BranchChip::default();
     let air_name = "Branch";
-    let _colmap = make_col_map();
+    let colmap = make_col_map();
+    println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
     let output_columns = vec![23, 24, 25, 26];
+
+    use latticevm::solver::RangeType;
+    constraint_info.range_types.insert(60, RangeType::Bool);
+    constraint_info.range_types.insert(61, RangeType::Bool);
+    constraint_info.range_types.insert(26, RangeType::U7);
+    let a = vec![19, 20, 21, 22];
+    constraint_info.refinable_cols.retain(|x| !a.contains(x));
 
     constraint_info
         .refinable_cols
@@ -127,6 +135,7 @@ fn main() -> Result<(), io::Error> {
             program_len: program.instructions.len(),
         };
         // ######################## Solve ############################################
+        let mut known_solution = HashSet::new();
         let result = experiment_harness(
             &program_info,
             &mut constraint_info,
@@ -137,6 +146,7 @@ fn main() -> Result<(), io::Error> {
             nop_post_process,
             final_check,
             &args.method,
+            &mut known_solution,
         );
         println!("({} {} {}), {:?}", x, y, z, result);
         ds.push(result.unwrap());

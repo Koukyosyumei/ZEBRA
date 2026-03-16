@@ -1,6 +1,7 @@
 use clap::Parser;
 use core::mem::transmute;
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use std::collections::HashSet;
 use std::io;
 
 use p3_koala_bear::KoalaBear;
@@ -85,6 +86,7 @@ fn main() -> Result<(), io::Error> {
         };
 
         // ######################## Solve ############################################
+        let mut known_solution = HashSet::new();
         let result = experiment_harness(
             &program_info,
             &mut constraint_info,
@@ -95,6 +97,7 @@ fn main() -> Result<(), io::Error> {
             nop_post_process,
             &final_check,
             &args.method,
+            &mut known_solution,
         );
         println!("({} {}), {:?}", x, y, result);
         ds.push(result.unwrap());
