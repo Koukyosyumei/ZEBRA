@@ -15,12 +15,7 @@ echo "mul"
 ./target/release/examples/mul --config ./configs/alu.config --opcode-str "MULHU" --method "bb" --num-trial 5 --ouptput-path "report/multu.yaml"
 ./target/release/examples/mul --config ./configs/alu.config --opcode-str "MULHSU" --method "bb" --num-trial 5 --ouptput-path "report/multu.yaml"
 
-echo "jump"
-./target/release/examples/jump --config ./configs/alu.config --opcode-str "JAL" --method "bb" --num-trial 5 --ouptput-path "report/jal.yaml"
-./target/release/examples/jump --config ./configs/alu.config --opcode-str "JALR" --method "bb" --num-trial 5 --ouptput-path "report/jalr.yaml"
-
 echo "sll"
-./target/release/examples/shiftleft --config ./configs/alu.config --opcode-str "ADD" --method "bb" --num-trial 5 --ouptput-path "report/sll.yaml"
+./target/release/examples/sll --config ./configs/alu.config --opcode-str "ADD" --method "bb" --num-trial 5 --ouptput-path "report/sll.yaml"
 
-#num files: 11
-#average exe_time_mean: 1.3341068630545454
+# average exe_time_mean: 0.07285856208888888

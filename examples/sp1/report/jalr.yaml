@@ -8,11 +8,11 @@ config:
   seed: 41
 args:
   config: ./configs/alu.config
-  num_trial: 30
+  num_trial: 5
   ouptput_path: report/jalr.yaml
   method: z3
   opcode_str: JALR
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.049928533766666665
-  exe_time_variance: 0.000030742887026420256
+  exe_time_mean: 0.052005112
+  exe_time_variance: 0.00005070362931560322

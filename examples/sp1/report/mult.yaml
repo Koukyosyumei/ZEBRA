@@ -8,11 +8,11 @@ config:
   seed: 41
 args:
   config: ./configs/alu.config
-  num_trial: 30
+  num_trial: 5
   ouptput_path: report/mult.yaml
   method: z3
   opcode_str: MULH
 report:
   success_ratio: 1.0
-  exe_time_mean: 6.091975283400001
-  exe_time_variance: 92.14022742163365
+  exe_time_mean: 1.9088459816
+  exe_time_variance: 0.030430590082870947

@@ -1,7 +1,7 @@
 config:
   num_workers: 8
-  time_out_ms: 1000000
-  minimum_num_taregt_cols: 4
+  time_out_ms: 10000
+  minimum_num_taregt_cols: 24
   max_expansions: 1000000000
   min_row_id: 0
   max_row_id: 0
@@ -9,10 +9,10 @@ config:
 args:
   config: ./configs/alu.config
   num_trial: 5
-  ouptput_path: report/jal.yaml
+  ouptput_path: report/multu.yaml
   method: z3
-  opcode_str: JAL
+  opcode_str: MULHSU
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.045487550800000005
-  exe_time_variance: 0.00003558465020253895
+  exe_time_mean: 1.9428104313999999
+  exe_time_variance: 0.02172363919530286

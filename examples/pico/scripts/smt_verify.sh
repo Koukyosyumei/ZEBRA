@@ -11,12 +11,5 @@ echo "mul"
 ./target/release/examples/mul --config ./configs/alu.config --opcode-str "MULHU" --method "z3" --num-trial 5 --ouptput-path "report/multu.yaml"
 ./target/release/examples/mul --config ./configs/alu.config --opcode-str "MULHSU" --method "z3" --num-trial 5 --ouptput-path "report/multu.yaml"
 
-echo "jump"
-./target/release/examples/jump --config ./configs/alu.config --opcode-str "JAL" --method "z3" --num-trial 5 --ouptput-path "report/jal.yaml"
-./target/release/examples/jump --config ./configs/alu.config --opcode-str "JALR" --method "z3" --num-trial 5 --ouptput-path "report/jalr.yaml"
-
-#echo "branch"
-#./target/release/examples/branch --config ./configs/alu.config --opcode-str "BEQ" --method "z3" --num-trial 5 --ouptput-path "report/beq.yaml"
-#./target/release/examples/branch --config ./configs/alu.config --opcode-str "BNE" --method "z3" --num-trial 5 --ouptput-path "report/bne.yaml"
-#./target/release/examples/branch --config ./configs/alu.config --opcode-str "BLT" --method "z3" --num-trial 5 --ouptput-path "report/blt.yaml"
-#./target/release/examples/branch --config ./configs/alu.config --opcode-str "BGE" --method "z3" --num-trial 5 --ouptput-path "report/bge.yaml"
+#num files: 9
+#average exe_time_mean: 0.6388582464888889

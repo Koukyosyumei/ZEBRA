@@ -1,6 +1,6 @@
 config:
   num_workers: 8
-  time_out_ms: 1000000
+  time_out_ms: 10000
   minimum_num_taregt_cols: 4
   max_expansions: 1000000000
   min_row_id: 0
@@ -9,10 +9,10 @@ config:
 args:
   config: ./configs/alu.config
   num_trial: 5
-  ouptput_path: report/jal.yaml
+  ouptput_path: report/and.yaml
   method: z3
-  opcode_str: JAL
+  opcode_str: AND
 report:
   success_ratio: 1.0
-  exe_time_mean: 0.045487550800000005
-  exe_time_variance: 0.00003558465020253895
+  exe_time_mean: 0.03483779
+  exe_time_variance: 0.0004424436504821964
