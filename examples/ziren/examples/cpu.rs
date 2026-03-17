@@ -16,24 +16,24 @@ use zkm_core_machine::{
 use zkm_stark::MachineProver;
 use zkm_stark::ZKM_PROOF_NUM_PV_ELTS;
 
-use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::constraint::eval_constraints;
-use latticevm::interval::AbstractInterval as AI;
-use latticevm::interval::MayBeFlag;
-use latticevm::memory::IntervalMemory;
-use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
-use latticevm::quick::{
+use zebra::canonicalizer::save_repr_if_unique;
+use zebra::constraint::eval_constraints;
+use zebra::interval::AbstractInterval as AI;
+use zebra::interval::MayBeFlag;
+use zebra::memory::IntervalMemory;
+use zebra::memory::{check_memory_consistency, reconstruct_word as rec_word};
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::dummy_program_counter_refine_fn;
-use latticevm::state::AbstractState;
-use latticevm::trace::AbstractTrace;
-use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
-use latticevm::utils::create_or_clear_dir;
-use latticevm::utils::PrettySet;
+use zebra::solver::dummy_program_counter_refine_fn;
+use zebra::state::AbstractState;
+use zebra::trace::AbstractTrace;
+use zebra::ui::{pad_dummy_rows_with_last_dummy, UiState};
+use zebra::utils::create_or_clear_dir;
+use zebra::utils::PrettySet;
 
-use latticevm_ziren::utils::get_pv_constraints;
-use latticevm_ziren::utils::{
+use zebra_ziren::utils::get_pv_constraints;
+use zebra_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 

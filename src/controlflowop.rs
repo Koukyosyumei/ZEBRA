@@ -1,5 +1,5 @@
 use crate::interval::AbstractInterval;
-use crate::symbolic::LatticeVMSymbolicExpr as LExpr;
+use crate::symbolic::ZEBRASymbolicExpr as LExpr;
 use crate::wordop::reconstruct_symbolic_word;
 
 #[derive(Debug)]

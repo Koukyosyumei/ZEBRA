@@ -15,14 +15,14 @@ use valida_machine::{
 use valida_opcodes::Opcode;
 use valida_program::{MachineWithProgramROM, ProgramTableType};
 
-use latticevm::constraint::LatticeVMConstraints;
-use latticevm::interval::AbstractInterval;
-use latticevm::solver::prepare_constraints_and_range_type;
-use latticevm::solver::ConstraintInfo;
-use latticevm::symbolic::GeneralLookupInfo;
-use latticevm::symbolic::{make_impl_constraint, LatticeVMSymbolicExpr as LVSExpr};
-use latticevm::trace::AbstractTrace;
-use latticevm::wordop::{get_alu_constraint, WordOp};
+use zebra::constraint::ZEBRAConstraints;
+use zebra::interval::AbstractInterval;
+use zebra::solver::prepare_constraints_and_range_type;
+use zebra::solver::ConstraintInfo;
+use zebra::symbolic::GeneralLookupInfo;
+use zebra::symbolic::{make_impl_constraint, ZEBRASymbolicExpr as LVSExpr};
+use zebra::trace::AbstractTrace;
+use zebra::wordop::{get_alu_constraint, WordOp};
 
 use crate::config::{get_machine_config, prover_options};
 use crate::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col as cv};
@@ -353,7 +353,7 @@ where
         prime,
     );
 
-    let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
+    let constraints = ZEBRAConstraints::new(air_constraints, lookup_constraints);
     let constraint_info = ConstraintInfo {
         constraints: constraints,
         num_total_columns: num_cols,

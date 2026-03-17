@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::interval::{AbstractInterval, MayBeFlag};
 use crate::symbolic::{
     gather_vars_simple, get_curr_add_vars_sub_const, get_curr_i, get_curr_i_sub_const,
-    get_curr_i_sub_cur_j, LatticeVMSymbolicExpr,
+    get_curr_i_sub_cur_j, ZEBRASymbolicExpr,
 };
 use crate::trace::AbstractTrace;
 
@@ -52,14 +52,14 @@ use crate::trace::AbstractTrace;
 ///
 /// * [`refine_conditional_constraints_var_sub_const`]
 pub fn detect_conditional_var_sub_const_constraints(
-    constraints: &[LatticeVMSymbolicExpr],
+    constraints: &[ZEBRASymbolicExpr],
     prime: u32,
 ) -> Vec<(usize, usize, i128)> {
     let mut const_constraints = Vec::new();
 
     for c in constraints {
         // Mul(selector, Sub(lhs, rhs))
-        if let LatticeVMSymbolicExpr::Mul(lhs_expr, rhs_expr) = c {
+        if let ZEBRASymbolicExpr::Mul(lhs_expr, rhs_expr) = c {
             // 1. the left is selector, and the right is Sub expr
             if let Some(s_idx) = get_curr_i(lhs_expr) {
                 if let Some((v_idx, target)) = get_curr_i_sub_const(rhs_expr, prime) {
@@ -86,14 +86,14 @@ pub fn detect_conditional_var_sub_const_constraints(
 }
 
 pub fn detect_conditional_addvars_sub_const_constraints(
-    constraints: &[LatticeVMSymbolicExpr],
+    constraints: &[ZEBRASymbolicExpr],
     prime: u32,
 ) -> Vec<(usize, Vec<usize>, i128)> {
     let mut const_constraints = Vec::new();
 
     for c in constraints {
         // Mul(selector, Sub(lhs, rhs))
-        if let LatticeVMSymbolicExpr::Mul(lhs_expr, rhs_expr) = c {
+        if let ZEBRASymbolicExpr::Mul(lhs_expr, rhs_expr) = c {
             // 1. the left is selector, and the right is Sub expr
             if let Some(s_idx) = get_curr_i(lhs_expr) {
                 if let Some((vs, target)) = get_curr_add_vars_sub_const(rhs_expr, prime) {
@@ -266,13 +266,13 @@ pub fn refine_conditional_constraints_addvars_sub_const(
 ///
 /// * [`refine_conditional_constraints_var_sub_var`]
 pub fn detect_conditional_var_sub_var_constraints(
-    constraints: &[LatticeVMSymbolicExpr],
+    constraints: &[ZEBRASymbolicExpr],
 ) -> Vec<(usize, usize, usize)> {
     let mut eq_constraints = Vec::new();
 
     for c in constraints {
         // Mul(selector, Sub(lhs, rhs))
-        if let LatticeVMSymbolicExpr::Mul(lhs_expr, rhs_expr) = c {
+        if let ZEBRASymbolicExpr::Mul(lhs_expr, rhs_expr) = c {
             // 1. the left is selector, and the right is Sub expr
             if let Some(s_idx) = get_curr_i(lhs_expr) {
                 if let Some((a_idx, b_idx)) = get_curr_i_sub_cur_j(rhs_expr) {
@@ -380,12 +380,12 @@ pub fn refine_conditional_constraints_var_sub_var(
 /// * Affine constraint detection
 /// * Symbolic normalization
 /// * Pattern matching for interval refinement
-pub fn move_sub_expr_to_right(expr: &LatticeVMSymbolicExpr) -> LatticeVMSymbolicExpr {
+pub fn move_sub_expr_to_right(expr: &ZEBRASymbolicExpr) -> ZEBRASymbolicExpr {
     // (a - c) + b ==> (a + b) - c
-    if let LatticeVMSymbolicExpr::Add(lhs_1, rhs_1) = expr {
-        if let LatticeVMSymbolicExpr::Sub(lhs_2, rhs_2) = *lhs_1.clone() {
-            return LatticeVMSymbolicExpr::Sub(
-                Box::new(LatticeVMSymbolicExpr::Add(lhs_2, rhs_1.clone())),
+    if let ZEBRASymbolicExpr::Add(lhs_1, rhs_1) = expr {
+        if let ZEBRASymbolicExpr::Sub(lhs_2, rhs_2) = *lhs_1.clone() {
+            return ZEBRASymbolicExpr::Sub(
+                Box::new(ZEBRASymbolicExpr::Add(lhs_2, rhs_1.clone())),
                 rhs_2,
             );
         }
@@ -461,7 +461,7 @@ pub fn move_sub_expr_to_right(expr: &LatticeVMSymbolicExpr) -> LatticeVMSymbolic
 #[derive(Debug, Clone)]
 pub struct AbirConstraint {
     pub lhs_var: usize,                         // a
-    pub affine_rhs: Box<LatticeVMSymbolicExpr>, // L
+    pub affine_rhs: Box<ZEBRASymbolicExpr>, // L
     pub quotient_var: usize,                    // e
     pub stride: u32,                            // d > 0
 }
@@ -504,7 +504,7 @@ pub struct AbirConstraint {
 /// * Detecting arithmetic decompositions
 /// * Constraint simplification
 pub fn detect_abir_constraints(
-    constraints: &[LatticeVMSymbolicExpr],
+    constraints: &[ZEBRASymbolicExpr],
     prime: u32,
 ) -> Vec<AbirConstraint> {
     let mut result = Vec::new();
@@ -512,12 +512,12 @@ pub fn detect_abir_constraints(
     for constraint in constraints {
         // Expect: a - RHS
         let (lhs, rhs) = match constraint {
-            LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
+            ZEBRASymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
             _ => continue,
         };
 
         let lhs_var = match &**lhs {
-            LatticeVMSymbolicExpr::Variable(v) => v.index,
+            ZEBRASymbolicExpr::Variable(v) => v.index,
             _ => continue,
         };
 
@@ -525,20 +525,20 @@ pub fn detect_abir_constraints(
         let normalized_rhs = move_sub_expr_to_right(rhs);
 
         let (affine_rhs, de_term) = match normalized_rhs {
-            LatticeVMSymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
+            ZEBRASymbolicExpr::Sub(lhs, rhs) => (lhs, rhs),
             _ => continue,
         };
 
         // Match d * e
         let (quotient_var, stride) = match &*de_term {
-            LatticeVMSymbolicExpr::Mul(x, y) => match (&**x, &**y) {
-                (LatticeVMSymbolicExpr::Variable(v), LatticeVMSymbolicExpr::Constant(k))
-                | (LatticeVMSymbolicExpr::Constant(k), LatticeVMSymbolicExpr::Variable(v)) => {
+            ZEBRASymbolicExpr::Mul(x, y) => match (&**x, &**y) {
+                (ZEBRASymbolicExpr::Variable(v), ZEBRASymbolicExpr::Constant(k))
+                | (ZEBRASymbolicExpr::Constant(k), ZEBRASymbolicExpr::Variable(v)) => {
                     (v.index, k.as_canonical_u32(prime))
                 }
                 _ => continue,
             },
-            LatticeVMSymbolicExpr::Variable(v) => (v.index, 1),
+            ZEBRASymbolicExpr::Variable(v) => (v.index, 1),
             _ => continue,
         };
 

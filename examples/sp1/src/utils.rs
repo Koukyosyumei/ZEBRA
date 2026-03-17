@@ -12,8 +12,8 @@ use sp1_stark::{
     InteractionBuilder, MachineProver, SP1CoreOpts,
 };
 
-use latticevm::{
-    constraint::LatticeVMConstraints, interval::AbstractInterval,
+use zebra::{
+    constraint::ZEBRAConstraints, interval::AbstractInterval,
     solver::prepare_constraints_and_range_type, solver::ConstraintInfo,
     symbolic::GeneralLookupInfo,
 };
@@ -145,7 +145,7 @@ where
         prime,
     );
 
-    let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
+    let constraints = ZEBRAConstraints::new(air_constraints, lookup_constraints);
     let constraint_info = ConstraintInfo {
         constraints: constraints,
         num_total_columns: num_cols,

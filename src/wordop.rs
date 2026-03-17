@@ -1,5 +1,5 @@
 use crate::interval::AbstractInterval;
-use crate::symbolic::LatticeVMSymbolicExpr;
+use crate::symbolic::ZEBRASymbolicExpr;
 
 pub type Word = [AbstractInterval; 4];
 pub const WORD_BITS: u32 = 32;
@@ -31,178 +31,178 @@ pub enum WordOp {
 }
 
 pub fn reconstruct_symbolic_word(
-    row: &[LatticeVMSymbolicExpr],
+    row: &[ZEBRASymbolicExpr],
     base: usize,
-) -> LatticeVMSymbolicExpr {
-    let mut val = LatticeVMSymbolicExpr::Constant(AbstractInterval::zero());
+) -> ZEBRASymbolicExpr {
+    let mut val = ZEBRASymbolicExpr::Constant(AbstractInterval::zero());
     let mut mul = 1_i128;
     for i in 0..4 {
-        let rm = LatticeVMSymbolicExpr::Mul(
+        let rm = ZEBRASymbolicExpr::Mul(
             Box::new(row[base + i].clone()),
-            Box::new(LatticeVMSymbolicExpr::Constant(
+            Box::new(ZEBRASymbolicExpr::Constant(
                 AbstractInterval::from_i128(mul),
             )),
         );
-        val = LatticeVMSymbolicExpr::Add(Box::new(val.clone()), Box::new(rm));
+        val = ZEBRASymbolicExpr::Add(Box::new(val.clone()), Box::new(rm));
         mul *= 256;
     }
     val
 }
 
 pub fn get_alu_constraint(
-    a: &[LatticeVMSymbolicExpr; 4],
-    b: &[LatticeVMSymbolicExpr; 4],
-    c: &[LatticeVMSymbolicExpr; 4],
-    hi: &[LatticeVMSymbolicExpr; 4],
+    a: &[ZEBRASymbolicExpr; 4],
+    b: &[ZEBRASymbolicExpr; 4],
+    c: &[ZEBRASymbolicExpr; 4],
+    hi: &[ZEBRASymbolicExpr; 4],
     op: &WordOp,
-) -> LatticeVMSymbolicExpr {
+) -> ZEBRASymbolicExpr {
     let a_word = reconstruct_symbolic_word(a, 0);
     let hi_word = reconstruct_symbolic_word(hi, 0);
 
     match op {
-        WordOp::AddU => LatticeVMSymbolicExpr::Sub(
+        WordOp::AddU => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordAddU(
+            Box::new(ZEBRASymbolicExpr::WordAddU(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::SubU => LatticeVMSymbolicExpr::Sub(
+        WordOp::SubU => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordSubU(
+            Box::new(ZEBRASymbolicExpr::WordSubU(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::Mul => LatticeVMSymbolicExpr::Sub(
+        WordOp::Mul => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordMul(
+            Box::new(ZEBRASymbolicExpr::WordMul(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::MulH => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulH => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordMulhs(
+            Box::new(ZEBRASymbolicExpr::WordMulhs(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::MulHU => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulHU => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordMulhu(
+            Box::new(ZEBRASymbolicExpr::WordMulhu(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::MulHS => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulHS => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordMulhs(
+            Box::new(ZEBRASymbolicExpr::WordMulhs(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::MulTL => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulTL => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordMultl(
+            Box::new(ZEBRASymbolicExpr::WordMultl(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::MulTH => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulTH => ZEBRASymbolicExpr::Sub(
             Box::new(hi_word),
-            Box::new(LatticeVMSymbolicExpr::WordMulth(
+            Box::new(ZEBRASymbolicExpr::WordMulth(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::MulTUL => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulTUL => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordMultul(
+            Box::new(ZEBRASymbolicExpr::WordMultul(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::MulTUH => LatticeVMSymbolicExpr::Sub(
+        WordOp::MulTUH => ZEBRASymbolicExpr::Sub(
             Box::new(hi_word),
-            Box::new(LatticeVMSymbolicExpr::WordMultuh(
+            Box::new(ZEBRASymbolicExpr::WordMultuh(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::And => LatticeVMSymbolicExpr::Sub(
+        WordOp::And => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordAnd(
+            Box::new(ZEBRASymbolicExpr::WordAnd(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::Or => LatticeVMSymbolicExpr::Sub(
+        WordOp::Or => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordOr(
+            Box::new(ZEBRASymbolicExpr::WordOr(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::Xor => LatticeVMSymbolicExpr::Sub(
+        WordOp::Xor => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordXOr(
+            Box::new(ZEBRASymbolicExpr::WordXOr(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::Lt => LatticeVMSymbolicExpr::Sub(
+        WordOp::Lt => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordLt(
+            Box::new(ZEBRASymbolicExpr::WordLt(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::SLe => LatticeVMSymbolicExpr::Sub(
+        WordOp::SLe => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordSLe(
+            Box::new(ZEBRASymbolicExpr::WordSLe(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::SLt => LatticeVMSymbolicExpr::Sub(
+        WordOp::SLt => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordSLt(
+            Box::new(ZEBRASymbolicExpr::WordSLt(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::SRL => LatticeVMSymbolicExpr::Sub(
+        WordOp::SRL => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordSrl(
+            Box::new(ZEBRASymbolicExpr::WordSrl(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::Eq => LatticeVMSymbolicExpr::Sub(
+        WordOp::Eq => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordEq(
+            Box::new(ZEBRASymbolicExpr::WordEq(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::NEq => LatticeVMSymbolicExpr::Sub(
+        WordOp::NEq => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordNEq(
+            Box::new(ZEBRASymbolicExpr::WordNEq(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::Div => LatticeVMSymbolicExpr::Sub(
+        WordOp::Div => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordDiv(
+            Box::new(ZEBRASymbolicExpr::WordDiv(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),
         ),
-        WordOp::SDiv => LatticeVMSymbolicExpr::Sub(
+        WordOp::SDiv => ZEBRASymbolicExpr::Sub(
             Box::new(a_word),
-            Box::new(LatticeVMSymbolicExpr::WordSDiv(
+            Box::new(ZEBRASymbolicExpr::WordSDiv(
                 b.clone().map(|f| Box::new(f)),
                 c.clone().map(|f| Box::new(f)),
             )),

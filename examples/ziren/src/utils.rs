@@ -13,32 +13,32 @@ use zkm_stark::{
     CpuProver, LookupBuilder, LookupKind, MachineProver, ZKMCoreOpts, ZKM_PROOF_NUM_PV_ELTS,
 };
 
-use latticevm::constraint::LatticeVMConstraints;
-use latticevm::controlflowop::get_control_flow_constraint;
-use latticevm::controlflowop::ControFLowOp;
-use latticevm::interval::AbstractInterval;
-use latticevm::solver::prepare_constraints_and_range_type;
-use latticevm::solver::ConstraintInfo;
-use latticevm::symbolic::GeneralLookupInfo;
-use latticevm::symbolic::{
-    make_impl_constraint, LatticeVMSymbolicEntry, LatticeVMSymbolicExpr as LVSExpr,
-    LatticeVMSymbolicVal,
+use zebra::constraint::ZEBRAConstraints;
+use zebra::controlflowop::get_control_flow_constraint;
+use zebra::controlflowop::ControFLowOp;
+use zebra::interval::AbstractInterval;
+use zebra::solver::prepare_constraints_and_range_type;
+use zebra::solver::ConstraintInfo;
+use zebra::symbolic::GeneralLookupInfo;
+use zebra::symbolic::{
+    make_impl_constraint, ZEBRASymbolicEntry, ZEBRASymbolicExpr as LVSExpr,
+    ZEBRASymbolicVal,
 };
-use latticevm::wordop::{get_alu_constraint, WordOp};
+use zebra::wordop::{get_alu_constraint, WordOp};
 
 use crate::p3_to_tv::{convert_p3_expr, convert_p3_virtual_pair_col as cv};
 
 pub fn get_pv_constraints() -> (Vec<LVSExpr>, Vec<LVSExpr>) {
     let pv_pos_constraints = vec![LVSExpr::Sub(
-        Box::new(LVSExpr::Variable(LatticeVMSymbolicVal {
-            entry: LatticeVMSymbolicEntry::Public,
+        Box::new(LVSExpr::Variable(ZEBRASymbolicVal {
+            entry: ZEBRASymbolicEntry::Public,
             index: 41,
         })),
         Box::new(LVSExpr::Constant(AbstractInterval { lo: 0, hi: 0 })),
     )];
     let pv_neg_constraints = vec![LVSExpr::Sub(
-        Box::new(LVSExpr::Variable(LatticeVMSymbolicVal {
-            entry: LatticeVMSymbolicEntry::Public,
+        Box::new(LVSExpr::Variable(ZEBRASymbolicVal {
+            entry: ZEBRASymbolicEntry::Public,
             index: 40,
         })),
         Box::new(LVSExpr::Constant(AbstractInterval { lo: 0, hi: 0 })),
@@ -394,7 +394,7 @@ where
         prime,
     );
 
-    let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
+    let constraints = ZEBRAConstraints::new(air_constraints, lookup_constraints);
     let constraint_info = ConstraintInfo {
         constraints: constraints,
         num_total_columns: num_cols,

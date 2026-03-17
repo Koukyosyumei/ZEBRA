@@ -13,19 +13,19 @@ use pico_vm::chips::chips::riscv_memory::read_write::{
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::canonicalizer::{generate_memory_op_final_checker, save_repr_if_unique};
-use latticevm::quick::{
+use zebra::canonicalizer::{generate_memory_op_final_checker, save_repr_if_unique};
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
-use latticevm::ui::UiState;
-use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{
-    constraint::LatticeVMConstraints,
+use zebra::solver::{dummy_program_counter_refine_fn, nop_post_process};
+use zebra::ui::UiState;
+use zebra::utils::{create_or_clear_dir, indices_arr};
+use zebra::{
+    constraint::ZEBRAConstraints,
     trace::{trace_fmt_with_idxs, AbstractTrace},
 };
 
-use latticevm_pico::utils::{
+use zebra_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 

@@ -14,16 +14,16 @@ use valida_memory::columns::{MEM_COL_MAP, NUM_MEM_COLS};
 use valida_memory::MemoryChip;
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::interval::{AbstractInterval, MayBeFlag};
-use latticevm::quick::quick_api;
-use latticevm::solver::{dummy_program_counter_refine_fn, nop_post_process};
-use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
-use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::UiState;
-use latticevm::utils::create_or_clear_dir;
+use zebra::interval::{AbstractInterval, MayBeFlag};
+use zebra::quick::quick_api;
+use zebra::solver::{dummy_program_counter_refine_fn, nop_post_process};
+use zebra::symbolic::{AbstractTrace, ZEBRAConstraints};
+use zebra::ui::save_repr_if_unique;
+use zebra::ui::UiState;
+use zebra::utils::create_or_clear_dir;
 
-use latticevm_valida::config::MyConfig;
-use latticevm_valida::utils::{
+use zebra_valida::config::MyConfig;
+use zebra_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
 
@@ -145,7 +145,7 @@ fn main() -> Result<(), io::Error> {
             &machine, &air, num_col, prime,
         );
 
-    let constraints = LatticeVMConstraints {
+    let constraints = ZEBRAConstraints {
         air_constraints,
         lookup_constraints,
         pv_pos_constraints: vec![],

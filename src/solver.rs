@@ -22,10 +22,10 @@ use crate::shrinker::{
 };
 use crate::symbolic::{
     gather_boolean_variables, gather_vars, is_babybear_word_range, is_boolean_constraint,
-    is_iszero_operator, is_koalabear_word_range, LatticeVMSymbolicExpr,
+    is_iszero_operator, is_koalabear_word_range, ZEBRASymbolicExpr,
 };
 use crate::{
-    constraint::{eval_constraints, LatticeVMConstraints},
+    constraint::{eval_constraints, ZEBRAConstraints},
     interval::{AbstractInterval, MayBeFlag},
     trace::{refine_trace, AbstractTrace},
     ui::UiState,
@@ -232,7 +232,7 @@ impl Default for SearchConfig {
 }
 
 pub struct ConstraintInfo {
-    pub constraints: LatticeVMConstraints,
+    pub constraints: ZEBRAConstraints,
     pub num_total_columns: usize,
     pub num_pv_columns: usize,
     pub output_columns: Vec<usize>,
@@ -298,7 +298,7 @@ pub struct ConstraintInfo {
 fn process_single_node(
     head: SearchNode,
     public_trace: AbstractTrace,
-    constraints: &LatticeVMConstraints,
+    constraints: &ZEBRAConstraints,
     prime: u32,
     rng: &mut StdRng,
     post_process: &impl Fn(&mut AbstractTrace, u32) -> MayBeFlag,
@@ -525,7 +525,7 @@ fn process_single_node(
 pub fn parallel_solve<PostProcessFn, FinalCheckFn>(
     initial_node: &mut SearchNode,
     public_trace: AbstractTrace,
-    constraints: Arc<LatticeVMConstraints>,
+    constraints: Arc<ZEBRAConstraints>,
     refinable_cols: Arc<Vec<usize>>, // Specific to this subset
     range_types: Arc<HashMap<usize, RangeType>>,
     post_process: PostProcessFn,
@@ -549,7 +549,7 @@ where
     let mut conditional_bool_target_indices = Vec::<(usize, usize)>::new();
 
     for t in &constraints.air_constraints {
-        if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = t {
+        if let ZEBRASymbolicExpr::Mul(lhs, rhs) = t {
             for i in search_config.min_row_id..(search_config.max_row_id + 1) {
                 let lv = lhs.eval(
                     &initial_node.main_trace.data[i],
@@ -1104,8 +1104,8 @@ pub fn prepare_constraints_and_range_type(
     u16_cols: &Vec<usize>,
     multiplicities: &HashSet<usize>,
     received_vars_from_cpu: &HashSet<usize>,
-    tv_constraints: &mut Vec<LatticeVMSymbolicExpr>,
-    lookup_symbolic_constraints: &Vec<LatticeVMSymbolicExpr>,
+    tv_constraints: &mut Vec<ZEBRASymbolicExpr>,
+    lookup_symbolic_constraints: &Vec<ZEBRASymbolicExpr>,
     prime: u32,
 ) -> (Vec<usize>, HashMap<usize, RangeType>) {
     let mut refinable_cols: Vec<usize> = (0..num_cols).collect();

@@ -18,21 +18,21 @@ use valida_cpu::{
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::interval::{AbstractInterval, MayBeFlag};
-use latticevm::quick::quick_api;
-use latticevm::solver::{
+use zebra::interval::{AbstractInterval, MayBeFlag};
+use zebra::quick::quick_api;
+use zebra::solver::{
     dummy_adjust_pc_program, dummy_program_counter_refine_fn, dummy_table_deriver, RangeType,
 };
-use latticevm::state::AbstractState;
-use latticevm::state::MemoryOp;
-use latticevm::state::MemoryOpKind;
-use latticevm::symbolic::{AbstractTrace, LatticeVMConstraints};
-use latticevm::ui::save_repr_if_unique;
-use latticevm::ui::UiState;
-use latticevm::utils::create_or_clear_dir;
+use zebra::state::AbstractState;
+use zebra::state::MemoryOp;
+use zebra::state::MemoryOpKind;
+use zebra::symbolic::{AbstractTrace, ZEBRAConstraints};
+use zebra::ui::save_repr_if_unique;
+use zebra::ui::UiState;
+use zebra::utils::create_or_clear_dir;
 
-use latticevm_valida::config::MyConfig;
-use latticevm_valida::utils::{
+use zebra_valida::config::MyConfig;
+use zebra_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program, make_pc_adjuster,
     refine_pc_interval,
 };
@@ -177,7 +177,7 @@ fn main() -> Result<(), io::Error> {
     public_vals[2] = AbstractInterval::from_i64(1);
     //let refinment_target_indicies_pv: Vec<usize> = vec![0, 1, 2];
 
-    let constraints = LatticeVMConstraints {
+    let constraints = ZEBRAConstraints {
         air_constraints,
         lookup_constraints,
         pv_pos_constraints: vec![],

@@ -6,13 +6,13 @@ mod tests {
     use sp1_core_machine::{cpu::columns::NUM_CPU_COLS, cpu::CpuChip};
     use sp1_stark::air::SP1_PROOF_NUM_PV_ELTS;
 
-    use latticevm::constraint::eval_constraints;
-    use latticevm::interval::AbstractInterval;
-    use latticevm::interval::MayBeFlag;
+    use zebra::constraint::eval_constraints;
+    use zebra::interval::AbstractInterval;
+    use zebra::interval::MayBeFlag;
 
-    use latticevm::trace::AbstractTrace;
+    use zebra::trace::AbstractTrace;
 
-    use latticevm_sp1::utils::{extract_constraints_and_range, generate_abstract_trace};
+    use zebra_sp1::utils::{extract_constraints_and_range, generate_abstract_trace};
 
     const PRIME: u32 = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 

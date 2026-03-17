@@ -15,19 +15,19 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::quick::{
+use zebra::canonicalizer::save_repr_if_unique;
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::nop_post_process;
-use latticevm::trace::trace_fmt_with_idxs;
-use latticevm::trace::AbstractTrace;
-use latticevm::ui::UiState;
-use latticevm::utils::create_or_clear_dir;
-use latticevm::utils::PrettySet;
+use zebra::solver::nop_post_process;
+use zebra::trace::trace_fmt_with_idxs;
+use zebra::trace::AbstractTrace;
+use zebra::ui::UiState;
+use zebra::utils::create_or_clear_dir;
+use zebra::utils::PrettySet;
 
-use latticevm_valida::config::MyConfig;
-use latticevm_valida::utils::{
+use zebra_valida::config::MyConfig;
+use zebra_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
 

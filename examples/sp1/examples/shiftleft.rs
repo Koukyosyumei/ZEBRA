@@ -10,14 +10,14 @@ use sp1_core_executor::{Instruction, Opcode, Program};
 use sp1_core_machine::alu::{ShiftLeftCols, NUM_SHIFT_LEFT_COLS};
 use sp1_core_machine::riscv::ShiftLeft;
 
-use latticevm::canonicalizer::generate_alu_final_checker;
-use latticevm::quick::{
+use zebra::canonicalizer::generate_alu_final_checker;
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::nop_post_process;
-use latticevm::utils::{create_or_clear_dir, indices_arr};
+use zebra::solver::nop_post_process;
+use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use latticevm_sp1::utils::{
+use zebra_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 

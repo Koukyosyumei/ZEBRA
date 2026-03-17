@@ -21,21 +21,21 @@ use valida_cpu::{
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::interval::AbstractInterval as AI;
-use latticevm::interval::MayBeFlag;
-use latticevm::memory::IntervalMemory;
-use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
-use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
-use latticevm::solver::RangeType;
-use latticevm::state::AbstractState;
-use latticevm::trace::AbstractTrace;
-use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
-use latticevm::utils::create_or_clear_dir;
-use latticevm::utils::PrettySet;
+use zebra::canonicalizer::save_repr_if_unique;
+use zebra::interval::AbstractInterval as AI;
+use zebra::interval::MayBeFlag;
+use zebra::memory::IntervalMemory;
+use zebra::memory::{check_memory_consistency, reconstruct_word as rec_word};
+use zebra::quick::{experiment_harness, load_config, Args, ProgramInfo};
+use zebra::solver::RangeType;
+use zebra::state::AbstractState;
+use zebra::trace::AbstractTrace;
+use zebra::ui::{pad_dummy_rows_with_last_dummy, UiState};
+use zebra::utils::create_or_clear_dir;
+use zebra::utils::PrettySet;
 
-use latticevm_valida::config::MyConfig;
-use latticevm_valida::utils::{
+use zebra_valida::config::MyConfig;
+use zebra_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program, make_pc_adjuster,
     refine_pc_interval,
 };
@@ -97,7 +97,7 @@ fn final_check(
         record_reprs.insert("\tempty".to_string());
     }
 
-    use latticevm::interval::AbstractInterval;
+    use zebra::interval::AbstractInterval;
     for i in 0..trace.data.len() {
         let mut ai = AbstractInterval::zero();
         for j in 9..27 {
@@ -190,8 +190,8 @@ fn main() -> Result<(), io::Error> {
         .map(|inst| format!("{}\n", inst))
         .collect::<String>();
 
-    use latticevm::constraint::eval_constraints;
-    use latticevm::solver::make_init_val;
+    use zebra::constraint::eval_constraints;
+    use zebra::solver::make_init_val;
     let mut base_abs_main_trace_data =
         generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
     let adjust_pc_program = make_pc_adjuster(program.clone());

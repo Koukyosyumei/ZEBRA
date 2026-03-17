@@ -1,5 +1,5 @@
 [package]
-name = "latticevm_sp1"
+name = "zebra_sp1"
 version = "0.0.0"
 edition = "2021"
 authors = ["Koukyosyumei <koukyosyumei@hotmail.com>"]
@@ -15,7 +15,7 @@ rand = "0.9.2"
 itertools = "0.14.0"
 clap = { version = "4.5.57", features = ["derive"] }
 num-traits = { version = "0.2.19", default-features = false }
-latticevm = { path = "../../" }
+zebra = { path = "../../" }
 p3-field = { version = "=0.2.3-succinct" }
 p3-air = { version = "=0.2.3-succinct" }
 p3-baby-bear = { version = "=0.2.3-succinct" }
