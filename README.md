@@ -1,6 +1,7 @@
 # ZEBRA
 
 **ZEBRA** is a lattice-based localized verifier for zero-knowledge virtual machines (zkVMs).
+
 ---
 
 ## Overview
