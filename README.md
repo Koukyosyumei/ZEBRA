@@ -1,7 +1,6 @@
 # ZEBRA
 
-**ZEBRA** is a lattice-based abstract-interpretation verifier for zero-knowledge virtual machines (zkVMs). It formally verifies zkVM execution traces by performing interval analysis over AIR (Algebraic Intermediate Representation) constraints, without requiring concrete witness generation.
-
+**ZEBRA** is a lattice-based localized verifier for zero-knowledge virtual machines (zkVMs).
 ---
 
 ## Overview
