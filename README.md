@@ -1,12 +1,12 @@
-# ZEBRA: Zero-knowledge zkVM Bounded Refinement Analysis
+# ZEBRA
 
-**ZEBRA** is a lattice-based abstract-interpretation verifier for zero-knowledge virtual machines (zkVMs). It formally verifies zkVM execution traces by performing interval analysis over AIR (Algebraic Intermediate Representation) constraints — without requiring concrete witness generation.
+**ZEBRA** is a lattice-based abstract-interpretation verifier for zero-knowledge virtual machines (zkVMs). It formally verifies zkVM execution traces by performing interval analysis over AIR (Algebraic Intermediate Representation) constraints, without requiring concrete witness generation.
 
 ---
 
 ## Overview
 
-zkVM correctness hinges on the soundness of their constraint systems. ZEBRA provides a lightweight, automated way to check whether a zkVM's AIR constraints can be satisfied by abstract (interval-valued) execution traces. Rather than enumerating concrete witnesses, ZEBRA abstracts over entire ranges of possible values and propagates interval refinements until a fixed point is reached.
+zkVM correctness hinges on the soundness of its constraint systems. ZEBRA provides a lightweight, automated way to check whether a zkVM's AIR constraints can be satisfied by abstract (interval-valued) execution traces. Rather than enumerating concrete witnesses, ZEBRA abstracts over entire ranges of possible values and propagates interval refinements until a fixed point is reached.
 
 **Key capabilities:**
 
@@ -14,7 +14,7 @@ zkVM correctness hinges on the soundness of their constraint systems. ZEBRA prov
 - **Three-valued verdict** — outputs `Satisfies`, `Violates`, or `MayBe` (inconclusive) for each constraint set
 - **SMT export** — emits SMT-LIB2 formulas for external solver verification (Z3, CVC5)
 - **Multi-backend support** — integrates with Ziren (RISC-V), SP1, Pico, and Valida zkVM backends
-- **Live terminal UI** — real-time verification status via `ratatui`
+- **Live terminal UI** — real-time verification status via `ratatui`.
 
 ---
 
