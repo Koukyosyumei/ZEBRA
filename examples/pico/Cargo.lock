@@ -1508,59 +1508,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "latticevm"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "clap",
- "crossterm 0.29.0",
- "itertools 0.14.0",
- "priority-queue",
- "rand 0.9.2",
- "ratatui",
- "serde",
- "serde_json",
- "serde_yaml",
-]
-
-[[package]]
-name = "latticevm_pico"
-version = "0.0.0"
-dependencies = [
- "bincode",
- "clap",
- "crossterm 0.29.0",
- "itertools 0.14.0",
- "latticevm",
- "num-traits",
- "p3-air",
- "p3-baby-bear",
- "p3-blake3",
- "p3-challenger",
- "p3-circle",
- "p3-commit",
- "p3-dft",
- "p3-field",
- "p3-fri",
- "p3-goldilocks",
- "p3-keccak",
- "p3-koala-bear",
- "p3-matrix",
- "p3-mds",
- "p3-merkle-tree",
- "p3-mersenne-31",
- "p3-poseidon",
- "p3-poseidon2",
- "p3-symmetric",
- "p3-uni-stark",
- "p3-util",
- "pico-vm",
- "rand 0.9.2",
- "ratatui",
- "tempfile",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3700,6 +3647,59 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
 dependencies = [
  "tap",
+]
+
+[[package]]
+name = "zebra"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crossterm 0.29.0",
+ "itertools 0.14.0",
+ "priority-queue",
+ "rand 0.9.2",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
+name = "zebra_pico"
+version = "0.0.0"
+dependencies = [
+ "bincode",
+ "clap",
+ "crossterm 0.29.0",
+ "itertools 0.14.0",
+ "num-traits",
+ "p3-air",
+ "p3-baby-bear",
+ "p3-blake3",
+ "p3-challenger",
+ "p3-circle",
+ "p3-commit",
+ "p3-dft",
+ "p3-field",
+ "p3-fri",
+ "p3-goldilocks",
+ "p3-keccak",
+ "p3-koala-bear",
+ "p3-matrix",
+ "p3-mds",
+ "p3-merkle-tree",
+ "p3-mersenne-31",
+ "p3-poseidon",
+ "p3-poseidon2",
+ "p3-symmetric",
+ "p3-uni-stark",
+ "p3-util",
+ "pico-vm",
+ "rand 0.9.2",
+ "ratatui",
+ "tempfile",
+ "zebra",
 ]
 
 [[package]]
