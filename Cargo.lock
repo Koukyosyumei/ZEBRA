@@ -406,22 +406,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
-name = "latticevm"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "clap",
- "crossterm 0.29.0",
- "itertools 0.14.0",
- "priority-queue",
- "rand",
- "ratatui",
- "serde",
- "serde_json",
- "serde_yaml",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.177"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -983,6 +967,22 @@ name = "wit-bindgen"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
+
+[[package]]
+name = "zebra"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crossterm 0.29.0",
+ "itertools 0.14.0",
+ "priority-queue",
+ "rand",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
 
 [[package]]
 name = "zerocopy"

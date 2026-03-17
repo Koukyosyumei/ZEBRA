@@ -11,18 +11,18 @@ use zkm_core_machine::control_flow::BranchColumns;
 use zkm_core_machine::control_flow::NUM_BRANCH_COLS;
 use zkm_core_machine::BranchChip;
 
-use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::quick::{
+use zebra::canonicalizer::save_repr_if_unique;
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::nop_post_process;
-use latticevm::trace::trace_fmt_with_idxs;
-use latticevm::trace::AbstractTrace;
-use latticevm::ui::UiState;
-use latticevm::utils::PrettySet;
-use latticevm::utils::{create_or_clear_dir, indices_arr};
+use zebra::solver::nop_post_process;
+use zebra::trace::trace_fmt_with_idxs;
+use zebra::trace::AbstractTrace;
+use zebra::ui::UiState;
+use zebra::utils::PrettySet;
+use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use latticevm_ziren::utils::{
+use zebra_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
@@ -103,7 +103,7 @@ fn main() -> Result<(), io::Error> {
         extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
     let output_columns = vec![23, 24, 25, 26];
 
-    use latticevm::solver::RangeType;
+    use zebra::solver::RangeType;
     constraint_info.range_types.insert(60, RangeType::Bool);
     constraint_info.range_types.insert(61, RangeType::Bool);
     constraint_info.range_types.insert(26, RangeType::U7);

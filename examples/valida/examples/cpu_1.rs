@@ -21,23 +21,23 @@ use valida_cpu::{
 use valida_machine::{Instruction, InstructionWord as IW, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::interval::AbstractInterval as AI;
-use latticevm::interval::AbstractInterval;
-use latticevm::interval::MayBeFlag;
-use latticevm::memory::IntervalMemory;
-use latticevm::memory::{check_memory_consistency, reconstruct_word as rec_word};
-use latticevm::quick::{experiment_harness, load_config, Args, ProgramInfo};
-use latticevm::solver::RangeType;
-use latticevm::state::AbstractState;
-use latticevm::trace::AbstractTrace;
-use latticevm::ui::{pad_dummy_rows_with_last_dummy, UiState};
-use latticevm::utils::create_or_clear_dir;
-use latticevm::utils::PrettySet;
+use zebra::canonicalizer::save_repr_if_unique;
+use zebra::interval::AbstractInterval as AI;
+use zebra::interval::AbstractInterval;
+use zebra::interval::MayBeFlag;
+use zebra::memory::IntervalMemory;
+use zebra::memory::{check_memory_consistency, reconstruct_word as rec_word};
+use zebra::quick::{experiment_harness, load_config, Args, ProgramInfo};
+use zebra::solver::RangeType;
+use zebra::state::AbstractState;
+use zebra::trace::AbstractTrace;
+use zebra::ui::{pad_dummy_rows_with_last_dummy, UiState};
+use zebra::utils::create_or_clear_dir;
+use zebra::utils::PrettySet;
 use valida_opcodes::Opcode;
 
-use latticevm_valida::config::MyConfig;
-use latticevm_valida::utils::{
+use zebra_valida::config::MyConfig;
+use zebra_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program, make_pc_adjuster,
     refine_pc_interval,
 };
@@ -362,7 +362,7 @@ fn main() -> Result<(), io::Error> {
 
         /*
         println!("{:?}", program);
-        use latticevm::constraint::eval_constraints;
+        use zebra::constraint::eval_constraints;
         let res = eval_constraints(
             &AbstractTrace::new(base_abs_main_trace_data.clone()),
             Some(&public_vals),

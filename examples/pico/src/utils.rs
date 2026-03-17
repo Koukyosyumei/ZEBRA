@@ -23,13 +23,13 @@ use pico_vm::{
     primitives::consts::RISCV_NUM_PVS,
 };
 
-use latticevm::constraint::LatticeVMConstraints;
-use latticevm::interval::AbstractInterval;
-use latticevm::solver::{prepare_constraints_and_range_type, ConstraintInfo};
-use latticevm::symbolic::{
-    make_impl_constraint, GeneralLookupInfo, LatticeVMSymbolicExpr as LVSExpr,
+use zebra::constraint::ZEBRAConstraints;
+use zebra::interval::AbstractInterval;
+use zebra::solver::{prepare_constraints_and_range_type, ConstraintInfo};
+use zebra::symbolic::{
+    make_impl_constraint, GeneralLookupInfo, ZEBRASymbolicExpr as LVSExpr,
 };
-use latticevm::wordop::{get_alu_constraint, WordOp};
+use zebra::wordop::{get_alu_constraint, WordOp};
 
 use crate::p3_to_tv::convert_p3_expr;
 use crate::p3_to_tv::convert_p3_virtual_pair_col as cv;
@@ -314,7 +314,7 @@ where
         prime,
     );
 
-    let constraints = LatticeVMConstraints::new(air_constraints, lookup_constraints);
+    let constraints = ZEBRAConstraints::new(air_constraints, lookup_constraints);
     let constraint_info = ConstraintInfo {
         constraints: constraints,
         num_total_columns: num_cols,

@@ -11,17 +11,17 @@ use pico_vm::chips::chips::alu::add_sub::AddSubChip;
 use pico_vm::compiler::riscv::program::Program;
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
-use latticevm::interval::MayBeFlag;
-use latticevm::quick::{
+use zebra::interval::MayBeFlag;
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::nop_post_process;
-use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
-use latticevm::utils::PrettySet;
-use latticevm::utils::{create_or_clear_dir, indices_arr};
-use latticevm::{canonicalizer::save_repr_if_unique, ui::UiState};
+use zebra::solver::nop_post_process;
+use zebra::trace::{trace_fmt_with_idxs, AbstractTrace};
+use zebra::utils::PrettySet;
+use zebra::utils::{create_or_clear_dir, indices_arr};
+use zebra::{canonicalizer::save_repr_if_unique, ui::UiState};
 
-use latticevm_pico::utils::{
+use zebra_pico::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 
@@ -111,7 +111,7 @@ fn main() -> Result<(), io::Error> {
         .extend(&output_columns.clone());
 
     /*
-    use latticevm::solver::RangeType;
+    use zebra::solver::RangeType;
     constraint_info.refinable_cols.push(7);
     constraint_info.refinable_cols.push(11);
     constraint_info.range_types.insert(7, RangeType::U8);

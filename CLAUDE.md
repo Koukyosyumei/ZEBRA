@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**LatticeVM** is a lattice-based abstract-interpretation verifier for zero-knowledge VMs (zkVMs). It formally verifies zkVM execution traces by performing interval analysis over AIR (Algebraic Intermediate Representation) constraints.
+**ZEBRA** (Zero-knowledge zkVM Bounded Refinement Analysis) is a lattice-based abstract-interpretation verifier for zero-knowledge VMs (zkVMs). It formally verifies zkVM execution traces by performing interval analysis over AIR (Algebraic Intermediate Representation) constraints.
 
 ## Commands
 
@@ -57,7 +57,7 @@ Each example has scripts in `examples/{name}/scripts/`:
 | Module | Role |
 |--------|------|
 | `interval.rs` | `AbstractInterval [lo, hi]` — range arithmetic over u32 values; three-valued `MayBeFlag` (True/False/MayBe) |
-| `symbolic.rs` | `LatticeVMSymbolicExpr` — symbolic expression trees; `RangeType` domain specs (Bool, U4, U8, U16, Top, Const, Any) |
+| `symbolic.rs` | `ZEBRASymbolicExpr` — symbolic expression trees; `RangeType` domain specs (Bool, U4, U8, U16, Top, Const, Any) |
 | `trace.rs` | `AbstractTrace` — execution trace as a table of symbolic intervals; tracks singleton positions |
 | `state.rs` | `AbstractState` — abstract VM state (clock, PC, memory, completion flag) |
 | `constraint.rs` | `eval_constraints()` — evaluates symbolic constraints over an abstract trace in strict or relaxed mode |
@@ -72,7 +72,7 @@ Each example has scripts in `examples/{name}/scripts/`:
 | `canonicalizer.rs` | Symbolic expression canonicalization |
 
 ### Example Integrations (`examples/`)
-Each subdirectory is a self-contained Cargo crate integrating LatticeVM with a specific zkVM backend:
+Each subdirectory is a self-contained Cargo crate integrating ZEBRA with a specific zkVM backend:
 - **ziren** — Zkm/RISC-V CPU (most complete; includes ALU config and CPU integration tests)
 - **sp1** — Succinct Proof System 1 (uses custom SP1 fork)
 - **pico** — PicoVM (uses custom Pico fork with Plonky3/Brevis)

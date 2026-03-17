@@ -10,18 +10,18 @@ use zkm_core_executor::{Instruction, Opcode, Program};
 use zkm_core_machine::alu::{AddSubCols, NUM_ADD_SUB_COLS};
 use zkm_core_machine::AddSubChip;
 
-use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::interval::MayBeFlag;
-use latticevm::quick::{
+use zebra::canonicalizer::save_repr_if_unique;
+use zebra::interval::MayBeFlag;
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::nop_post_process;
-use latticevm::trace::{trace_fmt_with_idxs, AbstractTrace};
-use latticevm::ui::UiState;
-use latticevm::utils::PrettySet;
-use latticevm::utils::{create_or_clear_dir, indices_arr};
+use zebra::solver::nop_post_process;
+use zebra::trace::{trace_fmt_with_idxs, AbstractTrace};
+use zebra::ui::UiState;
+use zebra::utils::PrettySet;
+use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use latticevm_ziren::utils::{
+use zebra_ziren::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 

@@ -1,5 +1,5 @@
 [package]
-name = "latticevm"
+name = "zebra"
 version = "0.0.0"
 edition = "2021"
 authors = ["Koukyosyumei <koukyosyumei@hotmail.com>"]

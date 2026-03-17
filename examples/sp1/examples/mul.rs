@@ -11,15 +11,15 @@ use sp1_core_machine::alu::MulCols;
 use sp1_core_machine::alu::NUM_MUL_COLS;
 use sp1_core_machine::riscv::MulChip;
 
-use latticevm::canonicalizer::generate_alu_final_checker;
-use latticevm::quick::{
+use zebra::canonicalizer::generate_alu_final_checker;
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::nop_post_process;
-use latticevm::solver::RangeType;
-use latticevm::utils::{create_or_clear_dir, indices_arr};
+use zebra::solver::nop_post_process;
+use zebra::solver::RangeType;
+use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use latticevm_sp1::utils::{
+use zebra_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 

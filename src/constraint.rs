@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 use crate::symbolic::{
-    gather_vars, LatticeVMSymbolicEntry, LatticeVMSymbolicExpr, LatticeVMSymbolicVal,
+    gather_vars, ZEBRASymbolicEntry, ZEBRASymbolicExpr, ZEBRASymbolicVal,
 };
 use crate::trace::AbstractTrace;
 
@@ -35,7 +35,7 @@ use crate::trace::AbstractTrace;
 pub fn eval_base_constraints(
     trace: &AbstractTrace,
     public_vals: Option<&[AbstractInterval]>,
-    constraints: &[LatticeVMSymbolicExpr],
+    constraints: &[ZEBRASymbolicExpr],
     prime: u32,
     is_strict: bool,
     potential: &mut i32,
@@ -110,16 +110,16 @@ pub fn eval_base_constraints(
 /// * `pv_neg_constraints` — Public-negative constraints
 /// * `blocking_constraints` — Row-specific blocking constraints
 #[derive(Clone)]
-pub struct LatticeVMConstraints {
-    pub air_constraints: Vec<LatticeVMSymbolicExpr>,
-    pub lookup_constraints: Vec<LatticeVMSymbolicExpr>,
-    pub pv_pos_constraints: Vec<LatticeVMSymbolicExpr>,
-    pub pv_neg_constraints: Vec<LatticeVMSymbolicExpr>,
-    pub blocking_constraints: Vec<(usize, LatticeVMSymbolicExpr)>,
+pub struct ZEBRAConstraints {
+    pub air_constraints: Vec<ZEBRASymbolicExpr>,
+    pub lookup_constraints: Vec<ZEBRASymbolicExpr>,
+    pub pv_pos_constraints: Vec<ZEBRASymbolicExpr>,
+    pub pv_neg_constraints: Vec<ZEBRASymbolicExpr>,
+    pub blocking_constraints: Vec<(usize, ZEBRASymbolicExpr)>,
 }
 
-impl LatticeVMConstraints {
-    /// Constructs a `LatticeVMConstraints` object with specified AIR and lookup constraints.
+impl ZEBRAConstraints {
+    /// Constructs a `ZEBRAConstraints` object with specified AIR and lookup constraints.
     ///
     /// Other constraint vectors are initialized empty.
     ///
@@ -130,16 +130,16 @@ impl LatticeVMConstraints {
     ///
     /// # Returns
     ///
-    /// Initialized `LatticeVMConstraints` object.
+    /// Initialized `ZEBRAConstraints` object.
     ///
     /// # Use Cases
     ///
     /// * Constraint collection before evaluation
     pub fn new(
-        air_constraints: Vec<LatticeVMSymbolicExpr>,
-        lookup_constraints: Vec<LatticeVMSymbolicExpr>,
+        air_constraints: Vec<ZEBRASymbolicExpr>,
+        lookup_constraints: Vec<ZEBRASymbolicExpr>,
     ) -> Self {
-        LatticeVMConstraints {
+        ZEBRAConstraints {
             air_constraints,
             lookup_constraints,
             pv_pos_constraints: vec![],
@@ -158,7 +158,7 @@ impl LatticeVMConstraints {
 ///
 /// * `trace` — Abstract execution trace
 /// * `public_vals` — Optional public input intervals
-/// * `constraints` — LatticeVMConstraints object
+/// * `constraints` — ZEBRAConstraints object
 /// * `prime` — Field modulus
 ///
 /// # Returns
@@ -177,7 +177,7 @@ impl LatticeVMConstraints {
 pub fn eval_constraints(
     trace: &AbstractTrace,
     public_vals: Option<&[AbstractInterval]>,
-    constraints: &LatticeVMConstraints,
+    constraints: &ZEBRAConstraints,
     prime: u32,
 ) -> (MayBeFlag, i32, HashSet<(usize, usize)>) {
     let mut is_all_true = true;
@@ -306,19 +306,19 @@ pub fn eval_constraints(
 
 pub fn add_blocking_constraint(
     output_columns: &[usize],
-    constraints: &mut LatticeVMConstraints,
+    constraints: &mut ZEBRAConstraints,
     base_abs_main_trace_data: &Vec<Vec<AbstractInterval>>,
     i: usize,
 ) {
     for j in output_columns {
         constraints.blocking_constraints.push((
             i,
-            LatticeVMSymbolicExpr::Sub(
-                Box::new(LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
-                    entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+            ZEBRASymbolicExpr::Sub(
+                Box::new(ZEBRASymbolicExpr::Variable(ZEBRASymbolicVal {
+                    entry: ZEBRASymbolicEntry::Main { is_curr: true },
                     index: *j,
                 })),
-                Box::new(LatticeVMSymbolicExpr::Constant(
+                Box::new(ZEBRASymbolicExpr::Constant(
                     base_abs_main_trace_data[i][*j].clone(),
                 )),
             ),

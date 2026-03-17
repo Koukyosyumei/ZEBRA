@@ -1,5 +1,5 @@
 [package]
-name = "latticevm_pico"
+name = "zebra_pico"
 version = "0.0.0"
 edition = "2021"
 authors = ["Koukyosyumei <koukyosyumei@hotmail.com>"]
@@ -13,7 +13,7 @@ rand = "0.9.2"
 clap = { version = "4.5.57", features = ["derive"] }
 itertools = "0.14.0"
 num-traits = { version = "0.2.19", default-features = false }
-latticevm = { path = "../../" }
+zebra = { path = "../../" }
 p3-air = { git = "https://github.com/brevis-network/Plonky3.git", rev = "411a80d" }
 p3-field = { git = "https://github.com/brevis-network/Plonky3.git", rev = "411a80d" }
 p3-matrix = { git = "https://github.com/brevis-network/Plonky3.git", rev = "411a80d" }

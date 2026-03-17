@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::constraint::LatticeVMConstraints;
+use crate::constraint::ZEBRAConstraints;
 use crate::interval::AbstractInterval;
 use crate::solver::RangeType;
-use crate::symbolic::{LatticeVMSymbolicEntry, LatticeVMSymbolicExpr};
+use crate::symbolic::{ZEBRASymbolicEntry, ZEBRASymbolicExpr};
 
 pub fn expr_to_smt(
-    constraints: &LatticeVMConstraints,
+    constraints: &ZEBRAConstraints,
     constants: &Vec<(usize, usize, AbstractInterval)>,
     neg_constants: &Vec<(usize, usize, AbstractInterval)>,
     range_types: &HashMap<usize, RangeType>,
@@ -16,14 +16,14 @@ pub fn expr_to_smt(
     prime: u32,
 ) -> String {
     fn helper(
-        expr: &LatticeVMSymbolicExpr,
+        expr: &ZEBRASymbolicExpr,
         row_id: usize,
         n_rows: usize,
         n_pvs: usize,
         vars: &mut HashSet<String>,
     ) -> String {
         fn reduce_word(
-            vec: &[Box<LatticeVMSymbolicExpr>],
+            vec: &[Box<ZEBRASymbolicExpr>],
             row_id: usize,
             n_rows: usize,
             n_pvs: usize,
@@ -46,91 +46,91 @@ pub fn expr_to_smt(
         let mut rec = |e| helper(e, row_id, n_rows, n_pvs, vars);
 
         match expr {
-            LatticeVMSymbolicExpr::IsFirstRow => {
+            ZEBRASymbolicExpr::IsFirstRow => {
                 if row_id == 0 {
                     "1".to_string()
                 } else {
                     "0".to_string()
                 }
             }
-            LatticeVMSymbolicExpr::IsTransition => {
+            ZEBRASymbolicExpr::IsTransition => {
                 if row_id < n_rows - 1 {
                     "1".to_string()
                 } else {
                     "0".to_string()
                 }
             }
-            LatticeVMSymbolicExpr::IsLastRow => {
+            ZEBRASymbolicExpr::IsLastRow => {
                 if row_id == n_rows - 1 {
                     "1".to_string()
                 } else {
                     "0".to_string()
                 }
             }
-            LatticeVMSymbolicExpr::Constant(AbstractInterval { lo, hi: _hi }) => {
+            ZEBRASymbolicExpr::Constant(AbstractInterval { lo, hi: _hi }) => {
                 format!("{}", lo)
             }
-            LatticeVMSymbolicExpr::Variable(v) => {
+            ZEBRASymbolicExpr::Variable(v) => {
                 // "curr" -> a_row_index, "next" -> a_row+1_index
                 let (ty, base_row) = match v.entry {
-                    LatticeVMSymbolicEntry::Main { is_curr } => {
+                    ZEBRASymbolicEntry::Main { is_curr } => {
                         if is_curr {
                             ("trace", row_id)
                         } else {
                             ("trace", row_id + 1)
                         }
                     }
-                    LatticeVMSymbolicEntry::Public => ("public", 0),
+                    ZEBRASymbolicEntry::Public => ("public", 0),
                     _ => todo!(),
                 };
                 let name = format!("{}_{}_{}", ty, base_row, v.index);
                 vars.insert(name.clone());
                 name
             }
-            LatticeVMSymbolicExpr::WhenNonZero(a, b) => {
+            ZEBRASymbolicExpr::WhenNonZero(a, b) => {
                 format!("(ite (= {} 0) 0 {})", rec(a), rec(b))
             }
-            LatticeVMSymbolicExpr::WhenZero(a, b) => {
+            ZEBRASymbolicExpr::WhenZero(a, b) => {
                 format!("(ite (= {} 0) {} 0)", rec(a), rec(b))
             }
-            LatticeVMSymbolicExpr::Add(a, b) => {
+            ZEBRASymbolicExpr::Add(a, b) => {
                 format!("(+ {} {})", rec(a), rec(b))
             }
-            LatticeVMSymbolicExpr::Sub(a, b) => {
+            ZEBRASymbolicExpr::Sub(a, b) => {
                 format!("(- {} {})", rec(a), rec(b))
             }
-            LatticeVMSymbolicExpr::Mul(a, b) => {
+            ZEBRASymbolicExpr::Mul(a, b) => {
                 format!("(* {} {})", rec(a), rec(b))
             }
-            LatticeVMSymbolicExpr::Lt(a, b) => {
+            ZEBRASymbolicExpr::Lt(a, b) => {
                 format!("(ite (< {} {}) 1 0)", rec(a), rec(b),)
             }
-            LatticeVMSymbolicExpr::Flip(a) => {
+            ZEBRASymbolicExpr::Flip(a) => {
                 format!("(ite (= {} 0) 1 0)", rec(a),)
             }
-            LatticeVMSymbolicExpr::And(a, b) => {
+            ZEBRASymbolicExpr::And(a, b) => {
                 format!("(bitwise_and {} {})", rec(a), rec(b))
             }
-            LatticeVMSymbolicExpr::Or(a, b) => {
+            ZEBRASymbolicExpr::Or(a, b) => {
                 format!("(bitwise_or {} {})", rec(a), rec(b))
             }
-            LatticeVMSymbolicExpr::Xor(a, b) => {
+            ZEBRASymbolicExpr::Xor(a, b) => {
                 format!("(bitwise_xor {} {})", rec(a), rec(b))
             }
-            LatticeVMSymbolicExpr::Neg(a) => {
+            ZEBRASymbolicExpr::Neg(a) => {
                 format!("(- {})", rec(a))
             }
-            LatticeVMSymbolicExpr::WordAnd(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordAnd(a_vec, b_vec) => {
                 let a_val = reduce_word(a_vec, row_id, n_rows, n_pvs, vars);
                 let b_val = reduce_word(b_vec, row_id, n_rows, n_pvs, vars);
                 format!("bitwise_and({}, {})", a_val, b_val)
             }
-            LatticeVMSymbolicExpr::WordOr(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordOr(a_vec, b_vec) => {
                 let a_val = reduce_word(a_vec, row_id, n_rows, n_pvs, vars);
                 let b_val = reduce_word(b_vec, row_id, n_rows, n_pvs, vars);
                 format!("bitwise_or({}, {})", a_val, b_val)
             }
-            LatticeVMSymbolicExpr::WordXOr(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordXOr(a_vec, b_vec) => {
                 let a_val = reduce_word(a_vec, row_id, n_rows, n_pvs, vars);
                 let b_val = reduce_word(b_vec, row_id, n_rows, n_pvs, vars);
                 format!("bitwise_xor({}, {})", a_val, b_val)
@@ -287,7 +287,7 @@ pub fn expr_to_smt(
 }
 
 pub fn expr_to_smt_bv(
-    constraints: &LatticeVMConstraints,
+    constraints: &ZEBRAConstraints,
     constants: &Vec<(usize, usize, AbstractInterval)>,
     neg_constants: &Vec<(usize, usize, AbstractInterval)>,
     range_types: &HashMap<usize, RangeType>,
@@ -297,7 +297,7 @@ pub fn expr_to_smt_bv(
     prime: u32, // 32-bit prime
 ) -> String {
     fn word_to_bv32(
-        vec: &[Box<LatticeVMSymbolicExpr>],
+        vec: &[Box<ZEBRASymbolicExpr>],
         row_id: usize,
         n_rows: usize,
         n_pvs: usize,
@@ -321,7 +321,7 @@ pub fn expr_to_smt_bv(
     }
 
     fn helper(
-        expr: &LatticeVMSymbolicExpr,
+        expr: &ZEBRASymbolicExpr,
         row_id: usize,
         n_rows: usize,
         n_pvs: usize,
@@ -334,78 +334,78 @@ pub fn expr_to_smt_bv(
         let mut rec = |e| helper(e, row_id, n_rows, n_pvs, vars, prime, not_field_op);
 
         match expr {
-            LatticeVMSymbolicExpr::IsFirstRow => {
+            ZEBRASymbolicExpr::IsFirstRow => {
                 if row_id == 0 {
                     one_hex
                 } else {
                     zero_hex
                 }
             }
-            LatticeVMSymbolicExpr::IsTransition => {
+            ZEBRASymbolicExpr::IsTransition => {
                 if row_id < n_rows - 1 {
                     one_hex
                 } else {
                     zero_hex
                 }
             }
-            LatticeVMSymbolicExpr::IsLastRow => {
+            ZEBRASymbolicExpr::IsLastRow => {
                 if row_id == n_rows - 1 {
                     one_hex
                 } else {
                     zero_hex
                 }
             }
-            LatticeVMSymbolicExpr::WhenNonZero(a, b) => {
+            ZEBRASymbolicExpr::WhenNonZero(a, b) => {
                 format!("(ite (= {} {}) {} {})", rec(a), zero_hex, zero_hex, rec(b))
             }
-            LatticeVMSymbolicExpr::WhenZero(a, b) => {
+            ZEBRASymbolicExpr::WhenZero(a, b) => {
                 format!("(ite (= {} {}) {} {})", rec(a), zero_hex, rec(b), zero_hex)
             }
-            LatticeVMSymbolicExpr::Constant(AbstractInterval { lo, hi: _ }) => {
+            ZEBRASymbolicExpr::Constant(AbstractInterval { lo, hi: _ }) => {
                 format!("#x{:08x}", lo)
             }
-            LatticeVMSymbolicExpr::Variable(v) => {
+            ZEBRASymbolicExpr::Variable(v) => {
                 let (ty, base_row) = match v.entry {
-                    LatticeVMSymbolicEntry::Main { is_curr } => {
+                    ZEBRASymbolicEntry::Main { is_curr } => {
                         if is_curr {
                             ("trace", row_id)
                         } else {
                             ("trace", row_id + 1)
                         }
                     }
-                    LatticeVMSymbolicEntry::Public => ("public", 0),
+                    ZEBRASymbolicEntry::Public => ("public", 0),
                     _ => todo!(),
                 };
                 let name = format!("{}_{}_{}", ty, base_row, v.index);
                 vars.insert(name.clone());
                 name
             }
-            LatticeVMSymbolicExpr::Add(a, b) => {
+            ZEBRASymbolicExpr::Add(a, b) => {
                 if not_field_op {
                     format!("(bvadd {} {})", rec(a), rec(b),)
                 } else {
                     format!("(ff_add {} {})", rec(a), rec(b),)
                 }
             }
-            LatticeVMSymbolicExpr::Sub(a, b) => {
+            ZEBRASymbolicExpr::Sub(a, b) => {
                 if not_field_op {
                     format!("(bvsub {} {})", rec(a), rec(b),) // TODO: fix potential overflow
                 } else {
                     format!("(ff_sub {} {})", rec(a), rec(b),)
                 }
             }
-            LatticeVMSymbolicExpr::Mul(a, b) => {
+            ZEBRASymbolicExpr::Mul(a, b) => {
                 if not_field_op {
                     format!("(bvmul {} {})", rec(a), rec(b),) // TODO: fix potential overflow
                 } else {
                     format!("(ff_mul {} {})", rec(a), rec(b),)
                 }
             }
-            LatticeVMSymbolicExpr::MulLo(a, b) => {
+            ZEBRASymbolicExpr::MulLo(a, b) => {
                 // low 32 bits of 32x32 multiplication
                 format!("((_ extract 31 0) (bvmul {} {}))", rec(a), rec(b),)
             }
-            LatticeVMSymbolicExpr::MulHiSS(a, b) => {
+            ZEBRASymbolicExpr::MulHiSS(a, b) => {
                 // signed * signed, high 32 bits
                 format!(
                     "((_ extract 63 32) \
@@ -414,7 +414,7 @@ pub fn expr_to_smt_bv(
                     rec(b),
                 )
             }
-            LatticeVMSymbolicExpr::MulHiUU(a, b) => {
+            ZEBRASymbolicExpr::MulHiUU(a, b) => {
                 // unsigned * unsigned, high 32 bits
                 format!(
                     "((_ extract 63 32) \
@@ -423,7 +423,7 @@ pub fn expr_to_smt_bv(
                     rec(b),
                 )
             }
-            LatticeVMSymbolicExpr::Lt(a, b) => {
+            ZEBRASymbolicExpr::Lt(a, b) => {
                 format!(
                     "(ite (bvult {} {}) {} {})",
                     rec(a),
@@ -432,19 +432,19 @@ pub fn expr_to_smt_bv(
                     zero_hex
                 )
             }
-            LatticeVMSymbolicExpr::And(a, b) => {
+            ZEBRASymbolicExpr::And(a, b) => {
                 format!("(bvand {} {})", rec(a), rec(b),)
             }
-            LatticeVMSymbolicExpr::Or(a, b) => {
+            ZEBRASymbolicExpr::Or(a, b) => {
                 format!("(bvor {} {})", rec(a), rec(b),)
             }
-            LatticeVMSymbolicExpr::Xor(a, b) => {
+            ZEBRASymbolicExpr::Xor(a, b) => {
                 format!("(bvxor {} {})", rec(a), rec(b),)
             }
-            LatticeVMSymbolicExpr::SRL(a, b) => {
+            ZEBRASymbolicExpr::SRL(a, b) => {
                 format!("(bvlshr {} {})", rec(a), rec(b),)
             }
-            LatticeVMSymbolicExpr::SRLCarry(a, b) => {
+            ZEBRASymbolicExpr::SRLCarry(a, b) => {
                 format!(
                     "(bvand {} (bvsub (bvshl {} {}) {}))",
                     rec(a),
@@ -453,14 +453,14 @@ pub fn expr_to_smt_bv(
                     one_hex
                 )
             }
-            LatticeVMSymbolicExpr::Flip(a) => {
+            ZEBRASymbolicExpr::Flip(a) => {
                 format!("(ite (= {} {}) {} {})", rec(a), zero_hex, one_hex, zero_hex)
             }
-            LatticeVMSymbolicExpr::Neg(a) => {
+            ZEBRASymbolicExpr::Neg(a) => {
                 // Two's complement negation
                 format!("(bvneg {})", rec(a))
             }
-            LatticeVMSymbolicExpr::KoalaBearRange(a) => {
+            ZEBRASymbolicExpr::KoalaBearRange(a) => {
                 let mut rec_t = |e| helper(e, row_id, n_rows, n_pvs, vars, prime, true);
                 format!(
                     "(ite (bvult {} #x7f000001) {} {})",
@@ -469,7 +469,7 @@ pub fn expr_to_smt_bv(
                     one_hex
                 )
             }
-            LatticeVMSymbolicExpr::BabyBearRange(a) => {
+            ZEBRASymbolicExpr::BabyBearRange(a) => {
                 let mut rec_t = |e| helper(e, row_id, n_rows, n_pvs, vars, prime, true);
                 format!(
                     "(ite (bvult {} #x78000001) {} {})",
@@ -478,7 +478,7 @@ pub fn expr_to_smt_bv(
                     one_hex
                 )
             }
-            LatticeVMSymbolicExpr::Msb(a) => {
+            ZEBRASymbolicExpr::Msb(a) => {
                 format!(
                     "((_ zero_extend {}) ((_ extract {} {}) {}))",
                     32 - 1,
@@ -487,17 +487,17 @@ pub fn expr_to_smt_bv(
                     rec(a),
                 )
             }
-            LatticeVMSymbolicExpr::WordAddU(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordAddU(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvadd {} {})", a_val, b_val)
             }
-            LatticeVMSymbolicExpr::WordSubU(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordSubU(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvsub {} {})", a_val, b_val)
             }
-            LatticeVMSymbolicExpr::WordMulhs(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordMulhs(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!(
@@ -506,7 +506,7 @@ pub fn expr_to_smt_bv(
                     a_val, b_val
                 )
             }
-            LatticeVMSymbolicExpr::WordMulhu(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordMulhu(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!(
@@ -516,13 +516,13 @@ pub fn expr_to_smt_bv(
                 )
             }
             // 符号付き乗算の低位32ビット (bvmulは下位ビットに関しては符号の有無を問わない)
-            LatticeVMSymbolicExpr::WordMultl(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordMultl(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvmul {} {})", a_val, b_val)
             }
             // 符号付き乗算の高位32ビット (WordMulhs と同じ挙動)
-            LatticeVMSymbolicExpr::WordMulth(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordMulth(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!(
@@ -531,13 +531,13 @@ pub fn expr_to_smt_bv(
                 )
             }
             // 符号なし乗算の低位32ビット
-            LatticeVMSymbolicExpr::WordMultul(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordMultul(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvmul {} {})", a_val, b_val)
             }
             // 符号なし乗算の高位32ビット (WordMulhu と同じ挙動)
-            LatticeVMSymbolicExpr::WordMultuh(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordMultuh(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!(
@@ -545,17 +545,17 @@ pub fn expr_to_smt_bv(
                     a_val, b_val
                 )
             }
-            LatticeVMSymbolicExpr::WordMul(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordMul(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvmul {} {})", a_val, b_val)
             }
-            LatticeVMSymbolicExpr::WordSrl(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordSrl(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvlshr {} {})", a_val, b_val)
             }
-            LatticeVMSymbolicExpr::WordAnd(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordAnd(a_vec, b_vec) => {
                 let mut res = vec![];
                 for (a, b) in a_vec.iter().zip(b_vec.iter()) {
                     let a_bv = rec(a);
@@ -571,7 +571,7 @@ pub fn expr_to_smt_bv(
                 }
                 acc
             }
-            LatticeVMSymbolicExpr::WordOr(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordOr(a_vec, b_vec) => {
                 assert_eq!(
                     a_vec.len(),
                     b_vec.len(),
@@ -593,7 +593,7 @@ pub fn expr_to_smt_bv(
                 }
                 acc
             }
-            LatticeVMSymbolicExpr::WordXOr(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordXOr(a_vec, b_vec) => {
                 assert_eq!(
                     a_vec.len(),
                     b_vec.len(),
@@ -615,37 +615,37 @@ pub fn expr_to_smt_bv(
                 }
                 acc
             }
-            LatticeVMSymbolicExpr::WordDiv(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordDiv(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvudiv {} {})", a_val, b_val)
             }
-            LatticeVMSymbolicExpr::WordSDiv(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordSDiv(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvsdiv {} {})", a_val, b_val)
             }
-            LatticeVMSymbolicExpr::WordLt(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordLt(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(ite (bvult {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
             }
-            LatticeVMSymbolicExpr::WordSLt(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordSLt(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(ite (bvslt {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
             }
-            LatticeVMSymbolicExpr::WordSLe(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordSLe(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(ite (bvsle {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
             }
-            LatticeVMSymbolicExpr::WordEq(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordEq(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(ite (= {} {}) {} {})", a_val, b_val, one_hex, zero_hex)
             }
-            LatticeVMSymbolicExpr::WordNEq(a_vec, b_vec) => {
+            ZEBRASymbolicExpr::WordNEq(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(ite (= {} {}) {} {})", a_val, b_val, zero_hex, one_hex)

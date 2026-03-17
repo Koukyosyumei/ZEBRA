@@ -14,15 +14,15 @@ use valida_cpu::StopInstruction;
 use valida_machine::{Instruction, InstructionWord, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
-use latticevm::canonicalizer::generate_alu_final_checker;
-use latticevm::quick::{
+use zebra::canonicalizer::generate_alu_final_checker;
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::nop_post_process;
-use latticevm::utils::create_or_clear_dir;
+use zebra::solver::nop_post_process;
+use zebra::utils::create_or_clear_dir;
 
-use latticevm_valida::config::MyConfig;
-use latticevm_valida::utils::{
+use zebra_valida::config::MyConfig;
+use zebra_valida::utils::{
     extract_constraints_and_range, generate_bootstrap_trace_from_program,
 };
 

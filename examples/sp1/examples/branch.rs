@@ -11,19 +11,19 @@ use sp1_core_machine::control_flow::BranchChip;
 use sp1_core_machine::control_flow::BranchColumns;
 use sp1_core_machine::control_flow::NUM_BRANCH_COLS;
 
-use latticevm::canonicalizer::save_repr_if_unique;
-use latticevm::quick::{
+use zebra::canonicalizer::save_repr_if_unique;
+use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use latticevm::solver::nop_post_process;
-use latticevm::solver::RangeType;
-use latticevm::trace::trace_fmt_with_idxs;
-use latticevm::trace::AbstractTrace;
-use latticevm::ui::UiState;
-use latticevm::utils::PrettySet;
-use latticevm::utils::{create_or_clear_dir, indices_arr};
+use zebra::solver::nop_post_process;
+use zebra::solver::RangeType;
+use zebra::trace::trace_fmt_with_idxs;
+use zebra::trace::AbstractTrace;
+use zebra::ui::UiState;
+use zebra::utils::PrettySet;
+use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use latticevm_sp1::utils::{
+use zebra_sp1::utils::{
     extract_constraints_and_range, generate_abstract_trace, get_program_str,
 };
 

@@ -50,34 +50,34 @@ use crate::wordop::{
 ///
 /// # Use Cases
 ///
-/// Typically embedded within [`LatticeVMSymbolicVal`] to form leaf nodes in
+/// Typically embedded within [`ZEBRASymbolicVal`] to form leaf nodes in
 /// symbolic expression trees.
 ///
 /// # See Also
 ///
-/// * [`LatticeVMSymbolicVal`] — Symbolic variable representation
-/// * [`LatticeVMSymbolicExpr`] — Symbolic expression tree
+/// * [`ZEBRASymbolicVal`] — Symbolic variable representation
+/// * [`ZEBRASymbolicExpr`] — Symbolic expression tree
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-pub enum LatticeVMSymbolicEntry {
+pub enum ZEBRASymbolicEntry {
     Main { is_curr: bool },
     Permutation { is_curr: bool },
     Preprocessed { is_curr: bool },
     Public,
 }
 
-impl fmt::Display for LatticeVMSymbolicEntry {
+impl fmt::Display for ZEBRASymbolicEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LatticeVMSymbolicEntry::Main { is_curr } => {
+            ZEBRASymbolicEntry::Main { is_curr } => {
                 write!(f, "{}", if *is_curr { "curr" } else { "next" })
             }
-            LatticeVMSymbolicEntry::Permutation { is_curr } => {
+            ZEBRASymbolicEntry::Permutation { is_curr } => {
                 write!(f, "{}", if *is_curr { "curr" } else { "next" })
             }
-            LatticeVMSymbolicEntry::Preprocessed { is_curr } => {
+            ZEBRASymbolicEntry::Preprocessed { is_curr } => {
                 write!(f, "{}", if *is_curr { "curr" } else { "next" })
             }
-            LatticeVMSymbolicEntry::Public => write!(f, "{}", "public"),
+            ZEBRASymbolicEntry::Public => write!(f, "{}", "public"),
         }
     }
 }
@@ -86,7 +86,7 @@ impl fmt::Display for LatticeVMSymbolicEntry {
 ///
 /// A symbolic value combines:
 ///
-/// * A [`LatticeVMSymbolicEntry`] describing the trace domain and row context
+/// * A [`ZEBRASymbolicEntry`] describing the trace domain and row context
 /// * A column index within that domain
 ///
 /// Together, these uniquely identify a concrete value in the execution trace
@@ -123,20 +123,20 @@ impl fmt::Display for LatticeVMSymbolicEntry {
 ///
 /// # Use Cases
 ///
-/// Serves as a leaf node in [`LatticeVMSymbolicExpr`] trees representing
+/// Serves as a leaf node in [`ZEBRASymbolicExpr`] trees representing
 /// constraints over traces.
 ///
 /// # See Also
 ///
-/// * [`LatticeVMSymbolicEntry`] — Domain and row selector
-/// * [`LatticeVMSymbolicExpr`] — Expression tree using these variables
+/// * [`ZEBRASymbolicEntry`] — Domain and row selector
+/// * [`ZEBRASymbolicExpr`] — Expression tree using these variables
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-pub struct LatticeVMSymbolicVal {
-    pub entry: LatticeVMSymbolicEntry,
+pub struct ZEBRASymbolicVal {
+    pub entry: ZEBRASymbolicEntry,
     pub index: usize,
 }
 
-impl fmt::Display for LatticeVMSymbolicVal {
+impl fmt::Display for ZEBRASymbolicVal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}[{}]", self.entry, self.index)
     }
@@ -187,17 +187,17 @@ impl fmt::Display for LatticeVMSymbolicVal {
 ///
 /// # See Also
 ///
-/// * [`LatticeVMSymbolicVal`] — Variable leaf nodes
-/// * [`LatticeVMSymbolicEntry`] — Trace domain selector
+/// * [`ZEBRASymbolicVal`] — Variable leaf nodes
+/// * [`ZEBRASymbolicEntry`] — Trace domain selector
 #[derive(Clone, Debug, Serialize)]
-pub enum LatticeVMSymbolicExpr {
+pub enum ZEBRASymbolicExpr {
     IsFirstRow,
     IsTransition,
     IsLastRow,
     WhenNonZero(Box<Self>, Box<Self>),
     WhenZero(Box<Self>, Box<Self>),
     Constant(AbstractInterval),
-    Variable(LatticeVMSymbolicVal),
+    Variable(ZEBRASymbolicVal),
     Add(Box<Self>, Box<Self>),
     Sub(Box<Self>, Box<Self>),
     Mul(Box<Self>, Box<Self>),
@@ -237,13 +237,13 @@ pub enum LatticeVMSymbolicExpr {
     WordSrl([Box<Self>; 4], [Box<Self>; 4]),
 }
 
-impl Default for LatticeVMSymbolicExpr {
+impl Default for ZEBRASymbolicExpr {
     fn default() -> Self {
         Self::Constant(AbstractInterval::zero())
     }
 }
 
-impl fmt::Display for LatticeVMSymbolicExpr {
+impl fmt::Display for ZEBRASymbolicExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IsFirstRow => write!(f, "IsFirstRow"),
@@ -374,41 +374,41 @@ impl fmt::Display for LatticeVMSymbolicExpr {
     }
 }
 
-impl<T: Into<Self>> Add<T> for LatticeVMSymbolicExpr {
+impl<T: Into<Self>> Add<T> for ZEBRASymbolicExpr {
     type Output = Self;
     fn add(self, rhs: T) -> Self {
         Self::Add(Box::new(self), Box::new(rhs.into()))
     }
 }
 
-impl<T: Into<Self>> Sub<T> for LatticeVMSymbolicExpr {
+impl<T: Into<Self>> Sub<T> for ZEBRASymbolicExpr {
     type Output = Self;
     fn sub(self, rhs: T) -> Self {
         Self::Sub(Box::new(self), Box::new(rhs.into()))
     }
 }
 
-impl<T: Into<Self>> Mul<T> for LatticeVMSymbolicExpr {
+impl<T: Into<Self>> Mul<T> for ZEBRASymbolicExpr {
     type Output = Self;
     fn mul(self, rhs: T) -> Self {
         Self::Mul(Box::new(self), Box::new(rhs.into()))
     }
 }
 
-impl Neg for LatticeVMSymbolicExpr {
+impl Neg for ZEBRASymbolicExpr {
     type Output = Self;
     fn neg(self) -> Self {
         Self::Neg(Box::new(self))
     }
 }
 
-impl From<LatticeVMSymbolicVal> for LatticeVMSymbolicExpr {
-    fn from(var: LatticeVMSymbolicVal) -> Self {
+impl From<ZEBRASymbolicVal> for ZEBRASymbolicExpr {
+    fn from(var: ZEBRASymbolicVal) -> Self {
         Self::Variable(var)
     }
 }
 
-impl LatticeVMSymbolicExpr {
+impl ZEBRASymbolicExpr {
     pub fn eval(
         &self,
         curr_row: &[AbstractInterval],
@@ -419,7 +419,7 @@ impl LatticeVMSymbolicExpr {
         is_last_row: bool,
         prime: u32,
     ) -> AbstractInterval {
-        let rec = |a: &LatticeVMSymbolicExpr| {
+        let rec = |a: &ZEBRASymbolicExpr| {
             a.eval(
                 curr_row,
                 next_row,
@@ -501,7 +501,7 @@ impl LatticeVMSymbolicExpr {
             }
             Self::Constant(c) => c.clone(),
             Self::Variable(cell) => match cell.entry {
-                LatticeVMSymbolicEntry::Main { is_curr } => {
+                ZEBRASymbolicEntry::Main { is_curr } => {
                     if is_curr {
                         curr_row[cell.index].clone()
                     } else {
@@ -511,7 +511,7 @@ impl LatticeVMSymbolicExpr {
                         }
                     }
                 }
-                LatticeVMSymbolicEntry::Preprocessed { is_curr } => {
+                ZEBRASymbolicEntry::Preprocessed { is_curr } => {
                     if is_curr {
                         curr_row[cell.index].clone()
                     } else {
@@ -521,7 +521,7 @@ impl LatticeVMSymbolicExpr {
                         }
                     }
                 }
-                LatticeVMSymbolicEntry::Permutation { is_curr } => {
+                ZEBRASymbolicEntry::Permutation { is_curr } => {
                     if is_curr {
                         curr_row[cell.index].clone()
                     } else {
@@ -531,7 +531,7 @@ impl LatticeVMSymbolicExpr {
                         }
                     }
                 }
-                LatticeVMSymbolicEntry::Public => match public_vals {
+                ZEBRASymbolicEntry::Public => match public_vals {
                     Some(pv) => pv[cell.index].clone(),
                     None => panic!("public_vals not provided"),
                 },
@@ -572,8 +572,8 @@ impl LatticeVMSymbolicExpr {
                 if let MayBeFlag::True = is_zero {
                     AbstractInterval::one()
                 } else {
-                    let tmp = LatticeVMSymbolicExpr::Sub(
-                        Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::one())),
+                    let tmp = ZEBRASymbolicExpr::Sub(
+                        Box::new(ZEBRASymbolicExpr::Constant(AbstractInterval::one())),
                         a.clone(),
                     );
                     let is_one = rec(&tmp).is_zero(prime);
@@ -586,18 +586,18 @@ impl LatticeVMSymbolicExpr {
             }
             Self::Msb(a) => msb_maybe(&rec(a)),
             Self::KoalaBearRange(a) => {
-                let e = LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
+                let e = ZEBRASymbolicExpr::Flip(Box::new(ZEBRASymbolicExpr::Lt(
                     a.clone(),
-                    Box::new(LatticeVMSymbolicExpr::Constant(
+                    Box::new(ZEBRASymbolicExpr::Constant(
                         AbstractInterval::from_i128(2130706433),
                     )),
                 )));
                 rec(&e)
             }
             Self::BabyBearRange(a) => {
-                let e = LatticeVMSymbolicExpr::Flip(Box::new(LatticeVMSymbolicExpr::Lt(
+                let e = ZEBRASymbolicExpr::Flip(Box::new(ZEBRASymbolicExpr::Lt(
                     a.clone(),
-                    Box::new(LatticeVMSymbolicExpr::Constant(
+                    Box::new(ZEBRASymbolicExpr::Constant(
                         AbstractInterval::from_i128(2013265921),
                     )),
                 )));
@@ -728,54 +728,54 @@ impl LatticeVMSymbolicExpr {
     }
 }
 
-pub fn gather_vars_simple(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize>) {
+pub fn gather_vars_simple(expr: &ZEBRASymbolicExpr, memo: &mut HashSet<usize>) {
     match expr {
-        LatticeVMSymbolicExpr::Variable(lattice_vmsymbolic_val) => {
+        ZEBRASymbolicExpr::Variable(lattice_vmsymbolic_val) => {
             memo.insert(lattice_vmsymbolic_val.index);
         }
-        LatticeVMSymbolicExpr::Add(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Add(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Sub(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Sub(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Mul(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Mul(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
+        ZEBRASymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
         }
-        LatticeVMSymbolicExpr::And(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
-            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
-            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
-        }
-        LatticeVMSymbolicExpr::Or(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::And(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Xor(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Or(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Lt(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Xor(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::SRL(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Lt(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::SRLCarry(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::SRL(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
             gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Msb(lattice_vmsymbolic_expr) => {
+        ZEBRASymbolicExpr::SRLCarry(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars_simple(&lattice_vmsymbolic_expr, memo);
+            gather_vars_simple(&lattice_vmsymbolic_expr1, memo);
+        }
+        ZEBRASymbolicExpr::Msb(lattice_vmsymbolic_expr) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
         }
-        LatticeVMSymbolicExpr::Flip(lattice_vmsymbolic_expr) => {
+        ZEBRASymbolicExpr::Flip(lattice_vmsymbolic_expr) => {
             gather_vars_simple(&lattice_vmsymbolic_expr, memo);
         }
         _ => {}
@@ -784,41 +784,41 @@ pub fn gather_vars_simple(expr: &LatticeVMSymbolicExpr, memo: &mut HashSet<usize
 
 pub fn gather_vars(
     row_index: usize,
-    expr: &LatticeVMSymbolicExpr,
+    expr: &ZEBRASymbolicExpr,
     memo: &mut HashSet<(usize, usize)>,
 ) {
     match expr {
-        LatticeVMSymbolicExpr::Variable(lattice_vmsymbolic_val) => {
+        ZEBRASymbolicExpr::Variable(lattice_vmsymbolic_val) => {
             memo.insert((row_index, lattice_vmsymbolic_val.index));
         }
-        LatticeVMSymbolicExpr::Add(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Add(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
             gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Sub(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Sub(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
             gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Mul(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Mul(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
             gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
+        ZEBRASymbolicExpr::Neg(lattice_vmsymbolic_expr) => {
             gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
         }
-        LatticeVMSymbolicExpr::And(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
-            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
-            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
-        }
-        LatticeVMSymbolicExpr::Or(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::And(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
             gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Xor(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Or(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
             gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
-        LatticeVMSymbolicExpr::Lt(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+        ZEBRASymbolicExpr::Xor(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
+            gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
+            gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
+        }
+        ZEBRASymbolicExpr::Lt(lattice_vmsymbolic_expr, lattice_vmsymbolic_expr1) => {
             gather_vars(row_index, &lattice_vmsymbolic_expr, memo);
             gather_vars(row_index, &lattice_vmsymbolic_expr1, memo);
         }
@@ -826,9 +826,9 @@ pub fn gather_vars(
     }
 }
 
-pub fn get_curr_i(expr: &LatticeVMSymbolicExpr) -> Option<usize> {
-    if let LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { entry, index }) = expr {
-        if let LatticeVMSymbolicEntry::Main { is_curr } = entry {
+pub fn get_curr_i(expr: &ZEBRASymbolicExpr) -> Option<usize> {
+    if let ZEBRASymbolicExpr::Variable(ZEBRASymbolicVal { entry, index }) = expr {
+        if let ZEBRASymbolicEntry::Main { is_curr } = entry {
             if *is_curr {
                 return Some(index.clone());
             }
@@ -837,8 +837,8 @@ pub fn get_curr_i(expr: &LatticeVMSymbolicExpr) -> Option<usize> {
     None
 }
 
-pub fn get_curr_i_sub_cur_j(expr: &LatticeVMSymbolicExpr) -> Option<(usize, usize)> {
-    if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = expr {
+pub fn get_curr_i_sub_cur_j(expr: &ZEBRASymbolicExpr) -> Option<(usize, usize)> {
+    if let ZEBRASymbolicExpr::Sub(lhs, rhs) = expr {
         if let Some(lhs_i) = get_curr_i(lhs) {
             if let Some(rhs_i) = get_curr_i(rhs) {
                 return Some((lhs_i, rhs_i));
@@ -851,18 +851,18 @@ pub fn get_curr_i_sub_cur_j(expr: &LatticeVMSymbolicExpr) -> Option<(usize, usiz
 
 // collect_add_vars
 
-pub fn get_curr_i_sub_const(expr: &LatticeVMSymbolicExpr, _prime: u32) -> Option<(usize, i128)> {
-    if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = expr {
+pub fn get_curr_i_sub_const(expr: &ZEBRASymbolicExpr, _prime: u32) -> Option<(usize, i128)> {
+    if let ZEBRASymbolicExpr::Sub(lhs, rhs) = expr {
         // Case: Variable - Constant
         if let Some(v_idx) = get_curr_i(lhs) {
-            if let LatticeVMSymbolicExpr::Constant(c) = &**rhs {
+            if let ZEBRASymbolicExpr::Constant(c) = &**rhs {
                 if c.is_singleton() {
                     return Some((v_idx, c.lo));
                 }
             }
         }
         // Case: Constant - Variable
-        if let LatticeVMSymbolicExpr::Constant(c) = &**lhs {
+        if let ZEBRASymbolicExpr::Constant(c) = &**lhs {
             if let Some(v_idx) = get_curr_i(rhs) {
                 if c.is_singleton() {
                     return Some((v_idx, c.lo));
@@ -874,20 +874,20 @@ pub fn get_curr_i_sub_const(expr: &LatticeVMSymbolicExpr, _prime: u32) -> Option
 }
 
 pub fn get_curr_add_vars_sub_const(
-    expr: &LatticeVMSymbolicExpr,
+    expr: &ZEBRASymbolicExpr,
     _prime: u32,
 ) -> Option<(Vec<usize>, i128)> {
-    if let LatticeVMSymbolicExpr::Sub(lhs, rhs) = expr {
+    if let ZEBRASymbolicExpr::Sub(lhs, rhs) = expr {
         // Case: Addition of Variables - Constant
         if let Some(vs) = collect_add_vars(lhs) {
-            if let LatticeVMSymbolicExpr::Constant(c) = &**rhs {
+            if let ZEBRASymbolicExpr::Constant(c) = &**rhs {
                 if c.is_singleton() {
                     return Some((vs.into_iter().collect::<Vec<_>>(), c.lo));
                 }
             }
         }
         // Case: Constant - Addition of Variables
-        if let LatticeVMSymbolicExpr::Constant(c) = &**lhs {
+        if let ZEBRASymbolicExpr::Constant(c) = &**lhs {
             if let Some(vs) = collect_add_vars(rhs) {
                 if c.is_singleton() {
                     return Some((vs.into_iter().collect::<Vec<_>>(), c.lo));
@@ -899,12 +899,12 @@ pub fn get_curr_add_vars_sub_const(
 }
 
 pub fn preprocess_row(
-    air_constraints: &Vec<LatticeVMSymbolicExpr>,
+    air_constraints: &Vec<ZEBRASymbolicExpr>,
     row: &mut Vec<AbstractInterval>,
     p: u32,
 ) {
     for c in air_constraints {
-        if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = c {
+        if let ZEBRASymbolicExpr::Mul(lhs, rhs) = c {
             if let Some(lhs_i) = get_curr_i(lhs) {
                 if let Some(rhs_i) = get_curr_i(rhs) {
                     if row[lhs_i].is_non_zero(p) == MayBeFlag::True
@@ -971,15 +971,15 @@ pub fn preprocess_row(
 /// # See Also
 ///
 /// * [`collect_add_vars_vec`] — Same operation preserving order and duplicates
-fn collect_add_vars(expr: &LatticeVMSymbolicExpr) -> Option<HashSet<usize>> {
+fn collect_add_vars(expr: &ZEBRASymbolicExpr) -> Option<HashSet<usize>> {
     match expr {
-        LatticeVMSymbolicExpr::Add(lhs, rhs) => {
+        ZEBRASymbolicExpr::Add(lhs, rhs) => {
             let mut left = collect_add_vars(lhs)?;
             let right = collect_add_vars(rhs)?;
             left.extend(right);
             Some(left)
         }
-        LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { index, .. }) => {
+        ZEBRASymbolicExpr::Variable(ZEBRASymbolicVal { index, .. }) => {
             let mut set = HashSet::new();
             set.insert(index.clone());
             Some(set)
@@ -1033,15 +1033,15 @@ fn collect_add_vars(expr: &LatticeVMSymbolicExpr) -> Option<HashSet<usize>> {
 /// # See Also
 ///
 /// * [`collect_add_vars`] — Set-based variant
-fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
+fn collect_add_vars_vec(expr: &ZEBRASymbolicExpr) -> Option<Vec<usize>> {
     match expr {
-        LatticeVMSymbolicExpr::Add(lhs, rhs) => {
+        ZEBRASymbolicExpr::Add(lhs, rhs) => {
             let mut left = collect_add_vars_vec(lhs)?;
             let right = collect_add_vars_vec(rhs)?;
             left.extend(right);
             Some(left)
         }
-        LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal { index, .. }) => {
+        ZEBRASymbolicExpr::Variable(ZEBRASymbolicVal { index, .. }) => {
             let mut v = Vec::new();
             v.push(index.clone());
             Some(v)
@@ -1058,7 +1058,7 @@ fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
 ///
 /// # Returns
 ///
-/// * `Some(Vec<LatticeVMSymbolicExpr>)` — Equivalent conditional constraints
+/// * `Some(Vec<ZEBRASymbolicExpr>)` — Equivalent conditional constraints
 /// * `None` — Pattern not recognized
 ///
 /// # Use Cases
@@ -1067,35 +1067,35 @@ fn collect_add_vars_vec(expr: &LatticeVMSymbolicExpr) -> Option<Vec<usize>> {
 /// * Conditional reasoning
 /// * Constraint normalization
 pub fn is_iszero_operator(
-    constraint: &LatticeVMSymbolicExpr,
+    constraint: &ZEBRASymbolicExpr,
     prime: u32,
-) -> Option<Vec<LatticeVMSymbolicExpr>> {
-    if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = constraint {
-        if let LatticeVMSymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
-            if let LatticeVMSymbolicExpr::Constant(c) = *r_rhs {
+) -> Option<Vec<ZEBRASymbolicExpr>> {
+    if let ZEBRASymbolicExpr::Mul(lhs, rhs) = constraint {
+        if let ZEBRASymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
+            if let ZEBRASymbolicExpr::Constant(c) = *r_rhs {
                 if c.as_canonical_u32(prime) == 58079999 {
-                    if let LatticeVMSymbolicExpr::Add(x, y) = *r_lhs {
-                        let cond_when_zero = LatticeVMSymbolicExpr::WhenZero(
+                    if let ZEBRASymbolicExpr::Add(x, y) = *r_lhs {
+                        let cond_when_zero = ZEBRASymbolicExpr::WhenZero(
                             x.clone(),
-                            Box::new(LatticeVMSymbolicExpr::Sub(
+                            Box::new(ZEBRASymbolicExpr::Sub(
                                 y.clone(),
-                                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::one())),
+                                Box::new(ZEBRASymbolicExpr::Constant(AbstractInterval::one())),
                             )),
                         );
-                        let cond_when_notzero = LatticeVMSymbolicExpr::WhenNonZero(
+                        let cond_when_notzero = ZEBRASymbolicExpr::WhenNonZero(
                             x,
-                            Box::new(LatticeVMSymbolicExpr::Sub(
+                            Box::new(ZEBRASymbolicExpr::Sub(
                                 y,
-                                Box::new(LatticeVMSymbolicExpr::Constant(AbstractInterval::zero())),
+                                Box::new(ZEBRASymbolicExpr::Constant(AbstractInterval::zero())),
                             )),
                         );
 
                         return Some(vec![
-                            LatticeVMSymbolicExpr::WhenNonZero(
+                            ZEBRASymbolicExpr::WhenNonZero(
                                 lhs.clone(),
                                 Box::new(cond_when_zero),
                             ),
-                            LatticeVMSymbolicExpr::WhenNonZero(
+                            ZEBRASymbolicExpr::WhenNonZero(
                                 lhs.clone(),
                                 Box::new(cond_when_notzero),
                             ),
@@ -1125,28 +1125,28 @@ pub fn is_iszero_operator(
 /// * Symbolic simplification
 /// * Constraint abstraction
 pub fn is_koalabear_word_range(
-    constraint: &LatticeVMSymbolicExpr,
+    constraint: &ZEBRASymbolicExpr,
     prime: u32,
-) -> Option<LatticeVMSymbolicExpr> {
-    if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = constraint {
-        if let LatticeVMSymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
-            if let LatticeVMSymbolicExpr::Constant(c) = *r_rhs {
+) -> Option<ZEBRASymbolicExpr> {
+    if let ZEBRASymbolicExpr::Mul(lhs, rhs) = constraint {
+        if let ZEBRASymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
+            if let ZEBRASymbolicExpr::Constant(c) = *r_rhs {
                 if c.as_canonical_u32(prime) == 13227174 {
                     if let Some(word) = collect_add_vars_vec(&r_lhs) {
                         if word.len() == 4 {
                             let word_expr: Vec<_> = word
                                 .iter()
                                 .map(|&index| {
-                                    LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
-                                        entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                                    ZEBRASymbolicExpr::Variable(ZEBRASymbolicVal {
+                                        entry: ZEBRASymbolicEntry::Main { is_curr: true },
                                         index,
                                     })
                                 })
                                 .collect();
                             let cond = reconstruct_symbolic_word(&word_expr, 0);
-                            return Some(LatticeVMSymbolicExpr::WhenNonZero(
+                            return Some(ZEBRASymbolicExpr::WhenNonZero(
                                 lhs.clone(),
-                                Box::new(LatticeVMSymbolicExpr::KoalaBearRange(Box::new(cond))),
+                                Box::new(ZEBRASymbolicExpr::KoalaBearRange(Box::new(cond))),
                             ));
                         }
                     }
@@ -1168,28 +1168,28 @@ pub fn is_koalabear_word_range(
 /// * `Some(expr)` — Range predicate expression
 /// * `None` — Pattern not matched
 pub fn is_babybear_word_range(
-    constraint: &LatticeVMSymbolicExpr,
+    constraint: &ZEBRASymbolicExpr,
     prime: u32,
-) -> Option<LatticeVMSymbolicExpr> {
-    if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = constraint {
-        if let LatticeVMSymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
-            if let LatticeVMSymbolicExpr::Constant(c) = *r_rhs {
+) -> Option<ZEBRASymbolicExpr> {
+    if let ZEBRASymbolicExpr::Mul(lhs, rhs) = constraint {
+        if let ZEBRASymbolicExpr::Sub(r_lhs, r_rhs) = *rhs.clone() {
+            if let ZEBRASymbolicExpr::Constant(c) = *r_rhs {
                 if c.as_canonical_u32(prime) == 785099 {
                     if let Some(word) = collect_add_vars_vec(&r_lhs) {
                         if word.len() == 4 {
                             let word_expr: Vec<_> = word
                                 .iter()
                                 .map(|&index| {
-                                    LatticeVMSymbolicExpr::Variable(LatticeVMSymbolicVal {
-                                        entry: LatticeVMSymbolicEntry::Main { is_curr: true },
+                                    ZEBRASymbolicExpr::Variable(ZEBRASymbolicVal {
+                                        entry: ZEBRASymbolicEntry::Main { is_curr: true },
                                         index,
                                     })
                                 })
                                 .collect();
                             let cond = reconstruct_symbolic_word(&word_expr, 0);
-                            return Some(LatticeVMSymbolicExpr::WhenNonZero(
+                            return Some(ZEBRASymbolicExpr::WhenNonZero(
                                 lhs.clone(),
-                                Box::new(LatticeVMSymbolicExpr::BabyBearRange(Box::new(cond))),
+                                Box::new(ZEBRASymbolicExpr::BabyBearRange(Box::new(cond))),
                             ));
                         }
                     }
@@ -1216,14 +1216,14 @@ pub fn is_babybear_word_range(
 /// * Identifying selector variables
 /// * Range inference
 /// * Domain restriction
-pub fn is_boolean_constraint(constraint: &LatticeVMSymbolicExpr) -> Option<usize> {
-    use LatticeVMSymbolicExpr::*;
+pub fn is_boolean_constraint(constraint: &ZEBRASymbolicExpr) -> Option<usize> {
+    use ZEBRASymbolicExpr::*;
 
     // helper: find `x - 1`
-    fn is_x_minus_one(expr: &LatticeVMSymbolicExpr) -> Option<usize> {
+    fn is_x_minus_one(expr: &ZEBRASymbolicExpr) -> Option<usize> {
         if let Sub(lhs, rhs) = expr {
             if let (
-                Variable(LatticeVMSymbolicVal { index, .. }),
+                Variable(ZEBRASymbolicVal { index, .. }),
                 Constant(AbstractInterval { lo: 1, hi: 1 }),
             ) = (&**lhs, &**rhs)
             {
@@ -1236,14 +1236,14 @@ pub fn is_boolean_constraint(constraint: &LatticeVMSymbolicExpr) -> Option<usize
     if let Mul(a, b) = constraint {
         match (&**a, &**b) {
             // x * (x - 1)
-            (Variable(LatticeVMSymbolicVal { index, .. }), rhs)
+            (Variable(ZEBRASymbolicVal { index, .. }), rhs)
                 if is_x_minus_one(rhs) == Some(index.clone()) =>
             {
                 return Some(index.clone());
             }
 
             // (x - 1) * x
-            (lhs, Variable(LatticeVMSymbolicVal { index, .. }))
+            (lhs, Variable(ZEBRASymbolicVal { index, .. }))
                 if is_x_minus_one(lhs) == Some(index.clone()) =>
             {
                 return Some(index.clone());
@@ -1257,12 +1257,12 @@ pub fn is_boolean_constraint(constraint: &LatticeVMSymbolicExpr) -> Option<usize
 }
 
 pub fn gather_boolean_variables(
-    constraints: &[LatticeVMSymbolicExpr],
+    constraints: &[ZEBRASymbolicExpr],
     multiplicities: &HashSet<usize>,
 ) -> Vec<usize> {
     let mut result = HashSet::new();
     for c in constraints {
-        if let LatticeVMSymbolicExpr::Mul(lhs, rhs) = c {
+        if let ZEBRASymbolicExpr::Mul(lhs, rhs) = c {
             let add_vars = collect_add_vars(lhs);
             if let Some(add_vars) = add_vars {
                 if add_vars.is_subset(multiplicities) {
@@ -1297,7 +1297,7 @@ pub fn gather_boolean_variables(
 ///
 /// # Returns
 ///
-/// * `Some(LatticeVMSymbolicExpr)` — Conditional constraint
+/// * `Some(ZEBRASymbolicExpr)` — Conditional constraint
 /// * `None` — Opcode constant mismatch
 ///
 /// # Use Cases
@@ -1307,21 +1307,21 @@ pub fn gather_boolean_variables(
 /// * Modular constraint generation in Lattice VM
 pub fn make_impl_constraint(
     opcode_val: i128,
-    opcode_var: &LatticeVMSymbolicExpr,
-    expr: LatticeVMSymbolicExpr,
+    opcode_var: &ZEBRASymbolicExpr,
+    expr: ZEBRASymbolicExpr,
     prime: u32,
-) -> Option<LatticeVMSymbolicExpr> {
-    if let LatticeVMSymbolicExpr::Constant(c) = opcode_var {
+) -> Option<ZEBRASymbolicExpr> {
+    if let ZEBRASymbolicExpr::Constant(c) = opcode_var {
         if c.as_canonical_u32(prime) as i128 == opcode_val {
             Some(expr)
         } else {
             None
         }
     } else {
-        Some(LatticeVMSymbolicExpr::WhenZero(
-            Box::new(LatticeVMSymbolicExpr::Sub(
+        Some(ZEBRASymbolicExpr::WhenZero(
+            Box::new(ZEBRASymbolicExpr::Sub(
                 Box::new(opcode_var.clone()),
-                Box::new(LatticeVMSymbolicExpr::Constant(
+                Box::new(ZEBRASymbolicExpr::Constant(
                     AbstractInterval::from_i128(opcode_val),
                 )),
             )),
@@ -1335,5 +1335,5 @@ pub struct GeneralLookupInfo {
     pub op_a: Vec<usize>,
     pub op_b: Vec<usize>,
     pub op_c: Vec<usize>,
-    pub is_real: Vec<LatticeVMSymbolicExpr>,
+    pub is_real: Vec<ZEBRASymbolicExpr>,
 }

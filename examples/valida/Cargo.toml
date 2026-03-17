@@ -1,5 +1,5 @@
 [package]
-name = "latticevm_valida"
+name = "zebra_valida"
 version = "0.0.0"
 edition = "2021"
 authors = ["Koukyosyumei <koukyosyumei@hotmail.com>"]
@@ -9,7 +9,7 @@ repository = "https://github.com/Koukyosyumei/TwinVM"
 keywords = ["formal method", "security", "zero-knowledge-proof", "zkp"]
 
 [[bin]]
-name = "latticevm-valida"
+name = "zebra-valida"
 path = "src/main.rs"
 
 [dependencies]
@@ -17,7 +17,7 @@ rand = "0.8.5"
 clap = { version = "4.5.57", features = ["derive"] }
 rand_pcg = "0.3.1"
 rand_seeder = "0.2.3"
-latticevm = { path = "../../" }
+zebra = { path = "../../" }
 p3-mds = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
 p3-merkle-tree = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
 p3-poseidon = { git = "https://github.com/Koukyosyumei/lita-xyz-Plonky3.git", branch = "debuggable" }
