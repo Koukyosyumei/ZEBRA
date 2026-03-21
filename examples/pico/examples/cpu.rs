@@ -1,4 +1,6 @@
 use clap::Parser;
+use rand::prelude::IndexedRandom;
+use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
@@ -10,6 +12,7 @@ use pico_vm::chips::chips::riscv_cpu::{
     CpuChip,
 };
 use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode, program::Program};
+use pico_vm::emulator::riscv::syscalls::SyscallCode;
 use pico_vm::primitives::consts::RISCV_NUM_PVS;
 
 use zebra::canonicalizer::save_repr_if_unique;
@@ -130,9 +133,9 @@ fn opcode_from_index(value: u8) -> Option<Opcode> {
         2 => Some(Opcode::XOR),
         3 => Some(Opcode::OR),
         4 => Some(Opcode::AND),
-        5 => Some(Opcode::SLL),
-        6 => Some(Opcode::SRL),
-        7 => Some(Opcode::SRA),
+        //5 => Some(Opcode::SLL),
+        //6 => Some(Opcode::SRL),
+        //7 => Some(Opcode::SRA),
         8 => Some(Opcode::SLT),
         9 => Some(Opcode::SLTU),
         10 => Some(Opcode::MUL),
@@ -141,8 +144,9 @@ fn opcode_from_index(value: u8) -> Option<Opcode> {
         13 => Some(Opcode::MULHSU),
         14 => Some(Opcode::DIV),
         15 => Some(Opcode::DIVU),
+        /*
         16 => Some(Opcode::REM),
-        17 => Some(Opcode::REMU),
+        17 => Some(Opcode::REMU),*/
         _ => None,
     }
 }
@@ -152,8 +156,9 @@ fn opcode_from_index(value: u8) -> Option<Opcode> {
 /// Halt is performed by setting a0 (x10) = 0 and executing ECALL.
 /// The HALT syscall code in pico is 0 (pico_vm::primitives::consts::HALT).
 pub fn get_random_target_program(pc_start: u32, pc_base: u32, rng: &mut StdRng) -> Program {
+    let v = vec![0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, 15];
     let mut instructions = vec![Instruction::new(
-        opcode_from_index(rng.random_range(0..18)).unwrap(),
+        opcode_from_index(*v.choose(rng).unwrap()).unwrap(),
         rng.random_range(0..32), // dest register
         rng.random(),
         rng.random(),
@@ -162,8 +167,9 @@ pub fn get_random_target_program(pc_start: u32, pc_base: u32, rng: &mut StdRng) 
     )];
     // Load HALT syscall code (0) into a0 (x10), then ECALL.
     instructions.extend(vec![
-        Instruction::new(Opcode::ADD, 10, 0, 0, false, true),
-        Instruction::new(Opcode::ECALL, 0, 0, 0, false, false),
+        Instruction::new(Opcode::ADD, 5, 0, SyscallCode::HALT as u32, false, true),
+        Instruction::new(Opcode::ADD, 4, 0, 0, false, true),
+        Instruction::new(Opcode::ECALL, 2, 4, 5, false, false),
     ]);
     Program::new(instructions, pc_start, pc_base)
 }
@@ -201,26 +207,33 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Cpu";
     println!("CPU_COL_MAP: {:?}", CPU_COL_MAP);
 
-    let (mut constraint_info, general_lookup_info) =
+    let (mut constraint_info, mut general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CpuChip<KoalaBear>>(&air, NUM_CPU_COLS, prime);
     constraint_info
         .refinable_cols
         .retain(|x| !program_cols.contains(x));
     // Allow is_real (col 111) to be refined.
     constraint_info.refinable_cols.push(111);
+    general_lookup_info.is_real = vec![general_lookup_info.is_real[3].clone()];
 
     // ######################## Program Initialization ###########################
     let mut rng = StdRng::seed_from_u64(search_config.seed);
-    for _ in 0..10 {
-        let pc_offset = get_random_offset(prime, &mut rng);
+    for i in 0..args.num_trial {
+        search_config.seed = i as u64;
+
+        let pc_offset = prime - 4; //get_random_offset(prime, &mut rng);
         let program = get_random_target_program(pc_offset, pc_offset, &mut rng);
+        println!("{}", get_program_str(&program));
 
         let base_abs_main_trace_data =
             generate_abstract_trace(&program, air_name.to_string(), num_extracted_rows);
+        if base_abs_main_trace_data.is_empty() {
+            continue;
+        }
 
         let pad_fn = pad_dummy_rows_with_last_dummy(general_lookup_info.clone());
         let post_process = move |trace: &mut AbstractTrace, prime: u32| -> MayBeFlag {
-            //pad_fn(trace, prime);
+            pad_fn(trace, prime);
             memory_check(trace, prime).1
         };
 
@@ -270,6 +283,9 @@ fn main() -> Result<(), io::Error> {
             &mut known_solution,
         );
         println!("{:?}", result);
+        if known_solution.len() > 1 {
+            break;
+        }
     }
 
     Ok(())

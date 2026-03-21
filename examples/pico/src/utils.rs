@@ -26,9 +26,7 @@ use pico_vm::{
 use zebra::constraint::ZEBRAConstraints;
 use zebra::interval::AbstractInterval;
 use zebra::solver::{prepare_constraints_and_range_type, ConstraintInfo};
-use zebra::symbolic::{
-    make_impl_constraint, GeneralLookupInfo, ZEBRASymbolicExpr as LVSExpr,
-};
+use zebra::symbolic::{make_impl_constraint, GeneralLookupInfo, ZEBRASymbolicExpr as LVSExpr};
 use zebra::wordop::{get_alu_constraint, WordOp};
 
 use crate::p3_to_tv::convert_p3_expr;
@@ -170,6 +168,9 @@ where
 
     for s in &sends {
         match s.kind {
+            LookupType::Program => {
+                general_lookup_info.is_real.push(cv(&s.mult));
+            }
             LookupType::Memory => {}
             LookupType::Alu => {
                 let multiplicities = cv(&s.mult);
@@ -200,11 +201,13 @@ where
                     (Opcode::MULH as u8, WordOp::MulH),
                     (Opcode::MULHU as u8, WordOp::MulHU),
                     (Opcode::SLT as u8, WordOp::SLt),
-                    (Opcode::SLTU as u8, WordOp::SLt),
+                    (Opcode::SLTU as u8, WordOp::Lt),
                     (Opcode::AND as u8, WordOp::And),
                     (Opcode::OR as u8, WordOp::Or),
                     (Opcode::XOR as u8, WordOp::Xor),
                     (Opcode::SRL as u8, WordOp::SRL),
+                    (Opcode::DIV as u8, WordOp::SDiv),
+                    (Opcode::DIVU as u8, WordOp::Div),
                 ];
                 for t in tmps {
                     let alu_constraint = get_alu_constraint(&a, &b, &c, &a, &t.1);
