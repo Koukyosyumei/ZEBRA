@@ -311,6 +311,7 @@ fn process_single_node(
     eq_constraints: &[(usize, usize, usize)],
     abir_constraints: &[AbirConstraint],
     is_balanced: bool,
+    is_backward_refine_on: bool,
 ) -> NodeProcessingResult {
     let mut main_trace = head.main_trace;
 
@@ -318,25 +319,28 @@ fn process_single_node(
     // (Omitted for brevity, but same as your original solve() logic)
     // If any refinement returns MayBeFlag::False -> return NodeProcessingResult::Pruned
 
-    if let MayBeFlag::False = refine_conditional_constraints_var_sub_const(
-        &mut main_trace,
-        &conditional_var_sub_const_constraints,
-    ) {
-        return NodeProcessingResult::Pruned;
-    }
-    if let MayBeFlag::False =
-        refine_conditional_constraints_var_sub_var(&mut main_trace, &eq_constraints)
-    {
-        return NodeProcessingResult::Pruned;
-    }
-    if let MayBeFlag::False = apply_abir_refinement(&mut main_trace, &abir_constraints, prime).0 {
-        return NodeProcessingResult::Pruned;
-    }
-    if let MayBeFlag::False = refine_conditional_constraints_addvars_sub_const(
-        &mut main_trace,
-        &conditional_addvars_sub_const_constraints,
-    ) {
-        return NodeProcessingResult::Pruned;
+    if is_backward_refine_on {
+        if let MayBeFlag::False = refine_conditional_constraints_var_sub_const(
+            &mut main_trace,
+            &conditional_var_sub_const_constraints,
+        ) {
+            return NodeProcessingResult::Pruned;
+        }
+        if let MayBeFlag::False =
+            refine_conditional_constraints_var_sub_var(&mut main_trace, &eq_constraints)
+        {
+            return NodeProcessingResult::Pruned;
+        }
+        if let MayBeFlag::False = apply_abir_refinement(&mut main_trace, &abir_constraints, prime).0
+        {
+            return NodeProcessingResult::Pruned;
+        }
+        if let MayBeFlag::False = refine_conditional_constraints_addvars_sub_const(
+            &mut main_trace,
+            &conditional_addvars_sub_const_constraints,
+        ) {
+            return NodeProcessingResult::Pruned;
+        }
     }
 
     // 2. Generate Children
@@ -539,6 +543,7 @@ pub fn parallel_solve<PostProcessFn, FinalCheckFn>(
     sleep_time: &mut Duration,
     start_time: &std::time::Instant,
     is_balanced: bool,
+    is_backward_refine_on: bool,
 ) -> (VerificationStatus, bool, bool)
 // (Found, Quit)
 where
@@ -699,6 +704,7 @@ where
                     &c_cvsv,
                     &c_abir,
                     is_balanced,
+                    is_backward_refine_on,
                 );
 
                 match result {
@@ -1003,6 +1009,7 @@ where
                 global_count.clone(),
                 sleep_time,
                 &start_time,
+                column_subset.len() == constraint_info.refinable_cols.len(),
                 column_subset.len() == constraint_info.refinable_cols.len(),
             );
             last_verification_status = status;

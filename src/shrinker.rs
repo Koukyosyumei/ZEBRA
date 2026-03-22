@@ -460,10 +460,10 @@ pub fn move_sub_expr_to_right(expr: &ZEBRASymbolicExpr) -> ZEBRASymbolicExpr {
 /// * [`apply_abir_refinement`]
 #[derive(Debug, Clone)]
 pub struct AbirConstraint {
-    pub lhs_var: usize,                         // a
+    pub lhs_var: usize,                     // a
     pub affine_rhs: Box<ZEBRASymbolicExpr>, // L
-    pub quotient_var: usize,                    // e
-    pub stride: u32,                            // d > 0
+    pub quotient_var: usize,                // e
+    pub stride: u32,                        // d > 0
 }
 
 /// Detects affine backward interval refinement (ABIR) constraints.
