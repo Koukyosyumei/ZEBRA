@@ -30,18 +30,15 @@ pub enum WordOp {
     SDiv,
 }
 
-pub fn reconstruct_symbolic_word(
-    row: &[ZEBRASymbolicExpr],
-    base: usize,
-) -> ZEBRASymbolicExpr {
+pub fn reconstruct_symbolic_word(row: &[ZEBRASymbolicExpr], base: usize) -> ZEBRASymbolicExpr {
     let mut val = ZEBRASymbolicExpr::Constant(AbstractInterval::zero());
     let mut mul = 1_i128;
     for i in 0..4 {
         let rm = ZEBRASymbolicExpr::Mul(
             Box::new(row[base + i].clone()),
-            Box::new(ZEBRASymbolicExpr::Constant(
-                AbstractInterval::from_i128(mul),
-            )),
+            Box::new(ZEBRASymbolicExpr::Constant(AbstractInterval::from_i128(
+                mul,
+            ))),
         );
         val = ZEBRASymbolicExpr::Add(Box::new(val.clone()), Box::new(rm));
         mul *= 256;
@@ -328,6 +325,11 @@ pub fn word_mul(a: &Word, b: &Word) -> AbstractInterval {
     // mul（low 32 bits）
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
+
+    if a.is_singleton() && b.is_singleton() {
+        let res = (a.lo * b.lo).rem_euclid(WORD_BOUND);
+        return AbstractInterval { lo: res, hi: res };
+    }
 
     let lo = a.lo * b.lo;
     let hi = a.hi * b.hi;
@@ -752,7 +754,7 @@ mod tests {
         let b: Word = [_byte(2), _byte(0), _byte(0), _byte(0)];
 
         let r = word_mul(&a, &b);
-        assert_eq!(r, _ai(0, (1 << 32) - 1));
+        assert_eq!(r, _ai(4294967294, 4294967294));
     }
 
     #[test]

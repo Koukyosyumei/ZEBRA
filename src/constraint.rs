@@ -1,9 +1,7 @@
 use std::collections::HashSet;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
-use crate::symbolic::{
-    gather_vars, ZEBRASymbolicEntry, ZEBRASymbolicExpr, ZEBRASymbolicVal,
-};
+use crate::symbolic::{gather_vars, ZEBRASymbolicEntry, ZEBRASymbolicExpr, ZEBRASymbolicVal};
 use crate::trace::AbstractTrace;
 
 /// Evaluates a set of symbolic constraints over a trace.
@@ -84,7 +82,7 @@ pub fn eval_base_constraints(
                     return MayBeFlag::False;
                 }
                 MayBeFlag::MayBe => {
-                    // println!("({}, {}): {}, {} ^^{}", i, _j, tc, prime, is_strict);
+                    //println!("({}, {}): {}, {} ^^{}", i, _j, tc, prime, is_strict);
                     gather_vars(i, tc, memo);
                     is_all_true = false;
                     *potential += 1;

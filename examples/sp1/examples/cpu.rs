@@ -1,5 +1,7 @@
 use clap::Parser;
 use core::mem::transmute;
+use rand::prelude::IndexedRandom;
+use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
@@ -27,9 +29,7 @@ use zebra::utils::create_or_clear_dir;
 use zebra::utils::PrettySet;
 
 use zebra_sp1::pv_constraints::get_pv_constraints;
-use zebra_sp1::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_sp1::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 fn clk(row: &[AI]) -> AI {
     row[1].clone() + row[2].clone() * AI::from_i128(2_usize.pow(16) as i128)
@@ -94,9 +94,9 @@ fn opcode_from_u8(value: u8) -> Option<Opcode> {
         2 => Some(Opcode::XOR),
         3 => Some(Opcode::OR),
         4 => Some(Opcode::AND),
-        5 => Some(Opcode::SLL),
-        6 => Some(Opcode::SRL),
-        7 => Some(Opcode::SRA),
+        //5 => Some(Opcode::SLL),
+        //6 => Some(Opcode::SRL),
+        //7 => Some(Opcode::SRA),
         8 => Some(Opcode::SLT),
         9 => Some(Opcode::SLTU),
         10 => Some(Opcode::MUL),
@@ -105,14 +105,16 @@ fn opcode_from_u8(value: u8) -> Option<Opcode> {
         13 => Some(Opcode::MULHSU),
         14 => Some(Opcode::DIV),
         15 => Some(Opcode::DIVU),
+        /*
         16 => Some(Opcode::REM),
-        17 => Some(Opcode::REMU),
+        17 => Some(Opcode::REMU),*/
         _ => None,
     }
 }
 pub fn get_random_target_program(pc_start: u32, pc_base: u32, rng: &mut StdRng) -> Program {
+    let v = vec![0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, 15];
     let mut instructions = vec![Instruction::new(
-        opcode_from_u8(rng.random_range(0..18)).unwrap(),
+        opcode_from_u8(*v.choose(rng).unwrap()).unwrap(),
         rng.random_range(0..32),
         rng.random(),
         rng.random(),
@@ -166,8 +168,9 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     let mut rng = StdRng::seed_from_u64(search_config.seed);
-    for _ in 0..args.num_trial {
-        let pc_offset = get_random_offset(prime, &mut rng);
+    for i in 0..args.num_trial {
+        search_config.seed = i as u64;
+        let pc_offset = prime - 4; //get_random_offset(prime, &mut rng);
         let program = get_random_target_program(pc_offset, pc_offset, &mut rng);
 
         let base_abs_main_trace_data =
