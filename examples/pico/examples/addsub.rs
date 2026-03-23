@@ -119,7 +119,6 @@ fn main() -> Result<(), io::Error> {
         let mut new_constraint_info = constraint_info.clone();
         if args.range_interval != 0 {
             use rand::prelude::IndexedRandom;
-            use rand::seq::SliceRandom;
             use zebra::solver::RangeType;
             let mut rng = StdRng::seed_from_u64(search_config.seed);
             let op_b = if opcode_str == "ADD" {

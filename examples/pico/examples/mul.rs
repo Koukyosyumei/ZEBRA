@@ -15,12 +15,10 @@ use zebra::canonicalizer::generate_alu_final_checker;
 use zebra::quick::{
     experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
 };
-use zebra::solver::{dummy_program_counter_refine_fn, nop_post_process};
+use zebra::solver::nop_post_process;
 use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use zebra_pico::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_pico::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 const fn make_col_map() -> MulCols<usize> {
     let indices_arr = indices_arr::<{ NUM_MUL_COLS }>();
@@ -74,7 +72,6 @@ fn main() -> Result<(), io::Error> {
         let mut new_constraint_info = constraint_info.clone();
         if args.range_interval != 0 {
             use rand::prelude::IndexedRandom;
-            use rand::seq::SliceRandom;
             use zebra::solver::RangeType;
             let mut rng = StdRng::seed_from_u64(search_config.seed);
             let op_b = general_lookup_info.op_b.clone();
