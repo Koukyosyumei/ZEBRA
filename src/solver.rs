@@ -345,6 +345,8 @@ fn process_single_node(
         ) {
             return NodeProcessingResult::Pruned;
         }
+
+        /*
         if let MayBeFlag::False =
             refine_double_sel_var_sub_const(&mut main_trace, double_sel_var_sub_const)
         {
@@ -354,7 +356,7 @@ fn process_single_node(
             refine_double_sel_addvars_sub_const(&mut main_trace, double_sel_addvars_sub_const)
         {
             return NodeProcessingResult::Pruned;
-        }
+        }*/
     }
 
     // 2. Generate Children
@@ -1007,64 +1009,23 @@ where
     PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
     // Arc wrappers for constant data shared across all subsets
+    let shared_constraints = Arc::new(constraint_info.constraints.clone());
     let shared_range_types = Arc::new(constraint_info.range_types.clone());
     let global_count = Arc::new(AtomicUsize::new(0));
     let start_time = std::time::Instant::now();
-
-    // --- PRE-FILTER: Remove trivially-true constraints and unused refinable cols ---
-    // Build the widest initial trace (all refinable cols at their initial domain).
-    let mut init_trace_data = base_abs_main_trace_data.clone();
-    for row in init_trace_data.iter_mut() {
-        for c in &constraint_info.refinable_cols {
-            row[*c] = make_init_val(*c, &constraint_info.range_types, constraint_info.prime);
-        }
-    }
-    let init_trace = AbstractTrace::new(init_trace_data);
-
-    let filtered_air: Vec<ZEBRASymbolicExpr> = constraint_info
-        .constraints
-        .air_constraints
-        .iter()
-        .filter(|tc| {
-            !is_constraint_trivially_true(tc, &init_trace, &public_vals, constraint_info.prime)
-        })
-        .cloned()
-        .collect();
-    let filtered_lookup: Vec<ZEBRASymbolicExpr> = constraint_info
-        .constraints
-        .lookup_constraints
-        .iter()
-        .filter(|tc| {
-            !is_constraint_trivially_true(tc, &init_trace, &public_vals, constraint_info.prime)
-        })
-        .cloned()
-        .collect();
-
-    // Gather column indices referenced by surviving constraints.
-    let mut referenced_cols: HashSet<usize> = HashSet::new();
-    for tc in filtered_air.iter().chain(filtered_lookup.iter()) {
-        gather_vars_simple(tc, &mut referenced_cols);
-    }
-
-    // Keep only refinable cols that appear in the remaining constraints.
-    let filtered_refinable_cols: Vec<usize> = constraint_info
-        .refinable_cols
-        .iter()
-        .copied()
-        .filter(|c| referenced_cols.contains(c))
-        .collect();
-
-    let mut filtered_constraints = constraint_info.constraints.clone();
-    filtered_constraints.air_constraints = filtered_air;
-    filtered_constraints.lookup_constraints = filtered_lookup;
-    let shared_constraints = Arc::new(filtered_constraints);
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut last_verification_status = VerificationStatus::Interrupted;
 
     // --- OUTER LOOP: Subset Sizes ---
-    'outer: for k in search_config.minimum_num_taregt_cols..(filtered_refinable_cols.len() + 1) {
-        let mut column_subsets: Vec<_> = filtered_refinable_cols.iter().combinations(k).collect();
+    'outer: for k in
+        search_config.minimum_num_taregt_cols..(constraint_info.refinable_cols.len() + 1)
+    {
+        let mut column_subsets: Vec<_> = constraint_info
+            .refinable_cols
+            .iter()
+            .combinations(k)
+            .collect();
         column_subsets.shuffle(&mut rng);
 
         // --- MIDDLE LOOP: Specific Subsets ---
@@ -1104,8 +1065,8 @@ where
                 global_count.clone(),
                 sleep_time,
                 &start_time,
-                column_subset.len() == filtered_refinable_cols.len(),
-                column_subset.len() == filtered_refinable_cols.len(),
+                column_subset.len() == constraint_info.refinable_cols.len(),
+                column_subset.len() == constraint_info.refinable_cols.len(),
             );
             last_verification_status = status;
 

@@ -13,13 +13,9 @@ echo "divrem"
 ./target/release/examples/divrem --config ./configs/alu.config --opcode-str "REM" --method "bb" --num-trial 1
 ./target/release/examples/divrem --config ./configs/alu.config --opcode-str "REMU" --method "bb" --num-trial 1
 
-echo "jump"
-./target/release/examples/jump --config ./configs/alu.config --opcode-str "JAL" --method "bb" --num-trial 1
-./target/release/examples/jump --config ./configs/alu.config --opcode-str "JALR" --method "bb" --num-trial 1
-
 echo "lt"
-./target/release/examples/lt --config ./configs/alu.config --opcode-str "SLT" --method "bb" --num-trial 1
-./target/release/examples/lt --config ./configs/alu.config --opcode-str "SLTU" --method "bb" --num-trial 1
+./target/release/examples/lessthan --config ./configs/alu.config --opcode-str "SLT" --method "bb" --num-trial 1
+./target/release/examples/lessthan --config ./configs/alu.config --opcode-str "SLTU" --method "bb" --num-trial 1
 
 echo "memoryreadwrite"
 ./target/release/examples/memoryreadwrite --config ./configs/alu.config --opcode-str "LB" --method "bb" --num-trial 1
@@ -38,7 +34,7 @@ echo "mul"
 ./target/release/examples/mul --config ./configs/alu.config --opcode-str "MULHSU" --method "bb" --num-trial 1
 
 echo "sll"
-./target/release/examples/shiftleft --config ./configs/alu.config --opcode-str "ADD" --method "bb" --num-trial 1
+./target/release/examples/sll --config ./configs/alu.config --opcode-str "ADD" --method "bb" --num-trial 1
 
 echo "sr"
 ./target/release/examples/sr --config ./configs/alu.config --opcode-str "SRL" --method "bb" --num-trial 1

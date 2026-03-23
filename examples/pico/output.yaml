@@ -1,8 +1,8 @@
 config:
   num_workers: 8
-  time_out_ms: 10000
-  minimum_num_taregt_cols: 9
-  max_expansions: 1000000000
+  time_out_ms: 10000000000
+  minimum_num_taregt_cols: 35
+  max_expansions: 30000000
   min_row_id: 0
   max_row_id: 0
   seed: 41
@@ -12,8 +12,8 @@ args:
   ouptput_path: output.yaml
   method: bb
   opcode_str: ADD
-  range_interval: 254
+  range_interval: 15
 report:
   success_ratio: 1.0
-  exe_time_mean: 6.008834614
+  exe_time_mean: 0.328922292
   exe_time_variance: 0.0

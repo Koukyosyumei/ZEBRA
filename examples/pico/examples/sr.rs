@@ -87,7 +87,6 @@ fn main() -> Result<(), io::Error> {
             );
             search_config.minimum_num_taregt_cols = new_constraint_info.refinable_cols.len();
         }
-        println!("{:?}", new_constraint_info.range_types);
         let x: u32 = rng.random_range(0..4);
         let y: u32 = rng.random_range(0..4);
 
