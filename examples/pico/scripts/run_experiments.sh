@@ -7,7 +7,7 @@
 #                                with fixed num_workers = 8
 #
 # Results are saved under:
-#   reports/
+#   report/
 #     worker_sweep/<chip>/workers_<N>/<OPCODE>.yaml
 #     range_sweep/<chip>/range_<R>/<OPCODE>.yaml
 #
@@ -40,7 +40,7 @@ done
 # ── paths ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PICO_DIR="$(dirname "$SCRIPT_DIR")"
-RESULTS_DIR="$PICO_DIR/reports"
+RESULTS_DIR="$PICO_DIR/report"
 BIN_DIR="$PICO_DIR/target/release/examples"
 
 # ── chip → opcode list (space-separated) ────────────────────────────────────
