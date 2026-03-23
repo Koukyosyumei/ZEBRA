@@ -12,7 +12,8 @@ args:
   ouptput_path: output.yaml
   method: bb
   opcode_str: BNE
+  range_interval: 0
 report:
   success_ratio: 0.0
-  exe_time_mean: 1000.006203076
+  exe_time_mean: 46.777644967
   exe_time_variance: 0.0

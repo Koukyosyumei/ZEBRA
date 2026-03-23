@@ -17,9 +17,11 @@ use crate::shrinker::{
     apply_abir_refinement, detect_abir_constraints,
     detect_conditional_addvars_sub_const_constraints, detect_conditional_var_sub_const_constraints,
     detect_conditional_var_sub_var_constraints, detect_double_sel_addvars_sub_const,
-    detect_double_sel_var_sub_const, refine_conditional_constraints_addvars_sub_const,
-    refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
-    refine_double_sel_addvars_sub_const, refine_double_sel_var_sub_const, AbirConstraint,
+    detect_double_sel_var_sub_const, detect_selector_addu_constraints,
+    refine_conditional_constraints_addvars_sub_const, refine_conditional_constraints_var_sub_const,
+    refine_conditional_constraints_var_sub_var, refine_double_sel_addvars_sub_const,
+    refine_double_sel_var_sub_const, refine_selector_addu_constraints, AbirConstraint,
+    SelectorAddUConstraint,
 };
 use crate::symbolic::{
     gather_boolean_variables, gather_vars, gather_vars_simple, is_babybear_word_range,
@@ -316,6 +318,7 @@ fn process_single_node(
     abir_constraints: &[AbirConstraint],
     double_sel_var_sub_const: &[(usize, bool, usize, bool, usize, i128)],
     double_sel_addvars_sub_const: &[(usize, bool, usize, bool, Vec<usize>, i128)],
+    selector_addu_constraints: &[SelectorAddUConstraint],
     is_balanced: bool,
     is_backward_refine_on: bool,
 ) -> NodeProcessingResult {
@@ -359,6 +362,11 @@ fn process_single_node(
         {
             return NodeProcessingResult::Pruned;
         }*/
+        if let MayBeFlag::False =
+            refine_selector_addu_constraints(&mut main_trace, selector_addu_constraints, prime)
+        {
+            return NodeProcessingResult::Pruned;
+        }
     }
 
     // 2. Generate Children
@@ -629,6 +637,8 @@ where
         detect_double_sel_var_sub_const(&constraints.air_constraints, prime);
     let double_sel_addvars_sub_const =
         detect_double_sel_addvars_sub_const(&constraints.air_constraints, prime);
+    let selector_addu_constraints =
+        detect_selector_addu_constraints(&constraints.lookup_constraints);
 
     // --- 2. ISOLATED SHARED STATE ---
     // These belong ONLY to this function call. They are dropped when function returns.
@@ -666,6 +676,7 @@ where
         let c_abir = abir_constraints.clone();
         let c_dsvsc = double_sel_var_sub_const.clone();
         let c_dsasc = double_sel_addvars_sub_const.clone();
+        let c_saddu = selector_addu_constraints.clone();
         let c_align = post_process.clone();
 
         thread::spawn(move || {
@@ -733,6 +744,7 @@ where
                     &c_abir,
                     &c_dsvsc,
                     &c_dsasc,
+                    &c_saddu,
                     is_balanced,
                     is_backward_refine_on,
                 );
