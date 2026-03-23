@@ -4,19 +4,19 @@
 # Reads the experiment results produced by run_experiments.sh and outputs:
 #   1. A human-readable chip-level summary (stdout)
 #   2. Two CSV files:
-#        experiments/worker_sweep_summary.csv
-#        experiments/range_sweep_summary.csv
+#        report/worker_sweep_summary.csv
+#        report/range_sweep_summary.csv
 #
 # Aggregation is chip-level: all opcodes within a chip are averaged.
 #
 # Usage (run from examples/pico/):
-#   bash scripts/aggregate.sh [results_dir]   (default: experiments/)
+#   bash scripts/aggregate.sh [results_dir]   (default: report/)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PICO_DIR="$(dirname "$SCRIPT_DIR")"
-RESULTS_DIR="${1:-$PICO_DIR/experiments}"
+RESULTS_DIR="${1:-$PICO_DIR/report}"
 
 CHIPS=(addsub bitwise mul sll)
 

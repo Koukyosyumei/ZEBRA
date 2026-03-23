@@ -54,7 +54,7 @@ CHIPS=(addsub bitwise mul sll)
 
 # ── experiment parameters ────────────────────────────────────────────────────
 WORKER_COUNTS=(1 2 3 8)
-RANGE_INTERVALS=(0 2 4 8 16 32 64 128)
+RANGE_INTERVALS=(0 1 3 7 15 31 63 127)
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
