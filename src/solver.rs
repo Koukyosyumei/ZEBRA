@@ -232,6 +232,7 @@ impl Default for SearchConfig {
     }
 }
 
+#[derive(Clone)]
 pub struct ConstraintInfo {
     pub constraints: ZEBRAConstraints,
     pub num_total_columns: usize,

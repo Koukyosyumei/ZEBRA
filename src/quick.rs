@@ -46,6 +46,8 @@ pub struct Args {
     pub method: String,
     #[arg(long, default_value = "none")]
     pub opcode_str: String,
+    #[arg(long, default_value = "0")]
+    pub range_interval: usize,
 }
 
 #[derive(Debug)]
