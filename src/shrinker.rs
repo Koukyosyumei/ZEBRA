@@ -2,8 +2,9 @@ use std::collections::HashSet;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 use crate::symbolic::{
-    gather_vars_simple, get_curr_add_vars_sub_const, get_curr_i, get_curr_i_sub_const,
-    get_curr_i_sub_cur_j, ZEBRASymbolicExpr,
+    gather_vars_simple, get_curr_add_vars_or_zero, get_curr_add_vars_sub_const, get_curr_i,
+    get_curr_i_or_zero, get_curr_i_sub_const, get_curr_i_sub_cur_j, get_curr_i_with_polarity,
+    ZEBRASymbolicExpr,
 };
 use crate::trace::AbstractTrace;
 
@@ -97,8 +98,7 @@ pub fn detect_conditional_addvars_sub_const_constraints(
             // 1. the left is selector, and the right is Sub expr
             if let Some(s_idx) = get_curr_i(lhs_expr) {
                 if let Some((vs, target)) = get_curr_add_vars_sub_const(rhs_expr, prime) {
-                    if !vs.contains(&s_idx) && vs.len() == 2 {
-                        // ToDO remove len condition
+                    if !vs.contains(&s_idx) && !vs.is_empty() {
                         const_constraints.push((s_idx, vs, target));
                         continue;
                     }
@@ -108,7 +108,7 @@ pub fn detect_conditional_addvars_sub_const_constraints(
             // 2. the left is Sub expr, and the right is the selector
             if let Some(s_idx) = get_curr_i(rhs_expr) {
                 if let Some((vs, target)) = get_curr_add_vars_sub_const(lhs_expr, prime) {
-                    if !vs.contains(&s_idx) && vs.len() == 2 {
+                    if !vs.contains(&s_idx) && !vs.is_empty() {
                         const_constraints.push((s_idx, vs, target));
                         continue;
                     }
@@ -653,4 +653,169 @@ pub fn apply_abir_refinement(
     }
 
     (MayBeFlag::MayBe, logs)
+}
+
+// ─── Double-selector constraint detection and refinement ──────────────────────
+//
+// Handles constraints of the form:
+//   (sel1_expr * sel2_expr) * body = 0
+// where each selector expression is either a plain variable (fires when == 1)
+// or its complement `1 - Var(s)` (fires when == 0).
+//
+// Tuple layout for single-value body:   (s1_idx, s1_inv, s2_idx, s2_inv, v_idx, target)
+// Tuple layout for multi-value body:    (s1_idx, s1_inv, s2_idx, s2_inv, v_idxs, target)
+
+fn double_sel_fires(row: &[AbstractInterval], s_idx: usize, s_inv: bool) -> bool {
+    let sel = &row[s_idx];
+    if sel.is_singleton() {
+        if s_inv { sel.lo == 0 } else { sel.lo == 1 }
+    } else {
+        false
+    }
+}
+
+/// Detects `(sel1 * sel2) * (curr[v] - target) = 0` patterns.
+///
+/// Returns tuples `(s1_idx, s1_inv, s2_idx, s2_inv, v_idx, target)`.
+/// When `s_inv` is `true` the corresponding selector must equal `0`.
+pub fn detect_double_sel_var_sub_const(
+    constraints: &[ZEBRASymbolicExpr],
+    prime: u32,
+) -> Vec<(usize, bool, usize, bool, usize, i128)> {
+    let mut result = Vec::new();
+    for c in constraints {
+        if let ZEBRASymbolicExpr::Mul(outer_lhs, outer_rhs) = c {
+            // Try lhs = Mul(sel1, sel2), rhs = body
+            for (sel_expr, body_expr) in [
+                (outer_lhs.as_ref(), outer_rhs.as_ref()),
+                (outer_rhs.as_ref(), outer_lhs.as_ref()),
+            ] {
+                if let ZEBRASymbolicExpr::Mul(s1_expr, s2_expr) = sel_expr {
+                    if let (Some((s1_idx, s1_inv)), Some((s2_idx, s2_inv))) = (
+                        get_curr_i_with_polarity(s1_expr),
+                        get_curr_i_with_polarity(s2_expr),
+                    ) {
+                        if let Some((v_idx, target)) = get_curr_i_or_zero(body_expr, prime) {
+                            if v_idx != s1_idx && v_idx != s2_idx {
+                                result.push((s1_idx, s1_inv, s2_idx, s2_inv, v_idx, target));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    result
+}
+
+/// Detects `(sel1 * sel2) * (sum(curr[vs]) - target) = 0` patterns.
+///
+/// Returns tuples `(s1_idx, s1_inv, s2_idx, s2_inv, v_idxs, target)`.
+pub fn detect_double_sel_addvars_sub_const(
+    constraints: &[ZEBRASymbolicExpr],
+    prime: u32,
+) -> Vec<(usize, bool, usize, bool, Vec<usize>, i128)> {
+    let mut result = Vec::new();
+    for c in constraints {
+        if let ZEBRASymbolicExpr::Mul(outer_lhs, outer_rhs) = c {
+            for (sel_expr, body_expr) in [
+                (outer_lhs.as_ref(), outer_rhs.as_ref()),
+                (outer_rhs.as_ref(), outer_lhs.as_ref()),
+            ] {
+                if let ZEBRASymbolicExpr::Mul(s1_expr, s2_expr) = sel_expr {
+                    if let (Some((s1_idx, s1_inv)), Some((s2_idx, s2_inv))) = (
+                        get_curr_i_with_polarity(s1_expr),
+                        get_curr_i_with_polarity(s2_expr),
+                    ) {
+                        if let Some((vs, target)) = get_curr_add_vars_or_zero(body_expr, prime) {
+                            if vs.len() >= 2
+                                && !vs.contains(&s1_idx)
+                                && !vs.contains(&s2_idx)
+                            {
+                                result.push((
+                                    s1_idx, s1_inv, s2_idx, s2_inv, vs, target,
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    result
+}
+
+/// Applies interval refinement for double-selector single-variable constraints.
+///
+/// For each `(s1, s1_inv, s2, s2_inv, v, target)`: when both selectors satisfy
+/// their polarity conditions (singleton 0 or 1), tightens `curr[v]` to `target`.
+pub fn refine_double_sel_var_sub_const(
+    trace: &mut AbstractTrace,
+    constraints: &[(usize, bool, usize, bool, usize, i128)],
+) -> MayBeFlag {
+    for r in 0..trace.data.len() {
+        for &(s1_idx, s1_inv, s2_idx, s2_inv, v_idx, target) in constraints {
+            if double_sel_fires(&trace.data[r], s1_idx, s1_inv)
+                && double_sel_fires(&trace.data[r], s2_idx, s2_inv)
+            {
+                let target_iv = AbstractInterval::from_i128(target);
+                if let Some(refined) = trace.data[r][v_idx].intersect(&target_iv) {
+                    trace.data[r][v_idx] = refined;
+                } else {
+                    return MayBeFlag::False;
+                }
+            }
+        }
+    }
+    MayBeFlag::MayBe
+}
+
+/// Applies interval refinement for double-selector sum-of-variables constraints.
+///
+/// For each `(s1, s1_inv, s2, s2_inv, vs, target)`: when both selectors fire,
+/// and all but one of the `vs` are singletons, tightens the remaining variable.
+pub fn refine_double_sel_addvars_sub_const(
+    trace: &mut AbstractTrace,
+    constraints: &[(usize, bool, usize, bool, Vec<usize>, i128)],
+) -> MayBeFlag {
+    for r in 0..trace.data.len() {
+        for (s1_idx, s1_inv, s2_idx, s2_inv, vs, target) in constraints {
+            if double_sel_fires(&trace.data[r], *s1_idx, *s1_inv)
+                && double_sel_fires(&trace.data[r], *s2_idx, *s2_inv)
+            {
+                let target_iv = AbstractInterval::from_i128(*target);
+                let mut singletons = vec![];
+                let mut non_singletons = vec![];
+                for &v_idx in vs {
+                    if trace.data[r][v_idx].is_singleton() {
+                        singletons.push(v_idx);
+                    } else {
+                        non_singletons.push(v_idx);
+                    }
+                }
+                if non_singletons.len() == 1 && !singletons.is_empty() {
+                    let mut sum = AbstractInterval::zero();
+                    for v_idx in &singletons {
+                        sum = sum + trace.data[r][*v_idx].clone();
+                    }
+                    let remainder = target_iv - sum;
+                    if let Some(refined) = trace.data[r][non_singletons[0]].intersect(&remainder) {
+                        trace.data[r][non_singletons[0]] = refined;
+                    } else {
+                        return MayBeFlag::False;
+                    }
+                } else if non_singletons.is_empty() {
+                    // All singletons — verify the sum
+                    let mut sum = AbstractInterval::zero();
+                    for &v_idx in vs {
+                        sum = sum + trace.data[r][v_idx].clone();
+                    }
+                    if sum.intersect(&target_iv).is_none() {
+                        return MayBeFlag::False;
+                    }
+                }
+            }
+        }
+    }
+    MayBeFlag::MayBe
 }

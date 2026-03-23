@@ -898,6 +898,48 @@ pub fn get_curr_add_vars_sub_const(
     None
 }
 
+/// Parses a selector expression into `(col_idx, is_inverted)`.
+///
+/// * `Var(s)` → `(s, false)` — condition fires when `curr[s] == 1`
+/// * `Sub(Const(1), Var(s))` → `(s, true)` — condition fires when `curr[s] == 0`
+pub fn get_curr_i_with_polarity(expr: &ZEBRASymbolicExpr) -> Option<(usize, bool)> {
+    if let Some(idx) = get_curr_i(expr) {
+        return Some((idx, false));
+    }
+    if let ZEBRASymbolicExpr::Sub(lhs, rhs) = expr {
+        if let ZEBRASymbolicExpr::Constant(c) = lhs.as_ref() {
+            if c.is_singleton() && c.lo == 1 {
+                if let Some(idx) = get_curr_i(rhs) {
+                    return Some((idx, true));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Like [`get_curr_i_sub_const`] but also matches a bare current-row variable (`target = 0`).
+pub fn get_curr_i_or_zero(expr: &ZEBRASymbolicExpr, prime: u32) -> Option<(usize, i128)> {
+    if let Some(result) = get_curr_i_sub_const(expr, prime) {
+        return Some(result);
+    }
+    if let Some(idx) = get_curr_i(expr) {
+        return Some((idx, 0));
+    }
+    None
+}
+
+/// Like [`get_curr_add_vars_sub_const`] but also matches a bare addition of variables (`target = 0`).
+pub fn get_curr_add_vars_or_zero(expr: &ZEBRASymbolicExpr, prime: u32) -> Option<(Vec<usize>, i128)> {
+    if let Some(result) = get_curr_add_vars_sub_const(expr, prime) {
+        return Some(result);
+    }
+    if let Some(vs) = collect_add_vars(expr) {
+        return Some((vs.into_iter().collect(), 0));
+    }
+    None
+}
+
 pub fn preprocess_row(
     air_constraints: &Vec<ZEBRASymbolicExpr>,
     row: &mut Vec<AbstractInterval>,
