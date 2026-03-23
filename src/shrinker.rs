@@ -1112,6 +1112,37 @@ fn collect_mul_factors(expr: &ZEBRASymbolicExpr, factors: &mut Vec<ZEBRASymbolic
     }
 }
 
+/// Collects the 4-limb variable index arrays for all words that have a
+/// `KoalaBearRange` or `BabyBearRange` check applied (inside a `WhenNonZero`).
+///
+/// Scans `constraints` for the pattern:
+/// ```text
+/// WhenNonZero(_, KoalaBearRange(word_expr))
+/// WhenNonZero(_, BabyBearRange(word_expr))
+/// ```
+/// and returns the set of `[usize; 4]` limb-index arrays extracted from
+/// `word_expr` via [`extract_word_var_indices`].
+fn collect_word_range_checked_indices(
+    constraints: &[ZEBRASymbolicExpr],
+) -> HashSet<[usize; 4]> {
+    let mut result = HashSet::new();
+    for c in constraints {
+        if let ZEBRASymbolicExpr::WhenNonZero(_, inner) = c {
+            let word_expr = match inner.as_ref() {
+                ZEBRASymbolicExpr::KoalaBearRange(w) => Some(w.as_ref()),
+                ZEBRASymbolicExpr::BabyBearRange(w) => Some(w.as_ref()),
+                _ => None,
+            };
+            if let Some(w) = word_expr {
+                if let Some(indices) = extract_word_var_indices(w) {
+                    result.insert(indices);
+                }
+            }
+        }
+    }
+    result
+}
+
 /// Detects `(sel_factors…) * (word_a - rhs_expr) = 0` constraints.
 ///
 /// Handles arbitrarily deep `Mul` nesting by first flattening the constraint
@@ -1132,12 +1163,25 @@ fn collect_mul_factors(expr: &ZEBRASymbolicExpr, factors: &mut Vec<ZEBRASymbolic
 ///   → selector = `Mul(sum_vars, Sub(curr[59],1))`
 ///
 /// Side conditions:
+/// * `prime` must be either KoalaBear (`2130706433`) or BabyBear (`2013265921`).
+/// * `word_a`'s limb variables must have a `KoalaBearRange` or `BabyBearRange`
+///   constraint applied to them (ensures byte-range validity).
 /// * `word_a`'s limb variables must not appear free in `selector_expr`.
 /// * `word_a`'s limb variables must not appear free in `rhs_expr`
 ///   (prevents circular evaluation during refinement).
 pub fn detect_selector_word_assign_constraints(
     constraints: &[ZEBRASymbolicExpr],
+    prime: u32,
 ) -> Vec<SelectorWordAssignConstraint> {
+    const KOALABEAR: u32 = 2130706433;
+    const BABYBEAR: u32 = 2013265921;
+    if prime != KOALABEAR && prime != BABYBEAR {
+        return Vec::new();
+    }
+
+    // Build a set of word index arrays that have a KoalaBear/BabyBear range check.
+    let range_checked = collect_word_range_checked_indices(constraints);
+
     let mut result = Vec::new();
 
     'outer: for c in constraints {
@@ -1182,6 +1226,12 @@ pub fn detect_selector_word_assign_constraints(
                     .iter()
                     .any(|idx| sel_vars.contains(idx) || rhs_vars.contains(idx))
                 {
+                    continue;
+                }
+
+                // Require that word_a's limbs have a KoalaBear/BabyBear range check,
+                // ensuring the byte-range invariant holds during refinement.
+                if !range_checked.contains(&a_var_indices) {
                     continue;
                 }
 

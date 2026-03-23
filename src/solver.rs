@@ -649,7 +649,7 @@ where
     let selector_addu_constraints =
         detect_selector_addu_constraints(&constraints.lookup_constraints);
     let selector_word_assign_constraints =
-        detect_selector_word_assign_constraints(&constraints.air_constraints);
+        detect_selector_word_assign_constraints(&constraints.air_constraints, prime);
 
     // --- 2. ISOLATED SHARED STATE ---
     // These belong ONLY to this function call. They are dropped when function returns.
