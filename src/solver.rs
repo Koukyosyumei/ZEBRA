@@ -322,18 +322,6 @@ fn process_single_node(
     // (Omitted for brevity, but same as your original solve() logic)
     // If any refinement returns MayBeFlag::False -> return NodeProcessingResult::Pruned
 
-    // Double-selector refinement runs unconditionally (cheap and high-value for branch-type chips)
-    if let MayBeFlag::False =
-        refine_double_sel_var_sub_const(&mut main_trace, double_sel_var_sub_const)
-    {
-        return NodeProcessingResult::Pruned;
-    }
-    if let MayBeFlag::False =
-        refine_double_sel_addvars_sub_const(&mut main_trace, double_sel_addvars_sub_const)
-    {
-        return NodeProcessingResult::Pruned;
-    }
-
     if is_backward_refine_on {
         if let MayBeFlag::False = refine_conditional_constraints_var_sub_const(
             &mut main_trace,
@@ -354,6 +342,16 @@ fn process_single_node(
             &mut main_trace,
             &conditional_addvars_sub_const_constraints,
         ) {
+            return NodeProcessingResult::Pruned;
+        }
+        if let MayBeFlag::False =
+            refine_double_sel_var_sub_const(&mut main_trace, double_sel_var_sub_const)
+        {
+            return NodeProcessingResult::Pruned;
+        }
+        if let MayBeFlag::False =
+            refine_double_sel_addvars_sub_const(&mut main_trace, double_sel_addvars_sub_const)
+        {
             return NodeProcessingResult::Pruned;
         }
     }
