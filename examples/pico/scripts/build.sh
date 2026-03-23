@@ -6,3 +6,4 @@ cargo build --release --example memoryreadwrite
 cargo build --release --example mul
 cargo build --release --example sll
 cargo build --release --example sr
+cargo build --release --example cpu
