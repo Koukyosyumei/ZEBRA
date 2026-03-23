@@ -22,9 +22,7 @@ use zebra::ui::UiState;
 use zebra::utils::PrettySet;
 use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use zebra_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_ziren::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 // ############## Final Check Function ##############################
 fn final_check(
@@ -106,10 +104,8 @@ fn main() -> Result<(), io::Error> {
     use zebra::solver::RangeType;
     constraint_info.range_types.insert(60, RangeType::Bool);
     constraint_info.range_types.insert(61, RangeType::Bool);
-    constraint_info.range_types.insert(26, RangeType::U7);
-    let a = vec![19, 20, 21, 22];
-    constraint_info.refinable_cols.retain(|x| !a.contains(x));
-
+    ///constraint_info.range_types.insert(26, RangeType::U7);
+    //constraint_info.refinable_cols.retain(|x| !a.contains(x));
     constraint_info
         .refinable_cols
         .extend(&output_columns.clone());

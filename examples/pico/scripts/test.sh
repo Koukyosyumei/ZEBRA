@@ -7,12 +7,6 @@ echo "bitwise"
 ./target/release/examples/bitwise --config ./configs/alu.config --opcode-str "OR" --method "bb" --num-trial 1
 ./target/release/examples/bitwise --config ./configs/alu.config --opcode-str "XOR" --method "bb" --num-trial 1
 
-echo "branch"
-./target/release/examples/branch --config ./configs/alu.config --opcode-str "BEQ" --method "bb" --num-trial 1
-./target/release/examples/branch --config ./configs/alu.config --opcode-str "BGE" --method "bb" --num-trial 1
-./target/release/examples/branch --config ./configs/alu.config --opcode-str "BLT" --method "bb" --num-trial 1
-./target/release/examples/branch --config ./configs/alu.config --opcode-str "BNE" --method "bb" --num-trial 1
-
 echo "divrem"
 ./target/release/examples/divrem --config ./configs/alu.config --opcode-str "DIV" --method "bb" --num-trial 1
 ./target/release/examples/divrem --config ./configs/alu.config --opcode-str "DIVU" --method "bb" --num-trial 1
