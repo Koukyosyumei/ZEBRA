@@ -16,9 +16,10 @@ use serde::{Deserialize, Serialize};
 use crate::shrinker::{
     apply_abir_refinement, detect_abir_constraints,
     detect_conditional_addvars_sub_const_constraints, detect_conditional_var_sub_const_constraints,
-    detect_conditional_var_sub_var_constraints, refine_conditional_constraints_addvars_sub_const,
+    detect_conditional_var_sub_var_constraints, detect_double_sel_addvars_sub_const,
+    detect_double_sel_var_sub_const, refine_conditional_constraints_addvars_sub_const,
     refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
-    AbirConstraint,
+    refine_double_sel_addvars_sub_const, refine_double_sel_var_sub_const, AbirConstraint,
 };
 use crate::symbolic::{
     gather_boolean_variables, gather_vars, gather_vars_simple, is_babybear_word_range,
@@ -310,6 +311,8 @@ fn process_single_node(
     conditional_addvars_sub_const_constraints: &[(usize, Vec<usize>, i128)],
     eq_constraints: &[(usize, usize, usize)],
     abir_constraints: &[AbirConstraint],
+    double_sel_var_sub_const: &[(usize, bool, usize, bool, usize, i128)],
+    double_sel_addvars_sub_const: &[(usize, bool, usize, bool, Vec<usize>, i128)],
     is_balanced: bool,
     is_backward_refine_on: bool,
 ) -> NodeProcessingResult {
@@ -318,6 +321,18 @@ fn process_single_node(
     // 1. Initial Refinements (ABIR, Conditional, etc.)
     // (Omitted for brevity, but same as your original solve() logic)
     // If any refinement returns MayBeFlag::False -> return NodeProcessingResult::Pruned
+
+    // Double-selector refinement runs unconditionally (cheap and high-value for branch-type chips)
+    if let MayBeFlag::False =
+        refine_double_sel_var_sub_const(&mut main_trace, double_sel_var_sub_const)
+    {
+        return NodeProcessingResult::Pruned;
+    }
+    if let MayBeFlag::False =
+        refine_double_sel_addvars_sub_const(&mut main_trace, double_sel_addvars_sub_const)
+    {
+        return NodeProcessingResult::Pruned;
+    }
 
     if is_backward_refine_on {
         if let MayBeFlag::False = refine_conditional_constraints_var_sub_const(
@@ -603,6 +618,10 @@ where
     let conditional_var_sub_var_constraints =
         detect_conditional_var_sub_var_constraints(&constraints.air_constraints);
     let abir_constraints = detect_abir_constraints(&constraints.air_constraints, prime);
+    let double_sel_var_sub_const =
+        detect_double_sel_var_sub_const(&constraints.air_constraints, prime);
+    let double_sel_addvars_sub_const =
+        detect_double_sel_addvars_sub_const(&constraints.air_constraints, prime);
 
     // --- 2. ISOLATED SHARED STATE ---
     // These belong ONLY to this function call. They are dropped when function returns.
@@ -638,6 +657,8 @@ where
         let c_casc = conditional_addvars_sub_const_constraints.clone();
         let c_cvsv = conditional_var_sub_var_constraints.clone();
         let c_abir = abir_constraints.clone();
+        let c_dsvsc = double_sel_var_sub_const.clone();
+        let c_dsasc = double_sel_addvars_sub_const.clone();
         let c_align = post_process.clone();
 
         thread::spawn(move || {
@@ -703,6 +724,8 @@ where
                     &c_casc,
                     &c_cvsv,
                     &c_abir,
+                    &c_dsvsc,
+                    &c_dsasc,
                     is_balanced,
                     is_backward_refine_on,
                 );
