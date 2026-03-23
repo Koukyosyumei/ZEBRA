@@ -67,6 +67,7 @@ fn final_check(
     prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
+    _area: &mut i128,
 ) {
     let mut record_reprs = HashSet::new();
     for row in &trace.data {

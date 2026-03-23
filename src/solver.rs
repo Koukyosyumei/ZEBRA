@@ -159,9 +159,11 @@ pub enum SolverMsg {
 ///
 /// This type guides the global search strategy (e.g., queue expansion).
 enum NodeProcessingResult {
-    Success(AbstractTrace),
+    Done {
+        solutions: Vec<AbstractTrace>,
+        refined: Vec<(SearchNode, Potential)>,
+    },
     Pruned, // Unsatisfiable
-    Refined(Vec<(SearchNode, Potential)>),
 }
 
 /// Heuristic score associated with a node in the search space.
@@ -406,19 +408,22 @@ fn process_single_node(
     // or push them all back to the global queue for other workers to grab.
     // Pushing them back is better for balancing high-level parallelism.
 
-    let mut results = Vec::new();
+    let mut solutions = Vec::new();
+    let mut refined = Vec::new();
+
+    //let mut results = Vec::new();
     for mut kid_trace in children {
         let post_res = post_process(&mut kid_trace, prime);
         let (res, pot, _) =
             eval_constraints(&kid_trace, Some(&public_trace.data[0]), constraints, prime);
 
         match (res, post_res) {
-            (MayBeFlag::True, MayBeFlag::True) => return NodeProcessingResult::Success(kid_trace),
+            (MayBeFlag::True, MayBeFlag::True) => solutions.push(kid_trace),
             (MayBeFlag::False, _) | (_, MayBeFlag::False) => {}
             (MayBeFlag::MayBe, MayBeFlag::MayBe)
             | (MayBeFlag::MayBe, MayBeFlag::True)
             | (MayBeFlag::True, MayBeFlag::MayBe) => {
-                results.push((
+                refined.push((
                     SearchNode {
                         main_trace: kid_trace,
                         depth: head.depth + 1,
@@ -429,10 +434,10 @@ fn process_single_node(
         }
     }
 
-    if results.is_empty() {
+    if solutions.is_empty() && refined.is_empty() {
         NodeProcessingResult::Pruned
     } else {
-        NodeProcessingResult::Refined(results)
+        NodeProcessingResult::Done { solutions, refined }
     }
 }
 
@@ -555,6 +560,7 @@ pub fn parallel_solve<PostProcessFn, FinalCheckFn>(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     final_check: FinalCheckFn,
     known_solution: &mut HashSet<String>,
+    known_solution_area: &mut i128,
     global_total_trials: Arc<AtomicUsize>,
     sleep_time: &mut Duration,
     start_time: &std::time::Instant,
@@ -564,7 +570,7 @@ pub fn parallel_solve<PostProcessFn, FinalCheckFn>(
 // (Found, Quit)
 where
     PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
-    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState),
+    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128),
 {
     let time_out = Duration::from_millis(search_config.time_out_ms);
     let mut conditional_bool_target_indices = Vec::<(usize, usize)>::new();
@@ -732,18 +738,18 @@ where
                 );
 
                 match result {
-                    NodeProcessingResult::Success(trace) => {
-                        //sd.store(true, Ordering::Relaxed);
-                        let _ = tx.send(SolverMsg::SolutionFound(trace, my_global_id));
-                    }
                     NodeProcessingResult::Pruned => {
                         un.fetch_add(1, Ordering::Relaxed);
                     }
-                    NodeProcessingResult::Refined(nodes) => {
-                        // Optimization: Push all at once (BATCH PUSH) to reduce locking
-                        let mut lock = q.lock().unwrap();
-                        for (n, p) in nodes {
-                            lock.push(n, p);
+                    NodeProcessingResult::Done { solutions, refined } => {
+                        for trace in solutions {
+                            let _ = tx.send(SolverMsg::SolutionFound(trace, my_global_id));
+                        }
+                        if !refined.is_empty() {
+                            let mut lock = q.lock().unwrap();
+                            for (n, p) in refined {
+                                lock.push(n, p);
+                            }
                         }
                     }
                 }
@@ -803,7 +809,14 @@ where
                         "Trial ID: {}\n\n#Main\n{}\n#PV\n{}",
                         trials, trace, public_trace
                     );
-                    final_check(&trace, trials, prime, known_solution, ui);
+                    final_check(
+                        &trace,
+                        trials,
+                        prime,
+                        known_solution,
+                        ui,
+                        known_solution_area,
+                    );
                     solution_found = true;
                     if last_tick.elapsed() >= tick_rate {
                         terminal
@@ -878,12 +891,39 @@ where
         let queue_empty = queue.lock().unwrap().is_empty();
         let workers_idle = active_workers.load(Ordering::SeqCst) == 0;
         if queue_empty && workers_idle {
+            for msg in rx.try_iter() {
+                if let SolverMsg::SolutionFound(trace, trials) = msg {
+                    final_check(
+                        &trace,
+                        trials,
+                        prime,
+                        known_solution,
+                        ui,
+                        known_solution_area,
+                    );
+                    solution_found = true;
+                }
+            }
             break;
         }
 
         // tiny sleep to avoid the over-usage of CPU
         *sleep_time += Duration::from_millis(10);
         thread::sleep(Duration::from_millis(10));
+    }
+
+    for msg in rx.try_iter() {
+        if let SolverMsg::SolutionFound(trace, trials) = msg {
+            final_check(
+                &trace,
+                trials,
+                prime,
+                known_solution,
+                ui,
+                known_solution_area,
+            );
+            solution_found = true;
+        }
     }
 
     (VerificationStatus::Verified, solution_found, user_quit)
@@ -1000,12 +1040,14 @@ pub fn run_parallel_solver<FinalCheckFn, PostProcessFn>(
     post_process: PostProcessFn,
     final_check: FinalCheckFn,
     known_solution: &mut HashSet<String>,
+    known_solution_area: &mut i128,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     sleep_time: &mut Duration,
 ) -> (VerificationStatus, usize)
 where
-    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
+    FinalCheckFn:
+        Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128) + Clone,
     PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
     // Arc wrappers for constant data shared across all subsets
@@ -1016,6 +1058,7 @@ where
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut last_verification_status = VerificationStatus::Interrupted;
+    let mut last_cum_sum = 1;
 
     // --- OUTER LOOP: Subset Sizes ---
     'outer: for k in
@@ -1062,6 +1105,7 @@ where
                 terminal,
                 final_check.clone(),
                 known_solution,
+                known_solution_area,
                 global_count.clone(),
                 sleep_time,
                 &start_time,

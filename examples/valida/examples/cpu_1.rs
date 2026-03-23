@@ -145,6 +145,7 @@ fn final_check(
     prime: u32,
     known_report: &mut HashSet<String>,
     ui: &mut UiState,
+    _area: &mut i128,
 ) {
     let mut record_reprs = cpu_canonicalizer(trace, prime);
 
