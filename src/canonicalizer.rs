@@ -94,12 +94,13 @@ pub fn generate_memory_op_final_checker(
     op_c_columns: Vec<usize>,
     memory_columns: Vec<usize>,
     general_lookup_info: GeneralLookupInfo,
-) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone {
+) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128) + Clone {
     move |trace: &AbstractTrace,
           _num_trial: usize,
           prime: u32,
           known_reprt: &mut HashSet<String>,
-          ui: &mut UiState| {
+          ui: &mut UiState,
+          _area: &mut i128| {
         let mut record_reprs = HashSet::new();
         let n = trace.data.len();
         for i in 0..trace.data.len() {

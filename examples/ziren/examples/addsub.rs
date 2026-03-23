@@ -86,7 +86,7 @@ fn main() -> Result<(), io::Error> {
     // ######################## Canonicalization ##################################
     let cr = if opcode_str == "ADD" { cr_add } else { cr_sub };
     let final_check =
-        |at: &AbstractTrace, _n: usize, p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
+        |at: &AbstractTrace, _n: usize, p: u32, kr: &mut HashSet<String>, ui: &mut UiState, _area: &mut i128| {
             save_repr_if_unique(&cr(at, p), kr, ui);
         };
 

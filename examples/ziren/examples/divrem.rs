@@ -88,7 +88,7 @@ fn main() -> Result<(), io::Error> {
         canonical_repr_rem
     };
     let final_check =
-        |at: &AbstractTrace, _n: usize, _p: u32, kr: &mut HashSet<String>, ui: &mut UiState| {
+        |at: &AbstractTrace, _n: usize, _p: u32, kr: &mut HashSet<String>, ui: &mut UiState, _area: &mut i128| {
             save_repr_if_unique(&cr(at), kr, ui);
         };
 

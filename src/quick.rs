@@ -90,7 +90,7 @@ where
 
     // ######################## Solve ############################################
     if verification_method == "bb" {
-        let mut known_solution_area = 1;
+        let mut known_solution_area = 0;
         quick_api(
             program_info.program_str.clone(),
             constraint_info,
