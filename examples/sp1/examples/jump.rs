@@ -112,6 +112,31 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..args.num_trial {
+        let mut new_constraint_info = constraint_info.clone();
+        if args.range_interval != 0 {
+            use rand::prelude::IndexedRandom;
+            use rand::seq::SliceRandom;
+            let mut rng = StdRng::seed_from_u64(search_config.seed);
+            let op_b = vec![14, 15, 16, 17];
+            let op_c = vec![18, 19, 20, 21];
+            let b = op_b.choose(&mut rng).unwrap();
+            let c = op_c.choose(&mut rng).unwrap();
+            let b_lo = rng.random_range(0..(255 - args.range_interval));
+            let c_lo = rng.random_range(0..(255 - args.range_interval));
+
+            new_constraint_info.refinable_cols.push(*b);
+            new_constraint_info.refinable_cols.push(*c);
+            new_constraint_info.range_types.insert(
+                *b,
+                RangeType::Any(b_lo as i128, (b_lo + args.range_interval) as i128),
+            );
+            new_constraint_info.range_types.insert(
+                *c,
+                RangeType::Any(c_lo as i128, (c_lo + args.range_interval) as i128),
+            );
+            search_config.minimum_num_taregt_cols = new_constraint_info.refinable_cols.len();
+        }
+        println!("{:?}", new_constraint_info.range_types);
         let r1: u8 = rng.random_range(0..32);
         let r2: u8 = rng.random_range(0..32);
         let x: u32 = rng.random_range(0..2_u32.pow(21)); //1006632960
@@ -131,7 +156,7 @@ fn main() -> Result<(), io::Error> {
         let mut known_solution = HashSet::new();
         let result = experiment_harness(
             &program_info,
-            &mut constraint_info,
+            &mut new_constraint_info,
             &search_config,
             &base_abs_main_trace_data,
             vec![],
