@@ -56,6 +56,7 @@ pub struct VerificationResult {
     pub num_solutions: usize,
     pub num_total_trials: usize,
     pub execution_time: std::time::Duration,
+    pub area: i128,
 }
 
 pub fn experiment_harness<FinalCheckFn, PostProcessFn>(
@@ -71,7 +72,8 @@ pub fn experiment_harness<FinalCheckFn, PostProcessFn>(
     known_solution: &mut HashSet<String>,
 ) -> Result<VerificationResult, io::Error>
 where
-    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
+    FinalCheckFn:
+        Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128) + Clone,
     PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
     let mut sleep_time = Duration::from_millis(0);
@@ -88,6 +90,7 @@ where
 
     // ######################## Solve ############################################
     if verification_method == "bb" {
+        let mut known_solution_area = 1;
         quick_api(
             program_info.program_str.clone(),
             constraint_info,
@@ -98,6 +101,7 @@ where
             final_check,
             &mut sleep_time,
             known_solution,
+            &mut known_solution_area,
         )
     } else {
         // ######################## Generating SMT Formula ##########################
@@ -148,6 +152,7 @@ where
             num_total_trials: 0,
             num_solutions,
             execution_time: start_time.elapsed() - sleep_time,
+            area: 1,
         })
     }
 }
@@ -162,9 +167,11 @@ pub fn quick_api<FinalCheckFn, PostProcessFn>(
     final_check: FinalCheckFn,
     sleep_time: &mut Duration,
     known_solution: &mut HashSet<String>,
+    known_solution_area: &mut i128,
 ) -> Result<VerificationResult, io::Error>
 where
-    FinalCheckFn: Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone,
+    FinalCheckFn:
+        Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128) + Clone,
     PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
     enable_raw_mode()?;
@@ -186,6 +193,7 @@ where
         align_pc_to_program,
         final_check,
         known_solution,
+        known_solution_area,
         &mut ui,
         &mut terminal,
         sleep_time,
@@ -204,6 +212,7 @@ where
         num_total_trials: global_count,
         num_solutions: known_solution.len(),
         execution_time: start_time.elapsed(),
+        area: *known_solution_area,
     })
 }
 

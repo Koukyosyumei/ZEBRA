@@ -55,14 +55,16 @@ fn is_maybe_real_wo_pubval(
 
 pub fn generate_alu_final_checker(
     general_lookup_info: GeneralLookupInfo,
-) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState) + Clone {
+) -> impl Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128) + Clone {
     move |trace: &AbstractTrace,
           _num_trial: usize,
           prime: u32,
           known_reprt: &mut HashSet<String>,
-          ui: &mut UiState| {
+          ui: &mut UiState,
+          area: &mut i128| {
         let mut record_reprs = HashSet::new();
         let n = trace.data.len();
+        let mut this_area = 1;
         for (i, curr_row) in trace.data.iter().enumerate() {
             if is_maybe_real_wo_pubval(curr_row, &general_lookup_info, prime, n, i) {
                 record_reprs.insert(format!(
@@ -71,7 +73,14 @@ pub fn generate_alu_final_checker(
                     trace_fmt_with_idxs(trace, 0, &general_lookup_info.op_c),
                     trace_fmt_with_idxs(trace, 0, &general_lookup_info.op_a),
                 ));
+                this_area *= trace.area(&general_lookup_info.op_b);
+                this_area *= trace.area(&general_lookup_info.op_c);
+                this_area *= trace.area(&general_lookup_info.op_a);
             }
+        }
+        let string_representation = format!("{}", PrettySet(record_reprs.clone()));
+        if !known_reprt.contains(&string_representation) {
+            *area += this_area;
         }
 
         save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);

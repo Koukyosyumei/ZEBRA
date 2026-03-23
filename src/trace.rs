@@ -80,6 +80,16 @@ impl AbstractTrace {
         }
     }
 
+    pub fn area(&self, cols: &Vec<usize>) -> i128 {
+        let mut s = 1;
+        for i in 0..self.data.len() {
+            for c in cols {
+                s *= self.data[i][*c].hi - self.data[i][*c].lo + 1;
+            }
+        }
+        s
+    }
+
     /// Compares two abstract traces and returns positions of differing intervals.
     ///
     /// # Parameters

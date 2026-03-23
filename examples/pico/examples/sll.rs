@@ -90,6 +90,24 @@ fn main() -> Result<(), io::Error> {
         let program = target_program(4, 4, x, y);
         let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
+        use zebra::constraint::eval_constraints;
+        use zebra::interval::AbstractInterval;
+        use zebra::trace::AbstractTrace;
+        let mut bam = base_abs_main_trace_data.clone();
+        let v = vec![
+            0, 64, 173, 148, 181, 82, 166, 64, 142, 215, 253, 78, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0,
+            0, 0, 0, 1, 0, 64, 64, 173, 148, 41, 45, 20, 41, 16, 0, 1, 0, 0, 1,
+        ];
+        for i in 0..search_config.minimum_num_taregt_cols {
+            bam[0][i] = AbstractInterval::from_i128(v[i]);
+        }
+        bam[0][9] = AbstractInterval { lo: 215, hi: 217 };
+        let at = AbstractTrace::new(bam);
+        println!("{}", at);
+        let result = eval_constraints(&at, None, &new_constraint_info.constraints, prime);
+
+        println!("{:?}", result);
+
         // ######################## Set Info ##########################################
         let program_info = ProgramInfo {
             program_str: get_program_str(&program),
