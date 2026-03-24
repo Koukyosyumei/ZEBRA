@@ -23,6 +23,7 @@ NUM_TRIALS=5
 TIMEOUT_MS=1000000
 MAX_EXPANSIONS=30000000
 FIXED_WORKERS=8
+BASE_SEED=41
 RUN_WORKER_SWEEP=1
 RUN_RANGE_SWEEP=1
 
@@ -62,33 +63,49 @@ RANGE_INTERVALS=(0 1 7 31 127)
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 make_config() {
-    local workers=$1
+    local workers=$1 seed=$2
     local tmpfile
     tmpfile="$(mktemp /tmp/zebra_config_XXXXXX.json)"
     cat > "$tmpfile" <<JSON
 {
     "time_out_ms": ${TIMEOUT_MS},
     "max_expansions": ${MAX_EXPANSIONS},
-    "num_workers": ${workers}
+    "num_workers": ${workers},
+    "seed": ${seed}
 }
 JSON
     echo "$tmpfile"
 }
 
 run_one() {
-    local chip="$1" opcode="$2" config="$3" range="$4" outfile="$5"
+    local chip="$1" opcode="$2" workers="$3" range="$4" outfile="$5"
     mkdir -p "$(dirname "$outfile")"
-    echo "    run: chip=$chip opcode=$opcode range=$range -> $(basename "$outfile")"
-    (cd "$VM_DIR" && \
-        "$BIN_DIR/$chip" \
-            --config        "$config" \
-            --opcode-str    "$opcode" \
-            --method        "bb" \
-            --num-trial     "$NUM_TRIALS" \
-            --range-interval "$range" \
-            --ouptput-path  "$outfile" \
-        2>/dev/null
-    )
+    local tmpfile trial_config ratio
+    tmpfile="$(mktemp /tmp/zebra_result_XXXXXX.yaml)"
+
+    for (( trial=1; trial<=NUM_TRIALS; trial++ )); do
+        trial_config="$(make_config "$workers" "$((BASE_SEED + trial - 1))")"
+        echo "    run: chip=$chip opcode=$opcode range=$range trial=$trial/$NUM_TRIALS seed=$((BASE_SEED + trial - 1)) -> $(basename "$outfile")"
+        (cd "$VM_DIR" && \
+            "$BIN_DIR/$chip" \
+                --config         "$trial_config" \
+                --opcode-str     "$opcode" \
+                --method         "bb" \
+                --num-trial      1 \
+                --range-interval "$range" \
+                --ouptput-path   "$tmpfile" \
+            2>/dev/null
+        ) || true
+        rm -f "$trial_config"
+        ratio=$(grep -m1 'success_ratio:' "$tmpfile" 2>/dev/null | awk '{print $2}')
+        if [[ -z "$ratio" ]] || ! awk "BEGIN { exit ($ratio >= 1.0) ? 0 : 1 }"; then
+            echo "      -> not verified (success_ratio=${ratio:-N/A}), skipping remaining trials"
+            break
+        fi
+    done
+
+    cp "$tmpfile" "$outfile"
+    rm -f "$tmpfile"
 }
 
 # ── experiment 1: worker sweep ────────────────────────────────────────────────
@@ -103,18 +120,12 @@ if [[ $RUN_WORKER_SWEEP -eq 1 ]]; then
     for workers in "${WORKER_COUNTS[@]}"; do
         echo ""
         echo "--- workers=$workers ---"
-        config="$(make_config "$workers")"
-        trap "rm -f '$config'" EXIT
-
         for chip in "${CHIPS[@]}"; do
             for opcode in ${CHIP_OPCODES[$chip]}; do
                 outfile="$RESULTS_DIR/worker_sweep/$chip/workers_${workers}/${opcode}.yaml"
-                run_one "$chip" "$opcode" "$config" 0 "$outfile"
+                run_one "$chip" "$opcode" "$workers" 0 "$outfile"
             done
         done
-
-        rm -f "$config"
-        trap - EXIT
     done
     echo ""
     echo "Worker sweep complete."
@@ -130,22 +141,16 @@ if [[ $RUN_RANGE_SWEEP -eq 1 ]]; then
     echo "  trials  : $NUM_TRIALS"
     echo "======================================================="
 
-    config="$(make_config "$FIXED_WORKERS")"
-    trap "rm -f '$config'" EXIT
-
     for range in "${RANGE_INTERVALS[@]}"; do
         echo ""
         echo "--- range-interval=$range ---"
         for chip in "${CHIPS[@]}"; do
             for opcode in ${CHIP_OPCODES[$chip]}; do
                 outfile="$RESULTS_DIR/range_sweep/$chip/range_${range}/${opcode}.yaml"
-                run_one "$chip" "$opcode" "$config" "$range" "$outfile"
+                run_one "$chip" "$opcode" "$FIXED_WORKERS" "$range" "$outfile"
             done
         done
     done
-
-    rm -f "$config"
-    trap - EXIT
     echo ""
     echo "Range sweep complete."
 fi
