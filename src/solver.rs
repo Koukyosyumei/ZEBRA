@@ -1083,7 +1083,6 @@ where
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut last_verification_status = VerificationStatus::Interrupted;
-    let mut last_cum_sum = 1;
 
     // --- OUTER LOOP: Subset Sizes ---
     'outer: for k in
