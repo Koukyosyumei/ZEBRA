@@ -7,6 +7,7 @@ use crate::symbolic::{
     ZEBRASymbolicExpr,
 };
 use crate::trace::AbstractTrace;
+use crate::wordop::word_addu;
 
 /// Detects selector-gated constant assignment constraints.
 ///
@@ -668,7 +669,11 @@ pub fn apply_abir_refinement(
 fn double_sel_fires(row: &[AbstractInterval], s_idx: usize, s_inv: bool) -> bool {
     let sel = &row[s_idx];
     if sel.is_singleton() {
-        if s_inv { sel.lo == 0 } else { sel.lo == 1 }
+        if s_inv {
+            sel.lo == 0
+        } else {
+            sel.lo == 1
+        }
     } else {
         false
     }
@@ -728,13 +733,8 @@ pub fn detect_double_sel_addvars_sub_const(
                         get_curr_i_with_polarity(s2_expr),
                     ) {
                         if let Some((vs, target)) = get_curr_add_vars_or_zero(body_expr, prime) {
-                            if vs.len() >= 2
-                                && !vs.contains(&s1_idx)
-                                && !vs.contains(&s2_idx)
-                            {
-                                result.push((
-                                    s1_idx, s1_inv, s2_idx, s2_inv, vs, target,
-                                ));
+                            if vs.len() >= 2 && !vs.contains(&s1_idx) && !vs.contains(&s2_idx) {
+                                result.push((s1_idx, s1_inv, s2_idx, s2_inv, vs, target));
                             }
                         }
                     }
@@ -767,6 +767,573 @@ pub fn refine_double_sel_var_sub_const(
             }
         }
     }
+    MayBeFlag::MayBe
+}
+
+// ─── Selector-gated WordAddU refinement ───────────────────────────────────────
+//
+// Handles constraints of the form:
+//   selector * (a_word - WordAddU(b_limbs, c_limbs)) = 0
+//
+// When the selector fires (singleton = 1) and all limbs of b and c are
+// singletons, the result of WordAddU(b, c) is a concrete u32.  The four byte
+// limbs of that result are then intersected with the corresponding a limb
+// variables, provided each a limb's current interval fits within u8 range.
+
+/// Holds a detected `selector * (a_word - WordAddU(b, c)) = 0` constraint.
+#[derive(Debug, Clone)]
+pub struct SelectorAddUConstraint {
+    /// Selector expression (fires when it evaluates to singleton `{1}`).
+    pub selector_expr: Box<ZEBRASymbolicExpr>,
+    /// Column indices for the four byte-limbs of a (LSB first).
+    pub a_var_indices: [usize; 4],
+    /// Symbolic expressions for the four byte-limbs of b.
+    pub b_limb_exprs: [Box<ZEBRASymbolicExpr>; 4],
+    /// Symbolic expressions for the four byte-limbs of c.
+    pub c_limb_exprs: [Box<ZEBRASymbolicExpr>; 4],
+}
+
+/// Attempts to reduce an expression to a bare variable index when the
+/// expression is semantically equivalent to `curr[i]` (coefficient 1).
+///
+/// Handles the two extra layers of wrapping that appear in practice:
+///
+/// * `Variable(i)`
+/// * `Mul(Variable(i), Const(1))` / `Mul(Const(1), Variable(i))`
+/// * `Add(Const(0), inner)` / `Add(inner, Const(0))` — recursively unwrapped
+fn try_unwrap_unit_var(expr: &ZEBRASymbolicExpr) -> Option<usize> {
+    match expr {
+        ZEBRASymbolicExpr::Variable(v) => Some(v.index),
+        ZEBRASymbolicExpr::Mul(lhs, rhs) => match (lhs.as_ref(), rhs.as_ref()) {
+            (ZEBRASymbolicExpr::Variable(v), ZEBRASymbolicExpr::Constant(k))
+            | (ZEBRASymbolicExpr::Constant(k), ZEBRASymbolicExpr::Variable(v))
+                if k.is_singleton() && k.lo == 1 =>
+            {
+                Some(v.index)
+            }
+            _ => None,
+        },
+        ZEBRASymbolicExpr::Add(lhs, rhs) => {
+            // Add(Const(0), inner) or Add(inner, Const(0))
+            if let ZEBRASymbolicExpr::Constant(k) = lhs.as_ref() {
+                if k.is_singleton() && k.lo == 0 {
+                    return try_unwrap_unit_var(rhs);
+                }
+            }
+            if let ZEBRASymbolicExpr::Constant(k) = rhs.as_ref() {
+                if k.is_singleton() && k.lo == 0 {
+                    return try_unwrap_unit_var(lhs);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+/// Collects `(var_index, scale)` pairs from a word-reconstruction expression.
+///
+/// Handles the actual format produced in practice:
+///
+/// ```text
+/// Mul(Add(Const(0), Mul(Variable(i), Const(1))), Const(scale))
+/// ```
+///
+/// i.e. each limb term is `Mul(inner_expr, Const(scale))` where `inner_expr`
+/// is any expression that [`try_unwrap_unit_var`] can reduce to a variable.
+/// The terms are accumulated inside a left-leaning `Add` tree.
+///
+/// `clean` is set to `false` whenever an unexpected node is encountered
+/// (non-zero constant, bare variable, or unrecognized Mul).  Callers that
+/// require a pure word reconstruction should check this flag.
+fn collect_scaled_vars_from_word(
+    expr: &ZEBRASymbolicExpr,
+    result: &mut Vec<(usize, i128)>,
+    clean: &mut bool,
+) {
+    match expr {
+        ZEBRASymbolicExpr::Add(lhs, rhs) => {
+            collect_scaled_vars_from_word(lhs, result, clean);
+            collect_scaled_vars_from_word(rhs, result, clean);
+        }
+        ZEBRASymbolicExpr::Mul(lhs, rhs) => {
+            // Try Mul(inner, Const(scale)) and Mul(Const(scale), inner)
+            for (inner, scale_expr) in [(lhs.as_ref(), rhs.as_ref()), (rhs.as_ref(), lhs.as_ref())]
+            {
+                if let ZEBRASymbolicExpr::Constant(k) = scale_expr {
+                    if let Some(var_idx) = try_unwrap_unit_var(inner) {
+                        result.push((var_idx, k.lo));
+                        return;
+                    }
+                }
+            }
+            *clean = false; // unrecognised Mul pattern
+        }
+        ZEBRASymbolicExpr::Constant(k) => {
+            // Only the implicit zero padding (Const(0)) is allowed; anything
+            // else (e.g. the "+4" offset in `next_pc + 4`) taints the result.
+            if !(k.is_singleton() && k.lo == 0) {
+                *clean = false;
+            }
+        }
+        _ => {
+            *clean = false; // bare variable or other unexpected node
+        }
+    }
+}
+
+/// Tries to parse a word-reconstruction expression into four variable indices.
+///
+/// Handles the nested format:
+/// `(((0 + ((0 + (curr[i] * 1)) * 1)) + ((0 + (curr[j] * 1)) * 256)) + ...)`
+///
+/// Returns `[a0_idx, a1_idx, a2_idx, a3_idx]` on success, or `None` if the
+/// expression contains unexpected content (e.g. a non-zero constant addend).
+fn extract_word_var_indices(expr: &ZEBRASymbolicExpr) -> Option<[usize; 4]> {
+    let mut scaled: Vec<(usize, i128)> = Vec::new();
+    let mut clean = true;
+    collect_scaled_vars_from_word(expr, &mut scaled, &mut clean);
+
+    if !clean || scaled.len() != 4 {
+        return None;
+    }
+
+    scaled.sort_by_key(|&(_, s)| s);
+
+    let expected = [1i128, 256, 65536, 16_777_216];
+    let mut indices = [0usize; 4];
+    for (i, &(var_idx, scale)) in scaled.iter().enumerate() {
+        if scale != expected[i] {
+            return None;
+        }
+        indices[i] = var_idx;
+    }
+    Some(indices)
+}
+
+/// Detects `selector_expr * (a_word - WordAddU(b_limbs, c_limbs)) = 0` constraints.
+///
+/// The selector may be any symbolic expression (e.g. as produced by
+/// `make_impl_constraint`).  The side condition — that a's limb variables do
+/// not appear free in the selector — is checked via [`gather_vars_simple`].
+///
+/// Returns a list of [`SelectorAddUConstraint`] values ready for refinement.
+pub fn detect_selector_addu_constraints(
+    constraints: &[ZEBRASymbolicExpr],
+) -> Vec<SelectorAddUConstraint> {
+    let mut result = Vec::new();
+
+    for c in constraints {
+        if let ZEBRASymbolicExpr::Mul(outer_lhs, outer_rhs) = c {
+            for (sel_expr, body_expr) in [
+                (outer_lhs.as_ref(), outer_rhs.as_ref()),
+                (outer_rhs.as_ref(), outer_lhs.as_ref()),
+            ] {
+                let ZEBRASymbolicExpr::Sub(a_word_expr, word_op_expr) = body_expr else {
+                    continue;
+                };
+                let ZEBRASymbolicExpr::WordAddU(b_arr, c_arr) = word_op_expr.as_ref() else {
+                    continue;
+                };
+                let Some(a_var_indices) = extract_word_var_indices(a_word_expr) else {
+                    continue;
+                };
+
+                // Side condition: a's limb variables must not appear free in the selector.
+                let mut sel_vars = HashSet::new();
+                gather_vars_simple(sel_expr, &mut sel_vars);
+                if a_var_indices.iter().any(|idx| sel_vars.contains(idx)) {
+                    continue;
+                }
+
+                result.push(SelectorAddUConstraint {
+                    selector_expr: Box::new(sel_expr.clone()),
+                    a_var_indices,
+                    b_limb_exprs: b_arr.clone(),
+                    c_limb_exprs: c_arr.clone(),
+                });
+                break; // matched one ordering; no need to try the other
+            }
+        }
+    }
+
+    result
+}
+
+/// Applies interval refinement for selector-gated `WordAddU` constraints.
+///
+/// For each constraint and each row, when:
+///
+/// * the selector expression evaluates to the singleton `{1}`,
+/// * all four limbs of both b and c evaluate to singletons, and
+/// * each limb of a satisfies `0 ≤ lo` and `hi ≤ 255` (proper u8 domain),
+///
+/// the function computes the exact 32-bit result of `WordAddU(b, c)`, decodes
+/// it into four bytes, and intersects each byte with the corresponding a limb.
+///
+/// Returns `MayBeFlag::False` on contradiction, `MayBeFlag::MayBe` otherwise.
+pub fn refine_selector_addu_constraints(
+    trace: &mut AbstractTrace,
+    constraints: &[SelectorAddUConstraint],
+    prime: u32,
+) -> MayBeFlag {
+    let num_rows = trace.data.len();
+
+    for r in 0..num_rows {
+        for constraint in constraints {
+            let next_row = if r + 1 < num_rows {
+                Some(&trace.data[r + 1][..])
+            } else {
+                None
+            };
+            let row = &trace.data[r];
+
+            // Evaluate the selector expression; proceed only when it fires (= {1}).
+            let sel_val = constraint.selector_expr.eval(
+                row,
+                next_row,
+                None,
+                r == 0,
+                r + 1 < num_rows,
+                r + 1 == num_rows,
+                prime,
+            );
+            if !sel_val.is_singleton() || sel_val.lo != 1 {
+                continue;
+            }
+
+            // Evaluate b and c limbs.
+            let b_word: [AbstractInterval; 4] = std::array::from_fn(|i| {
+                constraint.b_limb_exprs[i].eval(
+                    row,
+                    next_row,
+                    None,
+                    r == 0,
+                    r + 1 < num_rows,
+                    r + 1 == num_rows,
+                    prime,
+                )
+            });
+            let c_word: [AbstractInterval; 4] = std::array::from_fn(|i| {
+                constraint.c_limb_exprs[i].eval(
+                    row,
+                    next_row,
+                    None,
+                    r == 0,
+                    r + 1 < num_rows,
+                    r + 1 == num_rows,
+                    prime,
+                )
+            });
+
+            // b and c must all be singletons.
+            if !b_word.iter().all(|x| x.is_singleton()) || !c_word.iter().all(|x| x.is_singleton())
+            {
+                continue;
+            }
+
+            // Each a limb must lie within the proper u8 domain [0, 255].
+            let a_ok = constraint
+                .a_var_indices
+                .iter()
+                .all(|&idx| trace.data[r][idx].lo >= 0 && trace.data[r][idx].hi <= 255);
+            if !a_ok {
+                continue;
+            }
+
+            // Compute the exact 32-bit result.
+            let result = word_addu(&b_word, &c_word);
+            if !result.is_singleton() {
+                continue;
+            }
+            let target_u32 = result.lo as u32;
+
+            // Refine each a limb to its exact byte.
+            for i in 0..4 {
+                let byte_val = ((target_u32 >> (8 * i)) & 0xFF) as i128;
+                let target_iv = AbstractInterval::from_i128(byte_val);
+                let a_idx = constraint.a_var_indices[i];
+                if let Some(refined) = trace.data[r][a_idx].intersect(&target_iv) {
+                    trace.data[r][a_idx] = refined;
+                } else {
+                    return MayBeFlag::False;
+                }
+            }
+        }
+    }
+
+    MayBeFlag::MayBe
+}
+
+// ─── Selector-gated word-assignment refinement ────────────────────────────────
+//
+// Handles the general pattern:
+//   sel_expr * (word_a - rhs_expr) = 0   (or Sub in the other direction)
+//
+// i.e. "when the selector fires, word_a equals rhs_expr".
+//
+// Unlike SelectorAddUConstraint, the RHS here can be any symbolic expression
+// (e.g. next_pc_word + 4).  The refinement fires when:
+//   1. sel_expr evaluates to singleton {1}
+//   2. rhs_expr evaluates to a singleton (concrete u32)
+//   3. every limb of word_a lies in [0, 255]
+//
+// Side conditions (checked at detection time):
+//   • word_a's limb variables must not appear free in sel_expr
+//   • word_a's limb variables must not appear free in rhs_expr
+//     (avoids a circular evaluation where rhs depends on a)
+
+/// Holds a detected `sel_expr * (word_a ± rhs_expr) = 0` constraint where
+/// `word_a` is a 4-limb word reconstruction and `rhs_expr` is an arbitrary
+/// expression that is expected to become a singleton at refinement time.
+#[derive(Debug, Clone)]
+pub struct SelectorWordAssignConstraint {
+    /// Combined selector expression (fires when it evaluates to any non-zero singleton).
+    pub selector_expr: Box<ZEBRASymbolicExpr>,
+    /// Column indices for the four byte-limbs of `word_a` (LSB first).
+    pub a_var_indices: [usize; 4],
+    /// Expression that `word_a` must equal when the selector fires.
+    pub rhs_expr: Box<ZEBRASymbolicExpr>,
+}
+
+/// Flattens a top-level `Mul` chain into its leaf factors.
+///
+/// Only descends into `Mul` nodes; stops at any other variant.
+/// For example:
+/// ```text
+/// Mul(A, Mul(B, C))  →  [A, B, C]
+/// ```
+fn collect_mul_factors(expr: &ZEBRASymbolicExpr, factors: &mut Vec<ZEBRASymbolicExpr>) {
+    if let ZEBRASymbolicExpr::Mul(lhs, rhs) = expr {
+        collect_mul_factors(lhs, factors);
+        collect_mul_factors(rhs, factors);
+    } else {
+        factors.push(expr.clone());
+    }
+}
+
+/// Collects the 4-limb variable index arrays for all words that have a
+/// `KoalaBearRange` or `BabyBearRange` check applied (inside a `WhenNonZero`).
+///
+/// Scans `constraints` for the pattern:
+/// ```text
+/// WhenNonZero(_, KoalaBearRange(word_expr))
+/// WhenNonZero(_, BabyBearRange(word_expr))
+/// ```
+/// and returns the set of `[usize; 4]` limb-index arrays extracted from
+/// `word_expr` via [`extract_word_var_indices`].
+fn collect_word_range_checked_indices(
+    constraints: &[ZEBRASymbolicExpr],
+) -> HashSet<[usize; 4]> {
+    let mut result = HashSet::new();
+    for c in constraints {
+        if let ZEBRASymbolicExpr::WhenNonZero(_, inner) = c {
+            let word_expr = match inner.as_ref() {
+                ZEBRASymbolicExpr::KoalaBearRange(w) => Some(w.as_ref()),
+                ZEBRASymbolicExpr::BabyBearRange(w) => Some(w.as_ref()),
+                _ => None,
+            };
+            if let Some(w) = word_expr {
+                if let Some(indices) = extract_word_var_indices(w) {
+                    result.insert(indices);
+                }
+            }
+        }
+    }
+    result
+}
+
+/// Detects `(sel_factors…) * (word_a - rhs_expr) = 0` constraints.
+///
+/// Handles arbitrarily deep `Mul` nesting by first flattening the constraint
+/// into its multiplicative factors, then searching every `Sub` factor for one
+/// whose side can be parsed as a **pure** 4-limb word reconstruction (no
+/// extra constant offsets).  All remaining factors — including scalar `Sub`s
+/// like `curr[59]-1` — are recombined into the `selector_expr`.
+///
+/// Example matched:
+/// ```text
+/// Mul(sum_vars, Mul(curr[59]-1, Sub(Add(next_pc_word,4), next_next_pc_word)))
+/// ```
+/// Flattened factors: `[sum_vars, Sub(curr[59],1), Sub(Add(next_pc+4), next_next_pc)]`
+///   → `Sub(curr[59],1)`: neither side is a pure word → skip
+///   → `Sub(Add(next_pc+4), next_next_pc)`:
+///       LHS has a +4 constant → not a pure word → skip
+///       RHS = `next_next_pc` → pure 4-limb word → matched!
+///   → selector = `Mul(sum_vars, Sub(curr[59],1))`
+///
+/// Side conditions:
+/// * `prime` must be either KoalaBear (`2130706433`) or BabyBear (`2013265921`).
+/// * `word_a`'s limb variables must have a `KoalaBearRange` or `BabyBearRange`
+///   constraint applied to them (ensures byte-range validity).
+/// * `word_a`'s limb variables must not appear free in `selector_expr`.
+/// * `word_a`'s limb variables must not appear free in `rhs_expr`
+///   (prevents circular evaluation during refinement).
+pub fn detect_selector_word_assign_constraints(
+    constraints: &[ZEBRASymbolicExpr],
+    prime: u32,
+) -> Vec<SelectorWordAssignConstraint> {
+    const KOALABEAR: u32 = 2130706433;
+    const BABYBEAR: u32 = 2013265921;
+    if prime != KOALABEAR && prime != BABYBEAR {
+        return Vec::new();
+    }
+
+    // Build a set of word index arrays that have a KoalaBear/BabyBear range check.
+    let range_checked = collect_word_range_checked_indices(constraints);
+
+    let mut result = Vec::new();
+
+    'outer: for c in constraints {
+        // Flatten the top-level Mul chain into individual factors.
+        let mut factors: Vec<ZEBRASymbolicExpr> = Vec::new();
+        collect_mul_factors(c, &mut factors);
+        if factors.len() < 2 {
+            continue;
+        }
+
+        // Search every Sub factor for one whose side is a pure word reconstruction.
+        for sub_idx in 0..factors.len() {
+            let ZEBRASymbolicExpr::Sub(sub_lhs, sub_rhs) = &factors[sub_idx] else {
+                continue;
+            };
+
+            for (a_side, rhs_side) in [
+                (sub_lhs.as_ref(), sub_rhs.as_ref()),
+                (sub_rhs.as_ref(), sub_lhs.as_ref()),
+            ] {
+                // Reject expressions that are not a pure word reconstruction
+                // (e.g. Add(next_pc_word, Const(4)) fails because of the +4).
+                let Some(a_var_indices) = extract_word_var_indices(a_side) else {
+                    continue;
+                };
+
+                // Combine every other factor into the selector.
+                let sel_expr = factors
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| *i != sub_idx)
+                    .map(|(_, f)| f.clone())
+                    .reduce(|a, b| ZEBRASymbolicExpr::Mul(Box::new(a), Box::new(b)))
+                    .unwrap(); // safe: at least one non-Sub factor remains
+
+                let mut sel_vars = HashSet::new();
+                gather_vars_simple(&sel_expr, &mut sel_vars);
+                let mut rhs_vars = HashSet::new();
+                gather_vars_simple(rhs_side, &mut rhs_vars);
+
+                if a_var_indices
+                    .iter()
+                    .any(|idx| sel_vars.contains(idx) || rhs_vars.contains(idx))
+                {
+                    continue;
+                }
+
+                // Require that word_a's limbs have a KoalaBear/BabyBear range check,
+                // ensuring the byte-range invariant holds during refinement.
+                if !range_checked.contains(&a_var_indices) {
+                    continue;
+                }
+
+                result.push(SelectorWordAssignConstraint {
+                    selector_expr: Box::new(sel_expr),
+                    a_var_indices,
+                    rhs_expr: Box::new(rhs_side.clone()),
+                });
+                continue 'outer; // next top-level constraint
+            }
+        }
+    }
+
+    result
+}
+
+/// Applies interval refinement for selector-gated word-assignment constraints.
+///
+/// For each constraint and each row, when:
+///
+/// * the selector expression evaluates to a **non-zero singleton**
+///   (i.e. the constraint definitely forces `word_a = rhs_expr`),
+/// * `rhs_expr` evaluates to a concrete singleton, and
+/// * every limb of `word_a` satisfies `0 ≤ lo` and `hi ≤ 255`,
+///
+/// the function decodes the singleton into four bytes and intersects each byte
+/// with the corresponding limb of `word_a`.
+///
+/// The selector condition is **non-zero** (not specifically `1`) to handle
+/// compound selectors like `Mul(sum_vars, curr[59]-1)` that evaluate to `-1`
+/// when the constraint is active.
+///
+/// Returns `MayBeFlag::False` on contradiction, `MayBeFlag::MayBe` otherwise.
+pub fn refine_selector_word_assign_constraints(
+    trace: &mut AbstractTrace,
+    constraints: &[SelectorWordAssignConstraint],
+    prime: u32,
+) -> MayBeFlag {
+    let num_rows = trace.data.len();
+
+    for r in 0..num_rows {
+        for constraint in constraints {
+            let next_row = if r + 1 < num_rows {
+                Some(&trace.data[r + 1][..])
+            } else {
+                None
+            };
+            let row = &trace.data[r];
+
+            // Selector must be a concrete non-zero value (constraint is enforced).
+            let sel_val = constraint.selector_expr.eval(
+                row,
+                next_row,
+                None,
+                r == 0,
+                r + 1 < num_rows,
+                r + 1 == num_rows,
+                prime,
+            );
+            if !sel_val.is_singleton() || sel_val.lo == 0 {
+                continue;
+            }
+
+            // RHS must be a concrete singleton.
+            let rhs_val = constraint.rhs_expr.eval(
+                row,
+                next_row,
+                None,
+                r == 0,
+                r + 1 < num_rows,
+                r + 1 == num_rows,
+                prime,
+            );
+            if !rhs_val.is_singleton() {
+                continue;
+            }
+
+            // Each a limb must lie within [0, 255].
+            if !constraint
+                .a_var_indices
+                .iter()
+                .all(|&idx| trace.data[r][idx].lo >= 0 && trace.data[r][idx].hi <= 255)
+            {
+                continue;
+            }
+
+            let target_u32 = rhs_val.lo as u32;
+
+            // Refine each limb to its exact byte.
+            for i in 0..4 {
+                let byte_val = ((target_u32 >> (8 * i)) & 0xFF) as i128;
+                let target_iv = AbstractInterval::from_i128(byte_val);
+                let a_idx = constraint.a_var_indices[i];
+                if let Some(refined) = trace.data[r][a_idx].intersect(&target_iv) {
+                    trace.data[r][a_idx] = refined;
+                } else {
+                    return MayBeFlag::False;
+                }
+            }
+        }
+    }
+
     MayBeFlag::MayBe
 }
 

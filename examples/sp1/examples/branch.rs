@@ -23,9 +23,7 @@ use zebra::ui::UiState;
 use zebra::utils::PrettySet;
 use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use zebra_sp1::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_sp1::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 // ############## Final Check Function ##############################
 fn final_check(
@@ -105,6 +103,7 @@ fn main() -> Result<(), io::Error> {
     for i in vec![5, 6, 7, 8] {
         constraint_info.range_types.insert(i, RangeType::U8);
     }
+    constraint_info.range_types.insert(8, RangeType::U7);
 
     constraint_info
         .refinable_cols

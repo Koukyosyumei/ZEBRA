@@ -51,12 +51,13 @@ CHIP_OPCODES[bitwise]="AND OR XOR"
 CHIP_OPCODES[mul]="MUL MULH MULHU MULHSU"
 CHIP_OPCODES[jump]="JAL JALR"
 CHIP_OPCODES[shiftleft]="SLL"
+CHIP_OPCODES[branch]="BEQ BGE BLT BNE"
 
-CHIPS=(addsub bitwise mul jump shiftleft)
+CHIPS=(addsub bitwise mul jump shiftleft branch)
 
 # ── experiment parameters ─────────────────────────────────────────────────────
-WORKER_COUNTS=(1 2 3 8)
-RANGE_INTERVALS=(0 1 3 7 15 31 63 127)
+WORKER_COUNTS=(1 2 8 32)
+RANGE_INTERVALS=(0 1 7 31 127)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

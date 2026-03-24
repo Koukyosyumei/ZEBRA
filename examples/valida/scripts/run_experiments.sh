@@ -52,8 +52,8 @@ CHIP_OPCODES[sub32]="SUB"
 CHIPS=(add32 sub32)
 
 # ── experiment parameters ─────────────────────────────────────────────────────
-WORKER_COUNTS=(1 2 3 8)
-RANGE_INTERVALS=(0 1 3 7 15 31 63 127)
+WORKER_COUNTS=(1 2 8 32)
+RANGE_INTERVALS=(0 1 7 31 127)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
