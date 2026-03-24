@@ -175,6 +175,7 @@ def _plot_vm_ax(
     sweep_data:  dict,
     granularity: str = "opcode",   # "chip" | "opcode"
     x_transform = None,            # optional callable: raw param → display value
+    x_log:       bool = False,     # use log scale on x-axis
 ) -> None:
     """Draw lines for one VM onto *ax*, at chip or opcode granularity."""
     xfn = x_transform if x_transform is not None else (lambda v: v)
@@ -232,6 +233,9 @@ def _plot_vm_ax(
     ax.yaxis.set_major_formatter(
         plt.matplotlib.ticker.LogFormatterSciNotation(labelOnlyBase=False)
     )
+    if x_log:
+        ax.set_xscale("log")
+        ax.xaxis.set_major_formatter(plt.matplotlib.ticker.ScalarFormatter())
     ax.grid(True, which="both", axis="y", linestyle=":", linewidth=0.5, alpha=0.6)
     ax.tick_params(labelsize=8)
     ax.legend(fontsize=7, loc="best", framealpha=0.85, handlelength=2.0)
@@ -266,7 +270,8 @@ def plot_sweep(
         sweep_data    = load_sweep(vm_report_dir, sweep_type)
 
         _plot_vm_ax(ax, vm_name, vm_cfg, sweep_data, granularity=granularity,
-                    x_transform=x_transform)
+                    x_transform=x_transform,
+                    x_log=(sweep_type == "range_sweep"))
         ax.set_xlabel(x_label, fontsize=9)
 
     axes[0].set_ylabel("Mean verification time (s)  [log]", fontsize=9)
