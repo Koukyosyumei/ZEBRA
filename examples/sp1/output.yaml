@@ -8,12 +8,12 @@ config:
   seed: 41
 args:
   config: ./configs/alu.config
-  num_trial: 2
+  num_trial: 1
   ouptput_path: output.yaml
   method: bb
   opcode_str: AND
   range_interval: 0
 report:
-  success_ratio: 0.0
-  exe_time_mean: 0.0001363
-  exe_time_variance: 7.840000000000002e-12
+  success_ratio: 1.0
+  exe_time_mean: 0.003823801
+  exe_time_variance: 0.0
