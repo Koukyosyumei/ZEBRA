@@ -19,9 +19,7 @@ use zebra::solver::nop_post_process;
 use zebra::solver::RangeType;
 use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use zebra_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_ziren::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 pub fn target_program(opcode: Opcode, pc_start: u32, pc_base: u32, x: u32, y: u32) -> Program {
     let instructions = vec![Instruction::new(opcode, 1, x, y, true, true)];
@@ -103,7 +101,6 @@ fn main() -> Result<(), io::Error> {
             );
             search_config.minimum_num_taregt_cols = new_constraint_info.refinable_cols.len();
         }
-        println!("{:?}", new_constraint_info.range_types);
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 

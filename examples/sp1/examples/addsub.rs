@@ -21,9 +21,7 @@ use zebra::ui::UiState;
 use zebra::utils::PrettySet;
 use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use zebra_sp1::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_sp1::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
@@ -93,10 +91,14 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Canonicalization ##################################
     let cr = if opcode_str == "ADD" { cr_add } else { cr_sub };
-    let final_check =
-        |at: &AbstractTrace, _n: usize, p: u32, kr: &mut HashSet<String>, ui: &mut UiState, _area: &mut i128| {
-            save_repr_if_unique(&cr(at, p), kr, ui);
-        };
+    let final_check = |at: &AbstractTrace,
+                       _n: usize,
+                       p: u32,
+                       kr: &mut HashSet<String>,
+                       ui: &mut UiState,
+                       _area: &mut i128| {
+        save_repr_if_unique(&cr(at, p), kr, ui);
+    };
 
     // ######################## Extract CPU Constraints ##########################
     let air = AddSubChip::default();
@@ -149,7 +151,6 @@ fn main() -> Result<(), io::Error> {
             );
             search_config.minimum_num_taregt_cols = new_constraint_info.refinable_cols.len();
         }
-        println!("{:?}", new_constraint_info.range_types);
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 

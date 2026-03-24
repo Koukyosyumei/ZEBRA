@@ -21,9 +21,7 @@ use zebra::ui::UiState;
 use zebra::utils::PrettySet;
 use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use zebra_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_ziren::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 fn canonical_repr_div(trace: &AbstractTrace) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
@@ -87,10 +85,14 @@ fn main() -> Result<(), io::Error> {
     } else {
         canonical_repr_rem
     };
-    let final_check =
-        |at: &AbstractTrace, _n: usize, _p: u32, kr: &mut HashSet<String>, ui: &mut UiState, _area: &mut i128| {
-            save_repr_if_unique(&cr(at), kr, ui);
-        };
+    let final_check = |at: &AbstractTrace,
+                       _n: usize,
+                       _p: u32,
+                       kr: &mut HashSet<String>,
+                       ui: &mut UiState,
+                       _area: &mut i128| {
+        save_repr_if_unique(&cr(at), kr, ui);
+    };
 
     let output_columns = if opcode_str == "DIV" || opcode_str == "DIVU" {
         vec![10, 11, 12, 13]
@@ -142,7 +144,6 @@ fn main() -> Result<(), io::Error> {
             );
             search_config.minimum_num_taregt_cols = new_constraint_info.refinable_cols.len();
         }
-        println!("{:?}", new_constraint_info.range_types);
         let x: u32 = rng.random();
         let y: u32 = rng.random_range(1..u32::MAX);
 

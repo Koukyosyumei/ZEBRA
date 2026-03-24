@@ -22,9 +22,7 @@ use zebra::solver::nop_post_process;
 use zebra::utils::create_or_clear_dir;
 
 use zebra_valida::config::MyConfig;
-use zebra_valida::utils::{
-    extract_constraints_and_range, generate_bootstrap_trace_from_program,
-};
+use zebra_valida::utils::{extract_constraints_and_range, generate_bootstrap_trace_from_program};
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let _bytes_per_instr = BYTES_PER_INSTR as i32;
@@ -114,7 +112,6 @@ fn main() -> Result<(), io::Error> {
             );
             search_config.minimum_num_taregt_cols = new_constraint_info.refinable_cols.len();
         }
-        println!("{:?}", new_constraint_info.range_types);
 
         let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
         let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);

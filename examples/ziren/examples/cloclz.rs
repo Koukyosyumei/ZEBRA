@@ -21,9 +21,7 @@ use zebra::ui::UiState;
 use zebra::utils::PrettySet;
 use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use zebra_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_ziren::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 // ############## Final Check Function ##############################
 fn final_check(
@@ -120,7 +118,6 @@ fn main() -> Result<(), io::Error> {
             );
             search_config.minimum_num_taregt_cols = new_constraint_info.refinable_cols.len();
         }
-        println!("{:?}", new_constraint_info.range_types);
         let x: u32 = rng.random();
         let y: u32 = rng.random();
 
