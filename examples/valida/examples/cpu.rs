@@ -152,15 +152,18 @@ fn final_check(
     let mut bug_types: HashSet<String> = HashSet::new();
     check_bug_type(&trace, &mut record_reprs, &mut bug_types, prime);
 
-    let mut is_new = bug_types.is_empty();
-    for bt in &bug_types {
-        if !known_report.contains(bt) {
-            is_new = true;
-            known_report.insert(bt.clone());
+    let string_representation = format!("{}", PrettySet(record_reprs.clone()));
+    if !known_report.contains(&string_representation) {
+        let mut is_new = bug_types.is_empty();
+        for bt in &bug_types {
+            if !known_report.contains(bt) {
+                is_new = true;
+                known_report.insert(bt.clone());
+            }
         }
-    }
-    if !is_new {
-        return;
+        if !is_new {
+            return;
+        }
     }
 
     save_repr_if_unique(&PrettySet(record_reprs), known_report, ui);
@@ -340,6 +343,7 @@ fn main() -> Result<(), io::Error> {
     //    let program = get_target_program::<BabyBear>();
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
+    let mut global_known_solution = HashSet::new();
 
     for i in 0..10 {
         println!("\n\n===========");
@@ -394,10 +398,10 @@ fn main() -> Result<(), io::Error> {
             .insert(1, RangeType::Any(0, program.len() as i128 - 1));
 
         // ######################## Solve ############################################
-        let mut known_solution = HashSet::new();
+        let mut known_solution = global_known_solution.clone();
         let repr_sets =
             cpu_canonicalizer(&AbstractTrace::new(base_abs_main_trace_data.clone()), prime);
-        known_solution.insert(format!("{}", PrettySet(repr_sets)));
+        known_solution.insert(format!("{}", PrettySet(repr_sets.clone())));
 
         let result = experiment_harness(
             &program_info,
@@ -412,6 +416,26 @@ fn main() -> Result<(), io::Error> {
             &mut known_solution,
         );
         println!("{:?}", result);
+        if known_solution.len() > 1 {
+            println!("Honest Trace:\n   {}\n", PrettySet(repr_sets));
+            println!("Malicious Traces");
+            for k in &known_solution {
+                println!("  {}\n-------", k);
+            }
+
+            for a in vec![
+                "Empty",
+                "UnassignedOpcodeFlags",
+                "NonExclusiveOpcodeFlags",
+                "ContinueAfterStop",
+                "OverFlowWord",
+                "TerminateBeforeStop",
+            ] {
+                if known_solution.contains(a) {
+                    global_known_solution.insert(a.to_string());
+                }
+            }
+        }
         println!("=============\n\n");
     }
 

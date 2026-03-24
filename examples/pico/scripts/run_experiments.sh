@@ -53,7 +53,7 @@ CHIP_OPCODES[sll]="SLL"   # --opcode-str is ignored by sll binary; "SLL" is just
 CHIPS=(addsub bitwise mul sll)
 
 # ── experiment parameters ────────────────────────────────────────────────────
-WORKER_COUNTS=(1 2 3 8)
+WORKER_COUNTS=(1 2 4 8)
 RANGE_INTERVALS=(0 1 3 7 15 31 63 127)
 
 # ── helpers ──────────────────────────────────────────────────────────────────
