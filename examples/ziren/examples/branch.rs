@@ -115,13 +115,6 @@ fn main() -> Result<(), io::Error> {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
-    use zebra::shrinker::detect_selector_word_assign_constraints;
-    for c in &constraint_info.constraints.air_constraints {
-        //println!("  {}", c);
-    }
-    let a = detect_selector_word_assign_constraints(&constraint_info.constraints.air_constraints);
-    println!("{:?}", a);
-
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..args.num_trial {
