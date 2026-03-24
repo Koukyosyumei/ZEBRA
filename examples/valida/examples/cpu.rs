@@ -21,6 +21,7 @@ use valida_cpu::{
 use valida_machine::{Instruction, InstructionWord as IW, Operands, StarkField};
 use valida_opcodes::BYTES_PER_INSTR;
 
+use valida_opcodes::Opcode;
 use zebra::canonicalizer::save_repr_if_unique;
 use zebra::interval::AbstractInterval as AI;
 use zebra::interval::AbstractInterval;
@@ -34,7 +35,6 @@ use zebra::trace::AbstractTrace;
 use zebra::ui::{pad_dummy_rows_with_last_dummy, UiState};
 use zebra::utils::create_or_clear_dir;
 use zebra::utils::PrettySet;
-use valida_opcodes::Opcode;
 
 use zebra_valida::config::MyConfig;
 use zebra_valida::utils::{
