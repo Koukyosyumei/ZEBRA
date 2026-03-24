@@ -174,8 +174,10 @@ def _plot_vm_ax(
     vm_cfg:      dict,
     sweep_data:  dict,
     granularity: str = "opcode",   # "chip" | "opcode"
+    x_transform = None,            # optional callable: raw param → display value
 ) -> None:
     """Draw lines for one VM onto *ax*, at chip or opcode granularity."""
+    xfn = x_transform if x_transform is not None else (lambda v: v)
     colors = chip_colors(vm_cfg["chips"], vm_cfg["cmap"], vm_cfg["c_range"])
 
     if granularity == "chip":
@@ -186,9 +188,9 @@ def _plot_vm_ax(
             if not series:
                 continue
             color = colors.get(chip)
-            xs       = sorted(series.keys())
-            ys       = [series[x][0] for x in xs]
-            errs_raw = [series[x][1] for x in xs]
+            xs       = [xfn(v) for v in sorted(series.keys())]
+            ys       = [series[v][0] for v in sorted(series.keys())]
+            errs_raw = [series[v][1] for v in sorted(series.keys())]
             errs_lo  = [min(e, y * 0.9999) for y, e in zip(ys, errs_raw)]
             errs     = [errs_lo, errs_raw]
             marker   = _MARKERS[i % len(_MARKERS)]
@@ -211,9 +213,9 @@ def _plot_vm_ax(
                 series = sweep_data.get((chip, opcode), {})
                 if not series:
                     continue
-                xs       = sorted(series.keys())
-                ys       = [series[x][0] for x in xs]
-                errs_raw = [series[x][1] for x in xs]
+                xs       = [xfn(v) for v in sorted(series.keys())]
+                ys       = [series[v][0] for v in sorted(series.keys())]
+                errs_raw = [series[v][1] for v in sorted(series.keys())]
                 errs_lo  = [min(e, y * 0.9999) for y, e in zip(ys, errs_raw)]
                 errs     = [errs_lo, errs_raw]
                 idx       = chip_opcode_idx[chip]
@@ -246,6 +248,9 @@ def plot_sweep(
     out_path:    str,
     granularity: str = "opcode",   # "chip" | "opcode"
 ) -> None:
+    # For range sweeps, display the search-space volume (x+1)^2 instead of x.
+    x_transform = (lambda v: (v + 1) ** 2) if sweep_type == "range_sweep" else None
+
     vm_names = list(VMS.keys())
     n = len(vm_names)
 
@@ -260,15 +265,17 @@ def plot_sweep(
         vm_report_dir = os.path.join(base_dir, "examples", vm_name, "report")
         sweep_data    = load_sweep(vm_report_dir, sweep_type)
 
-        _plot_vm_ax(ax, vm_name, vm_cfg, sweep_data, granularity=granularity)
+        _plot_vm_ax(ax, vm_name, vm_cfg, sweep_data, granularity=granularity,
+                    x_transform=x_transform)
         ax.set_xlabel(x_label, fontsize=9)
 
     axes[0].set_ylabel("Mean verification time (s)  [log]", fontsize=9)
 
     fig.tight_layout()
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    print(f"Saved: {out_path}")
+    pdf_path = os.path.splitext(out_path)[0] + ".pdf"
+    fig.savefig(pdf_path, format="pdf", bbox_inches="tight")
+    print(f"Saved: {pdf_path}")
     plt.close(fig)
 
 
@@ -303,8 +310,8 @@ def main() -> None:
     gran     = args.granularity
 
     sweeps = [
-        ("worker_sweep", "Number of workers", f"worker_sweep_{gran}.png"),
-        ("range_sweep",  "Range interval",    f"range_sweep_{gran}.png"),
+        ("worker_sweep", "Number of workers",          f"worker_sweep_{gran}.pdf"),
+        ("range_sweep",  "Search volume  (x+1)²",      f"range_sweep_{gran}.pdf"),
     ]
 
     for sweep_type, x_label, fname in sweeps:
