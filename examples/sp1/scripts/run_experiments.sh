@@ -56,8 +56,8 @@ CHIP_OPCODES[branch]="BEQ BGE BLT BNE"
 CHIPS=(addsub bitwise mul jump shiftleft branch)
 
 # ── experiment parameters ─────────────────────────────────────────────────────
-WORKER_COUNTS=(1 2 3 8)
-RANGE_INTERVALS=(0 1 3 7 15 31 63 127)
+WORKER_COUNTS=(1 2 8 32)
+RANGE_INTERVALS=(0 1 7 31 127)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

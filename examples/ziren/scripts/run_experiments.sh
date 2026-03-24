@@ -58,8 +58,8 @@ CHIP_OPCODES[branch]="BEQ BNE BGEZ BGTZ BLEZ BLTZ"
 CHIPS=(addsub bitwise cloclz movcond mul shiftleft jump branch)
 
 # ── experiment parameters ─────────────────────────────────────────────────────
-WORKER_COUNTS=(1 2 3 8)
-RANGE_INTERVALS=(0 1 3 7 15 31 63 127)
+WORKER_COUNTS=(1 2 8 32)
+RANGE_INTERVALS=(0 1 7 31 127)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

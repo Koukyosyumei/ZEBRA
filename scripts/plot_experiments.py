@@ -72,12 +72,17 @@ def load_sweep(vm_report_dir: str, sweep_type: str) -> dict:
 
     Returns
       { (chip, opcode): { param_value: (mean, std) } }
+
+    (chip, opcode) pairs where any parameter point has success_ratio < 1.0
+    are excluded entirely.
     """
     base = os.path.join(vm_report_dir, sweep_type)
     if not os.path.isdir(base):
         return {}
 
     data: dict = defaultdict(dict)
+    # Track which (chip, opcode) pairs have a sub-1.0 success_ratio at any point.
+    failed: set = set()
     prefix = "workers_" if sweep_type == "worker_sweep" else "range_"
 
     for chip in sorted(os.listdir(base)):
@@ -105,10 +110,17 @@ def load_sweep(vm_report_dir: str, sweep_type: str) -> dict:
                 rep  = content["report"]
                 mean = rep.get("exe_time_mean")
                 var  = rep.get("exe_time_variance", 0.0)
+                success_ratio = rep.get("success_ratio", 1.0)
                 if mean is None:
                     continue
+                if success_ratio < 1.0:
+                    failed.add((chip, opcode))
                 std = math.sqrt(max(var, 0.0))
                 data[(chip, opcode)][param_val] = (mean, std)
+
+    # Remove any (chip, opcode) that failed at least once.
+    for key in failed:
+        data.pop(key, None)
 
     return data
 
