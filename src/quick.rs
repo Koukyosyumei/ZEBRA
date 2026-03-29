@@ -48,6 +48,8 @@ pub struct Args {
     pub opcode_str: String,
     #[arg(long, default_value = "0")]
     pub range_interval: usize,
+    #[arg(long, default_value = "false")]
+    pub blocking_closure: bool,
 }
 
 #[derive(Debug)]
@@ -132,7 +134,7 @@ where
         // ######################### Query SMT solver ###############################
         let start_time = time::Instant::now();
         let output = Command::new(verification_method)
-            .arg(format!("-T:{}", search_config.time_out_ms / 1000))
+            .arg(format!("-t:{}", search_config.time_out_ms))
             .arg(smt_file_path)
             .output()
             .expect("Failed to execute SMT solver");

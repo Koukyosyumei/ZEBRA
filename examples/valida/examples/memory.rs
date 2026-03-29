@@ -23,9 +23,7 @@ use zebra::ui::UiState;
 use zebra::utils::create_or_clear_dir;
 
 use zebra_valida::config::MyConfig;
-use zebra_valida::utils::{
-    extract_constraints_and_range, generate_bootstrap_trace_from_program,
-};
+use zebra_valida::utils::{extract_constraints_and_range, generate_bootstrap_trace_from_program};
 
 fn program_counter_refine_fn(
     abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
@@ -46,6 +44,26 @@ fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
     }
     val
 }
+
+/*
+        let mut known_solution = global_known_solution.clone();
+        let repr_sets =
+            cpu_canonicalizer(&AbstractTrace::new(base_abs_main_trace_data.clone()), prime);
+        known_solution.insert(format!("{}", PrettySet(repr_sets.clone())));
+
+        let result = experiment_harness(
+            &program_info,
+            &mut constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            public_vals.clone(),
+            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            post_process,
+            final_check,
+            &args.method,
+            &mut known_solution,
+        );
+*/
 
 // ############## Final Check Function ##############################
 fn final_check(

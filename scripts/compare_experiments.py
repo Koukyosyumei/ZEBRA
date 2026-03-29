@@ -2,9 +2,12 @@
 """
 ZEBRA Cross-zkVM Comparison Experiment
 =======================================
-Runs branch-and-bound (bb) and SMT (z3) verification for every opcode of
-every chip across all supported zkVMs using single-point search
-(--range-interval 0).
+Runs three verification strategies for every opcode of every chip across all
+supported zkVMs using single-point search (--range-interval 0):
+
+  bb           — pure branch-and-bound
+  bb_blocking  — branch-and-bound with blocking closure (--blocking-closure)
+  z3           — SMT solver (z3)
 
 Early-stop rule:  if ANY single trial for an opcode fails (timeout or
 verification failure), that opcode is immediately marked as "not verified"
@@ -13,7 +16,7 @@ and the experiment moves to the next opcode.
 Aggregation is zkVM-wise.  The final report shows:
   - zkVM name
   - #chips / #opcodes in that VM
-  - per-method (bb, z3): #verified-chips, #verified-ops, success-rate,
+  - per-method: #verified-chips, #verified-ops, success-rate,
     mean ± std verification time (seconds)
 
 Output
@@ -26,10 +29,10 @@ Usage (run from repo root)
 --------------------------
   python3 scripts/compare_experiments.py
   python3 scripts/compare_experiments.py --num-trial 5 --timeout-ms 60000
-  python3 scripts/compare_experiments.py --methods bb      # only bb
-  python3 scripts/compare_experiments.py --vms ziren,sp1   # subset of VMs
-  python3 scripts/compare_experiments.py --skip-run        # just (re-)aggregate
-  python3 scripts/compare_experiments.py --build           # cargo build first
+  python3 scripts/compare_experiments.py --methods bb,bb_blocking  # subset
+  python3 scripts/compare_experiments.py --vms ziren,sp1           # subset of VMs
+  python3 scripts/compare_experiments.py --skip-run                # just (re-)aggregate
+  python3 scripts/compare_experiments.py --build                   # cargo build first
 """
 
 from __future__ import annotations
@@ -124,7 +127,14 @@ VM_REGISTRY: Dict[str, Dict] = {
     },
 }
 
-ALL_METHODS = ["bb", "z3"]
+ALL_METHODS = ["bb", "bb_blocking", "z3"]
+
+# Human-readable labels for table headers
+METHOD_LABELS: Dict[str, str] = {
+    "bb":          "Branch-and-Bound (bb)",
+    "bb_blocking": "B&B + Blocking Closure",
+    "z3":          "SMT Solver (z3)",
+}
 
 
 # ── Data structures ───────────────────────────────────────────────────────────
@@ -202,15 +212,20 @@ def _run_one_trial(
     # Safety wall-clock limit: 2× internal timeout + 30 s headroom
     wall_limit = timeout_ms / 1000.0 * 2.0 + 30.0
 
+    # bb_blocking uses the bb solver internally, plus --blocking-closure flag
+    binary_method = "bb" if method == "bb_blocking" else method
+
     cmd = [
         str(binary),
         "--config",           config_path,
         "--opcode-str",       opcode,
-        "--method",           method,
+        "--method",           binary_method,
         "--num-trial",        "1",
         "--ouptput-path",     out_yaml,   # note: intentional typo matching quick.rs
         "--range-interval",   "0",
     ]
+    if method == "bb_blocking":
+        cmd.append("--blocking-closure")
 
     wall_start = time.monotonic()
     try:
@@ -504,7 +519,8 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
         return "│" + "│".join(cells) + "│"
 
     # ── header ───────────────────────────────────────────────────────────────
-    title = "ZEBRA Verification — Cross-zkVM Comparison  (single-point, bb vs z3)"
+    methods_str = " vs ".join(METHOD_LABELS.get(m, m) for m in methods)
+    title = f"ZEBRA Verification — Cross-zkVM Comparison  (single-point, {methods_str})"
     outer_w = w_vm + 2 + 1 + 6 + 1 + 5 + 1 + len(methods) * (blk_w + 3)
     outer_w = max(outer_w, len(title) + 4)
 
@@ -515,7 +531,7 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
 
     # Column group header
     meth_headers = "│".join(
-        f"  {'Branch-and-Bound (bb)' if m == 'bb' else 'SMT Solver (z3)':^{blk_w}}  "
+        f"  {METHOD_LABELS.get(m, m):^{blk_w}}  "
         for m in methods
     )
     base_hdr = f" {'zkVM':<{w_vm}} │ {'#Chips':>4}  │ {'#Ops':>3}  "
@@ -546,12 +562,18 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
 
 def print_detail_table(results: List[OpcodeResult], methods: List[str]) -> None:
     """Print a per-opcode breakdown table."""
+    # Widen method column to fit longest method name (e.g. "bb_blocking" = 11)
+    w_method = max(len(m) for m in methods) if methods else 6
+    w_method = max(w_method, 6)
+    sep_m = "─" * (w_method + 2)
+    hdr_m = f" {'Method':<{w_method}} "
+
     print()
-    print("┌─────────────────────────────────────────────────────────────────────────┐")
-    print("│                  Per-Opcode Verification Detail                         │")
-    print("├──────────┬────────────┬──────────┬────────┬────────────────────────────┤")
-    print("│ zkVM     │ Chip       │ Opcode   │ Method │ Verdict  / Time (s)         │")
-    print("├──────────┼────────────┼──────────┼────────┼────────────────────────────┤")
+    print(f"┌──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┐")
+    print(f"│          Per-Opcode Verification Detail{' ' * (w_method + 35)}│")
+    print(f"├──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┤")
+    print(f"│ zkVM     │ Chip       │ Opcode   │{hdr_m}│ Verdict  / Time (s)         │")
+    print(f"├──────────┼────────────┼──────────┼{sep_m}┼────────────────────────────┤")
 
     last_vm_chip = ("", "")
     for r in sorted(results, key=lambda x: (x.vm, x.chip, x.opcode, x.method)):
@@ -569,10 +591,10 @@ def print_detail_table(results: List[OpcodeResult], methods: List[str]) -> None:
             verdict = f"✗ FAILED    ({r.n_success}/{r.n_run} ok)"
 
         print(
-            f"│ {vm_cell:<8} │ {chip_cell:<10} │ {r.opcode:<8} │ {r.method:<6} │ {verdict:<26} │"
+            f"│ {vm_cell:<8} │ {chip_cell:<10} │ {r.opcode:<8} │ {r.method:<{w_method}} │ {verdict:<26} │"
         )
 
-    print("└──────────┴────────────┴──────────┴────────┴────────────────────────────┘")
+    print(f"└──────────┴────────────┴──────────┴{sep_m}┴────────────────────────────┘")
     print()
 
 
@@ -732,7 +754,7 @@ def build_vm(vm: str, repo_root: Path) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="ZEBRA cross-zkVM comparison experiment (bb vs z3)",
+        description="ZEBRA cross-zkVM comparison experiment (bb vs bb_blocking vs z3)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -740,8 +762,8 @@ def main() -> None:
                         help="Trials per opcode (default: 5)")
     parser.add_argument("--timeout-ms",  type=int,   default=60_000,
                         help="Per-trial timeout in milliseconds (default: 60000)")
-    parser.add_argument("--methods",     type=str,   default="bb,z3",
-                        help="Comma-separated list of methods (default: bb,z3)")
+    parser.add_argument("--methods",     type=str,   default="bb,bb_blocking,z3",
+                        help="Comma-separated list of methods (default: bb,bb_blocking,z3)")
     parser.add_argument("--vms",         type=str,   default=",".join(VM_REGISTRY),
                         help=f"Comma-separated VMs (default: all)")
     parser.add_argument("--base-seed",   type=int,   default=41,

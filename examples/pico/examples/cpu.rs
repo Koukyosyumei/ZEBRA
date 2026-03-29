@@ -277,7 +277,7 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             public_vals,
-            &vec![],
+            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
             post_process,
             final_check,
             &args.method,
