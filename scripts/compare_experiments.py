@@ -55,49 +55,71 @@ except ImportError:
 
 
 # ── VM Registry ───────────────────────────────────────────────────────────────
-# Mirrors CHIP_OPCODES from each VM's run_experiments.sh.
-# For chips where --opcode-str is ignored (shiftleft, sll), the single label
-# is still listed so the binary is invoked once with that label.
+# Complete chip→opcode mapping derived from each chip binary's get_opcode().
+# For chips whose binary ignores --opcode-str (shiftleft, shiftright, sll, sr,
+# pico/sr, ziren/shiftright, valida/lt32, valida/mul32, valida/memory) a single
+# label is still listed so the binary is invoked exactly once with that label.
 
 VM_REGISTRY: Dict[str, Dict] = {
     "ziren": {
         "dir": "examples/ziren",
         "chips": {
-            "addsub":    ["ADD", "SUB"],
-            "bitwise":   ["AND", "OR", "XOR"],
-            "cloclz":    ["CLO", "CLZ"],
-            "movcond":   ["MEQ", "MNE", "WSBH"],
-            "mul":       ["MUL", "MULT", "MULTU"],
-            "shiftleft": ["SLL"],           # --opcode-str ignored by binary
-            "jump":      ["Jump", "Jumpi", "JumpDirect"],
-            "branch":    ["BEQ", "BNE", "BGEZ", "BGTZ", "BLEZ", "BLTZ"],
+            "addsub":          ["ADD", "SUB"],
+            "bitwise":         ["AND", "OR", "XOR"],
+            "cloclz":          ["CLO", "CLZ"],
+            "movcond":         ["MEQ", "MNE", "WSBH"],
+            "mul":             ["MUL", "MULT", "MULTU"],
+            "shiftleft":       ["SLL"],      # --opcode-str ignored
+            "shiftright":      ["SRL"],      # --opcode-str ignored
+            "divrem":          ["DIV", "DIVU", "MOD", "MODU"],
+            "lt":              ["SLT", "SLTU"],
+            "memoryreadwrite": ["LB", "LBU", "LH", "LHU", "LW",
+                                "SB", "SH", "SW", "SC", "SWL", "SWR"],
+            "jump":            ["Jump", "Jumpi", "JumpDirect"],
+            "branch":          ["BEQ", "BNE", "BGEZ", "BGTZ", "BLEZ", "BLTZ"],
         },
     },
     "sp1": {
         "dir": "examples/sp1",
         "chips": {
-            "addsub":    ["ADD", "SUB"],
-            "bitwise":   ["AND", "OR", "XOR"],
-            "mul":       ["MUL", "MULH", "MULHU", "MULHSU"],
-            "jump":      ["JAL", "JALR"],
-            "shiftleft": ["SLL"],           # --opcode-str ignored by binary
-            "branch":    ["BEQ", "BGE", "BLT", "BNE"],
+            "addsub":          ["ADD", "SUB"],
+            "bitwise":         ["AND", "OR", "XOR"],
+            "mul":             ["MUL", "MULH", "MULHU", "MULHSU"],
+            "divrem":          ["DIV", "DIVU", "REM", "REMU"],
+            "lt":              ["SLT", "SLTU"],
+            "shiftleft":       ["SLL"],      # --opcode-str ignored
+            "sr":              ["SRL", "SRA"],
+            "memoryreadwrite": ["LB", "LH", "LW", "LBU", "LHU",
+                                "SB", "SH", "SW"],
+            "jump":            ["JAL", "JALR"],
+            "branch":          ["BEQ", "BGE", "BLT", "BNE"],
         },
     },
     "pico": {
         "dir": "examples/pico",
         "chips": {
-            "addsub": ["ADD", "SUB"],
-            "bitwise": ["AND", "OR", "XOR"],
-            "mul":    ["MUL", "MULH", "MULHU", "MULHSU"],
-            "sll":    ["SLL"],              # --opcode-str ignored by binary
+            "addsub":          ["ADD", "SUB"],
+            "bitwise":         ["AND", "OR", "XOR"],
+            "mul":             ["MUL", "MULH", "MULHU", "MULHSU"],
+            "divrem":          ["DIV", "DIVU", "REM", "REMU"],
+            "lessthan":        ["SLT", "SLTU"],
+            "sll":             ["SLL"],      # --opcode-str ignored
+            "sr":              ["SRL"],      # --opcode-str ignored
+            "memoryreadwrite": ["LB", "LBU", "LH", "LHU", "LW",
+                                "SB", "SH", "SW"],
         },
     },
     "valida": {
         "dir": "examples/valida",
         "chips": {
-            "add32": ["ADD"],
-            "sub32": ["SUB"],
+            "add32":    ["ADD"],
+            "sub32":    ["SUB"],
+            "mul32":    ["MUL"],    # --opcode-str ignored
+            "div32":    ["DIV", "SDIV"],
+            "bitwise32":["AND", "OR", "XOR"],
+            "com32":    ["EQ", "NE"],
+            "lt32":     ["LT"],     # --opcode-str ignored
+            "memory":   ["LOAD"],   # --opcode-str ignored
         },
     },
 }
