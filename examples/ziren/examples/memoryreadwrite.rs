@@ -19,9 +19,7 @@ use zebra::quick::{
 use zebra::solver::nop_post_process;
 use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use zebra_ziren::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_ziren::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 const fn make_col_map() -> MemoryInstructionsColumns<usize> {
     let indices_arr = indices_arr::<{ NUM_MEMORY_INSTRUCTIONS_COLUMNS }>();
@@ -81,6 +79,7 @@ fn main() -> Result<(), io::Error> {
     let air = MemoryInstructionsChip::default();
     let air_name = "MemoryInstrs";
     let _colmap = make_col_map();
+    println!("{:?}", _colmap);
 
     let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
         KoalaBear,
@@ -113,7 +112,7 @@ fn main() -> Result<(), io::Error> {
     search_config.min_row_id = if is_load { 1 } else { 0 };
     search_config.max_row_id = if is_load { 1 } else { 0 };
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
@@ -151,7 +150,7 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &vec![], // vec![0],
+            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
             nop_post_process,
             &final_check,
             &args.method,

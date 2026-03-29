@@ -158,7 +158,7 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &vec![],
+            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
             nop_post_process,
             &final_check,
             &args.method,

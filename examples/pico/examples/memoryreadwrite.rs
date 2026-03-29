@@ -25,9 +25,7 @@ use zebra::{
     trace::{trace_fmt_with_idxs, AbstractTrace},
 };
 
-use zebra_pico::utils::{
-    extract_constraints_and_range, generate_abstract_trace, get_program_str,
-};
+use zebra_pico::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 const fn make_col_map() -> MemoryChipCols<usize> {
     let indices_arr = indices_arr::<{ NUM_MEMORY_CHIP_COLS }>();
@@ -99,12 +97,12 @@ fn main() -> Result<(), io::Error> {
     let air: MemoryReadWriteChip<KoalaBear> = MemoryReadWriteChip::default();
     let air_name = "MemoryReadWrite";
     let _colmap = make_col_map();
+    println!("{:?}", _colmap);
 
     let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
         KoalaBear,
         MemoryReadWriteChip<KoalaBear>,
     >(&air, NUM_MEMORY_CHIP_COLS, prime);
-    println!("{:?}", general_lookup_info);
 
     let final_check = generate_memory_op_final_checker(
         1,                    // clk
@@ -134,7 +132,7 @@ fn main() -> Result<(), io::Error> {
     search_config.min_row_id = if is_load { 1 } else { 0 };
     search_config.max_row_id = if is_load { 1 } else { 0 };
     if search_config.minimum_num_taregt_cols == 0 {
-        search_config.minimum_num_taregt_cols = 3; //constraint_info.refinable_cols.len();
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
@@ -176,7 +174,7 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &vec![], // vec![0],
+            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
             &nop_post_process,
             &final_check,
             &args.method,
