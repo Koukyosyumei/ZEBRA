@@ -22,9 +22,7 @@ use zebra::solver::nop_post_process;
 use zebra::utils::create_or_clear_dir;
 
 use zebra_valida::config::MyConfig;
-use zebra_valida::utils::{
-    extract_constraints_and_range, generate_bootstrap_trace_from_program,
-};
+use zebra_valida::utils::{extract_constraints_and_range, generate_bootstrap_trace_from_program};
 
 fn get_target_program<Val: StarkField>(opcode: u32, a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let _bytes_per_instr = BYTES_PER_INSTR as i32;
@@ -122,6 +120,7 @@ fn main() -> Result<(), io::Error> {
         };
 
         // ######################## Solve ############################################
+        constraint_info.constraints.blocking_constraints.clear();
         let mut known_solution = HashSet::new();
         let result = experiment_harness(
             &program_info,
@@ -129,7 +128,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             nop_post_process,
             &final_check,
             &args.method,

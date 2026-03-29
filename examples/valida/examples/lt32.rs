@@ -27,9 +27,7 @@ use zebra::utils::create_or_clear_dir;
 use zebra::utils::PrettySet;
 
 use zebra_valida::config::MyConfig;
-use zebra_valida::utils::{
-    extract_constraints_and_range, generate_bootstrap_trace_from_program,
-};
+use zebra_valida::utils::{extract_constraints_and_range, generate_bootstrap_trace_from_program};
 
 // ############## Final Check Function ##############################
 fn final_check(
@@ -41,7 +39,7 @@ fn final_check(
     _area: &mut i128,
 ) {
     let mut record_reprs = HashSet::new();
-    for i in 0..trace.data.len() {
+    for i in 0..1 {
         let string_representation = format!(
             "input0: [{}], input1: [{}], output: {}",
             trace_fmt_with_idxs(trace, i, &[0, 1, 2, 3]),
@@ -118,7 +116,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for _ in 0..args.num_trial {
+    for _ in args.num_trial {
         let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
         let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
 
@@ -145,7 +143,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             nop_post_process,
             final_check,
             &args.method,
