@@ -82,7 +82,7 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime,
+            &machine, &air, num_col, prime, args.method == "bb",
         );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info

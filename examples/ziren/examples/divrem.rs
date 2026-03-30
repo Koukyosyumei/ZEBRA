@@ -105,7 +105,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "DivRem";
     let _colmap = make_col_map();
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
+        extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime, args.method == "bb");
     constraint_info
         .refinable_cols
         .extend(&output_columns.clone());

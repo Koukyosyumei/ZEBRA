@@ -56,7 +56,7 @@ fn main() -> Result<(), io::Error> {
     //println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
-        extract_constraints_and_range::<BabyBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
+        extract_constraints_and_range::<BabyBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime, args.method == "bb");
     //println!("{:?}", general_lookup_info);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info

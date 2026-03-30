@@ -104,7 +104,7 @@ fn main() -> Result<(), io::Error> {
     };
 
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime);
+        extract_constraints_and_range::<KoalaBear, AddSubChip>(&air, NUM_ADD_SUB_COLS, prime, args.method == "bb");
     constraint_info
         .refinable_cols
         .extend(&output_columns.clone());

@@ -287,6 +287,7 @@ pub fn extract_constraints_and_range<M, SC, C>(
     chip: &C,
     num_cols: usize,
     prime: u32,
+    simplify_constraints: bool,
 ) -> (ConstraintInfo, GeneralLookupInfo)
 where
     M: Machine<SC::Val>,
@@ -351,6 +352,7 @@ where
         &mut air_constraints,
         &lookup_constraints,
         prime,
+        simplify_constraints,
     );
 
     let constraints = ZEBRAConstraints::new(air_constraints, lookup_constraints);

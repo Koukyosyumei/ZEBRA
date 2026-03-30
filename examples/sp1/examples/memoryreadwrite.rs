@@ -103,7 +103,7 @@ fn main() -> Result<(), io::Error> {
         BabyBear,
         MemoryInstructionsChip,
     >(
-        &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime
+        &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime, args.method == "bb"
     );
     //  println!("{:?}", general_lookup_info);
 

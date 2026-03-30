@@ -99,7 +99,7 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
+        extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime, args.method == "bb");
     let output_columns = vec![23, 24, 25, 26];
 
     use zebra::solver::RangeType;

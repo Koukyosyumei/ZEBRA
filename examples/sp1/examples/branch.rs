@@ -97,7 +97,7 @@ fn main() -> Result<(), io::Error> {
     //println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<BabyBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
+        extract_constraints_and_range::<BabyBear, BranchChip>(&air, NUM_BRANCH_COLS, prime, args.method == "bb");
     //println!("{:?}", general_lookup_info);
     let output_columns = vec![5, 6, 7, 8];
     for i in vec![5, 6, 7, 8] {

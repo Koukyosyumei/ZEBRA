@@ -85,7 +85,7 @@ fn main() -> Result<(), io::Error> {
         KoalaBear,
         MemoryInstructionsChip,
     >(
-        &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime
+        &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime, args.method == "bb"
     );
 
     let final_check = generate_memory_op_final_checker(

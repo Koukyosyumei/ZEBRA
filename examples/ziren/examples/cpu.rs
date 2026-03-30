@@ -130,7 +130,7 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", CPU_COL_MAP);
 
     let (mut constraint_info, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, prime);
+        extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, prime, args.method == "bb");
     constraint_info
         .refinable_cols
         .retain(|x| !program_cols.contains(x));

@@ -50,7 +50,7 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
         KoalaBear,
         ShiftRightChip<KoalaBear>,
-    >(&air, NUM_SLR_COLS, prime);
+    >(&air, NUM_SLR_COLS, prime, args.method == "bb");
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
         .refinable_cols

@@ -102,7 +102,7 @@ fn main() -> Result<(), io::Error> {
     let _colmap = make_col_map();
 
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
+        extract_constraints_and_range::<KoalaBear, JumpChip>(&air, NUM_JUMP_COLS, prime, args.method == "bb");
     let output_columns = vec![19, 20, 21, 22, 37, 38, 39, 40];
 
     constraint_info

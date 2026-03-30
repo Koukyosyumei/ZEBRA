@@ -59,7 +59,7 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
         KoalaBear,
         DivRemChip<KoalaBear>,
-    >(&air, NUM_DIVREM_COLS, prime);
+    >(&air, NUM_DIVREM_COLS, prime, args.method == "bb");
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     for i in &general_lookup_info.op_a {
         constraint_info.range_types.insert(*i, RangeType::U8);

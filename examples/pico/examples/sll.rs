@@ -46,7 +46,7 @@ fn main() -> Result<(), io::Error> {
     let _colmap = make_col_map();
 
     let (mut constraint_info, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, SLLChip<KoalaBear>>(&air, NUM_SLL_COLS, prime);
+        extract_constraints_and_range::<KoalaBear, SLLChip<KoalaBear>>(&air, NUM_SLL_COLS, prime, args.method == "bb");
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
         .refinable_cols

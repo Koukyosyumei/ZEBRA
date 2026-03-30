@@ -97,7 +97,7 @@ fn main() -> Result<(), io::Error> {
     //println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<BabyBear, JumpChip>(&air, NUM_JUMP_COLS, prime);
+        extract_constraints_and_range::<BabyBear, JumpChip>(&air, NUM_JUMP_COLS, prime, args.method == "bb");
     let output_columns = vec![5, 6, 7, 8];
     constraint_info
         .refinable_cols

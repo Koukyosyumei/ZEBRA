@@ -47,7 +47,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "Bitwise";
 
     let (mut constraint_info, general_lookup_info) =
-        extract_constraints_and_range::<BabyBear, BitwiseChip>(&air, NUM_BITWISE_COLS, prime);
+        extract_constraints_and_range::<BabyBear, BitwiseChip>(&air, NUM_BITWISE_COLS, prime, args.method == "bb");
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     //println!("{:?}", general_lookup_info);
 

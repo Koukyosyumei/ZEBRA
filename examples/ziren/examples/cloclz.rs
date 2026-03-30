@@ -79,7 +79,7 @@ fn main() -> Result<(), io::Error> {
     //println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, CloClzChip>(&air, NUM_CLOCLZ_COLS, prime);
+        extract_constraints_and_range::<KoalaBear, CloClzChip>(&air, NUM_CLOCLZ_COLS, prime, args.method == "bb");
     let output_columns = vec![2, 3, 4, 5];
 
     constraint_info

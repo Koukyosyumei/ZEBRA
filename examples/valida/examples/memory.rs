@@ -161,7 +161,7 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (air_constraints, lookup_constraints, refinable_cols, range_types, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime,
+            &machine, &air, num_col, prime, args.method == "bb",
         );
 
     let constraints = ZEBRAConstraints {

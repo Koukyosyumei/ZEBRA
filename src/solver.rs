@@ -1238,50 +1238,53 @@ pub fn prepare_constraints_and_range_type(
     tv_constraints: &mut Vec<ZEBRASymbolicExpr>,
     lookup_symbolic_constraints: &Vec<ZEBRASymbolicExpr>,
     prime: u32,
+    simplify_constraints: bool,
 ) -> (Vec<usize>, HashMap<usize, RangeType>) {
     let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
 
-    let mut new_tv_constraints = Vec::new();
-    let mut is_in_koalabear_word_range_check = false;
-    let mut is_in_babybear_word_range_check = false;
-    let mut is_in_iszero_operator = false;
-    for t in tv_constraints.iter() {
-        if let Some(exprs) = is_iszero_operator(t, prime) {
-            if is_in_iszero_operator {
-                is_in_iszero_operator = false;
-            } else {
-                new_tv_constraints.push(exprs[0].clone());
-                new_tv_constraints.push(exprs[1].clone());
-                is_in_iszero_operator = true;
-            }
-        } else {
-            if let Some(expr) = is_koalabear_word_range(t, prime) {
-                if is_in_koalabear_word_range_check {
-                    is_in_koalabear_word_range_check = false;
+    if simplify_constraints {
+        let mut new_tv_constraints = Vec::new();
+        let mut is_in_koalabear_word_range_check = false;
+        let mut is_in_babybear_word_range_check = false;
+        let mut is_in_iszero_operator = false;
+        for t in tv_constraints.iter() {
+            if let Some(exprs) = is_iszero_operator(t, prime) {
+                if is_in_iszero_operator {
+                    is_in_iszero_operator = false;
                 } else {
-                    new_tv_constraints.push(expr);
-                    is_in_koalabear_word_range_check = true;
-                }
-            } else if let Some(expr) = is_babybear_word_range(t, prime) {
-                if is_in_babybear_word_range_check {
-                    is_in_babybear_word_range_check = false;
-                } else {
-                    new_tv_constraints.push(expr);
-                    is_in_babybear_word_range_check = true;
+                    new_tv_constraints.push(exprs[0].clone());
+                    new_tv_constraints.push(exprs[1].clone());
+                    is_in_iszero_operator = true;
                 }
             } else {
-                if (!is_in_koalabear_word_range_check)
-                    && (!is_in_iszero_operator)
-                    && (!is_in_babybear_word_range_check)
-                {
-                    new_tv_constraints.push(t.clone());
+                if let Some(expr) = is_koalabear_word_range(t, prime) {
+                    if is_in_koalabear_word_range_check {
+                        is_in_koalabear_word_range_check = false;
+                    } else {
+                        new_tv_constraints.push(expr);
+                        is_in_koalabear_word_range_check = true;
+                    }
+                } else if let Some(expr) = is_babybear_word_range(t, prime) {
+                    if is_in_babybear_word_range_check {
+                        is_in_babybear_word_range_check = false;
+                    } else {
+                        new_tv_constraints.push(expr);
+                        is_in_babybear_word_range_check = true;
+                    }
+                } else {
+                    if (!is_in_koalabear_word_range_check)
+                        && (!is_in_iszero_operator)
+                        && (!is_in_babybear_word_range_check)
+                    {
+                        new_tv_constraints.push(t.clone());
+                    }
                 }
             }
         }
+        *tv_constraints = new_tv_constraints;
     }
-    *tv_constraints = new_tv_constraints;
     //tv_constraints.extend(lookup_symbolic_constraints);
 
     let mut used_vars = HashSet::new();

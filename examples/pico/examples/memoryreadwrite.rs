@@ -102,7 +102,7 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
         KoalaBear,
         MemoryReadWriteChip<KoalaBear>,
-    >(&air, NUM_MEMORY_CHIP_COLS, prime);
+    >(&air, NUM_MEMORY_CHIP_COLS, prime, args.method == "bb");
 
     let final_check = generate_memory_op_final_checker(
         1,                    // clk

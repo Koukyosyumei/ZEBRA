@@ -102,7 +102,7 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime,
+            &machine, &air, num_col, prime, args.method == "bb",
         );
     let is_reals = [23, 24, 25, 26];
     constraint_info

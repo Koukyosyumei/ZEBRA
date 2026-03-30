@@ -85,7 +85,7 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, mut general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime,
+            &machine, &air, num_col, prime, args.method == "bb",
         );
     general_lookup_info.op_a.extend(&[8, 9, 10, 11]);
     general_lookup_info.op_b.extend(&[0, 1, 2, 3]);

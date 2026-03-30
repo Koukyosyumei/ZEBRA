@@ -57,7 +57,7 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
         KoalaBear,
         BitwiseChip<KoalaBear>,
-    >(&air, NUM_BITWISE_COLS, prime);
+    >(&air, NUM_BITWISE_COLS, prime, args.method == "bb");
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
         .refinable_cols
