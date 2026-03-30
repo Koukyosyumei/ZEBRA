@@ -285,7 +285,7 @@ def run_opcode(
     binary = vm_dir / "target" / "release" / "examples" / chip
     if not binary.exists():
         if verbose:
-            print(f"    [SKIP] binary not found: {binary}", flush=True)
+            _println(f"    [SKIP] binary not found: {binary}", flush=True)
         return OpcodeResult(vm, chip, opcode, method,
                             verified=False, times_s=[], n_run=0, n_success=0,
                             skipped=True)
@@ -312,7 +312,7 @@ def run_opcode(
 
         if verbose:
             status_str = "ok" if ok else "FAIL"
-            print(f"    trial {i+1}/{n_trials}  {status_str}  ({t:.3f}s)", flush=True)
+            _println(f"    trial {i+1}/{n_trials}  {status_str}  ({t:.3f}s)", flush=True)
 
         if not ok:
             # Early stop
@@ -334,6 +334,16 @@ def run_opcode(
 
 _print_lock = threading.Lock()
 
+# ESC[2K clears the entire current line; \r moves cursor to column 0.
+# This is needed because the binaries use crossterm/ratatui which opens
+# /dev/tty directly and leaves the terminal cursor at an arbitrary column.
+_CLR = "\033[2K\r"
+
+
+def _println(msg: str = "", **kwargs) -> None:
+    """Print with a preceding line-clear so cursor pollution doesn't indent output."""
+    print(_CLR + msg, **kwargs)
+
 
 def _print_verdict(r: OpcodeResult) -> None:
     if r.skipped:
@@ -345,8 +355,7 @@ def _print_verdict(r: OpcodeResult) -> None:
     else:
         verdict = f"NOT verified  ({r.n_success}/{r.n_run} trials ok)"
     with _print_lock:
-        # \r resets cursor to column 0 in case a subprocess TUI left it mid-line
-        print(f"\r  --> [{r.vm}/{r.chip}/{r.opcode}] {r.method}  {verdict}", flush=True)
+        _println(f"  --> [{r.vm}/{r.chip}/{r.opcode}] {r.method}  {verdict}", flush=True)
 
 
 def run_experiments(
@@ -384,11 +393,12 @@ def run_experiments(
         for vm, vm_dir, chip, opcode, method in all_tasks:
             if vm != cur_vm:
                 chips = VM_REGISTRY[vm]["chips"]
-                print(f"\n{'='*60}", flush=True)
-                print(f"  zkVM: {vm}  ({len(chips)} chips)", flush=True)
-                print(f"{'='*60}", flush=True)
+                _println(flush=True)
+                _println(f"{'='*60}", flush=True)
+                _println(f"  zkVM: {vm}  ({len(chips)} chips)", flush=True)
+                _println(f"{'='*60}", flush=True)
                 cur_vm = vm
-            print(f"\r\n  [{vm}/{chip}/{opcode}] {method}", flush=True)
+            _println(f"  [{vm}/{chip}/{opcode}] {method}", flush=True)
             r = run_opcode(
                 vm=vm, vm_dir=vm_dir, chip=chip, opcode=opcode,
                 method=method, n_trials=n_trials, timeout_ms=timeout_ms,
@@ -401,8 +411,8 @@ def run_experiments(
         # Each experiment uses cfg_num_workers=1 to avoid CPU overload when
         # many bb/bb_blocking processes run simultaneously.
         with _print_lock:
-            print(f"\nRunning {len(all_tasks)} tasks with {workers} parallel workers "
-                  f"(cfg_num_workers=1 per task) ...", flush=True)
+            _println(f"Running {len(all_tasks)} tasks with {workers} parallel workers "
+                     f"(cfg_num_workers=1 per task) ...", flush=True)
 
         def _task(args):
             vm, vm_dir, chip, opcode, method = args
@@ -568,10 +578,10 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
     outer_w = w_vm + 2 + 1 + 6 + 1 + 5 + 1 + len(methods) * (blk_w + 3)
     outer_w = max(outer_w, len(title) + 4)
 
-    print()
-    print("┌" + "─" * (outer_w) + "┐")
-    print("│" + f" {title} ".center(outer_w) + "│")
-    print("├" + "─" * (outer_w) + "┤")
+    _println()
+    _println("┌" + "─" * (outer_w) + "┐")
+    _println("│" + f" {title} ".center(outer_w) + "│")
+    _println("├" + "─" * (outer_w) + "┤")
 
     # Column group header
     meth_headers = "│".join(
@@ -579,7 +589,7 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
         for m in methods
     )
     base_hdr = f" {'zkVM':<{w_vm}} │ {'#Chips':>4}  │ {'#Ops':>3}  "
-    print("│" + base_hdr + "│" + meth_headers + "│")
+    _println("│" + base_hdr + "│" + meth_headers + "│")
 
     # Sub-header
     def method_subhdr(m: str) -> str:
@@ -587,19 +597,19 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
 
     sub_base = f" {'':>{w_vm}} │ {'':>4}   │ {'':>3}   "
     sub_meths = "│".join(method_subhdr(m) for m in methods)
-    print("│" + sub_base + "│" + sub_meths + "│")
+    _println("│" + sub_base + "│" + sub_meths + "│")
 
-    print(sep("─", "┼", "├", "┤"))
+    _println(sep("─", "┼", "├", "┤"))
 
     # Data rows
     for r in rows:
-        print(row_line(r.vm, r.n_chips, r.n_ops, r.stats))
+        _println(row_line(r.vm, r.n_chips, r.n_ops, r.stats))
 
     # Totals
-    print(sep("═", "╪", "╞", "╡"))
-    print(row_line(totals.vm, totals.n_chips, totals.n_ops, totals.stats))
-    print("└" + "─" * outer_w + "┘")
-    print()
+    _println(sep("═", "╪", "╞", "╡"))
+    _println(row_line(totals.vm, totals.n_chips, totals.n_ops, totals.stats))
+    _println("└" + "─" * outer_w + "┘")
+    _println()
 
 
 # ── Per-opcode detail table ───────────────────────────────────────────────────
@@ -612,12 +622,12 @@ def print_detail_table(results: List[OpcodeResult], methods: List[str]) -> None:
     sep_m = "─" * (w_method + 2)
     hdr_m = f" {'Method':<{w_method}} "
 
-    print()
-    print(f"┌──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┐")
-    print(f"│          Per-Opcode Verification Detail{' ' * (w_method + 35)}│")
-    print(f"├──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┤")
-    print(f"│ zkVM     │ Chip       │ Opcode   │{hdr_m}│ Verdict  / Time (s)         │")
-    print(f"├──────────┼────────────┼──────────┼{sep_m}┼────────────────────────────┤")
+    _println()
+    _println(f"┌──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┐")
+    _println(f"│          Per-Opcode Verification Detail{' ' * (w_method + 35)}│")
+    _println(f"├──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┤")
+    _println(f"│ zkVM     │ Chip       │ Opcode   │{hdr_m}│ Verdict  / Time (s)         │")
+    _println(f"├──────────┼────────────┼──────────┼{sep_m}┼────────────────────────────┤")
 
     last_vm_chip = ("", "")
     for r in sorted(results, key=lambda x: (x.vm, x.chip, x.opcode, x.method)):
@@ -634,12 +644,12 @@ def print_detail_table(results: List[OpcodeResult], methods: List[str]) -> None:
         else:
             verdict = f"✗ FAILED    ({r.n_success}/{r.n_run} ok)"
 
-        print(
+        _println(
             f"│ {vm_cell:<8} │ {chip_cell:<10} │ {r.opcode:<8} │ {r.method:<{w_method}} │ {verdict:<26} │"
         )
 
-    print(f"└──────────┴────────────┴──────────┴{sep_m}┴────────────────────────────┘")
-    print()
+    _println(f"└──────────┴────────────┴──────────┴{sep_m}┴────────────────────────────┘")
+    _println()
 
 
 # ── CSV export ────────────────────────────────────────────────────────────────
@@ -708,8 +718,8 @@ def write_csv(
                 "skipped":          r.skipped,
             })
 
-    print(f"CSV summary  saved to:  {summary_path}")
-    print(f"CSV detail   saved to:  {detail_path}")
+    _println(f"CSV summary  saved to:  {summary_path}")
+    _println(f"CSV detail   saved to:  {detail_path}")
 
 
 # ── Load saved results (--skip-run) ──────────────────────────────────────────
@@ -851,7 +861,7 @@ def main() -> None:
 
     # ── Optional build ────────────────────────────────────────────────────────
     if args.build:
-        print("\n=== Building VMs ===")
+        _println("\n=== Building VMs ===")
         for vm in vms:
             if not build_vm(vm, repo_root):
                 print(f"Build failed for {vm}; aborting.", file=sys.stderr)
@@ -859,7 +869,7 @@ def main() -> None:
 
     # ── Run or load ───────────────────────────────────────────────────────────
     if args.skip_run:
-        print(f"\nLoading saved results from  {out_root} ...", flush=True)
+        _println(f"\nLoading saved results from  {out_root} ...", flush=True)
         results = load_saved_results(out_root, vms, methods)
         if not results:
             print("ERROR: no saved results found.  Run without --skip-run first.",
@@ -871,10 +881,10 @@ def main() -> None:
             for vm in vms
             for chip in VM_REGISTRY[vm]["chips"]
         )
-        print(f"\nStarting experiment: {len(vms)} VMs, {len(methods)} methods, "
-              f"{args.num_trial} trials/opcode, timeout={args.timeout_ms}ms")
-        print(f"Total (chip×opcode×method) tasks: {total_tasks}")
-        print(f"Results directory: {out_root}")
+        _println(f"\nStarting experiment: {len(vms)} VMs, {len(methods)} methods, "
+                 f"{args.num_trial} trials/opcode, timeout={args.timeout_ms}ms")
+        _println(f"Total (chip×opcode×method) tasks: {total_tasks}")
+        _println(f"Results directory: {out_root}")
 
         results = run_experiments(
             vms        = vms,
