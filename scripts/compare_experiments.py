@@ -125,7 +125,6 @@ VM_REGISTRY: Dict[str, Dict] = {
             "bitwise32":["AND", "OR", "XOR"],
             "com32":    ["EQ", "NE"],
             "lt32":     ["LT"],     # --opcode-str ignored
-            "memory":   ["LOAD"],   # --opcode-str ignored
         },
     },
 }
