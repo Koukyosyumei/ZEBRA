@@ -92,7 +92,6 @@ fn main() -> Result<(), io::Error> {
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
-    //println!("{:?}", constraint_info.range_types);
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
