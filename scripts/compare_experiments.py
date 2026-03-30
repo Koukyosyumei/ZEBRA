@@ -359,24 +359,35 @@ def _print_verdict(r: OpcodeResult) -> None:
 
 
 def run_experiments(
-    vms:     List[str],
-    methods: List[str],
-    n_trials:   int,
-    timeout_ms: int,
-    base_seed:  int,
-    out_root:   Path,
-    repo_root:  Path,
-    verbose:    bool = True,
-    workers:    int  = 1,
+    vms:            List[str],
+    methods:        List[str],
+    n_trials:       int,
+    timeout_ms:     int,
+    base_seed:      int,
+    out_root:       Path,
+    repo_root:      Path,
+    verbose:        bool  = True,
+    workers:        int   = 1,
+    timeout_scale:  float = 1.0,
 ) -> List[OpcodeResult]:
     """
     Run all (vm, chip, opcode, method) combinations.
 
-    workers=1  — fully sequential (original behaviour).
-    workers>1  — all tasks dispatched to a ThreadPoolExecutor; each task sets
-                 cfg_num_workers=1 so the total CPU load stays proportional.
+    workers=1       — fully sequential (original behaviour).
+    workers>1       — all tasks dispatched to a ThreadPoolExecutor; each task
+                      uses cfg_num_workers=1 and a scaled-up timeout to account
+                      for CPU sharing.
+    timeout_scale   — multiply timeout_ms by this factor for each experiment.
+                      When workers>1 the effective CPU share per task is ~1/workers,
+                      so the same amount of work takes proportionally longer on the
+                      wall clock.  Defaults to workers when workers>1 (auto-scale).
     """
     results: List[OpcodeResult] = []
+
+    # When running in parallel each task gets ~1/workers of the CPU, so its
+    # wall-clock time is ~workers× longer.  Scale the timeout accordingly so
+    # experiments don't time out just because of contention.
+    effective_timeout_ms = int(timeout_ms * timeout_scale)
 
     # Build a flat task list: (vm, vm_dir, chip, opcode, method)
     all_tasks = [
@@ -401,7 +412,7 @@ def run_experiments(
             _println(f"  [{vm}/{chip}/{opcode}] {method}", flush=True)
             r = run_opcode(
                 vm=vm, vm_dir=vm_dir, chip=chip, opcode=opcode,
-                method=method, n_trials=n_trials, timeout_ms=timeout_ms,
+                method=method, n_trials=n_trials, timeout_ms=effective_timeout_ms,
                 base_seed=base_seed, out_root=out_root, verbose=verbose,
             )
             results.append(r)
@@ -409,19 +420,20 @@ def run_experiments(
     else:
         # ── Parallel ─────────────────────────────────────────────────────────
         # Each experiment uses cfg_num_workers=1 to avoid CPU overload when
-        # many bb/bb_blocking processes run simultaneously.
+        # many processes run simultaneously.
         with _print_lock:
             _println(f"Running {len(all_tasks)} tasks with {workers} parallel workers "
-                     f"(cfg_num_workers=1 per task) ...", flush=True)
+                     f"(cfg_num_workers=1, effective timeout={effective_timeout_ms}ms) ...",
+                     flush=True)
 
         def _task(args):
             vm, vm_dir, chip, opcode, method = args
             return run_opcode(
                 vm=vm, vm_dir=vm_dir, chip=chip, opcode=opcode,
-                method=method, n_trials=n_trials, timeout_ms=timeout_ms,
+                method=method, n_trials=n_trials, timeout_ms=effective_timeout_ms,
                 base_seed=base_seed, out_root=out_root,
-                verbose=False,          # suppress per-trial noise; verdicts printed below
-                cfg_num_workers=1,      # each parallel task gets a single internal worker
+                verbose=False,      # suppress per-trial noise; verdicts printed below
+                cfg_num_workers=1,  # each parallel task gets a single internal worker
             )
 
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -830,9 +842,13 @@ def main() -> None:
                         help="Skip running experiments; aggregate from existing --output-dir")
     parser.add_argument("--build",       action="store_true",
                         help="Run  cargo build --release  for each VM before experiments")
-    parser.add_argument("--workers",      type=int,   default=1,
+    parser.add_argument("--workers",        type=int,   default=1,
                         help="Parallel workers for all methods (default: 1 = sequential). "
                              "When >1, each experiment uses cfg_num_workers=1 internally.")
+    parser.add_argument("--timeout-scale",  type=float, default=None,
+                        help="Multiply --timeout-ms by this factor for each experiment. "
+                             "Defaults to --workers when --workers>1 (auto-scale for CPU "
+                             "sharing), or 1.0 when sequential.")
     parser.add_argument("--no-detail",   action="store_true",
                         help="Suppress per-opcode detail table")
     parser.add_argument("--quiet",       action="store_true",
@@ -841,6 +857,14 @@ def main() -> None:
 
     methods   = [m.strip() for m in args.methods.split(",") if m.strip()]
     vms       = [v.strip() for v in args.vms.split(",")     if v.strip()]
+
+    # Auto-scale timeout for parallel runs: each task gets ~1/workers CPU share,
+    # so wall-clock time is ~workers× longer.  User can override with --timeout-scale.
+    timeout_scale = (
+        args.timeout_scale if args.timeout_scale is not None
+        else float(args.workers) if args.workers > 1
+        else 1.0
+    )
 
     # Validate
     for vm in vms:
@@ -881,21 +905,24 @@ def main() -> None:
             for vm in vms
             for chip in VM_REGISTRY[vm]["chips"]
         )
+        effective_ms = int(args.timeout_ms * timeout_scale)
         _println(f"\nStarting experiment: {len(vms)} VMs, {len(methods)} methods, "
-                 f"{args.num_trial} trials/opcode, timeout={args.timeout_ms}ms")
+                 f"{args.num_trial} trials/opcode, timeout={args.timeout_ms}ms"
+                 + (f" × {timeout_scale:.1f} = {effective_ms}ms (scaled)" if timeout_scale != 1.0 else ""))
         _println(f"Total (chip×opcode×method) tasks: {total_tasks}")
         _println(f"Results directory: {out_root}")
 
         results = run_experiments(
-            vms        = vms,
-            methods    = methods,
-            n_trials   = args.num_trial,
-            timeout_ms = args.timeout_ms,
-            base_seed  = args.base_seed,
-            out_root   = out_root,
-            repo_root  = repo_root,
-            verbose    = not args.quiet,
-            workers    = args.workers,
+            vms            = vms,
+            methods        = methods,
+            n_trials       = args.num_trial,
+            timeout_ms     = args.timeout_ms,
+            base_seed      = args.base_seed,
+            out_root       = out_root,
+            repo_root      = repo_root,
+            verbose        = not args.quiet,
+            workers        = args.workers,
+            timeout_scale  = timeout_scale,
         )
 
     # ── Aggregate ─────────────────────────────────────────────────────────────
