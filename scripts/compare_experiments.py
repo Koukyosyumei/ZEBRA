@@ -2,12 +2,19 @@
 """
 ZEBRA Cross-zkVM Comparison Experiment
 =======================================
-Runs three verification strategies for every opcode of every chip across all
-supported zkVMs using single-point search (--range-interval 0):
+Runs verification strategies for every opcode of every chip across all
+supported zkVMs using single-point search (--range-interval 0).
 
+Standard mode  (default):
   bb           — pure branch-and-bound
   bb_blocking  — branch-and-bound with blocking closure (--blocking-closure)
   z3           — SMT solver (z3)
+
+Ablation study mode  (--ablation):
+  bb                — full bb (baseline)
+  bb_no_heuristic   — bb without priority-queue heuristic (pure DFS)
+  bb_no_simplify    — bb without constraint simplification
+  bb_no_refinement  — bb without interval refinement
 
 Early-stop rule:  if ANY single trial for an opcode fails (timeout or
 verification failure), that opcode is immediately marked as "not verified"
@@ -34,6 +41,8 @@ Usage (run from repo root)
   python3 scripts/compare_experiments.py --skip-run                # just (re-)aggregate
   python3 scripts/compare_experiments.py --build                   # cargo build first
   python3 scripts/compare_experiments.py --workers 8               # run all tasks in parallel
+  python3 scripts/compare_experiments.py --ablation                # ablation study mode
+  python3 scripts/compare_experiments.py --ablation --methods bb,bb_no_heuristic  # subset
 """
 
 from __future__ import annotations
@@ -129,13 +138,40 @@ VM_REGISTRY: Dict[str, Dict] = {
     },
 }
 
-ALL_METHODS = ["bb", "bb_blocking", "z3"]
+STANDARD_METHODS = ["bb", "bb_blocking", "z3"]
+ABLATION_METHODS = ["bb_no_heuristic", "bb_no_simplify", "bb_no_refinement"]
+ALL_METHODS      = STANDARD_METHODS + ABLATION_METHODS
 
 # Human-readable labels for table headers
 METHOD_LABELS: Dict[str, str] = {
-    "bb":          "Branch-and-Bound (bb)",
-    "bb_blocking": "B&B + Blocking Closure",
-    "z3":          "SMT Solver (z3)",
+    "bb":               "Branch-and-Bound (bb)",
+    "bb_blocking":      "B&B + Blocking Closure",
+    "z3":               "SMT Solver (z3)",
+    "bb_no_heuristic":  "bb (no heuristic)",
+    "bb_no_simplify":   "bb (no simplify)",
+    "bb_no_refinement": "bb (no refinement)",
+}
+
+# Extra CLI flags passed to the binary for each method.
+# The binary always receives --method bb (or z3); the dict captures only
+# the ablation / variant flags that differ from plain bb.
+METHOD_EXTRA_ARGS: Dict[str, List[str]] = {
+    "bb":               [],
+    "bb_blocking":      ["--blocking-closure"],
+    "z3":               [],
+    "bb_no_heuristic":  ["--no-heuristic"],
+    "bb_no_simplify":   ["--no-simplify"],
+    "bb_no_refinement": ["--no-refinement"],
+}
+
+# Which --method value to pass to the binary for each logical method
+METHOD_BINARY_METHOD: Dict[str, str] = {
+    "bb":               "bb",
+    "bb_blocking":      "bb",
+    "z3":               "z3",
+    "bb_no_heuristic":  "bb",
+    "bb_no_simplify":   "bb",
+    "bb_no_refinement": "bb",
 }
 
 
@@ -214,8 +250,8 @@ def _run_one_trial(
     # Safety wall-clock limit: 2× internal timeout + 30 s headroom
     wall_limit = timeout_ms / 1000.0 * 2.0 + 30.0
 
-    # bb_blocking uses the bb solver internally, plus --blocking-closure flag
-    binary_method = "bb" if method == "bb_blocking" else method
+    binary_method = METHOD_BINARY_METHOD.get(method, method)
+    extra_args    = METHOD_EXTRA_ARGS.get(method, [])
 
     cmd = [
         str(binary),
@@ -225,9 +261,7 @@ def _run_one_trial(
         "--num-trial",        "1",
         "--ouptput-path",     out_yaml,   # note: intentional typo matching quick.rs
         "--range-interval",   "0",
-    ]
-    if method == "bb_blocking":
-        cmd.append("--blocking-closure")
+    ] + extra_args
 
     wall_start = time.monotonic()
     try:
@@ -819,7 +853,7 @@ def build_vm(vm: str, repo_root: Path) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="ZEBRA cross-zkVM comparison experiment (bb vs bb_blocking vs z3)",
+        description="ZEBRA cross-zkVM comparison experiment",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -827,14 +861,16 @@ def main() -> None:
                         help="Trials per opcode (default: 5)")
     parser.add_argument("--timeout-ms",  type=int,   default=60_000,
                         help="Per-trial timeout in milliseconds (default: 60000)")
-    parser.add_argument("--methods",     type=str,   default="bb,bb_blocking,z3",
-                        help="Comma-separated list of methods (default: bb,bb_blocking,z3)")
+    parser.add_argument("--methods",     type=str,   default=None,
+                        help="Comma-separated list of methods.  Defaults to standard methods "
+                             "(bb,bb_blocking,z3) or ablation methods when --ablation is set.")
     parser.add_argument("--vms",         type=str,   default=",".join(VM_REGISTRY),
                         help=f"Comma-separated VMs (default: all)")
     parser.add_argument("--base-seed",   type=int,   default=41,
                         help="Base random seed; trial i uses seed+i (default: 41)")
-    parser.add_argument("--output-dir",  type=str,   default="experiments/comparison",
-                        help="Directory for per-trial YAML results (default: experiments/comparison)")
+    parser.add_argument("--output-dir",  type=str,   default=None,
+                        help="Directory for per-trial YAML results "
+                             "(default: experiments/comparison or experiments/ablation)")
     parser.add_argument("--csv-out",     type=str,   default=None,
                         help="Path for CSV outputs (default: <output-dir>/results.csv)")
     parser.add_argument("--skip-run",    action="store_true",
@@ -852,10 +888,24 @@ def main() -> None:
                         help="Suppress per-opcode detail table")
     parser.add_argument("--quiet",       action="store_true",
                         help="Suppress per-trial progress output")
+    parser.add_argument("--ablation",    action="store_true",
+                        help="Run ablation study mode: bb vs bb_no_heuristic vs "
+                             "bb_no_simplify vs bb_no_refinement.  "
+                             "Changes the default --methods and --output-dir.")
     args = parser.parse_args()
 
-    methods   = [m.strip() for m in args.methods.split(",") if m.strip()]
-    vms       = [v.strip() for v in args.vms.split(",")     if v.strip()]
+    # ── Resolve mode-dependent defaults ──────────────────────────────────────
+    if args.ablation:
+        default_methods = "bb," + ",".join(ABLATION_METHODS)
+        default_out_dir = "experiments/ablation"
+    else:
+        default_methods = ",".join(STANDARD_METHODS)
+        default_out_dir = "experiments/comparison"
+
+    methods_str = args.methods if args.methods is not None else default_methods
+    methods     = [m.strip() for m in methods_str.split(",") if m.strip()]
+    vms         = [v.strip() for v in args.vms.split(",")    if v.strip()]
+    output_dir  = args.output_dir if args.output_dir is not None else default_out_dir
 
     # Auto-scale timeout for parallel runs.
     # When N workers share C CPUs the contention factor is max(1, N/C), NOT N.
@@ -881,7 +931,7 @@ def main() -> None:
             sys.exit(1)
 
     repo_root = Path(__file__).resolve().parent.parent
-    out_root  = (repo_root / args.output_dir).resolve()
+    out_root  = (repo_root / output_dir).resolve()
     out_root.mkdir(parents=True, exist_ok=True)
 
     csv_path = Path(args.csv_out).resolve() if args.csv_out else out_root / "results.csv"
@@ -910,7 +960,8 @@ def main() -> None:
             for chip in VM_REGISTRY[vm]["chips"]
         )
         effective_ms = int(args.timeout_ms * timeout_scale)
-        _println(f"\nStarting experiment: {len(vms)} VMs, {len(methods)} methods, "
+        mode_label = "ablation study" if args.ablation else "standard comparison"
+        _println(f"\nStarting experiment [{mode_label}]: {len(vms)} VMs, {len(methods)} methods, "
                  f"{args.num_trial} trials/opcode, timeout={args.timeout_ms}ms"
                  + (f" × {timeout_scale:.1f} = {effective_ms}ms (scaled)" if timeout_scale != 1.0 else ""))
         _println(f"Total (chip×opcode×method) tasks: {total_tasks}")
