@@ -9,3 +9,4 @@ cargo build --release --example memoryreadwrite
 cargo build --release --example movcond
 cargo build --release --example mul
 cargo build --release --example shiftleft
+cargo build --release --example shiftright

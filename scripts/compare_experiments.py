@@ -33,6 +33,7 @@ Usage (run from repo root)
   python3 scripts/compare_experiments.py --vms ziren,sp1           # subset of VMs
   python3 scripts/compare_experiments.py --skip-run                # just (re-)aggregate
   python3 scripts/compare_experiments.py --build                   # cargo build first
+  python3 scripts/compare_experiments.py --workers 8               # run all tasks in parallel
 """
 
 from __future__ import annotations
@@ -46,6 +47,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -261,20 +264,23 @@ def _run_one_trial(
 # ── Opcode-level experiment ───────────────────────────────────────────────────
 
 def run_opcode(
-    vm:         str,
-    vm_dir:     Path,
-    chip:       str,
-    opcode:     str,
-    method:     str,
-    n_trials:   int,
-    timeout_ms: int,
-    base_seed:  int,
-    out_root:   Path,
-    verbose:    bool = True,
+    vm:              str,
+    vm_dir:          Path,
+    chip:            str,
+    opcode:          str,
+    method:          str,
+    n_trials:        int,
+    timeout_ms:      int,
+    base_seed:       int,
+    out_root:        Path,
+    verbose:         bool = True,
+    cfg_num_workers: int  = 12,
 ) -> OpcodeResult:
     """
     Run up to n_trials trials for one (chip, opcode, method).
     Stops immediately on the first failed trial (early-stop rule).
+    cfg_num_workers controls the num_workers written into the temp config
+    (set to 1 when running many experiments in parallel to avoid CPU overload).
     """
     binary = vm_dir / "target" / "release" / "examples" / chip
     if not binary.exists():
@@ -292,7 +298,7 @@ def run_opcode(
 
     for i in range(n_trials):
         seed        = base_seed + i
-        cfg_path    = _write_temp_config(timeout_ms, seed)
+        cfg_path    = _write_temp_config(timeout_ms, seed, num_workers=cfg_num_workers)
         yaml_out    = str(trial_dir / f"{opcode}_trial{i+1}.yaml")
 
         try:
@@ -326,56 +332,94 @@ def run_opcode(
 
 # ── Full experiment loop ──────────────────────────────────────────────────────
 
+_print_lock = threading.Lock()
+
+
+def _print_verdict(r: OpcodeResult) -> None:
+    if r.skipped:
+        verdict = "SKIPPED (binary not found)"
+    elif r.verified:
+        mean_t = sum(r.times_s) / len(r.times_s)
+        std_t  = _std(r.times_s)
+        verdict = f"VERIFIED  mean={mean_t:.3f}s  std={std_t:.3f}s"
+    else:
+        verdict = f"NOT verified  ({r.n_success}/{r.n_run} trials ok)"
+    with _print_lock:
+        # \r resets cursor to column 0 in case a subprocess TUI left it mid-line
+        print(f"\r  --> [{r.vm}/{r.chip}/{r.opcode}] {r.method}  {verdict}", flush=True)
+
+
 def run_experiments(
-    vms:        List[str],
-    methods:    List[str],
+    vms:     List[str],
+    methods: List[str],
     n_trials:   int,
     timeout_ms: int,
     base_seed:  int,
     out_root:   Path,
     repo_root:  Path,
     verbose:    bool = True,
+    workers:    int  = 1,
 ) -> List[OpcodeResult]:
+    """
+    Run all (vm, chip, opcode, method) combinations.
+
+    workers=1  — fully sequential (original behaviour).
+    workers>1  — all tasks dispatched to a ThreadPoolExecutor; each task sets
+                 cfg_num_workers=1 so the total CPU load stays proportional.
+    """
     results: List[OpcodeResult] = []
 
-    for vm in vms:
-        reg    = VM_REGISTRY[vm]
-        vm_dir = repo_root / reg["dir"]
-        chips  = reg["chips"]
+    # Build a flat task list: (vm, vm_dir, chip, opcode, method)
+    all_tasks = [
+        (vm, repo_root / VM_REGISTRY[vm]["dir"], chip, opcode, method)
+        for vm in vms
+        for chip, opcodes in VM_REGISTRY[vm]["chips"].items()
+        for opcode in opcodes
+        for method in methods
+    ]
 
-        print(f"\n{'='*60}", flush=True)
-        print(f"  zkVM: {vm}  ({len(chips)} chips)", flush=True)
-        print(f"{'='*60}", flush=True)
+    if workers == 1:
+        # ── Sequential (original behaviour) ──────────────────────────────────
+        cur_vm = None
+        for vm, vm_dir, chip, opcode, method in all_tasks:
+            if vm != cur_vm:
+                chips = VM_REGISTRY[vm]["chips"]
+                print(f"\n{'='*60}", flush=True)
+                print(f"  zkVM: {vm}  ({len(chips)} chips)", flush=True)
+                print(f"{'='*60}", flush=True)
+                cur_vm = vm
+            print(f"\r\n  [{vm}/{chip}/{opcode}] {method}", flush=True)
+            r = run_opcode(
+                vm=vm, vm_dir=vm_dir, chip=chip, opcode=opcode,
+                method=method, n_trials=n_trials, timeout_ms=timeout_ms,
+                base_seed=base_seed, out_root=out_root, verbose=verbose,
+            )
+            results.append(r)
+            _print_verdict(r)
+    else:
+        # ── Parallel ─────────────────────────────────────────────────────────
+        # Each experiment uses cfg_num_workers=1 to avoid CPU overload when
+        # many bb/bb_blocking processes run simultaneously.
+        with _print_lock:
+            print(f"\nRunning {len(all_tasks)} tasks with {workers} parallel workers "
+                  f"(cfg_num_workers=1 per task) ...", flush=True)
 
-        for chip, opcodes in chips.items():
-            for opcode in opcodes:
-                for method in methods:
-                    label = f"[{vm}/{chip}/{opcode}] {method}"
-                    print(f"\n  {label}", flush=True)
+        def _task(args):
+            vm, vm_dir, chip, opcode, method = args
+            return run_opcode(
+                vm=vm, vm_dir=vm_dir, chip=chip, opcode=opcode,
+                method=method, n_trials=n_trials, timeout_ms=timeout_ms,
+                base_seed=base_seed, out_root=out_root,
+                verbose=False,          # suppress per-trial noise; verdicts printed below
+                cfg_num_workers=1,      # each parallel task gets a single internal worker
+            )
 
-                    r = run_opcode(
-                        vm=vm,
-                        vm_dir=vm_dir,
-                        chip=chip,
-                        opcode=opcode,
-                        method=method,
-                        n_trials=n_trials,
-                        timeout_ms=timeout_ms,
-                        base_seed=base_seed,
-                        out_root=out_root,
-                        verbose=verbose,
-                    )
-                    results.append(r)
-
-                    if r.skipped:
-                        verdict = "SKIPPED (binary not found)"
-                    elif r.verified:
-                        mean_t = sum(r.times_s) / len(r.times_s)
-                        std_t  = _std(r.times_s)
-                        verdict = f"VERIFIED  mean={mean_t:.3f}s  std={std_t:.3f}s"
-                    else:
-                        verdict = f"NOT verified  ({r.n_success}/{r.n_run} trials ok)"
-                    print(f"  --> {verdict}", flush=True)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_task, t): t for t in all_tasks}
+            for fut in as_completed(futures):
+                r = fut.result()
+                results.append(r)
+                _print_verdict(r)
 
     return results
 
@@ -776,6 +820,9 @@ def main() -> None:
                         help="Skip running experiments; aggregate from existing --output-dir")
     parser.add_argument("--build",       action="store_true",
                         help="Run  cargo build --release  for each VM before experiments")
+    parser.add_argument("--workers",      type=int,   default=1,
+                        help="Parallel workers for all methods (default: 1 = sequential). "
+                             "When >1, each experiment uses cfg_num_workers=1 internally.")
     parser.add_argument("--no-detail",   action="store_true",
                         help="Suppress per-opcode detail table")
     parser.add_argument("--quiet",       action="store_true",
@@ -838,6 +885,7 @@ def main() -> None:
             out_root   = out_root,
             repo_root  = repo_root,
             verbose    = not args.quiet,
+            workers    = args.workers,
         )
 
     # ── Aggregate ─────────────────────────────────────────────────────────────
