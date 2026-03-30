@@ -20,12 +20,11 @@ use crate::shrinker::{
     detect_double_sel_var_sub_const, detect_selector_addu_constraints,
     detect_selector_word_assign_constraints, refine_conditional_constraints_addvars_sub_const,
     refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
-    refine_double_sel_addvars_sub_const, refine_double_sel_var_sub_const,
     refine_selector_addu_constraints, refine_selector_word_assign_constraints, AbirConstraint,
     SelectorAddUConstraint, SelectorWordAssignConstraint,
 };
 use crate::symbolic::{
-    gather_boolean_variables, gather_vars, gather_vars_simple, is_babybear_word_range,
+    gather_boolean_variables, gather_vars, is_babybear_word_range,
     is_boolean_constraint, is_iszero_operator, is_koalabear_word_range, ZEBRASymbolicExpr,
 };
 use crate::{
@@ -321,8 +320,8 @@ fn process_single_node(
     conditional_addvars_sub_const_constraints: &[(usize, Vec<usize>, i128)],
     eq_constraints: &[(usize, usize, usize)],
     abir_constraints: &[AbirConstraint],
-    double_sel_var_sub_const: &[(usize, bool, usize, bool, usize, i128)],
-    double_sel_addvars_sub_const: &[(usize, bool, usize, bool, Vec<usize>, i128)],
+    _double_sel_var_sub_const: &[(usize, bool, usize, bool, usize, i128)],
+    _double_sel_addvars_sub_const: &[(usize, bool, usize, bool, Vec<usize>, i128)],
     selector_addu_constraints: &[SelectorAddUConstraint],
     selector_word_assign_constraints: &[SelectorWordAssignConstraint],
     is_balanced: bool,
@@ -969,7 +968,7 @@ where
 ///
 /// Used to detect constraints that are trivially satisfied under the initial
 /// (widest) abstract intervals and can be dropped before the search begins.
-fn is_constraint_trivially_true(
+pub fn is_constraint_trivially_true(
     tc: &ZEBRASymbolicExpr,
     trace: &AbstractTrace,
     public_vals: &[AbstractInterval],
