@@ -185,9 +185,13 @@ where
         Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128) + Clone,
     PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
-    enable_raw_mode()?;
+    // Attempt TUI setup; degrade gracefully when there is no TTY (e.g. when
+    // the binary is invoked as a subprocess from compare_experiments.py).
+    let tui_available = enable_raw_mode().is_ok();
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    if tui_available {
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    }
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut ui = UiState::new();
@@ -210,13 +214,15 @@ where
         sleep_time,
     );
 
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+    if tui_available {
+        disable_raw_mode()?;
+        execute!(
+            terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        )?;
+        terminal.show_cursor()?;
+    }
 
     Ok(VerificationResult {
         status: verification_status,

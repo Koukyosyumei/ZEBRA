@@ -308,10 +308,14 @@ def run_opcode(
     out_root:        Path,
     verbose:         bool = True,
     cfg_num_workers: int  = 12,
+    tolerance:       int  = 0,
 ) -> OpcodeResult:
     """
     Run up to n_trials trials for one (chip, opcode, method).
-    Stops immediately on the first failed trial (early-stop rule).
+    Early-stops after (tolerance + 1) failures.
+    tolerance=0 (default / z3): stop on the first failure.
+    tolerance=1 (bb methods):   allow one failure; stop on the second.
+    Verified iff total failures <= tolerance.
     cfg_num_workers controls the num_workers written into the temp config
     (set to 1 when running many experiments in parallel to avoid CPU overload).
     """
@@ -327,7 +331,8 @@ def run_opcode(
     trial_dir = out_root / vm / chip / method
     trial_dir.mkdir(parents=True, exist_ok=True)
 
-    times: List[float] = []
+    times:     List[float] = []
+    n_failures: int        = 0
 
     for i in range(n_trials):
         seed        = base_seed + i
@@ -343,21 +348,26 @@ def run_opcode(
             except OSError:
                 pass
 
+        if not ok:
+            n_failures += 1
+
         if verbose:
-            status_str = "ok" if ok else "FAIL"
+            status_str = "ok" if ok else f"FAIL [{n_failures}/{tolerance + 1}]"
             _println(f"    trial {i+1}/{n_trials}  {status_str}  ({t:.3f}s)", flush=True)
 
         if not ok:
-            # Early stop
-            return OpcodeResult(vm, chip, opcode, method,
-                                verified=False,
-                                times_s=times,
-                                n_run=i + 1,
-                                n_success=len(times))
-        times.append(t)
+            if n_failures > tolerance:
+                # Early stop
+                return OpcodeResult(vm, chip, opcode, method,
+                                    verified=False,
+                                    times_s=times,
+                                    n_run=i + 1,
+                                    n_success=len(times))
+        else:
+            times.append(t)
 
     return OpcodeResult(vm, chip, opcode, method,
-                        verified=True,
+                        verified=n_failures <= tolerance,
                         times_s=times,
                         n_run=n_trials,
                         n_success=len(times))
@@ -402,6 +412,7 @@ def run_experiments(
     verbose:        bool  = True,
     workers:        int   = 1,
     timeout_scale:  float = 1.0,
+    tolerance:      int   = 1,
 ) -> List[OpcodeResult]:
     """
     Run all (vm, chip, opcode, method) combinations.
@@ -414,6 +425,8 @@ def run_experiments(
                       When workers>1 the effective CPU share per task is ~1/workers,
                       so the same amount of work takes proportionally longer on the
                       wall clock.  Defaults to workers when workers>1 (auto-scale).
+    tolerance       — allowed failures before early-stop; applied only to bb-based
+                      methods (z3 always uses tolerance=0).
     """
     results: List[OpcodeResult] = []
 
@@ -447,6 +460,7 @@ def run_experiments(
                 vm=vm, vm_dir=vm_dir, chip=chip, opcode=opcode,
                 method=method, n_trials=n_trials, timeout_ms=effective_timeout_ms,
                 base_seed=base_seed, out_root=out_root, verbose=verbose,
+                tolerance=tolerance if METHOD_BINARY_METHOD.get(method) == "bb" else 0,
             )
             results.append(r)
             _print_verdict(r)
@@ -467,6 +481,7 @@ def run_experiments(
                 base_seed=base_seed, out_root=out_root,
                 verbose=False,      # suppress per-trial noise; verdicts printed below
                 cfg_num_workers=1,  # each parallel task gets a single internal worker
+                tolerance=tolerance if METHOD_BINARY_METHOD.get(method) == "bb" else 0,
             )
 
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -888,6 +903,9 @@ def main() -> None:
                         help="Suppress per-opcode detail table")
     parser.add_argument("--quiet",       action="store_true",
                         help="Suppress per-trial progress output")
+    parser.add_argument("--tolerance",   type=int, default=1,
+                        help="Allowed failures before early-stop for bb-based methods "
+                             "(default: 1).  z3 always uses tolerance=0.")
     parser.add_argument("--ablation",    action="store_true",
                         help="Run ablation study mode: bb vs bb_no_heuristic vs "
                              "bb_no_simplify vs bb_no_refinement.  "
@@ -963,7 +981,8 @@ def main() -> None:
         mode_label = "ablation study" if args.ablation else "standard comparison"
         _println(f"\nStarting experiment [{mode_label}]: {len(vms)} VMs, {len(methods)} methods, "
                  f"{args.num_trial} trials/opcode, timeout={args.timeout_ms}ms"
-                 + (f" × {timeout_scale:.1f} = {effective_ms}ms (scaled)" if timeout_scale != 1.0 else ""))
+                 + (f" × {timeout_scale:.1f} = {effective_ms}ms (scaled)" if timeout_scale != 1.0 else "")
+                 + f", tolerance={args.tolerance} (bb only)")
         _println(f"Total (chip×opcode×method) tasks: {total_tasks}")
         _println(f"Results directory: {out_root}")
 
@@ -978,6 +997,7 @@ def main() -> None:
             verbose        = not args.quiet,
             workers        = args.workers,
             timeout_scale  = timeout_scale,
+            tolerance      = args.tolerance,
         )
 
     # ── Aggregate ─────────────────────────────────────────────────────────────
