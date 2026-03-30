@@ -7,6 +7,8 @@ use p3_baby_bear::BabyBear;
 
 use valida_alu_u32::mul::columns::MUL_COL_MAP;
 use valida_alu_u32::mul::Mul32Chip;
+use valida_alu_u32::mul::Mulhs32Instruction;
+use valida_alu_u32::mul::Mulhu32Instruction;
 use valida_alu_u32::mul::{columns::NUM_MUL_COLS, Mul32Instruction};
 use valida_basic_api::BasicMachine;
 use valida_cpu::Imm32Instruction;
@@ -22,11 +24,9 @@ use zebra::solver::nop_post_process;
 use zebra::utils::create_or_clear_dir;
 
 use zebra_valida::config::MyConfig;
-use zebra_valida::utils::{
-    extract_constraints_and_range, generate_bootstrap_trace_from_program,
-};
+use zebra_valida::utils::{extract_constraints_and_range, generate_bootstrap_trace_from_program};
 
-fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
+fn get_target_program<Val: StarkField>(opcode: u32, a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let _bytes_per_instr = BYTES_PER_INSTR as i32;
     let a_bytes = a.to_le_bytes();
 
@@ -43,7 +43,7 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
             ]),
         },
         InstructionWord {
-            opcode: <Mul32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+            opcode: opcode,
             operands: Operands([-8, -4, b, 0, 1]),
         },
         InstructionWord {
@@ -55,11 +55,20 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
     program
 }
 
+pub fn get_opcode_addsub<Val: StarkField>(target_opcode: &str) -> u32 {
+    match target_opcode {
+        "MUL32" => <Mul32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+        "MULHS32" => <Mulhs32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+        "MILHU32" => <Mulhu32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
+        _ => panic!("unsupported instruction"),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let _opcode_str = args.opcode_str.clone();
+    let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
 
     // ######################## Prime and Column Settings ########################
@@ -100,7 +109,8 @@ fn main() -> Result<(), io::Error> {
         let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
 
         // ######################## Program Initialization ###########################
-        let program = get_target_program::<BabyBear>(x, y);
+        let program =
+            get_target_program::<BabyBear>(get_opcode_addsub::<BabyBear>(&opcode_str), x, y);
         let program_str = program
             .iter()
             .map(|inst| format!("{}\n", inst))
@@ -122,7 +132,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             nop_post_process,
             &final_check,
             &args.method,

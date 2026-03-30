@@ -356,10 +356,24 @@ pub fn expr_to_smt_bv(
                 }
             }
             ZEBRASymbolicExpr::WhenNonZero(a, b) => {
-                format!("(ite (= {} {}) {} {})", rec(a), zero_hex, zero_hex, rec(b))
+                // Use bvurem to reduce rec(a) by the prime P before checking equality to zero
+                format!(
+                    "(ite (= (bvurem {} P) {}) {} {})",
+                    rec(a),
+                    zero_hex,
+                    zero_hex,
+                    rec(b)
+                )
             }
             ZEBRASymbolicExpr::WhenZero(a, b) => {
-                format!("(ite (= {} {}) {} {})", rec(a), zero_hex, rec(b), zero_hex)
+                // Use bvurem to reduce rec(a) by the prime P before checking equality to zero
+                format!(
+                    "(ite (= (bvurem {} P) {}) {} {})",
+                    rec(a),
+                    zero_hex,
+                    rec(b),
+                    zero_hex
+                )
             }
             ZEBRASymbolicExpr::Constant(AbstractInterval { lo, hi: _ }) => {
                 format!("#x{:08x}", lo)
@@ -714,7 +728,7 @@ pub fn expr_to_smt_bv(
 
     for expr in &constraints.lookup_constraints {
         for i in 0..n_rows {
-            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime, false);
+            let body = helper(expr, i, n_rows, n_pvs, &mut vars, prime, true);
             smt.push_str(&format!("(assert (= {} {}))\n", body, zero_hex));
         }
     }
@@ -757,6 +771,12 @@ pub fn expr_to_smt_bv(
     }
 
     // ranges
+    for i in 0..n_rows {
+        for j in 0..n_cols {
+            smt.push_str(&format!("(assert (bvule trace_{}_{} P))\n", i, j));
+        }
+    }
+
     for (j, k) in range_types {
         if let RangeType::U16 = k {
             for i in 0..n_rows {

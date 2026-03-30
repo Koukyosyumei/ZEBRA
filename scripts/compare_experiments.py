@@ -33,6 +33,7 @@ Usage (run from repo root)
   python3 scripts/compare_experiments.py --vms ziren,sp1           # subset of VMs
   python3 scripts/compare_experiments.py --skip-run                # just (re-)aggregate
   python3 scripts/compare_experiments.py --build                   # cargo build first
+  python3 scripts/compare_experiments.py --workers 8               # run all tasks in parallel
 """
 
 from __future__ import annotations
@@ -46,6 +47,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -261,25 +264,28 @@ def _run_one_trial(
 # ── Opcode-level experiment ───────────────────────────────────────────────────
 
 def run_opcode(
-    vm:         str,
-    vm_dir:     Path,
-    chip:       str,
-    opcode:     str,
-    method:     str,
-    n_trials:   int,
-    timeout_ms: int,
-    base_seed:  int,
-    out_root:   Path,
-    verbose:    bool = True,
+    vm:              str,
+    vm_dir:          Path,
+    chip:            str,
+    opcode:          str,
+    method:          str,
+    n_trials:        int,
+    timeout_ms:      int,
+    base_seed:       int,
+    out_root:        Path,
+    verbose:         bool = True,
+    cfg_num_workers: int  = 12,
 ) -> OpcodeResult:
     """
     Run up to n_trials trials for one (chip, opcode, method).
     Stops immediately on the first failed trial (early-stop rule).
+    cfg_num_workers controls the num_workers written into the temp config
+    (set to 1 when running many experiments in parallel to avoid CPU overload).
     """
     binary = vm_dir / "target" / "release" / "examples" / chip
     if not binary.exists():
         if verbose:
-            print(f"    [SKIP] binary not found: {binary}", flush=True)
+            _println(f"    [SKIP] binary not found: {binary}", flush=True)
         return OpcodeResult(vm, chip, opcode, method,
                             verified=False, times_s=[], n_run=0, n_success=0,
                             skipped=True)
@@ -292,7 +298,7 @@ def run_opcode(
 
     for i in range(n_trials):
         seed        = base_seed + i
-        cfg_path    = _write_temp_config(timeout_ms, seed)
+        cfg_path    = _write_temp_config(timeout_ms, seed, num_workers=cfg_num_workers)
         yaml_out    = str(trial_dir / f"{opcode}_trial{i+1}.yaml")
 
         try:
@@ -306,7 +312,7 @@ def run_opcode(
 
         if verbose:
             status_str = "ok" if ok else "FAIL"
-            print(f"    trial {i+1}/{n_trials}  {status_str}  ({t:.3f}s)", flush=True)
+            _println(f"    trial {i+1}/{n_trials}  {status_str}  ({t:.3f}s)", flush=True)
 
         if not ok:
             # Early stop
@@ -326,56 +332,104 @@ def run_opcode(
 
 # ── Full experiment loop ──────────────────────────────────────────────────────
 
+_print_lock = threading.Lock()
+
+# ESC[2K clears the entire current line; \r moves cursor to column 0.
+# This is needed because the binaries use crossterm/ratatui which opens
+# /dev/tty directly and leaves the terminal cursor at an arbitrary column.
+_CLR = "\033[2K\r"
+
+
+def _println(msg: str = "", **kwargs) -> None:
+    """Print with a preceding line-clear so cursor pollution doesn't indent output."""
+    print(_CLR + msg, **kwargs)
+
+
+def _print_verdict(r: OpcodeResult) -> None:
+    if r.skipped:
+        verdict = "SKIPPED (binary not found)"
+    elif r.verified:
+        mean_t = sum(r.times_s) / len(r.times_s)
+        std_t  = _std(r.times_s)
+        verdict = f"VERIFIED  mean={mean_t:.3f}s  std={std_t:.3f}s"
+    else:
+        verdict = f"NOT verified  ({r.n_success}/{r.n_run} trials ok)"
+    with _print_lock:
+        _println(f"  --> [{r.vm}/{r.chip}/{r.opcode}] {r.method}  {verdict}", flush=True)
+
+
 def run_experiments(
-    vms:        List[str],
-    methods:    List[str],
+    vms:     List[str],
+    methods: List[str],
     n_trials:   int,
     timeout_ms: int,
     base_seed:  int,
     out_root:   Path,
     repo_root:  Path,
     verbose:    bool = True,
+    workers:    int  = 1,
 ) -> List[OpcodeResult]:
+    """
+    Run all (vm, chip, opcode, method) combinations.
+
+    workers=1  — fully sequential (original behaviour).
+    workers>1  — all tasks dispatched to a ThreadPoolExecutor; each task sets
+                 cfg_num_workers=1 so the total CPU load stays proportional.
+    """
     results: List[OpcodeResult] = []
 
-    for vm in vms:
-        reg    = VM_REGISTRY[vm]
-        vm_dir = repo_root / reg["dir"]
-        chips  = reg["chips"]
+    # Build a flat task list: (vm, vm_dir, chip, opcode, method)
+    all_tasks = [
+        (vm, repo_root / VM_REGISTRY[vm]["dir"], chip, opcode, method)
+        for vm in vms
+        for chip, opcodes in VM_REGISTRY[vm]["chips"].items()
+        for opcode in opcodes
+        for method in methods
+    ]
 
-        print(f"\n{'='*60}", flush=True)
-        print(f"  zkVM: {vm}  ({len(chips)} chips)", flush=True)
-        print(f"{'='*60}", flush=True)
+    if workers == 1:
+        # ── Sequential (original behaviour) ──────────────────────────────────
+        cur_vm = None
+        for vm, vm_dir, chip, opcode, method in all_tasks:
+            if vm != cur_vm:
+                chips = VM_REGISTRY[vm]["chips"]
+                _println(flush=True)
+                _println(f"{'='*60}", flush=True)
+                _println(f"  zkVM: {vm}  ({len(chips)} chips)", flush=True)
+                _println(f"{'='*60}", flush=True)
+                cur_vm = vm
+            _println(f"  [{vm}/{chip}/{opcode}] {method}", flush=True)
+            r = run_opcode(
+                vm=vm, vm_dir=vm_dir, chip=chip, opcode=opcode,
+                method=method, n_trials=n_trials, timeout_ms=timeout_ms,
+                base_seed=base_seed, out_root=out_root, verbose=verbose,
+            )
+            results.append(r)
+            _print_verdict(r)
+    else:
+        # ── Parallel ─────────────────────────────────────────────────────────
+        # Each experiment uses cfg_num_workers=1 to avoid CPU overload when
+        # many bb/bb_blocking processes run simultaneously.
+        with _print_lock:
+            _println(f"Running {len(all_tasks)} tasks with {workers} parallel workers "
+                     f"(cfg_num_workers=1 per task) ...", flush=True)
 
-        for chip, opcodes in chips.items():
-            for opcode in opcodes:
-                for method in methods:
-                    label = f"[{vm}/{chip}/{opcode}] {method}"
-                    print(f"\n  {label}", flush=True)
+        def _task(args):
+            vm, vm_dir, chip, opcode, method = args
+            return run_opcode(
+                vm=vm, vm_dir=vm_dir, chip=chip, opcode=opcode,
+                method=method, n_trials=n_trials, timeout_ms=timeout_ms,
+                base_seed=base_seed, out_root=out_root,
+                verbose=False,          # suppress per-trial noise; verdicts printed below
+                cfg_num_workers=1,      # each parallel task gets a single internal worker
+            )
 
-                    r = run_opcode(
-                        vm=vm,
-                        vm_dir=vm_dir,
-                        chip=chip,
-                        opcode=opcode,
-                        method=method,
-                        n_trials=n_trials,
-                        timeout_ms=timeout_ms,
-                        base_seed=base_seed,
-                        out_root=out_root,
-                        verbose=verbose,
-                    )
-                    results.append(r)
-
-                    if r.skipped:
-                        verdict = "SKIPPED (binary not found)"
-                    elif r.verified:
-                        mean_t = sum(r.times_s) / len(r.times_s)
-                        std_t  = _std(r.times_s)
-                        verdict = f"VERIFIED  mean={mean_t:.3f}s  std={std_t:.3f}s"
-                    else:
-                        verdict = f"NOT verified  ({r.n_success}/{r.n_run} trials ok)"
-                    print(f"  --> {verdict}", flush=True)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_task, t): t for t in all_tasks}
+            for fut in as_completed(futures):
+                r = fut.result()
+                results.append(r)
+                _print_verdict(r)
 
     return results
 
@@ -524,10 +578,10 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
     outer_w = w_vm + 2 + 1 + 6 + 1 + 5 + 1 + len(methods) * (blk_w + 3)
     outer_w = max(outer_w, len(title) + 4)
 
-    print()
-    print("┌" + "─" * (outer_w) + "┐")
-    print("│" + f" {title} ".center(outer_w) + "│")
-    print("├" + "─" * (outer_w) + "┤")
+    _println()
+    _println("┌" + "─" * (outer_w) + "┐")
+    _println("│" + f" {title} ".center(outer_w) + "│")
+    _println("├" + "─" * (outer_w) + "┤")
 
     # Column group header
     meth_headers = "│".join(
@@ -535,7 +589,7 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
         for m in methods
     )
     base_hdr = f" {'zkVM':<{w_vm}} │ {'#Chips':>4}  │ {'#Ops':>3}  "
-    print("│" + base_hdr + "│" + meth_headers + "│")
+    _println("│" + base_hdr + "│" + meth_headers + "│")
 
     # Sub-header
     def method_subhdr(m: str) -> str:
@@ -543,19 +597,19 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
 
     sub_base = f" {'':>{w_vm}} │ {'':>4}   │ {'':>3}   "
     sub_meths = "│".join(method_subhdr(m) for m in methods)
-    print("│" + sub_base + "│" + sub_meths + "│")
+    _println("│" + sub_base + "│" + sub_meths + "│")
 
-    print(sep("─", "┼", "├", "┤"))
+    _println(sep("─", "┼", "├", "┤"))
 
     # Data rows
     for r in rows:
-        print(row_line(r.vm, r.n_chips, r.n_ops, r.stats))
+        _println(row_line(r.vm, r.n_chips, r.n_ops, r.stats))
 
     # Totals
-    print(sep("═", "╪", "╞", "╡"))
-    print(row_line(totals.vm, totals.n_chips, totals.n_ops, totals.stats))
-    print("└" + "─" * outer_w + "┘")
-    print()
+    _println(sep("═", "╪", "╞", "╡"))
+    _println(row_line(totals.vm, totals.n_chips, totals.n_ops, totals.stats))
+    _println("└" + "─" * outer_w + "┘")
+    _println()
 
 
 # ── Per-opcode detail table ───────────────────────────────────────────────────
@@ -568,12 +622,12 @@ def print_detail_table(results: List[OpcodeResult], methods: List[str]) -> None:
     sep_m = "─" * (w_method + 2)
     hdr_m = f" {'Method':<{w_method}} "
 
-    print()
-    print(f"┌──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┐")
-    print(f"│          Per-Opcode Verification Detail{' ' * (w_method + 35)}│")
-    print(f"├──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┤")
-    print(f"│ zkVM     │ Chip       │ Opcode   │{hdr_m}│ Verdict  / Time (s)         │")
-    print(f"├──────────┼────────────┼──────────┼{sep_m}┼────────────────────────────┤")
+    _println()
+    _println(f"┌──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┐")
+    _println(f"│          Per-Opcode Verification Detail{' ' * (w_method + 35)}│")
+    _println(f"├──────────┬────────────┬──────────┬{sep_m}┬────────────────────────────┤")
+    _println(f"│ zkVM     │ Chip       │ Opcode   │{hdr_m}│ Verdict  / Time (s)         │")
+    _println(f"├──────────┼────────────┼──────────┼{sep_m}┼────────────────────────────┤")
 
     last_vm_chip = ("", "")
     for r in sorted(results, key=lambda x: (x.vm, x.chip, x.opcode, x.method)):
@@ -590,12 +644,12 @@ def print_detail_table(results: List[OpcodeResult], methods: List[str]) -> None:
         else:
             verdict = f"✗ FAILED    ({r.n_success}/{r.n_run} ok)"
 
-        print(
+        _println(
             f"│ {vm_cell:<8} │ {chip_cell:<10} │ {r.opcode:<8} │ {r.method:<{w_method}} │ {verdict:<26} │"
         )
 
-    print(f"└──────────┴────────────┴──────────┴{sep_m}┴────────────────────────────┘")
-    print()
+    _println(f"└──────────┴────────────┴──────────┴{sep_m}┴────────────────────────────┘")
+    _println()
 
 
 # ── CSV export ────────────────────────────────────────────────────────────────
@@ -664,8 +718,8 @@ def write_csv(
                 "skipped":          r.skipped,
             })
 
-    print(f"CSV summary  saved to:  {summary_path}")
-    print(f"CSV detail   saved to:  {detail_path}")
+    _println(f"CSV summary  saved to:  {summary_path}")
+    _println(f"CSV detail   saved to:  {detail_path}")
 
 
 # ── Load saved results (--skip-run) ──────────────────────────────────────────
@@ -776,6 +830,9 @@ def main() -> None:
                         help="Skip running experiments; aggregate from existing --output-dir")
     parser.add_argument("--build",       action="store_true",
                         help="Run  cargo build --release  for each VM before experiments")
+    parser.add_argument("--workers",      type=int,   default=1,
+                        help="Parallel workers for all methods (default: 1 = sequential). "
+                             "When >1, each experiment uses cfg_num_workers=1 internally.")
     parser.add_argument("--no-detail",   action="store_true",
                         help="Suppress per-opcode detail table")
     parser.add_argument("--quiet",       action="store_true",
@@ -804,7 +861,7 @@ def main() -> None:
 
     # ── Optional build ────────────────────────────────────────────────────────
     if args.build:
-        print("\n=== Building VMs ===")
+        _println("\n=== Building VMs ===")
         for vm in vms:
             if not build_vm(vm, repo_root):
                 print(f"Build failed for {vm}; aborting.", file=sys.stderr)
@@ -812,7 +869,7 @@ def main() -> None:
 
     # ── Run or load ───────────────────────────────────────────────────────────
     if args.skip_run:
-        print(f"\nLoading saved results from  {out_root} ...", flush=True)
+        _println(f"\nLoading saved results from  {out_root} ...", flush=True)
         results = load_saved_results(out_root, vms, methods)
         if not results:
             print("ERROR: no saved results found.  Run without --skip-run first.",
@@ -824,10 +881,10 @@ def main() -> None:
             for vm in vms
             for chip in VM_REGISTRY[vm]["chips"]
         )
-        print(f"\nStarting experiment: {len(vms)} VMs, {len(methods)} methods, "
-              f"{args.num_trial} trials/opcode, timeout={args.timeout_ms}ms")
-        print(f"Total (chip×opcode×method) tasks: {total_tasks}")
-        print(f"Results directory: {out_root}")
+        _println(f"\nStarting experiment: {len(vms)} VMs, {len(methods)} methods, "
+                 f"{args.num_trial} trials/opcode, timeout={args.timeout_ms}ms")
+        _println(f"Total (chip×opcode×method) tasks: {total_tasks}")
+        _println(f"Results directory: {out_root}")
 
         results = run_experiments(
             vms        = vms,
@@ -838,6 +895,7 @@ def main() -> None:
             out_root   = out_root,
             repo_root  = repo_root,
             verbose    = not args.quiet,
+            workers    = args.workers,
         )
 
     # ── Aggregate ─────────────────────────────────────────────────────────────
