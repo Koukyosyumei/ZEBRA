@@ -221,6 +221,8 @@ pub struct SearchConfig {
     pub min_row_id: usize,
     pub max_row_id: usize,
     pub seed: u64,
+    pub enable_heuristic: bool,
+    pub enable_interval_refinement: bool,
 }
 
 impl Default for SearchConfig {
@@ -233,6 +235,8 @@ impl Default for SearchConfig {
             min_row_id: 0,
             max_row_id: 0,
             seed: 41,
+            enable_heuristic: true,
+            enable_interval_refinement: true,
         }
     }
 }
@@ -323,6 +327,7 @@ fn process_single_node(
     selector_word_assign_constraints: &[SelectorWordAssignConstraint],
     is_balanced: bool,
     is_backward_refine_on: bool,
+    enable_heuristic: bool,
 ) -> NodeProcessingResult {
     let mut main_trace = head.main_trace;
 
@@ -440,12 +445,17 @@ fn process_single_node(
             (MayBeFlag::MayBe, MayBeFlag::MayBe)
             | (MayBeFlag::MayBe, MayBeFlag::True)
             | (MayBeFlag::True, MayBeFlag::MayBe) => {
+                let priority = if enable_heuristic {
+                    (-pot, head.depth as i32 + 1)
+                } else {
+                    (0, head.depth as i32 + 1)
+                };
                 refined.push((
                     SearchNode {
                         main_trace: kid_trace,
                         depth: head.depth + 1,
                     },
-                    (-pot, (head.depth as i32 + 1)),
+                    priority,
                 ));
             }
         }
@@ -760,6 +770,7 @@ where
                     &c_swa,
                     is_balanced,
                     is_backward_refine_on,
+                    search_config.enable_heuristic,
                 );
 
                 match result {
@@ -1134,7 +1145,8 @@ where
                 sleep_time,
                 &start_time,
                 column_subset.len() == constraint_info.refinable_cols.len(),
-                column_subset.len() == constraint_info.refinable_cols.len(),
+                search_config.enable_interval_refinement
+                    && column_subset.len() == constraint_info.refinable_cols.len(),
             );
             last_verification_status = status;
 

@@ -50,6 +50,15 @@ pub struct Args {
     pub range_interval: usize,
     #[arg(long, default_value = "false")]
     pub blocking_closure: bool,
+    /// Ablation: disable the heuristic score (use constant priority, pure DFS)
+    #[arg(long, default_value = "false")]
+    pub no_heuristic: bool,
+    /// Ablation: disable constraint simplification (is_zero / word-range pattern rewriting)
+    #[arg(long, default_value = "false")]
+    pub no_simplify: bool,
+    /// Ablation: disable interval refinement (ABIR / conditional-constraint back-propagation)
+    #[arg(long, default_value = "false")]
+    pub no_refinement: bool,
 }
 
 #[derive(Debug)]

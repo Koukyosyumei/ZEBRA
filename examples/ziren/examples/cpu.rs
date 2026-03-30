@@ -112,6 +112,8 @@ fn main() -> Result<(), io::Error> {
 
     let args = Args::parse();
     let mut search_config = load_config(&args.config).unwrap();
+    search_config.enable_heuristic = !args.no_heuristic;
+    search_config.enable_interval_refinement = !args.no_refinement;
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
@@ -130,7 +132,7 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", CPU_COL_MAP);
 
     let (mut constraint_info, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, prime, args.method == "bb");
+        extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, prime, args.method == "bb" && !args.no_simplify);
     constraint_info
         .refinable_cols
         .retain(|x| !program_cols.contains(x));

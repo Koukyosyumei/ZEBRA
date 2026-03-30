@@ -47,6 +47,8 @@ fn main() -> Result<(), io::Error> {
     let args = Args::parse();
     let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
+    search_config.enable_heuristic = !args.no_heuristic;
+    search_config.enable_interval_refinement = !args.no_refinement;
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
@@ -59,7 +61,7 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
         KoalaBear,
         DivRemChip<KoalaBear>,
-    >(&air, NUM_DIVREM_COLS, prime, args.method == "bb");
+    >(&air, NUM_DIVREM_COLS, prime, args.method == "bb" && !args.no_simplify);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     for i in &general_lookup_info.op_a {
         constraint_info.range_types.insert(*i, RangeType::U8);

@@ -70,6 +70,8 @@ fn main() -> Result<(), io::Error> {
     let args = Args::parse();
     let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
+    search_config.enable_heuristic = !args.no_heuristic;
+    search_config.enable_interval_refinement = !args.no_refinement;
     let (opcode, is_load) = get_opcode(&opcode_str);
 
     // ######################## Prime and Column Settings ########################
@@ -85,7 +87,7 @@ fn main() -> Result<(), io::Error> {
         KoalaBear,
         MemoryInstructionsChip,
     >(
-        &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime, args.method == "bb"
+        &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime, args.method == "bb" && !args.no_simplify
     );
 
     let final_check = generate_memory_op_final_checker(

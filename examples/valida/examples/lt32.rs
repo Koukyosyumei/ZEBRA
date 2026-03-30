@@ -87,6 +87,8 @@ fn main() -> Result<(), io::Error> {
     let args = Args::parse();
     let _opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
+    search_config.enable_heuristic = !args.no_heuristic;
+    search_config.enable_interval_refinement = !args.no_refinement;
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
@@ -102,7 +104,7 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime, args.method == "bb",
+            &machine, &air, num_col, prime, args.method == "bb" && !args.no_simplify,
         );
     let is_reals = [23, 24, 25, 26];
     constraint_info
