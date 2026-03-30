@@ -103,6 +103,7 @@ pub fn extract_constraints_and_range<F, A>(
     air: &A,
     num_cols: usize,
     prime: u32,
+    simplify_constraints: bool,
 ) -> (ConstraintInfo, GeneralLookupInfo)
 where
     F: p3_field::PrimeField32,
@@ -143,6 +144,7 @@ where
         &mut air_constraints,
         &lookup_constraints,
         prime,
+        simplify_constraints,
     );
 
     let constraints = ZEBRAConstraints::new(air_constraints, lookup_constraints);

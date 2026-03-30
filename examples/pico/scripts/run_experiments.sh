@@ -122,36 +122,27 @@ JSON
 run_one() {
     local chip="$1" opcode="$2" workers="$3" range="$4" outfile="$5" track="${6:-0}"
     mkdir -p "$(dirname "$outfile")"
-    local tmpfile trial_config ratio verified=1
-    tmpfile="$(mktemp /tmp/zebra_result_XXXXXX.yaml)"
+    local trial_config ratio
+    trial_config="$(make_config "$workers" "$BASE_SEED")"
+    echo "    run: chip=$chip opcode=$opcode workers=$workers range=$range trials=$NUM_TRIALS"
+    (cd "$VM_DIR" && \
+        "$BIN_DIR/$chip" \
+            --config         "$trial_config" \
+            --opcode-str     "$opcode" \
+            --method         "bb" \
+            --num-trial      "$NUM_TRIALS" \
+            --range-interval "$range" \
+            --ouptput-path   "$outfile" \
+        2>/dev/null
+    ) || true
+    rm -f "$trial_config"
 
-    for (( trial=1; trial<=NUM_TRIALS; trial++ )); do
-        trial_config="$(make_config "$workers" "$((BASE_SEED + trial - 1))")"
-        echo "    run: chip=$chip opcode=$opcode workers=$workers range=$range trial=$trial/$NUM_TRIALS"
-        (cd "$VM_DIR" && \
-            "$BIN_DIR/$chip" \
-                --config         "$trial_config" \
-                --opcode-str     "$opcode" \
-                --method         "bb" \
-                --num-trial      1 \
-                --range-interval "$range" \
-                --ouptput-path   "$tmpfile" \
-            2>/dev/null
-        ) || true
-        rm -f "$trial_config"
-        ratio=$(grep -m1 'success_ratio:' "$tmpfile" 2>/dev/null | awk '{print $2}')
-        if [[ -z "$ratio" ]] || ! awk "BEGIN { exit ($ratio >= 1.0) ? 0 : 1 }"; then
-            echo "      -> not verified (success_ratio=${ratio:-N/A}), early stop"
-            verified=0
-            break
+    ratio=$(grep -m1 'success_ratio:' "$outfile" 2>/dev/null | awk '{print $2}')
+    if [[ -z "$ratio" ]] || ! awk "BEGIN { exit ($ratio >= 1.0) ? 0 : 1 }"; then
+        echo "      -> not verified (success_ratio=${ratio:-N/A})"
+        if [[ "$track" == "1" ]]; then
+            mark_failed "$chip" "$opcode"
         fi
-    done
-
-    cp "$tmpfile" "$outfile" 2>/dev/null || true
-    rm -f "$tmpfile"
-
-    if [[ $verified -eq 0 && "$track" == "1" ]]; then
-        mark_failed "$chip" "$opcode"
     fi
 }
 

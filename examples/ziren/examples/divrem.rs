@@ -75,6 +75,8 @@ fn main() -> Result<(), io::Error> {
     let args = Args::parse();
     let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
+    search_config.enable_heuristic = !args.no_heuristic;
+    search_config.enable_interval_refinement = !args.no_refinement;
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
@@ -105,7 +107,7 @@ fn main() -> Result<(), io::Error> {
     let air_name = "DivRem";
     let _colmap = make_col_map();
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime);
+        extract_constraints_and_range::<KoalaBear, DivRemChip>(&air, NUM_DIVREM_COLS, prime, args.method == "bb" && !args.no_simplify);
     constraint_info
         .refinable_cols
         .extend(&output_columns.clone());

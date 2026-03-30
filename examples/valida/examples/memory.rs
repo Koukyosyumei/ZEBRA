@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use clap::Parser;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashSet;
 use std::io;
 
 use p3_baby_bear::BabyBear;
-use p3_field::{AbstractField, Field};
 
 use valida_alu_u32::sub::Sub32Instruction;
 use valida_basic_api::BasicMachine;
@@ -14,82 +14,54 @@ use valida_memory::columns::{MEM_COL_MAP, NUM_MEM_COLS};
 use valida_memory::MemoryChip;
 use valida_opcodes::BYTES_PER_INSTR;
 
+use zebra::canonicalizer::save_repr_if_unique;
 use zebra::interval::{AbstractInterval, MayBeFlag};
-use zebra::quick::quick_api;
-use zebra::solver::{dummy_program_counter_refine_fn, nop_post_process};
-use zebra::symbolic::{AbstractTrace, ZEBRAConstraints};
-use zebra::ui::save_repr_if_unique;
+use zebra::quick::{
+    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+};
+use zebra::solver::nop_post_process;
+use zebra::trace::AbstractTrace;
 use zebra::ui::UiState;
-use zebra::utils::create_or_clear_dir;
+use zebra::utils::{create_or_clear_dir, PrettySet};
 
 use zebra_valida::config::MyConfig;
 use zebra_valida::utils::{extract_constraints_and_range, generate_bootstrap_trace_from_program};
 
-fn program_counter_refine_fn(
-    abs_main_trace_data: &mut Vec<Vec<AbstractInterval>>,
-    program_len: usize,
-    i: usize,
-    j: usize,
-) {
-}
-
-fn adjust_pc_program(main_trace: &mut AbstractTrace, prime: u32) {}
-
 fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
-    let mut val = AbstractInterval::from_i64(0);
-    let mut mul = 1_i64;
+    let mut val = AbstractInterval::from_i128(0);
+    let mut mul = 1_i128;
     for i in 0..4 {
-        val = val + row[base + i].clone() * AbstractInterval::from_i64(mul);
+        val = val + row[base + i].clone() * AbstractInterval::from_i128(mul);
         mul *= 256;
     }
     val
 }
 
-/*
-        let mut known_solution = global_known_solution.clone();
-        let repr_sets =
-            cpu_canonicalizer(&AbstractTrace::new(base_abs_main_trace_data.clone()), prime);
-        known_solution.insert(format!("{}", PrettySet(repr_sets.clone())));
-
-        let result = experiment_harness(
-            &program_info,
-            &mut constraint_info,
-            &search_config,
-            &base_abs_main_trace_data,
-            public_vals.clone(),
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
-            post_process,
-            final_check,
-            &args.method,
-            &mut known_solution,
-        );
-*/
-
-// ############## Final Check Function ##############################
 fn final_check(
     trace: &AbstractTrace,
-    num_trial: usize,
+    _num_trial: usize,
     prime: u32,
     known_reprt: &mut HashSet<String>,
     ui: &mut UiState,
     _area: &mut i128,
 ) {
-    let mut string_representation = String::new();
-
     let num_row = trace.data.len();
     let def_interval = AbstractInterval::zero();
-    let mut memory = HashMap::<i64, AbstractInterval>::new();
+    let mut memory = std::collections::HashMap::<i128, AbstractInterval>::new();
+    let mut record_reprs = HashSet::new();
     let mut is_consistent_flag = true;
     let mut break_point = 0;
+    let mut string_representation = String::new();
 
     for i in 0..num_row {
         let addr = trace.data[i][12].clone();
+        let clk = trace.data[i][13].clone();
         let value = reconstruct_word(&trace.data[i], 4);
         let is_read = trace.data[i][14].clone() + trace.data[i][15].clone();
         let is_write = &trace.data[i][16];
-        string_representation.push_str(&format!(
-            "addr: {}, value: {}, is_read: {}, is_write: {}\n",
-            addr, value, is_read, is_write
+        record_reprs.insert(format!(
+            "clk: {}, addr: {}, value: {}, is_read: {}, is_write: {}\n",
+            clk, addr, value, is_read, is_write
         ));
 
         if is_read.is_zero(prime) != MayBeFlag::True {
@@ -97,7 +69,7 @@ fn final_check(
                 let prev_value = memory.get(&a).unwrap_or(&def_interval);
                 if (value.clone() - prev_value.clone()).is_zero(prime) != MayBeFlag::True {
                     is_consistent_flag = false;
-                    string_representation.push_str("crash\n");
+                    record_reprs.insert("crash\n".to_string());
                     break_point = i;
                 }
             }
@@ -111,18 +83,25 @@ fn final_check(
     }
 
     if !is_consistent_flag {
-        save_repr_if_unique(&string_representation, known_reprt, ui);
+        save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
     }
 }
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
-    let bytes_per_instr = BYTES_PER_INSTR as i32;
+    let _bytes_per_instr = BYTES_PER_INSTR as i32;
+    let a_bytes = a.to_le_bytes();
 
     let mut program = vec![];
     program.extend([
         InstructionWord {
             opcode: <Imm32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
-            operands: Operands([-4, a, 0, 0, 0]),
+            operands: Operands([
+                -4,
+                a_bytes[0] as i32,
+                a_bytes[1] as i32,
+                a_bytes[2] as i32,
+                a_bytes[3] as i32,
+            ]),
         },
         InstructionWord {
             opcode: <Sub32Instruction as Instruction<BasicMachine<Val>, Val>>::OPCODE,
@@ -140,17 +119,15 @@ fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i3
 fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
+    let args = Args::parse();
+    let mut search_config = load_config(&args.config).unwrap();
+    search_config.enable_heuristic = !args.no_heuristic;
+    search_config.enable_interval_refinement = !args.no_refinement;
+
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
-    // ######################## Solver Parameters ###############################
-    let max_iteration = 10000;
-    let min_row_id = 1;
-    let max_row_id = 1;
-    let num_extracted_rows = 1;
-    let seed = 41;
-
-    // ######################## Extract Add Constraints ##########################
+    // ######################## Extract Memory Constraints #######################
     println!("MEM AIR MAP");
     println!("  {:?}", MEM_COL_MAP);
 
@@ -159,47 +136,65 @@ fn main() -> Result<(), io::Error> {
     let chip_idx = 2;
 
     let machine = BasicMachine::<BabyBear>::default();
-    let (air_constraints, lookup_constraints, refinable_cols, range_types, general_lookup_info) =
+    let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime,
+            &machine,
+            &air,
+            num_col,
+            prime,
+            args.method == "bb",
         );
+    if search_config.minimum_num_taregt_cols == 0 {
+        search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
+    }
 
-    let constraints = ZEBRAConstraints {
-        air_constraints,
-        lookup_constraints,
-        pv_pos_constraints: vec![],
-        pv_neg_constraints: vec![],
-    };
-    let minimum_num_taregt_cols = 1; //refinable_cols.len();
+    let mut rng = StdRng::seed_from_u64(search_config.seed);
+    let mut ds = vec![];
+    for _ in 0..args.num_trial {
+        let mut new_constraint_info = constraint_info.clone();
 
-    // ######################## Program Initialization ###########################
-    let program = get_target_program::<BabyBear>(3, 4);
-    let program_str = program
-        .iter()
-        .map(|inst| format!("{}\n", inst))
-        .collect::<String>();
+        let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
+        let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
 
-    let base_abs_main_trace_data =
-        generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000);
+        // ######################## Program Initialization ###########################
+        let program = get_target_program::<BabyBear>(x, y);
+        let program_str = program
+            .iter()
+            .map(|inst| format!("{}\n", inst))
+            .collect::<String>();
+        let base_abs_main_trace_data =
+            generate_bootstrap_trace_from_program(&program, chip_idx, 0, 0x1000).1;
 
-    // ######################## Solve ############################################
-    quick_api(
-        program_str,
-        &constraints,
-        &refinable_cols,
-        &range_types,
-        &vec![],
-        &base_abs_main_trace_data,
-        vec![],
-        max_iteration,
-        minimum_num_taregt_cols,
-        min_row_id,
-        max_row_id,
-        program.len(),
-        dummy_program_counter_refine_fn,
-        nop_post_process,
-        final_check,
-        prime,
-        seed,
-    )
+        // ######################## Set Info ##########################################
+        let program_info = ProgramInfo {
+            program_str: program_str,
+            program_len: program.len(),
+        };
+
+        // ######################## Solve ############################################
+        let mut known_solution = HashSet::new();
+        let result = experiment_harness(
+            &program_info,
+            &mut new_constraint_info,
+            &search_config,
+            &base_abs_main_trace_data,
+            vec![],
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
+            nop_post_process,
+            final_check,
+            &args.method,
+            &mut known_solution,
+        );
+        println!("({} {}), {:?}", x, y, result);
+        ds.push(result.unwrap());
+    }
+    let report = generate_report(&ds);
+    println!("{:?}", report);
+    let _ = write_output(args, search_config, report);
+
+    Ok(())
 }

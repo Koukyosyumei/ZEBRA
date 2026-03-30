@@ -20,12 +20,11 @@ use crate::shrinker::{
     detect_double_sel_var_sub_const, detect_selector_addu_constraints,
     detect_selector_word_assign_constraints, refine_conditional_constraints_addvars_sub_const,
     refine_conditional_constraints_var_sub_const, refine_conditional_constraints_var_sub_var,
-    refine_double_sel_addvars_sub_const, refine_double_sel_var_sub_const,
     refine_selector_addu_constraints, refine_selector_word_assign_constraints, AbirConstraint,
     SelectorAddUConstraint, SelectorWordAssignConstraint,
 };
 use crate::symbolic::{
-    gather_boolean_variables, gather_vars, gather_vars_simple, is_babybear_word_range,
+    gather_boolean_variables, gather_vars, is_babybear_word_range,
     is_boolean_constraint, is_iszero_operator, is_koalabear_word_range, ZEBRASymbolicExpr,
 };
 use crate::{
@@ -221,6 +220,8 @@ pub struct SearchConfig {
     pub min_row_id: usize,
     pub max_row_id: usize,
     pub seed: u64,
+    pub enable_heuristic: bool,
+    pub enable_interval_refinement: bool,
 }
 
 impl Default for SearchConfig {
@@ -233,6 +234,8 @@ impl Default for SearchConfig {
             min_row_id: 0,
             max_row_id: 0,
             seed: 41,
+            enable_heuristic: true,
+            enable_interval_refinement: true,
         }
     }
 }
@@ -317,12 +320,13 @@ fn process_single_node(
     conditional_addvars_sub_const_constraints: &[(usize, Vec<usize>, i128)],
     eq_constraints: &[(usize, usize, usize)],
     abir_constraints: &[AbirConstraint],
-    double_sel_var_sub_const: &[(usize, bool, usize, bool, usize, i128)],
-    double_sel_addvars_sub_const: &[(usize, bool, usize, bool, Vec<usize>, i128)],
+    _double_sel_var_sub_const: &[(usize, bool, usize, bool, usize, i128)],
+    _double_sel_addvars_sub_const: &[(usize, bool, usize, bool, Vec<usize>, i128)],
     selector_addu_constraints: &[SelectorAddUConstraint],
     selector_word_assign_constraints: &[SelectorWordAssignConstraint],
     is_balanced: bool,
     is_backward_refine_on: bool,
+    enable_heuristic: bool,
 ) -> NodeProcessingResult {
     let mut main_trace = head.main_trace;
 
@@ -440,12 +444,17 @@ fn process_single_node(
             (MayBeFlag::MayBe, MayBeFlag::MayBe)
             | (MayBeFlag::MayBe, MayBeFlag::True)
             | (MayBeFlag::True, MayBeFlag::MayBe) => {
+                let priority = if enable_heuristic {
+                    (-pot, head.depth as i32 + 1)
+                } else {
+                    (0, head.depth as i32 + 1)
+                };
                 refined.push((
                     SearchNode {
                         main_trace: kid_trace,
                         depth: head.depth + 1,
                     },
-                    (-pot, (head.depth as i32 + 1)),
+                    priority,
                 ));
             }
         }
@@ -760,6 +769,7 @@ where
                     &c_swa,
                     is_balanced,
                     is_backward_refine_on,
+                    search_config.enable_heuristic,
                 );
 
                 match result {
@@ -805,9 +815,7 @@ where
         "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
         refinable_cols, 0, 0, 1
     );
-    terminal
-        .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
-        .unwrap();
+    let _ = terminal.draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
     // 30 FPR = ~33ms
     let tick_rate = Duration::from_millis(50);
     let mut last_tick = std::time::Instant::now();
@@ -844,9 +852,8 @@ where
                     );
                     solution_found = true;
                     if last_tick.elapsed() >= tick_rate {
-                        terminal
-                            .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
-                            .unwrap();
+                        let _ = terminal
+                            .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
                         last_tick = std::time::Instant::now();
                     }
                 }
@@ -875,8 +882,8 @@ where
         // --------------------------------------------------------
         // 2. Check Key Inputs
         // --------------------------------------------------------
-        if event::poll(Duration::from_millis(0)).unwrap() {
-            if let Event::Key(key) = event::read().unwrap() {
+        if event::poll(Duration::from_millis(0)).unwrap_or(false) {
+            if let Ok(Event::Key(key)) = event::read() {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Char('c') => {
                         user_quit = true;
@@ -892,9 +899,7 @@ where
         // 3. Update UI
         // --------------------------------------------------------
         if last_tick.elapsed() >= tick_rate {
-            terminal
-                .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
-                .unwrap();
+            let _ = terminal.draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
             last_tick = std::time::Instant::now();
         }
 
@@ -958,7 +963,7 @@ where
 ///
 /// Used to detect constraints that are trivially satisfied under the initial
 /// (widest) abstract intervals and can be dropped before the search begins.
-fn is_constraint_trivially_true(
+pub fn is_constraint_trivially_true(
     tc: &ZEBRASymbolicExpr,
     trace: &AbstractTrace,
     public_vals: &[AbstractInterval],
@@ -1134,7 +1139,8 @@ where
                 sleep_time,
                 &start_time,
                 column_subset.len() == constraint_info.refinable_cols.len(),
-                column_subset.len() == constraint_info.refinable_cols.len(),
+                search_config.enable_interval_refinement
+                    && column_subset.len() == constraint_info.refinable_cols.len(),
             );
             last_verification_status = status;
 
@@ -1238,50 +1244,60 @@ pub fn prepare_constraints_and_range_type(
     tv_constraints: &mut Vec<ZEBRASymbolicExpr>,
     lookup_symbolic_constraints: &Vec<ZEBRASymbolicExpr>,
     prime: u32,
+    simplify_constraints: bool,
 ) -> (Vec<usize>, HashMap<usize, RangeType>) {
     let mut refinable_cols: Vec<usize> = (0..num_cols).collect();
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
 
-    let mut new_tv_constraints = Vec::new();
-    let mut is_in_koalabear_word_range_check = false;
-    let mut is_in_babybear_word_range_check = false;
-    let mut is_in_iszero_operator = false;
-    for t in tv_constraints.iter() {
-        if let Some(exprs) = is_iszero_operator(t, prime) {
-            if is_in_iszero_operator {
-                is_in_iszero_operator = false;
-            } else {
-                new_tv_constraints.push(exprs[0].clone());
-                new_tv_constraints.push(exprs[1].clone());
-                is_in_iszero_operator = true;
-            }
-        } else {
-            if let Some(expr) = is_koalabear_word_range(t, prime) {
-                if is_in_koalabear_word_range_check {
-                    is_in_koalabear_word_range_check = false;
+    {
+        let mut new_tv_constraints = Vec::new();
+        let mut is_in_koalabear_word_range_check = false;
+        let mut is_in_babybear_word_range_check = false;
+        let mut is_in_iszero_operator = false;
+        for t in tv_constraints.iter() {
+            if let Some(exprs) = is_iszero_operator(t, prime) {
+                if is_in_iszero_operator {
+                    is_in_iszero_operator = false;
                 } else {
-                    new_tv_constraints.push(expr);
-                    is_in_koalabear_word_range_check = true;
-                }
-            } else if let Some(expr) = is_babybear_word_range(t, prime) {
-                if is_in_babybear_word_range_check {
-                    is_in_babybear_word_range_check = false;
-                } else {
-                    new_tv_constraints.push(expr);
-                    is_in_babybear_word_range_check = true;
+                    if simplify_constraints {
+                        new_tv_constraints.push(exprs[0].clone());
+                        new_tv_constraints.push(exprs[1].clone());
+                    }
+                    is_in_iszero_operator = true;
                 }
             } else {
-                if (!is_in_koalabear_word_range_check)
-                    && (!is_in_iszero_operator)
-                    && (!is_in_babybear_word_range_check)
-                {
-                    new_tv_constraints.push(t.clone());
+                if let Some(expr) = is_koalabear_word_range(t, prime) {
+                    if is_in_koalabear_word_range_check {
+                        is_in_koalabear_word_range_check = false;
+                    } else {
+                        if simplify_constraints {
+                            new_tv_constraints.push(expr);
+                        }
+                        is_in_koalabear_word_range_check = true;
+                    }
+                } else if let Some(expr) = is_babybear_word_range(t, prime) {
+                    if is_in_babybear_word_range_check {
+                        is_in_babybear_word_range_check = false;
+                    } else {
+                        if simplify_constraints {
+                            new_tv_constraints.push(expr);
+                        }
+                        is_in_babybear_word_range_check = true;
+                    }
+                } else {
+                    if !simplify_constraints
+                        || ((!is_in_koalabear_word_range_check)
+                            && (!is_in_iszero_operator)
+                            && (!is_in_babybear_word_range_check))
+                    {
+                        new_tv_constraints.push(t.clone());
+                    }
                 }
             }
         }
+        *tv_constraints = new_tv_constraints;
     }
-    *tv_constraints = new_tv_constraints;
     //tv_constraints.extend(lookup_symbolic_constraints);
 
     let mut used_vars = HashSet::new();

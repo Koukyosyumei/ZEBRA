@@ -88,6 +88,8 @@ fn main() -> Result<(), io::Error> {
     let args = Args::parse();
     let opcode_str = args.opcode_str.clone();
     let mut search_config = load_config(&args.config).unwrap();
+    search_config.enable_heuristic = !args.no_heuristic;
+    search_config.enable_interval_refinement = !args.no_refinement;
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(24) + 1;
@@ -99,7 +101,7 @@ fn main() -> Result<(), io::Error> {
     println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime);
+        extract_constraints_and_range::<KoalaBear, BranchChip>(&air, NUM_BRANCH_COLS, prime, args.method == "bb" && !args.no_simplify);
     let output_columns = vec![23, 24, 25, 26];
 
     use zebra::solver::RangeType;

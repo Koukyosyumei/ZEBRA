@@ -2,12 +2,19 @@
 """
 ZEBRA Cross-zkVM Comparison Experiment
 =======================================
-Runs three verification strategies for every opcode of every chip across all
-supported zkVMs using single-point search (--range-interval 0):
+Runs verification strategies for every opcode of every chip across all
+supported zkVMs using single-point search (--range-interval 0).
 
+Standard mode  (default):
   bb           — pure branch-and-bound
   bb_blocking  — branch-and-bound with blocking closure (--blocking-closure)
   z3           — SMT solver (z3)
+
+Ablation study mode  (--ablation):
+  bb                — full bb (baseline)
+  bb_no_heuristic   — bb without priority-queue heuristic (pure DFS)
+  bb_no_simplify    — bb without constraint simplification
+  bb_no_refinement  — bb without interval refinement
 
 Early-stop rule:  if ANY single trial for an opcode fails (timeout or
 verification failure), that opcode is immediately marked as "not verified"
@@ -34,6 +41,8 @@ Usage (run from repo root)
   python3 scripts/compare_experiments.py --skip-run                # just (re-)aggregate
   python3 scripts/compare_experiments.py --build                   # cargo build first
   python3 scripts/compare_experiments.py --workers 8               # run all tasks in parallel
+  python3 scripts/compare_experiments.py --ablation                # ablation study mode
+  python3 scripts/compare_experiments.py --ablation --methods bb,bb_no_heuristic  # subset
 """
 
 from __future__ import annotations
@@ -129,13 +138,40 @@ VM_REGISTRY: Dict[str, Dict] = {
     },
 }
 
-ALL_METHODS = ["bb", "bb_blocking", "z3"]
+STANDARD_METHODS = ["bb", "bb_blocking", "z3"]
+ABLATION_METHODS = ["bb_no_heuristic", "bb_no_simplify", "bb_no_refinement"]
+ALL_METHODS      = STANDARD_METHODS + ABLATION_METHODS
 
 # Human-readable labels for table headers
 METHOD_LABELS: Dict[str, str] = {
-    "bb":          "Branch-and-Bound (bb)",
-    "bb_blocking": "B&B + Blocking Closure",
-    "z3":          "SMT Solver (z3)",
+    "bb":               "Branch-and-Bound (bb)",
+    "bb_blocking":      "B&B + Blocking Closure",
+    "z3":               "SMT Solver (z3)",
+    "bb_no_heuristic":  "bb (no heuristic)",
+    "bb_no_simplify":   "bb (no simplify)",
+    "bb_no_refinement": "bb (no refinement)",
+}
+
+# Extra CLI flags passed to the binary for each method.
+# The binary always receives --method bb (or z3); the dict captures only
+# the ablation / variant flags that differ from plain bb.
+METHOD_EXTRA_ARGS: Dict[str, List[str]] = {
+    "bb":               [],
+    "bb_blocking":      ["--blocking-closure"],
+    "z3":               [],
+    "bb_no_heuristic":  ["--no-heuristic"],
+    "bb_no_simplify":   ["--no-simplify"],
+    "bb_no_refinement": ["--no-refinement"],
+}
+
+# Which --method value to pass to the binary for each logical method
+METHOD_BINARY_METHOD: Dict[str, str] = {
+    "bb":               "bb",
+    "bb_blocking":      "bb",
+    "z3":               "z3",
+    "bb_no_heuristic":  "bb",
+    "bb_no_simplify":   "bb",
+    "bb_no_refinement": "bb",
 }
 
 
@@ -214,8 +250,8 @@ def _run_one_trial(
     # Safety wall-clock limit: 2× internal timeout + 30 s headroom
     wall_limit = timeout_ms / 1000.0 * 2.0 + 30.0
 
-    # bb_blocking uses the bb solver internally, plus --blocking-closure flag
-    binary_method = "bb" if method == "bb_blocking" else method
+    binary_method = METHOD_BINARY_METHOD.get(method, method)
+    extra_args    = METHOD_EXTRA_ARGS.get(method, [])
 
     cmd = [
         str(binary),
@@ -225,9 +261,17 @@ def _run_one_trial(
         "--num-trial",        "1",
         "--ouptput-path",     out_yaml,   # note: intentional typo matching quick.rs
         "--range-interval",   "0",
-    ]
-    if method == "bb_blocking":
-        cmd.append("--blocking-closure")
+    ] + extra_args
+
+    # Reset terminal to a clean state before each invocation so that a
+    # previous binary that exited without calling disable_raw_mode() (e.g.
+    # due to a panic or timeout kill) cannot leave a dirty termios that
+    # corrupts the next trial's TUI setup.
+    try:
+        subprocess.run(["stty", "sane"], stdin=None, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=2)
+    except Exception:
+        pass  # stty not available or no TTY — harmless
 
     wall_start = time.monotonic()
     try:
@@ -274,10 +318,14 @@ def run_opcode(
     out_root:        Path,
     verbose:         bool = True,
     cfg_num_workers: int  = 12,
+    tolerance:       int  = 0,
 ) -> OpcodeResult:
     """
     Run up to n_trials trials for one (chip, opcode, method).
-    Stops immediately on the first failed trial (early-stop rule).
+    Early-stops after (tolerance + 1) failures.
+    tolerance=0 (default / z3): stop on the first failure.
+    tolerance=1 (bb methods):   allow one failure; stop on the second.
+    Verified iff total failures <= tolerance.
     cfg_num_workers controls the num_workers written into the temp config
     (set to 1 when running many experiments in parallel to avoid CPU overload).
     """
@@ -293,7 +341,8 @@ def run_opcode(
     trial_dir = out_root / vm / chip / method
     trial_dir.mkdir(parents=True, exist_ok=True)
 
-    times: List[float] = []
+    times:     List[float] = []
+    n_failures: int        = 0
 
     for i in range(n_trials):
         seed        = base_seed + i
@@ -309,21 +358,26 @@ def run_opcode(
             except OSError:
                 pass
 
+        if not ok:
+            n_failures += 1
+
         if verbose:
-            status_str = "ok" if ok else "FAIL"
+            status_str = "ok" if ok else f"FAIL [{n_failures}/{tolerance + 1}]"
             _println(f"    trial {i+1}/{n_trials}  {status_str}  ({t:.3f}s)", flush=True)
 
         if not ok:
-            # Early stop
-            return OpcodeResult(vm, chip, opcode, method,
-                                verified=False,
-                                times_s=times,
-                                n_run=i + 1,
-                                n_success=len(times))
-        times.append(t)
+            if n_failures > tolerance:
+                # Early stop
+                return OpcodeResult(vm, chip, opcode, method,
+                                    verified=False,
+                                    times_s=times,
+                                    n_run=i + 1,
+                                    n_success=len(times))
+        else:
+            times.append(t)
 
     return OpcodeResult(vm, chip, opcode, method,
-                        verified=True,
+                        verified=n_failures <= tolerance,
                         times_s=times,
                         n_run=n_trials,
                         n_success=len(times))
@@ -368,6 +422,7 @@ def run_experiments(
     verbose:        bool  = True,
     workers:        int   = 1,
     timeout_scale:  float = 1.0,
+    tolerance:      int   = 0,
 ) -> List[OpcodeResult]:
     """
     Run all (vm, chip, opcode, method) combinations.
@@ -380,6 +435,8 @@ def run_experiments(
                       When workers>1 the effective CPU share per task is ~1/workers,
                       so the same amount of work takes proportionally longer on the
                       wall clock.  Defaults to workers when workers>1 (auto-scale).
+    tolerance       — allowed failures before early-stop; applied only to bb-based
+                      methods (z3 always uses tolerance=0).
     """
     results: List[OpcodeResult] = []
 
@@ -413,6 +470,7 @@ def run_experiments(
                 vm=vm, vm_dir=vm_dir, chip=chip, opcode=opcode,
                 method=method, n_trials=n_trials, timeout_ms=effective_timeout_ms,
                 base_seed=base_seed, out_root=out_root, verbose=verbose,
+                tolerance=tolerance if METHOD_BINARY_METHOD.get(method) == "bb" else 0,
             )
             results.append(r)
             _print_verdict(r)
@@ -433,6 +491,7 @@ def run_experiments(
                 base_seed=base_seed, out_root=out_root,
                 verbose=False,      # suppress per-trial noise; verdicts printed below
                 cfg_num_workers=1,  # each parallel task gets a single internal worker
+                tolerance=tolerance if METHOD_BINARY_METHOD.get(method) == "bb" else 0,
             )
 
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -819,7 +878,7 @@ def build_vm(vm: str, repo_root: Path) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="ZEBRA cross-zkVM comparison experiment (bb vs bb_blocking vs z3)",
+        description="ZEBRA cross-zkVM comparison experiment",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -827,14 +886,16 @@ def main() -> None:
                         help="Trials per opcode (default: 5)")
     parser.add_argument("--timeout-ms",  type=int,   default=60_000,
                         help="Per-trial timeout in milliseconds (default: 60000)")
-    parser.add_argument("--methods",     type=str,   default="bb,bb_blocking,z3",
-                        help="Comma-separated list of methods (default: bb,bb_blocking,z3)")
+    parser.add_argument("--methods",     type=str,   default=None,
+                        help="Comma-separated list of methods.  Defaults to standard methods "
+                             "(bb,bb_blocking,z3) or ablation methods when --ablation is set.")
     parser.add_argument("--vms",         type=str,   default=",".join(VM_REGISTRY),
                         help=f"Comma-separated VMs (default: all)")
     parser.add_argument("--base-seed",   type=int,   default=41,
                         help="Base random seed; trial i uses seed+i (default: 41)")
-    parser.add_argument("--output-dir",  type=str,   default="experiments/comparison",
-                        help="Directory for per-trial YAML results (default: experiments/comparison)")
+    parser.add_argument("--output-dir",  type=str,   default=None,
+                        help="Directory for per-trial YAML results "
+                             "(default: experiments/comparison or experiments/ablation)")
     parser.add_argument("--csv-out",     type=str,   default=None,
                         help="Path for CSV outputs (default: <output-dir>/results.csv)")
     parser.add_argument("--skip-run",    action="store_true",
@@ -852,10 +913,27 @@ def main() -> None:
                         help="Suppress per-opcode detail table")
     parser.add_argument("--quiet",       action="store_true",
                         help="Suppress per-trial progress output")
+    parser.add_argument("--tolerance",   type=int, default=0,
+                        help="Allowed failures before early-stop for bb-based methods "
+                             "(default: 0).  z3 always uses tolerance=0.")
+    parser.add_argument("--ablation",    action="store_true",
+                        help="Run ablation study mode: bb vs bb_no_heuristic vs "
+                             "bb_no_simplify vs bb_no_refinement.  "
+                             "Changes the default --methods and --output-dir.")
     args = parser.parse_args()
 
-    methods   = [m.strip() for m in args.methods.split(",") if m.strip()]
-    vms       = [v.strip() for v in args.vms.split(",")     if v.strip()]
+    # ── Resolve mode-dependent defaults ──────────────────────────────────────
+    if args.ablation:
+        default_methods = "bb," + ",".join(ABLATION_METHODS)
+        default_out_dir = "experiments/ablation"
+    else:
+        default_methods = ",".join(STANDARD_METHODS)
+        default_out_dir = "experiments/comparison"
+
+    methods_str = args.methods if args.methods is not None else default_methods
+    methods     = [m.strip() for m in methods_str.split(",") if m.strip()]
+    vms         = [v.strip() for v in args.vms.split(",")    if v.strip()]
+    output_dir  = args.output_dir if args.output_dir is not None else default_out_dir
 
     # Auto-scale timeout for parallel runs.
     # When N workers share C CPUs the contention factor is max(1, N/C), NOT N.
@@ -881,7 +959,7 @@ def main() -> None:
             sys.exit(1)
 
     repo_root = Path(__file__).resolve().parent.parent
-    out_root  = (repo_root / args.output_dir).resolve()
+    out_root  = (repo_root / output_dir).resolve()
     out_root.mkdir(parents=True, exist_ok=True)
 
     csv_path = Path(args.csv_out).resolve() if args.csv_out else out_root / "results.csv"
@@ -910,9 +988,11 @@ def main() -> None:
             for chip in VM_REGISTRY[vm]["chips"]
         )
         effective_ms = int(args.timeout_ms * timeout_scale)
-        _println(f"\nStarting experiment: {len(vms)} VMs, {len(methods)} methods, "
+        mode_label = "ablation study" if args.ablation else "standard comparison"
+        _println(f"\nStarting experiment [{mode_label}]: {len(vms)} VMs, {len(methods)} methods, "
                  f"{args.num_trial} trials/opcode, timeout={args.timeout_ms}ms"
-                 + (f" × {timeout_scale:.1f} = {effective_ms}ms (scaled)" if timeout_scale != 1.0 else ""))
+                 + (f" × {timeout_scale:.1f} = {effective_ms}ms (scaled)" if timeout_scale != 1.0 else "")
+                 + f", tolerance={args.tolerance} (bb only)")
         _println(f"Total (chip×opcode×method) tasks: {total_tasks}")
         _println(f"Results directory: {out_root}")
 
@@ -927,6 +1007,7 @@ def main() -> None:
             verbose        = not args.quiet,
             workers        = args.workers,
             timeout_scale  = timeout_scale,
+            tolerance      = args.tolerance,
         )
 
     # ── Aggregate ─────────────────────────────────────────────────────────────

@@ -32,7 +32,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -66,7 +66,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -100,7 +100,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -134,7 +134,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -168,7 +168,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -202,7 +202,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -236,7 +236,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -272,7 +272,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -309,7 +309,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);
@@ -347,7 +347,7 @@ mod tests {
 
         let air = CpuChip::default();
         let (constraint_info, _general_lookup_info) =
-            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME);
+            extract_constraints_and_range::<KoalaBear, CpuChip>(&air, NUM_CPU_COLS, PRIME, true);
 
         // ######################## Program Initialization ###########################
         let program = target_program(4, 4);

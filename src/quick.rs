@@ -50,6 +50,15 @@ pub struct Args {
     pub range_interval: usize,
     #[arg(long, default_value = "false")]
     pub blocking_closure: bool,
+    /// Ablation: disable the heuristic score (use constant priority, pure DFS)
+    #[arg(long, default_value = "false")]
+    pub no_heuristic: bool,
+    /// Ablation: disable constraint simplification (is_zero / word-range pattern rewriting)
+    #[arg(long, default_value = "false")]
+    pub no_simplify: bool,
+    /// Ablation: disable interval refinement (ABIR / conditional-constraint back-propagation)
+    #[arg(long, default_value = "false")]
+    pub no_refinement: bool,
 }
 
 #[derive(Debug)]
@@ -176,9 +185,18 @@ where
         Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128) + Clone,
     PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
-    enable_raw_mode()?;
+    // Attempt TUI setup; degrade gracefully when stdout is not a real
+    // terminal (e.g. when the binary is invoked as a subprocess from
+    // compare_experiments.py with stdout=DEVNULL).  Checking stdout here is
+    // the right guard: enable_raw_mode() operates on stdin and can succeed
+    // even when stdout is /dev/null, but terminal.draw() calls
+    // crossterm::terminal::size() which queries stdout and panics on failure.
+    use std::io::IsTerminal;
+    let tui_available = std::io::stdout().is_terminal() && enable_raw_mode().is_ok();
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    if tui_available {
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    }
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut ui = UiState::new();
@@ -201,13 +219,15 @@ where
         sleep_time,
     );
 
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+    if tui_available {
+        disable_raw_mode()?;
+        execute!(
+            terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        )?;
+        terminal.show_cursor()?;
+    }
 
     Ok(VerificationResult {
         status: verification_status,
