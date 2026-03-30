@@ -28,10 +28,10 @@ use zebra_valida::config::MyConfig;
 use zebra_valida::utils::{extract_constraints_and_range, generate_bootstrap_trace_from_program};
 
 fn reconstruct_word(row: &[AbstractInterval], base: usize) -> AbstractInterval {
-    let mut val = AbstractInterval::from_i64(0);
-    let mut mul = 1_i64;
+    let mut val = AbstractInterval::from_i128(0);
+    let mut mul = 1_i128;
     for i in 0..4 {
-        val = val + row[base + i].clone() * AbstractInterval::from_i64(mul);
+        val = val + row[base + i].clone() * AbstractInterval::from_i128(mul);
         mul *= 256;
     }
     val
@@ -47,23 +47,30 @@ fn final_check(
 ) {
     let num_row = trace.data.len();
     let def_interval = AbstractInterval::zero();
-    let mut memory = std::collections::HashMap::<i64, AbstractInterval>::new();
+    let mut memory = std::collections::HashMap::<i128, AbstractInterval>::new();
     let mut record_reprs = HashSet::new();
+    let mut is_consistent_flag = true;
+    let mut break_point = 0;
+    let mut string_representation = String::new();
 
     for i in 0..num_row {
         let addr = trace.data[i][12].clone();
+        let clk = trace.data[i][13].clone();
         let value = reconstruct_word(&trace.data[i], 4);
         let is_read = trace.data[i][14].clone() + trace.data[i][15].clone();
         let is_write = &trace.data[i][16];
+        record_reprs.insert(format!(
+            "clk: {}, addr: {}, value: {}, is_read: {}, is_write: {}\n",
+            clk, addr, value, is_read, is_write
+        ));
 
         if is_read.is_zero(prime) != MayBeFlag::True {
             for a in addr.lo..(addr.hi + 1) {
                 let prev_value = memory.get(&a).unwrap_or(&def_interval);
                 if (value.clone() - prev_value.clone()).is_zero(prime) != MayBeFlag::True {
-                    record_reprs.insert(format!(
-                        "row {}: addr: {}, expected: {}, got: {}, is_read: {}, is_write: {}",
-                        i, addr, prev_value, value, is_read, is_write
-                    ));
+                    is_consistent_flag = false;
+                    record_reprs.insert("crash\n".to_string());
+                    break_point = i;
                 }
             }
         }
@@ -75,7 +82,7 @@ fn final_check(
         }
     }
 
-    if !record_reprs.is_empty() {
+    if !is_consistent_flag {
         save_repr_if_unique(&PrettySet(record_reprs), known_reprt, ui);
     }
 }
@@ -131,7 +138,11 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime, args.method == "bb",
+            &machine,
+            &air,
+            num_col,
+            prime,
+            args.method == "bb",
         );
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
@@ -168,7 +179,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             nop_post_process,
             final_check,
             &args.method,

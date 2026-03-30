@@ -412,7 +412,7 @@ def run_experiments(
     verbose:        bool  = True,
     workers:        int   = 1,
     timeout_scale:  float = 1.0,
-    tolerance:      int   = 1,
+    tolerance:      int   = 0,
 ) -> List[OpcodeResult]:
     """
     Run all (vm, chip, opcode, method) combinations.
@@ -903,9 +903,9 @@ def main() -> None:
                         help="Suppress per-opcode detail table")
     parser.add_argument("--quiet",       action="store_true",
                         help="Suppress per-trial progress output")
-    parser.add_argument("--tolerance",   type=int, default=1,
+    parser.add_argument("--tolerance",   type=int, default=0,
                         help="Allowed failures before early-stop for bb-based methods "
-                             "(default: 1).  z3 always uses tolerance=0.")
+                             "(default: 0).  z3 always uses tolerance=0.")
     parser.add_argument("--ablation",    action="store_true",
                         help="Run ablation study mode: bb vs bb_no_heuristic vs "
                              "bb_no_simplify vs bb_no_refinement.  "
