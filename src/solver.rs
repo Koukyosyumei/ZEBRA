@@ -1255,7 +1255,7 @@ pub fn prepare_constraints_and_range_type(
     refinable_cols.retain(|c| !multiplicities.contains(c));
     refinable_cols.retain(|c| !received_vars_from_cpu.contains(c));
 
-    if simplify_constraints {
+    {
         let mut new_tv_constraints = Vec::new();
         let mut is_in_koalabear_word_range_check = false;
         let mut is_in_babybear_word_range_check = false;
@@ -1265,8 +1265,10 @@ pub fn prepare_constraints_and_range_type(
                 if is_in_iszero_operator {
                     is_in_iszero_operator = false;
                 } else {
-                    new_tv_constraints.push(exprs[0].clone());
-                    new_tv_constraints.push(exprs[1].clone());
+                    if simplify_constraints {
+                        new_tv_constraints.push(exprs[0].clone());
+                        new_tv_constraints.push(exprs[1].clone());
+                    }
                     is_in_iszero_operator = true;
                 }
             } else {
@@ -1274,20 +1276,25 @@ pub fn prepare_constraints_and_range_type(
                     if is_in_koalabear_word_range_check {
                         is_in_koalabear_word_range_check = false;
                     } else {
-                        new_tv_constraints.push(expr);
+                        if simplify_constraints {
+                            new_tv_constraints.push(expr);
+                        }
                         is_in_koalabear_word_range_check = true;
                     }
                 } else if let Some(expr) = is_babybear_word_range(t, prime) {
                     if is_in_babybear_word_range_check {
                         is_in_babybear_word_range_check = false;
                     } else {
-                        new_tv_constraints.push(expr);
+                        if simplify_constraints {
+                            new_tv_constraints.push(expr);
+                        }
                         is_in_babybear_word_range_check = true;
                     }
                 } else {
-                    if (!is_in_koalabear_word_range_check)
-                        && (!is_in_iszero_operator)
-                        && (!is_in_babybear_word_range_check)
+                    if !simplify_constraints
+                        || ((!is_in_koalabear_word_range_check)
+                            && (!is_in_iszero_operator)
+                            && (!is_in_babybear_word_range_check))
                     {
                         new_tv_constraints.push(t.clone());
                     }
