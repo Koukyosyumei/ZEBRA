@@ -185,9 +185,14 @@ where
         Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128) + Clone,
     PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
-    // Attempt TUI setup; degrade gracefully when there is no TTY (e.g. when
-    // the binary is invoked as a subprocess from compare_experiments.py).
-    let tui_available = enable_raw_mode().is_ok();
+    // Attempt TUI setup; degrade gracefully when stdout is not a real
+    // terminal (e.g. when the binary is invoked as a subprocess from
+    // compare_experiments.py with stdout=DEVNULL).  Checking stdout here is
+    // the right guard: enable_raw_mode() operates on stdin and can succeed
+    // even when stdout is /dev/null, but terminal.draw() calls
+    // crossterm::terminal::size() which queries stdout and panics on failure.
+    use std::io::IsTerminal;
+    let tui_available = std::io::stdout().is_terminal() && enable_raw_mode().is_ok();
     let mut stdout = io::stdout();
     if tui_available {
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;

@@ -263,6 +263,16 @@ def _run_one_trial(
         "--range-interval",   "0",
     ] + extra_args
 
+    # Reset terminal to a clean state before each invocation so that a
+    # previous binary that exited without calling disable_raw_mode() (e.g.
+    # due to a panic or timeout kill) cannot leave a dirty termios that
+    # corrupts the next trial's TUI setup.
+    try:
+        subprocess.run(["stty", "sane"], stdin=None, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=2)
+    except Exception:
+        pass  # stty not available or no TTY — harmless
+
     wall_start = time.monotonic()
     try:
         proc = subprocess.run(

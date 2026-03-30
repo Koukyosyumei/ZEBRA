@@ -815,9 +815,7 @@ where
         "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
         refinable_cols, 0, 0, 1
     );
-    terminal
-        .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
-        .unwrap();
+    let _ = terminal.draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
     // 30 FPR = ~33ms
     let tick_rate = Duration::from_millis(50);
     let mut last_tick = std::time::Instant::now();
@@ -854,9 +852,8 @@ where
                     );
                     solution_found = true;
                     if last_tick.elapsed() >= tick_rate {
-                        terminal
-                            .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
-                            .unwrap();
+                        let _ = terminal
+                            .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
                         last_tick = std::time::Instant::now();
                     }
                 }
@@ -885,8 +882,8 @@ where
         // --------------------------------------------------------
         // 2. Check Key Inputs
         // --------------------------------------------------------
-        if event::poll(Duration::from_millis(0)).unwrap() {
-            if let Event::Key(key) = event::read().unwrap() {
+        if event::poll(Duration::from_millis(0)).unwrap_or(false) {
+            if let Ok(Event::Key(key)) = event::read() {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Char('c') => {
                         user_quit = true;
@@ -902,9 +899,7 @@ where
         // 3. Update UI
         // --------------------------------------------------------
         if last_tick.elapsed() >= tick_rate {
-            terminal
-                .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f))
-                .unwrap();
+            let _ = terminal.draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
             last_tick = std::time::Instant::now();
         }
 
