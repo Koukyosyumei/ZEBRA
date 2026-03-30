@@ -847,8 +847,8 @@ def main() -> None:
                              "When >1, each experiment uses cfg_num_workers=1 internally.")
     parser.add_argument("--timeout-scale",  type=float, default=None,
                         help="Multiply --timeout-ms by this factor for each experiment. "
-                             "Defaults to --workers when --workers>1 (auto-scale for CPU "
-                             "sharing), or 1.0 when sequential.")
+                             "Auto-computed as max(1, workers/cpu_count) when --workers>1 "
+                             "(scales only when workers actually exceeds available cores).")
     parser.add_argument("--no-detail",   action="store_true",
                         help="Suppress per-opcode detail table")
     parser.add_argument("--quiet",       action="store_true",
@@ -858,13 +858,18 @@ def main() -> None:
     methods   = [m.strip() for m in args.methods.split(",") if m.strip()]
     vms       = [v.strip() for v in args.vms.split(",")     if v.strip()]
 
-    # Auto-scale timeout for parallel runs: each task gets ~1/workers CPU share,
-    # so wall-clock time is ~workers× longer.  User can override with --timeout-scale.
-    timeout_scale = (
-        args.timeout_scale if args.timeout_scale is not None
-        else float(args.workers) if args.workers > 1
-        else 1.0
-    )
+    # Auto-scale timeout for parallel runs.
+    # When N workers share C CPUs the contention factor is max(1, N/C), NOT N.
+    # On a 128-core server with --workers 64 there is no contention (scale=1);
+    # on a 4-core laptop with --workers 64 the scale is 16×.
+    # The user can always override with --timeout-scale.
+    if args.timeout_scale is not None:
+        timeout_scale = args.timeout_scale
+    elif args.workers > 1:
+        cpu_count = os.cpu_count() or 1
+        timeout_scale = max(1.0, args.workers / cpu_count)
+    else:
+        timeout_scale = 1.0
 
     # Validate
     for vm in vms:
