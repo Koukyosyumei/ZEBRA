@@ -261,6 +261,7 @@ def _run_one_trial(
         "--num-trial",        "1",
         "--ouptput-path",     out_yaml,   # note: intentional typo matching quick.rs
         "--range-interval",   "0",
+        "--turn-off-ui",
     ] + extra_args
 
     # Reset terminal to a clean state before each invocation so that a

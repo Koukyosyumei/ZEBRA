@@ -133,6 +133,7 @@ run_one() {
             --num-trial      "$NUM_TRIALS" \
             --range-interval "$range" \
             --ouptput-path   "$outfile" \
+            --turn-off-ui \
         2>/dev/null
     ) || true
     rm -f "$trial_config"

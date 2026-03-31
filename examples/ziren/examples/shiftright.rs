@@ -113,6 +113,7 @@ fn main() -> Result<(), io::Error> {
             &final_check,
             &args.method,
             &mut known_solution,
+            args.turn_off_ui,
         );
         println!("({} {}), {:?}", x, y, result);
         ds.push(result.unwrap());
