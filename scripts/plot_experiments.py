@@ -239,8 +239,9 @@ def _plot_vm_ax(
         ax.set_xscale("log")
         ax.xaxis.set_major_formatter(plt.matplotlib.ticker.ScalarFormatter())
     ax.grid(True, which="both", axis="y", linestyle=":", linewidth=0.5, alpha=0.6)
-    ax.tick_params(labelsize=8)
-    ax.legend(fontsize=7, loc="best", framealpha=0.85, handlelength=2.0)
+    ax.tick_params(labelsize=11)
+    ax.legend(fontsize=9, loc="best", bbox_to_anchor=(1.0, 1.0),
+              framealpha=0.85, handlelength=2.0)
 
     if not sweep_data:
         ax.text(0.5, 0.5, "no data", transform=ax.transAxes,
@@ -261,11 +262,6 @@ def plot_sweep(
     n = len(vm_names)
 
     fig, axes = plt.subplots(1, n, figsize=(5 * n, 5), sharey=False)
-    gran_label = "chip-level" if granularity == "chip" else "opcode-level"
-    title = sweep_type.replace("_", " ").title()
-    fig.suptitle(f"ZEBRA – {title}  ({gran_label})",
-                 fontsize=13, fontweight="bold", y=1.02)
-
     for ax, vm_name in zip(axes, vm_names):
         vm_cfg        = VMS[vm_name]
         vm_report_dir = os.path.join(base_dir, "examples", vm_name, "report")
@@ -274,9 +270,9 @@ def plot_sweep(
         _plot_vm_ax(ax, vm_name, vm_cfg, sweep_data, granularity=granularity,
                     x_transform=x_transform,
                     x_log=(sweep_type == "range_sweep"))
-        ax.set_xlabel(x_label, fontsize=9)
+        ax.set_xlabel(x_label, fontsize=13)
 
-    axes[0].set_ylabel("Mean verification time (s)  [log]", fontsize=9)
+    axes[0].set_ylabel("Mean verification time (s)  [log]", fontsize=13)
 
     fig.tight_layout()
     os.makedirs(os.path.dirname(out_path), exist_ok=True)

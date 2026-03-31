@@ -23,9 +23,7 @@ use zebra::solver::nop_post_process;
 use zebra::utils::create_or_clear_dir;
 
 use zebra_valida::config::MyConfig;
-use zebra_valida::utils::{
-    extract_constraints_and_range, generate_bootstrap_trace_from_program,
-};
+use zebra_valida::utils::{extract_constraints_and_range, generate_bootstrap_trace_from_program};
 
 fn get_target_program<Val: StarkField>(a: i32, b: i32) -> Vec<InstructionWord<i32>> {
     let _bytes_per_instr = BYTES_PER_INSTR as i32;
@@ -69,8 +67,8 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    println!("SUB AIR MAP");
-    println!("  {:?}", SUB_COL_MAP);
+    // println!("SUB AIR MAP");
+    // println!("  {:?}", SUB_COL_MAP);
 
     let air = Sub32Chip::default();
     let num_col = NUM_SUB_COLS;
@@ -79,7 +77,11 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime, args.method == "bb" && !args.no_simplify,
+            &machine,
+            &air,
+            num_col,
+            prime,
+            args.method == "bb" && !args.no_simplify,
         );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
@@ -117,7 +119,6 @@ fn main() -> Result<(), io::Error> {
             );
             search_config.minimum_num_taregt_cols = new_constraint_info.refinable_cols.len();
         }
-        println!("{:?}", new_constraint_info.range_types);
 
         let x: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
         let y: i32 = rng.r#gen_range(-0x3C000000..0x3C000000);
@@ -145,7 +146,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             nop_post_process,
             &final_check,
             &args.method,

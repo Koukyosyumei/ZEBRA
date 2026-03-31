@@ -128,8 +128,8 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Memory Constraints #######################
-    println!("MEM AIR MAP");
-    println!("  {:?}", MEM_COL_MAP);
+    //println!("MEM AIR MAP");
+    //println!("  {:?}", MEM_COL_MAP);
 
     let air = MemoryChip::default();
     let num_col = NUM_MEM_COLS;
