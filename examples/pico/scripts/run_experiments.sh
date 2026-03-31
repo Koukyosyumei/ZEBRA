@@ -64,7 +64,7 @@ CHIP_OPCODES[memoryreadwrite]="LB LBU LH LHU LW SB SH SW"
 CHIPS=(addsub bitwise mul divrem lessthan sll sr memoryreadwrite)
 
 # ── experiment parameters ─────────────────────────────────────────────────────
-WORKER_COUNTS=(1 2 8 32)
+WORKER_COUNTS=(1 2 4 6 8)
 RANGE_INTERVALS=(0 1 7 31 127)
 
 # ── parallel job pool ─────────────────────────────────────────────────────────

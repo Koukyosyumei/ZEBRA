@@ -228,9 +228,9 @@ def _write_temp_config(
     return path
 
 
-# ── Single-trial runner ───────────────────────────────────────────────────────
+# ── Multi-trial runner ────────────────────────────────────────────────────────
 
-def _run_one_trial(
+def _run_trials(
     vm_dir:     Path,
     chip:       str,
     opcode:     str,
@@ -238,17 +238,18 @@ def _run_one_trial(
     config_path: str,
     timeout_ms: int,
     out_yaml:   str,
-) -> Tuple[bool, float]:
+    n_trials:   int,
+) -> Tuple[bool, float, int, int]:
     """
-    Invoke the chip binary for one trial.
-    Returns (success: bool, exe_time_s: float).
+    Invoke the chip binary for n_trials trials in a single call with --fail-fast.
+    Returns (success: bool, exe_time_mean_s: float, n_run: int, n_success: int).
     """
     binary = vm_dir / "target" / "release" / "examples" / chip
     if not binary.exists():
-        return False, 0.0
+        return False, 0.0, 0, 0
 
-    # Safety wall-clock limit: 2× internal timeout + 30 s headroom
-    wall_limit = timeout_ms / 1000.0 * 2.0 + 30.0
+    # Safety wall-clock limit: 2× internal timeout × n_trials + 30 s headroom
+    wall_limit = timeout_ms / 1000.0 * 2.0 * n_trials + 30.0
 
     binary_method = METHOD_BINARY_METHOD.get(method, method)
     extra_args    = METHOD_EXTRA_ARGS.get(method, [])
@@ -258,16 +259,16 @@ def _run_one_trial(
         "--config",           config_path,
         "--opcode-str",       opcode,
         "--method",           binary_method,
-        "--num-trial",        "1",
+        "--num-trial",        str(n_trials),
         "--ouptput-path",     out_yaml,   # note: intentional typo matching quick.rs
         "--range-interval",   "0",
         "--turn-off-ui",
+        "--fail-fast",
     ] + extra_args
 
-    # Reset terminal to a clean state before each invocation so that a
-    # previous binary that exited without calling disable_raw_mode() (e.g.
-    # due to a panic or timeout kill) cannot leave a dirty termios that
-    # corrupts the next trial's TUI setup.
+    # Reset terminal to a clean state before invocation so that a previous
+    # binary that exited without calling disable_raw_mode() cannot leave a
+    # dirty termios that corrupts the next run's TUI setup.
     try:
         subprocess.run(["stty", "sane"], stdin=None, stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL, timeout=2)
@@ -286,23 +287,25 @@ def _run_one_trial(
         wall_elapsed = time.monotonic() - wall_start
 
         if proc.returncode != 0:
-            return False, wall_elapsed
+            return False, wall_elapsed, n_trials, 0
 
         # Parse YAML written by the binary
         try:
             with open(out_yaml) as fh:
                 data = yaml.safe_load(fh) or {}
-            report = data.get("report", {})
-            ratio  = float(report.get("success_ratio", 0.0))
-            t_mean = float(report.get("exe_time_mean", wall_elapsed))
-            return ratio >= 1.0, t_mean
+            report   = data.get("report", {})
+            ratio    = float(report.get("success_ratio", 0.0))
+            t_mean   = float(report.get("exe_time_mean", wall_elapsed))
+            n_run    = int(report.get("n_trials_run", n_trials))
+            n_succ   = round(ratio * n_run)
+            return ratio >= 1.0, t_mean, n_run, n_succ
         except Exception:
-            return False, wall_elapsed
+            return False, wall_elapsed, n_trials, 0
 
     except subprocess.TimeoutExpired:
-        return False, wall_limit
+        return False, wall_limit, n_trials, 0
     except FileNotFoundError:
-        return False, 0.0
+        return False, 0.0, 0, 0
 
 
 # ── Opcode-level experiment ───────────────────────────────────────────────────
@@ -322,11 +325,8 @@ def run_opcode(
     tolerance:       int  = 0,
 ) -> OpcodeResult:
     """
-    Run up to n_trials trials for one (chip, opcode, method).
-    Early-stops after (tolerance + 1) failures.
-    tolerance=0 (default / z3): stop on the first failure.
-    tolerance=1 (bb methods):   allow one failure; stop on the second.
-    Verified iff total failures <= tolerance.
+    Run n_trials trials for one (chip, opcode, method) in a single binary call.
+    The binary handles early-stopping on the first failure via --fail-fast.
     cfg_num_workers controls the num_workers written into the temp config
     (set to 1 when running many experiments in parallel to avoid CPU overload).
     """
@@ -338,50 +338,34 @@ def run_opcode(
                             verified=False, times_s=[], n_run=0, n_success=0,
                             skipped=True)
 
-    # Directory for saved per-trial YAMLs
+    # Directory for saved YAML output
     trial_dir = out_root / vm / chip / method
     trial_dir.mkdir(parents=True, exist_ok=True)
 
-    times:     List[float] = []
-    n_failures: int        = 0
+    cfg_path = _write_temp_config(timeout_ms, base_seed, num_workers=cfg_num_workers)
+    yaml_out = str(trial_dir / f"{opcode}.yaml")
 
-    for i in range(n_trials):
-        seed        = base_seed + i
-        cfg_path    = _write_temp_config(timeout_ms, seed, num_workers=cfg_num_workers)
-        yaml_out    = str(trial_dir / f"{opcode}_trial{i+1}.yaml")
-
+    try:
+        ok, t_mean, n_run, n_succ = _run_trials(
+            vm_dir, chip, opcode, method,
+            cfg_path, timeout_ms, yaml_out, n_trials,
+        )
+    finally:
         try:
-            ok, t = _run_one_trial(vm_dir, chip, opcode, method,
-                                   cfg_path, timeout_ms, yaml_out)
-        finally:
-            try:
-                os.unlink(cfg_path)
-            except OSError:
-                pass
+            os.unlink(cfg_path)
+        except OSError:
+            pass
 
-        if not ok:
-            n_failures += 1
+    if verbose:
+        status_str = "ok" if ok else f"FAIL ({n_succ}/{n_run} ok)"
+        _println(f"    {n_run} trial(s)  {status_str}  (mean {t_mean:.3f}s)", flush=True)
 
-        if verbose:
-            status_str = "ok" if ok else f"FAIL [{n_failures}/{tolerance + 1}]"
-            _println(f"    trial {i+1}/{n_trials}  {status_str}  ({t:.3f}s)", flush=True)
-
-        if not ok:
-            if n_failures > tolerance:
-                # Early stop
-                return OpcodeResult(vm, chip, opcode, method,
-                                    verified=False,
-                                    times_s=times,
-                                    n_run=i + 1,
-                                    n_success=len(times))
-        else:
-            times.append(t)
-
+    times = [t_mean] if ok else []
     return OpcodeResult(vm, chip, opcode, method,
-                        verified=n_failures <= tolerance,
+                        verified=ok,
                         times_s=times,
-                        n_run=n_trials,
-                        n_success=len(times))
+                        n_run=n_run,
+                        n_success=n_succ)
 
 
 # ── Full experiment loop ──────────────────────────────────────────────────────
@@ -810,39 +794,22 @@ def load_saved_results(
             for opcode in opcodes:
                 for method in methods:
                     trial_dir = out_root / vm / chip / method
-                    times: List[float] = []
-                    n_run = 0
-                    n_ok  = 0
-
-                    # Gather trial files in order
-                    i = 1
-                    while True:
-                        yf = trial_dir / f"{opcode}_trial{i}.yaml"
-                        if not yf.exists():
-                            break
-                        n_run += 1
-                        try:
-                            with open(yf) as fh:
-                                data = yaml.safe_load(fh) or {}
-                            report = data.get("report", {})
-                            ratio  = float(report.get("success_ratio", 0.0))
-                            t_mean = float(report.get("exe_time_mean", 0.0))
-                            if ratio >= 1.0:
-                                times.append(t_mean)
-                                n_ok += 1
-                            else:
-                                # Early-stop means no more files should exist
-                                break
-                        except Exception:
-                            break
-                        i += 1
-
-                    if n_run == 0:
+                    yf = trial_dir / f"{opcode}.yaml"
+                    if not yf.exists():
                         continue  # no data for this combo; skip silently
 
-                    # How many trials were expected?  If we have n_run files and
-                    # the last one was successful, we ran all N without early-stop.
-                    verified = (n_ok == n_run) and n_run > 0
+                    try:
+                        with open(yf) as fh:
+                            data = yaml.safe_load(fh) or {}
+                        report   = data.get("report", {})
+                        ratio    = float(report.get("success_ratio", 0.0))
+                        t_mean   = float(report.get("exe_time_mean", 0.0))
+                        n_run    = int(report.get("n_trials_run", 0))
+                        n_ok     = round(ratio * n_run)
+                        verified = ratio >= 1.0
+                        times    = [t_mean] if verified else []
+                    except Exception:
+                        continue
 
                     results.append(OpcodeResult(
                         vm=vm, chip=chip, opcode=opcode, method=method,

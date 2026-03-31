@@ -62,6 +62,9 @@ pub struct Args {
     /// Explicitly disable the terminal UI (useful for scripts and batch runs)
     #[arg(long, default_value = "false")]
     pub turn_off_ui: bool,
+    /// Stop immediately after the first failed trial (useful for batch scripts)
+    #[arg(long, default_value = "true")]
+    pub fail_fast: bool,
 }
 
 #[derive(Debug)]
@@ -71,6 +74,12 @@ pub struct VerificationResult {
     pub num_total_trials: usize,
     pub execution_time: std::time::Duration,
     pub area: i128,
+}
+
+impl VerificationResult {
+    pub fn is_verified(&self) -> bool {
+        matches!(self.status, VerificationStatus::Verified)
+    }
 }
 
 pub fn experiment_harness<FinalCheckFn, PostProcessFn>(
@@ -198,7 +207,8 @@ where
     // even when stdout is /dev/null, but terminal.draw() calls
     // crossterm::terminal::size() which queries stdout and panics on failure.
     use std::io::IsTerminal;
-    let tui_available = !turn_off_ui && std::io::stdout().is_terminal() && enable_raw_mode().is_ok();
+    let tui_available =
+        !turn_off_ui && std::io::stdout().is_terminal() && enable_raw_mode().is_ok();
     let mut stdout = io::stdout();
     if tui_available {
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -223,6 +233,7 @@ where
         &mut ui,
         &mut terminal,
         sleep_time,
+        tui_available,
     );
 
     if tui_available {
@@ -259,6 +270,7 @@ pub struct ResultReport {
     pub success_ratio: f64,
     pub exe_time_mean: f64,
     pub exe_time_variance: f64,
+    pub n_trials_run: usize,
 }
 
 pub fn generate_report(results: &[VerificationResult]) -> ResultReport {
@@ -292,6 +304,7 @@ pub fn generate_report(results: &[VerificationResult]) -> ResultReport {
         success_ratio,
         exe_time_mean,
         exe_time_variance,
+        n_trials_run: results.len(),
     }
 }
 
