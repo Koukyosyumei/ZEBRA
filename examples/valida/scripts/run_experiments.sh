@@ -165,7 +165,7 @@ if [[ $RUN_WORKER_SWEEP -eq 1 ]]; then
         echo "--- workers=$workers ---"
         local_skip=0
         for chip in "${CHIPS[@]}"; do
-            for opcode in ${CHIP_OPCODES[$chip]}; do
+            for opcode in ${CHIP_OPCODES[$chip]:-}; do
                 if is_failed "$chip" "$opcode"; then
                     echo "  [SKIP] $chip/$opcode (failed at more workers)"
                     (( local_skip++ )) || true
@@ -201,7 +201,7 @@ if [[ $RUN_RANGE_SWEEP -eq 1 ]]; then
         echo "--- range-interval=$range ---"
         local_skip=0
         for chip in "${CHIPS[@]}"; do
-            for opcode in ${CHIP_OPCODES[$chip]}; do
+            for opcode in ${CHIP_OPCODES[$chip]:-}; do
                 if is_failed "$chip" "$opcode"; then
                     echo "  [SKIP] $chip/$opcode (failed at smaller range)"
                     (( local_skip++ )) || true
