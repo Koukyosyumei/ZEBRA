@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # ZEBRA Valida Experiment Runner
 #
-# Experiment 1 – Worker sweep  : vary num_workers = {1,2,8,32}
+# Experiment 1 – Worker sweep  : vary num_workers = {8,6,4,2,1} (high → low)
 #                                with --range-interval 0 (single-point)
+#                                Opcodes that fail at more workers are
+#                                automatically skipped at all fewer workers.
 # Experiment 2 – Range sweep   : vary --range-interval = {0,1,7,31,127}
 #                                with fixed num_workers = 1 (bb method)
 #                                Opcodes that fail at a smaller range are
@@ -63,7 +65,7 @@ CHIP_OPCODES[lt32]="LT"
 CHIPS=(add32 sub32 mul32 div32 bitwise32 com32 lt32 memory)
 
 # ── experiment parameters ─────────────────────────────────────────────────────
-WORKER_COUNTS=(1 2 8 32)
+WORKER_COUNTS=(8 6 4 2 1)
 RANGE_INTERVALS=(0 1 7 31 127)
 
 # ── parallel job pool ─────────────────────────────────────────────────────────
@@ -154,19 +156,28 @@ if [[ $RUN_WORKER_SWEEP -eq 1 ]]; then
     echo "  chips   : ${CHIPS[*]}"
     echo "  trials  : $NUM_TRIALS"
     echo "  parallel: $PARALLEL_JOBS job(s)"
+    echo "  note    : opcodes that fail at W workers are skipped for all W' < W"
     echo "======================================================="
 
+    reset_failed
     for workers in "${WORKER_COUNTS[@]}"; do
         echo ""
         echo "--- workers=$workers ---"
+        local_skip=0
         for chip in "${CHIPS[@]}"; do
             for opcode in ${CHIP_OPCODES[$chip]}; do
+                if is_failed "$chip" "$opcode"; then
+                    echo "  [SKIP] $chip/$opcode (failed at more workers)"
+                    (( local_skip++ )) || true
+                    continue
+                fi
                 outfile="$RESULTS_DIR/worker_sweep/$chip/workers_${workers}/${opcode}.yaml"
                 submit_job "$PARALLEL_JOBS" run_one \
-                    "$chip" "$opcode" "$workers" 0 "$outfile" 0
+                    "$chip" "$opcode" "$workers" 0 "$outfile" 1
             done
         done
         wait_all
+        echo "  (skipped $local_skip opcode(s) due to prior worker failure)"
     done
     echo ""
     echo "Worker sweep complete."
