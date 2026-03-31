@@ -1250,15 +1250,25 @@ pub fn detect_selector_word_assign_constraints(
 
 /// Applies interval refinement for selector-gated word-assignment constraints.
 ///
-/// For each constraint and each row, when:
+/// For each constraint and each row, when the selector expression evaluates to a
+/// **non-zero singleton** (i.e. the constraint definitely forces `word_a = rhs_expr`),
+/// and every limb of `word_a` satisfies `0 ≤ lo` and `hi ≤ 255`, the function
+/// uses the RHS interval to narrow each limb via byte-decomposition.
 ///
-/// * the selector expression evaluates to a **non-zero singleton**
-///   (i.e. the constraint definitely forces `word_a = rhs_expr`),
-/// * `rhs_expr` evaluates to a concrete singleton, and
-/// * every limb of `word_a` satisfies `0 ≤ lo` and `hi ≤ 255`,
+/// # Byte-decomposition narrowing
 ///
-/// the function decodes the singleton into four bytes and intersects each byte
-/// with the corresponding limb of `word_a`.
+/// When `rhs_expr` evaluates to a contiguous u32 interval `[rhs_lo, rhs_hi]`
+/// (i.e. `rhs_lo <= rhs_hi`), the i-th byte of `word_a` is narrowable whenever
+/// all higher bytes are identical across the interval:
+///
+/// * Byte 3 (MSB): always narrowable → `[(rhs_lo >> 24) & 0xFF, (rhs_hi >> 24) & 0xFF]`
+/// * Byte 2: narrowable iff `(rhs_lo >> 24) == (rhs_hi >> 24)`
+/// * Byte 1: narrowable iff `(rhs_lo >> 16) == (rhs_hi >> 16)`
+/// * Byte 0 (LSB): narrowable iff `(rhs_lo >>  8) == (rhs_hi >>  8)`
+///
+/// When `rhs_expr` evaluates to a singleton the result is identical to the
+/// previous "pin each byte" behaviour.  When the interval is wrap-around
+/// (`rhs_lo > rhs_hi` in i128) no refinement is attempted (conservative fallback).
 ///
 /// The selector condition is **non-zero** (not specifically `1`) to handle
 /// compound selectors like `Mul(sum_vars, curr[59]-1)` that evaluate to `-1`
@@ -1295,7 +1305,7 @@ pub fn refine_selector_word_assign_constraints(
                 continue;
             }
 
-            // RHS must be a concrete singleton.
+            // Evaluate RHS — may be a non-singleton interval.
             let rhs_val = constraint.rhs_expr.eval(
                 row,
                 next_row,
@@ -1305,7 +1315,10 @@ pub fn refine_selector_word_assign_constraints(
                 r + 1 == num_rows,
                 prime,
             );
-            if !rhs_val.is_singleton() {
+
+            // Skip wrap-around intervals (rhs_lo > rhs_hi in i128): we cannot
+            // derive contiguous per-byte bounds from a disconnected range.
+            if rhs_val.lo > rhs_val.hi {
                 continue;
             }
 
@@ -1318,13 +1331,25 @@ pub fn refine_selector_word_assign_constraints(
                 continue;
             }
 
-            let target_u32 = rhs_val.lo as u32;
+            let rhs_lo = rhs_val.lo as u32;
+            let rhs_hi = rhs_val.hi as u32;
 
-            // Refine each limb to its exact byte.
-            for i in 0..4 {
-                let byte_val = ((target_u32 >> (8 * i)) & 0xFF) as i128;
-                let target_iv = AbstractInterval::from_i128(byte_val);
-                let a_idx = constraint.a_var_indices[i];
+            // Byte-decomposition narrowing: for byte i, the derived range is
+            // [byte_i(rhs_lo), byte_i(rhs_hi)] only when all higher bytes are
+            // identical across [rhs_lo, rhs_hi] (otherwise the byte wraps and
+            // we can only claim [0, 255], which is already the limb's domain).
+            for i in 0..4u32 {
+                // Higher-byte prefix: bits above byte i must agree.
+                let upper_shift = 8 * (i + 1);
+                let narrowable = i == 3 || (rhs_lo >> upper_shift) == (rhs_hi >> upper_shift);
+                if !narrowable {
+                    continue;
+                }
+
+                let byte_lo = ((rhs_lo >> (8 * i)) & 0xFF) as i128;
+                let byte_hi = ((rhs_hi >> (8 * i)) & 0xFF) as i128;
+                let target_iv = AbstractInterval { lo: byte_lo, hi: byte_hi };
+                let a_idx = constraint.a_var_indices[i as usize];
                 if let Some(refined) = trace.data[r][a_idx].intersect(&target_iv) {
                     trace.data[r][a_idx] = refined;
                 } else {

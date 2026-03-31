@@ -139,7 +139,7 @@ VM_REGISTRY: Dict[str, Dict] = {
 }
 
 STANDARD_METHODS = ["bb", "bb_blocking", "z3"]
-ABLATION_METHODS = ["bb_no_heuristic", "bb_no_simplify", "bb_no_refinement"]
+ABLATION_METHODS = ["bb_no_simplify", "bb_no_refinement"]
 ALL_METHODS      = STANDARD_METHODS + ABLATION_METHODS
 
 # Human-readable labels for table headers
@@ -924,7 +924,7 @@ def main() -> None:
 
     # ── Resolve mode-dependent defaults ──────────────────────────────────────
     if args.ablation:
-        default_methods = "bb," + ",".join(ABLATION_METHODS)
+        default_methods = ",".join(ABLATION_METHODS)
         default_out_dir = "experiments/ablation"
     else:
         default_methods = ",".join(STANDARD_METHODS)
