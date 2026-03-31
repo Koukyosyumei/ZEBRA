@@ -225,8 +225,10 @@ def _plot_vm_ax(
                 chip_opcode_idx[chip] += 1
                 ax.plot(xs, ys, color=color, linestyle=linestyle, marker=marker,
                         markersize=5, linewidth=1.6, label=f"{chip} · {opcode}")
+                """
                 ax.errorbar(xs, ys, yerr=errs, fmt="none", color=color,
                             capsize=3, capthick=1.0, elinewidth=0.9, alpha=0.7)
+                """
 
     ax.set_title(vm_name, fontsize=11, fontweight="bold")
     ax.set_yscale("log")
