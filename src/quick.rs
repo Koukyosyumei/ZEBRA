@@ -59,6 +59,9 @@ pub struct Args {
     /// Ablation: disable interval refinement (ABIR / conditional-constraint back-propagation)
     #[arg(long, default_value = "false")]
     pub no_refinement: bool,
+    /// Explicitly disable the terminal UI (useful for scripts and batch runs)
+    #[arg(long, default_value = "false")]
+    pub turn_off_ui: bool,
 }
 
 #[derive(Debug)]
@@ -81,6 +84,7 @@ pub fn experiment_harness<FinalCheckFn, PostProcessFn>(
     final_check: FinalCheckFn,
     verification_method: &String,
     known_solution: &mut HashSet<String>,
+    turn_off_ui: bool,
 ) -> Result<VerificationResult, io::Error>
 where
     FinalCheckFn:
@@ -113,6 +117,7 @@ where
             &mut sleep_time,
             known_solution,
             &mut known_solution_area,
+            turn_off_ui,
         )
     } else {
         // ######################## Generating SMT Formula ##########################
@@ -179,6 +184,7 @@ pub fn quick_api<FinalCheckFn, PostProcessFn>(
     sleep_time: &mut Duration,
     known_solution: &mut HashSet<String>,
     known_solution_area: &mut i128,
+    turn_off_ui: bool,
 ) -> Result<VerificationResult, io::Error>
 where
     FinalCheckFn:
@@ -192,7 +198,7 @@ where
     // even when stdout is /dev/null, but terminal.draw() calls
     // crossterm::terminal::size() which queries stdout and panics on failure.
     use std::io::IsTerminal;
-    let tui_available = std::io::stdout().is_terminal() && enable_raw_mode().is_ok();
+    let tui_available = !turn_off_ui && std::io::stdout().is_terminal() && enable_raw_mode().is_ok();
     let mut stdout = io::stdout();
     if tui_available {
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
