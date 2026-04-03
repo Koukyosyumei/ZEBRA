@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+
+**Never use `--debug` mode of cargo. It creats too huge binaries. Always use `--release` mode**
+
 ## Project Overview
 
 **ZEBRA** (Zero-knowledge zkVM Bounded Refinement Analysis) is a lattice-based abstract-interpretation verifier for zero-knowledge VMs (zkVMs). It formally verifies zkVM execution traces by performing interval analysis over AIR (Algebraic Intermediate Representation) constraints.
