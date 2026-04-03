@@ -16,7 +16,7 @@ mod tests {
     // ── JAL helpers ───────────────────────────────────────────────────────────
 
     fn check_jal_valid(from_pc: u32, imm: i32) {
-        let (ci, _) = extract_jal_constraints::<F>(BABY_BEAR_PRIME);
+        let (ci, _) = extract_jal_constraints(BABY_BEAR_PRIME);
         let row = make_jal_row(from_pc, imm);
         let at = AbstractTrace::new(vec![row]);
         let (flag, _, _) = eval_constraints(&at, None, &ci.constraints, BABY_BEAR_PRIME);
@@ -24,7 +24,7 @@ mod tests {
     }
 
     fn check_jal_invalid(from_pc: u32, imm: i32) {
-        let (ci, _) = extract_jal_constraints::<F>(BABY_BEAR_PRIME);
+        let (ci, _) = extract_jal_constraints(BABY_BEAR_PRIME);
         let mut row = make_jal_row(from_pc, imm);
         // Corrupt rd_data[0] (the first limb of from_pc + 4).
         let orig = row[COL_JAL_RD_START].lo;
@@ -37,7 +37,7 @@ mod tests {
     // ── LUI helpers ───────────────────────────────────────────────────────────
 
     fn check_lui_valid(imm: u32) {
-        let (ci, _) = extract_jal_constraints::<F>(BABY_BEAR_PRIME);
+        let (ci, _) = extract_jal_constraints(BABY_BEAR_PRIME);
         let row = make_lui_row(imm);
         let at = AbstractTrace::new(vec![row]);
         let (flag, _, _) = eval_constraints(&at, None, &ci.constraints, BABY_BEAR_PRIME);
@@ -45,7 +45,7 @@ mod tests {
     }
 
     fn check_lui_invalid(imm: u32) {
-        let (ci, _) = extract_jal_constraints::<F>(BABY_BEAR_PRIME);
+        let (ci, _) = extract_jal_constraints(BABY_BEAR_PRIME);
         let mut row = make_lui_row(imm);
         // Corrupt rd_data[1] (one of the limbs of imm << 12).
         let orig = row[COL_JAL_RD_START + 1].lo;

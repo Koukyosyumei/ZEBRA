@@ -17,7 +17,7 @@ mod tests {
     // ── BEQ / BNE helpers ─────────────────────────────────────────────────────
 
     fn check_beq_valid(op: BranchEqualOpcode, a: [u32; 4], b: [u32; 4]) {
-        let (ci, _) = extract_branch_eq_constraints::<F>(BABY_BEAR_PRIME);
+        let (ci, _) = extract_branch_eq_constraints(BABY_BEAR_PRIME);
         let row = make_branch_eq_row(a, b, op);
         let at = AbstractTrace::new(vec![row]);
         let (flag, _, _) = eval_constraints(&at, None, &ci.constraints, BABY_BEAR_PRIME);
@@ -25,7 +25,7 @@ mod tests {
     }
 
     fn check_beq_invalid(op: BranchEqualOpcode, a: [u32; 4], b: [u32; 4]) {
-        let (ci, _) = extract_branch_eq_constraints::<F>(BABY_BEAR_PRIME);
+        let (ci, _) = extract_branch_eq_constraints(BABY_BEAR_PRIME);
         let mut row = make_branch_eq_row(a, b, op);
         let orig = row[COL_BREQ_CMP_RESULT].lo;
         row[COL_BREQ_CMP_RESULT] = AbstractInterval::from_i128(1 - orig);
@@ -37,7 +37,7 @@ mod tests {
     // ── BLT / BLTU / BGE / BGEU helpers ──────────────────────────────────────
 
     fn check_blt_valid(op: BranchLessThanOpcode, a: [u32; 4], b: [u32; 4]) {
-        let (ci, _) = extract_branch_lt_constraints::<F>(BABY_BEAR_PRIME);
+        let (ci, _) = extract_branch_lt_constraints(BABY_BEAR_PRIME);
         let row = make_branch_lt_row(a, b, op);
         let at = AbstractTrace::new(vec![row]);
         let (flag, _, _) = eval_constraints(&at, None, &ci.constraints, BABY_BEAR_PRIME);
@@ -45,7 +45,7 @@ mod tests {
     }
 
     fn check_blt_invalid(op: BranchLessThanOpcode, a: [u32; 4], b: [u32; 4]) {
-        let (ci, _) = extract_branch_lt_constraints::<F>(BABY_BEAR_PRIME);
+        let (ci, _) = extract_branch_lt_constraints(BABY_BEAR_PRIME);
         let mut row = make_branch_lt_row(a, b, op);
         let orig = row[COL_BLT_CMP_RESULT].lo;
         row[COL_BLT_CMP_RESULT] = AbstractInterval::from_i128(1 - orig);

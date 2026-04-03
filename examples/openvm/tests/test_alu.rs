@@ -15,7 +15,7 @@ mod tests {
 
     /// Build a single-row trace and verify that all constraints hold.
     fn check_valid(op: BaseAluOpcode, b_limbs: [u32; 4], c_limbs: [u32; 4]) {
-        let (constraint_info, _) = extract_base_alu_constraints::<F>(BABY_BEAR_PRIME);
+        let (constraint_info, _) = extract_base_alu_constraints(BABY_BEAR_PRIME);
         let row = make_base_alu_row(b_limbs, c_limbs, op);
         let at = AbstractTrace::new(vec![row]);
         let (flag, _, _) =
@@ -29,7 +29,7 @@ mod tests {
 
     /// Build a trace with a corrupted result and verify that a constraint is violated.
     fn check_invalid(op: BaseAluOpcode, b_limbs: [u32; 4], c_limbs: [u32; 4]) {
-        let (constraint_info, _) = extract_base_alu_constraints::<F>(BABY_BEAR_PRIME);
+        let (constraint_info, _) = extract_base_alu_constraints(BABY_BEAR_PRIME);
         let mut row = make_base_alu_row(b_limbs, c_limbs, op);
         // Corrupt the lowest limb of the result.
         let orig = row[COL_A_START].lo;

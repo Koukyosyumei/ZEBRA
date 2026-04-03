@@ -14,7 +14,7 @@ mod tests {
     type F = BabyBear;
 
     fn check_valid(b_limbs: [u32; 4], c_limbs: [u32; 4]) {
-        let (constraint_info, _) = extract_shift_constraints::<F>(BABY_BEAR_PRIME);
+        let (constraint_info, _) = extract_shift_constraints(BABY_BEAR_PRIME);
         let row = make_shift_row(b_limbs, c_limbs, ShiftOpcode::SRL);
         let at = AbstractTrace::new(vec![row]);
         let (flag, _, _) =
@@ -27,7 +27,7 @@ mod tests {
     }
 
     fn check_invalid(b_limbs: [u32; 4], c_limbs: [u32; 4]) {
-        let (constraint_info, _) = extract_shift_constraints::<F>(BABY_BEAR_PRIME);
+        let (constraint_info, _) = extract_shift_constraints(BABY_BEAR_PRIME);
         let mut row = make_shift_row(b_limbs, c_limbs, ShiftOpcode::SRL);
         let orig = row[COL_SHIFT_A_START].lo;
         row[COL_SHIFT_A_START] = AbstractInterval::from_i128((orig + 1) % 256);

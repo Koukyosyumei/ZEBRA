@@ -14,7 +14,7 @@ mod tests {
     type F = BabyBear;
 
     fn check_valid(op: LessThanOpcode, b_limbs: [u32; 4], c_limbs: [u32; 4]) {
-        let (constraint_info, _) = extract_lt_constraints::<F>(BABY_BEAR_PRIME);
+        let (constraint_info, _) = extract_lt_constraints(BABY_BEAR_PRIME);
         let row = make_lt_row(b_limbs, c_limbs, op);
         let at = AbstractTrace::new(vec![row]);
         let (flag, _, _) =
@@ -27,7 +27,7 @@ mod tests {
     }
 
     fn check_invalid(op: LessThanOpcode, b_limbs: [u32; 4], c_limbs: [u32; 4]) {
-        let (constraint_info, _) = extract_lt_constraints::<F>(BABY_BEAR_PRIME);
+        let (constraint_info, _) = extract_lt_constraints(BABY_BEAR_PRIME);
         let mut row = make_lt_row(b_limbs, c_limbs, op);
         // Flip the comparison result.
         let orig = row[COL_LT_CMP_RESULT].lo;

@@ -36,7 +36,7 @@ fn main() -> Result<(), io::Error> {
     let op = get_opcode(&opcode_str);
 
     let (mut constraint_info, general_lookup_info) =
-        extract_base_alu_constraints::<openvm_stark_sdk::p3_baby_bear::BabyBear>(BABY_BEAR_PRIME);
+        extract_base_alu_constraints(BABY_BEAR_PRIME);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
 
     constraint_info

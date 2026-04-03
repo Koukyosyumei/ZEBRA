@@ -32,7 +32,7 @@ fn main() -> Result<(), io::Error> {
     match opcode_str.as_str() {
         "BEQ" | "BNE" => {
             let (mut constraint_info, general_lookup_info) =
-                extract_branch_eq_constraints::<openvm_stark_sdk::p3_baby_bear::BabyBear>(
+                extract_branch_eq_constraints(
                     BABY_BEAR_PRIME,
                 );
             let final_check = generate_alu_final_checker(general_lookup_info.clone());
@@ -84,7 +84,7 @@ fn main() -> Result<(), io::Error> {
         }
         "BLT" | "BLTU" | "BGE" | "BGEU" => {
             let (mut constraint_info, general_lookup_info) =
-                extract_branch_lt_constraints::<openvm_stark_sdk::p3_baby_bear::BabyBear>(
+                extract_branch_lt_constraints(
                     BABY_BEAR_PRIME,
                 );
             let final_check = generate_alu_final_checker(general_lookup_info.clone());

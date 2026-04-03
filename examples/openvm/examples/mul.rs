@@ -21,7 +21,7 @@ fn main() -> Result<(), io::Error> {
     search_config.enable_interval_refinement = !args.no_refinement;
 
     let (mut constraint_info, general_lookup_info) =
-        extract_mul_constraints::<openvm_stark_sdk::p3_baby_bear::BabyBear>(BABY_BEAR_PRIME);
+        extract_mul_constraints(BABY_BEAR_PRIME);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
 
     constraint_info

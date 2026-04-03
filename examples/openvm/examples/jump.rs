@@ -30,7 +30,7 @@ fn main() -> Result<(), io::Error> {
     match opcode_str.as_str() {
         "JAL" => {
             let (mut constraint_info, general_lookup_info) =
-                extract_jal_constraints::<openvm_stark_sdk::p3_baby_bear::BabyBear>(
+                extract_jal_constraints(
                     BABY_BEAR_PRIME,
                 );
             let final_check = generate_alu_final_checker(general_lookup_info.clone());
@@ -75,7 +75,7 @@ fn main() -> Result<(), io::Error> {
         }
         "LUI" => {
             let (mut constraint_info, general_lookup_info) =
-                extract_jal_constraints::<openvm_stark_sdk::p3_baby_bear::BabyBear>(
+                extract_jal_constraints(
                     BABY_BEAR_PRIME,
                 );
             let final_check = generate_alu_final_checker(general_lookup_info.clone());

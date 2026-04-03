@@ -13,7 +13,7 @@ mod tests {
     type F = BabyBear;
 
     fn check_valid(b_limbs: [u32; 4], c_limbs: [u32; 4]) {
-        let (constraint_info, _) = extract_mul_constraints::<F>(BABY_BEAR_PRIME);
+        let (constraint_info, _) = extract_mul_constraints(BABY_BEAR_PRIME);
         let row = make_mul_row(b_limbs, c_limbs);
         let at = AbstractTrace::new(vec![row]);
         let (flag, _, _) =
@@ -26,7 +26,7 @@ mod tests {
     }
 
     fn check_invalid(b_limbs: [u32; 4], c_limbs: [u32; 4]) {
-        let (constraint_info, _) = extract_mul_constraints::<F>(BABY_BEAR_PRIME);
+        let (constraint_info, _) = extract_mul_constraints(BABY_BEAR_PRIME);
         let mut row = make_mul_row(b_limbs, c_limbs);
         let orig = row[COL_MUL_A_START].lo;
         row[COL_MUL_A_START] = AbstractInterval::from_i128((orig + 1) % 256);
