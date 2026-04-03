@@ -38,3 +38,9 @@ name = "mul"
 
 [[example]]
 name = "lt"
+
+[[example]]
+name = "branch"
+
+[[example]]
+name = "jump"
