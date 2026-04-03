@@ -65,7 +65,7 @@ fn main() -> Result<(), io::Error> {
         }
 
         let x: u32 = rng.random();
-        let y: u32 = rng.random() & 0x1F; // shift amount 0..31
+        let y: u32 = rng.random::<u32>() & 0x1F; // shift amount 0..31
         let b_limbs = to_limbs(x);
         let c_limbs = to_limbs(y);
 

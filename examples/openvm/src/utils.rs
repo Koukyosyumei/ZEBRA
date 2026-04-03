@@ -1,8 +1,24 @@
 use std::collections::HashSet;
 
-use openvm_rv32im_circuit::adapters::RV32_CELL_BITS;
+use openvm_circuit::arch::{
+    testing::{test_adapter::TestAdapterAir, BITWISE_OP_LOOKUP_BUS, RANGE_TUPLE_CHECKER_BUS},
+    ExecutionBus, ExecutionBridge, VmAirWrapper,
+};
+use openvm_circuit::system::program::ProgramBus;
+use openvm_circuit_primitives::{
+    bitwise_op_lookup::{BitwiseOperationLookupBus, SharedBitwiseOperationLookupChip},
+    range_tuple::{RangeTupleCheckerBus, SharedRangeTupleCheckerChip},
+    var_range::{SharedVariableRangeCheckerChip, VariableRangeCheckerBus},
+};
+use openvm_instructions::LocalOpcode;
+use openvm_rv32im_circuit::{
+    adapters::{RV32_CELL_BITS, RV32_REGISTER_NUM_LIMBS},
+    BaseAluCoreChip, LessThanCoreChip, MultiplicationCoreChip, ShiftCoreChip,
+};
 use openvm_rv32im_transpiler::{BaseAluOpcode, LessThanOpcode, MulOpcode, ShiftOpcode};
 use openvm_stark_backend::p3_field::PrimeField32;
+
+use crate::p3_to_tv::{contains_permutation, convert_openvm_expr, get_symbolic_constraints_openvm};
 
 use zebra::constraint::ZEBRAConstraints;
 use zebra::interval::AbstractInterval;
@@ -99,6 +115,14 @@ pub const BABY_BEAR_PRIME: u32 = (1 << 31) - (1 << 27) + 1;
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
+/// Construct a `TestAdapterAir` with dummy bus indices (fine for symbolic extraction
+/// since bus interactions are filtered out by `contains_permutation`).
+fn make_test_adapter_air() -> TestAdapterAir {
+    TestAdapterAir {
+        execution_bridge: ExecutionBridge::new(ExecutionBus::new(0), ProgramBus::new(1)),
+    }
+}
+
 fn col(idx: usize) -> LVSExpr {
     LVSExpr::Variable(ZEBRASymbolicVal {
         entry: ZEBRASymbolicEntry::Main { is_curr: true },
@@ -154,7 +178,25 @@ pub fn extract_base_alu_constraints<F: PrimeField32>(
     .collect();
     let received_vars: HashSet<usize> = HashSet::new();
 
-    let mut air_constraints: Vec<LVSExpr> = Vec::new();
+    // Extract polynomial AIR constraints from the OpenVM BaseAluCoreAir.
+    let bitwise_bus = BitwiseOperationLookupBus::new(BITWISE_OP_LOOKUP_BUS);
+    let bitwise_chip = SharedBitwiseOperationLookupChip::<RV32_CELL_BITS>::new(bitwise_bus);
+    let core_air = BaseAluCoreChip::<RV32_REGISTER_NUM_LIMBS, RV32_CELL_BITS>::new(
+        bitwise_chip,
+        BaseAluOpcode::CLASS_OFFSET,
+    )
+    .air;
+    let air = VmAirWrapper {
+        adapter: make_test_adapter_air(),
+        core: core_air,
+    };
+    let symbolic = get_symbolic_constraints_openvm::<F, _>(&air);
+    let mut air_constraints: Vec<LVSExpr> = symbolic
+        .constraints
+        .iter()
+        .filter(|e| !contains_permutation(e))
+        .map(|e| convert_openvm_expr::<F>(e))
+        .collect();
 
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         NUM_BASE_ALU_COLS,
@@ -223,7 +265,28 @@ pub fn extract_shift_constraints<F: PrimeField32>(
     let multiplicities: HashSet<usize> = [COL_SHIFT_SRL_FLAG].into_iter().collect();
     let received_vars: HashSet<usize> = HashSet::new();
 
-    let mut air_constraints: Vec<LVSExpr> = Vec::new();
+    // Extract polynomial AIR constraints from the OpenVM ShiftCoreAir.
+    let bitwise_bus = BitwiseOperationLookupBus::new(BITWISE_OP_LOOKUP_BUS);
+    let bitwise_chip = SharedBitwiseOperationLookupChip::<RV32_CELL_BITS>::new(bitwise_bus);
+    let range_bus = VariableRangeCheckerBus::new(5, RV32_CELL_BITS);
+    let range_chip = SharedVariableRangeCheckerChip::new(range_bus);
+    let core_air = ShiftCoreChip::<RV32_REGISTER_NUM_LIMBS, RV32_CELL_BITS>::new(
+        bitwise_chip,
+        range_chip,
+        ShiftOpcode::CLASS_OFFSET,
+    )
+    .air;
+    let air = VmAirWrapper {
+        adapter: make_test_adapter_air(),
+        core: core_air,
+    };
+    let symbolic = get_symbolic_constraints_openvm::<F, _>(&air);
+    let mut air_constraints: Vec<LVSExpr> = symbolic
+        .constraints
+        .iter()
+        .filter(|e| !contains_permutation(e))
+        .map(|e| convert_openvm_expr::<F>(e))
+        .collect();
 
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         NUM_SHIFT_COLS,
@@ -286,7 +349,29 @@ pub fn extract_mul_constraints<F: PrimeField32>(
     let multiplicities: HashSet<usize> = [COL_MUL_IS_VALID].into_iter().collect();
     let received_vars: HashSet<usize> = HashSet::new();
 
-    let mut air_constraints: Vec<LVSExpr> = Vec::new();
+    // Extract polynomial AIR constraints from the OpenVM MultiplicationCoreAir.
+    // sizes[0] must be 2^LIMB_BITS, sizes[1] must be >= 2^LIMB_BITS * NUM_LIMBS.
+    let range_tuple_bus = RangeTupleCheckerBus::<2>::new(
+        RANGE_TUPLE_CHECKER_BUS,
+        [1 << RV32_CELL_BITS, (1 << RV32_CELL_BITS) * RV32_REGISTER_NUM_LIMBS as u32],
+    );
+    let range_tuple_chip = SharedRangeTupleCheckerChip::<2>::new(range_tuple_bus);
+    let core_air = MultiplicationCoreChip::<RV32_REGISTER_NUM_LIMBS, RV32_CELL_BITS>::new(
+        range_tuple_chip,
+        MulOpcode::CLASS_OFFSET,
+    )
+    .air;
+    let air = VmAirWrapper {
+        adapter: make_test_adapter_air(),
+        core: core_air,
+    };
+    let symbolic = get_symbolic_constraints_openvm::<F, _>(&air);
+    let mut air_constraints: Vec<LVSExpr> = symbolic
+        .constraints
+        .iter()
+        .filter(|e| !contains_permutation(e))
+        .map(|e| convert_openvm_expr::<F>(e))
+        .collect();
 
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         NUM_MUL_COLS,
@@ -374,7 +459,25 @@ pub fn extract_lt_constraints<F: PrimeField32>(
         .collect();
     let received_vars: HashSet<usize> = HashSet::new();
 
-    let mut air_constraints: Vec<LVSExpr> = Vec::new();
+    // Extract polynomial AIR constraints from the OpenVM LessThanCoreAir.
+    let bitwise_bus = BitwiseOperationLookupBus::new(BITWISE_OP_LOOKUP_BUS);
+    let bitwise_chip = SharedBitwiseOperationLookupChip::<RV32_CELL_BITS>::new(bitwise_bus);
+    let core_air = LessThanCoreChip::<RV32_REGISTER_NUM_LIMBS, RV32_CELL_BITS>::new(
+        bitwise_chip,
+        LessThanOpcode::CLASS_OFFSET,
+    )
+    .air;
+    let air = VmAirWrapper {
+        adapter: make_test_adapter_air(),
+        core: core_air,
+    };
+    let symbolic = get_symbolic_constraints_openvm::<F, _>(&air);
+    let mut air_constraints: Vec<LVSExpr> = symbolic
+        .constraints
+        .iter()
+        .filter(|e| !contains_permutation(e))
+        .map(|e| convert_openvm_expr::<F>(e))
+        .collect();
 
     let (refinable_cols, range_types) = prepare_constraints_and_range_type(
         NUM_LT_COLS,
