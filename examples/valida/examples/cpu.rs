@@ -273,10 +273,10 @@ fn branch_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
 
 pub fn generate_random_program(rng: &mut StdRng) -> Vec<IW<i32>> {
     let fs = vec![
-        //imm_program::<BabyBear>,
-        //alu_program::<BabyBear>,
+        imm_program::<BabyBear>,
+        alu_program::<BabyBear>,
         jal_program::<BabyBear>,
-        //branch_program::<BabyBear>,
+        branch_program::<BabyBear>,
     ];
     let f = fs.choose(rng).unwrap();
     f(rng)
@@ -334,7 +334,7 @@ fn main() -> Result<(), io::Error> {
     // Bug classes confirmed across all programs
     let mut global_found_classes: HashSet<String> = HashSet::new();
 
-    for i in 0..2 {
+    for i in 0..args.num_trial {
         //0..args.num_trial {
         println!("\n\n===========");
         let program = generate_random_program(&mut rng);
