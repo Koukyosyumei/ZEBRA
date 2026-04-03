@@ -2,8 +2,10 @@ use clap::Parser;
 use core::mem::transmute;
 use rand::seq::SliceRandom;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::io;
+use std::rc::Rc;
 
 use p3_baby_bear::BabyBear;
 use p3_field::AbstractField;
@@ -26,6 +28,7 @@ use zebra::canonicalizer::save_repr_if_unique;
 use zebra::interval::AbstractInterval as AI;
 use zebra::interval::AbstractInterval;
 use zebra::interval::MayBeFlag;
+use zebra::memory::reconstruct_word;
 use zebra::memory::IntervalMemory;
 use zebra::memory::{check_memory_consistency, reconstruct_word as rec_word};
 use zebra::quick::{experiment_harness, load_config, Args, ProgramInfo};
@@ -98,13 +101,14 @@ fn check_bug_type(
                 }
             }
 
-            if MayBeFlag::True != trace.data[i][42].is_zero(prime) {
-                let v = trace.data[i][44].clone()
-                    + trace.data[i][45].clone()
-                    + trace.data[i][46].clone()
-                    + trace.data[i][47].clone();
-                if v.lo > prime as i128 {
-                    bug_types.insert("OverFlowWord".to_string());
+            if (MayBeFlag::True != trace.data[i][20].is_zero(prime))
+                || (MayBeFlag::True != trace.data[i][21].is_zero(prime))
+            {
+                if MayBeFlag::True != trace.data[i][42].is_zero(prime) {
+                    let v = reconstruct_word(&trace.data[i], 44, 4);
+                    if v.lo > prime as i128 {
+                        bug_types.insert("OverFlowWord".to_string());
+                    }
                 }
             }
         }
@@ -138,36 +142,14 @@ fn cpu_canonicalizer(trace: &AbstractTrace, prime: u32) -> HashSet<String> {
     record_reprs
 }
 
-// ############## Final Check Function ##############################
-fn final_check(
-    trace: &AbstractTrace,
-    num_trial: usize,
-    prime: u32,
-    known_report: &mut HashSet<String>,
-    ui: &mut UiState,
-    _area: &mut i128,
-) {
-    let mut record_reprs = cpu_canonicalizer(trace, prime);
-
-    let mut bug_types: HashSet<String> = HashSet::new();
-    check_bug_type(&trace, &mut record_reprs, &mut bug_types, prime);
-
-    let string_representation = format!("{}", PrettySet(record_reprs.clone()));
-    if !known_report.contains(&string_representation) {
-        let mut is_new = bug_types.is_empty();
-        for bt in &bug_types {
-            if !known_report.contains(bt) {
-                is_new = true;
-                known_report.insert(bt.clone());
-            }
-        }
-        if !is_new {
-            return;
-        }
-    }
-
-    save_repr_if_unique(&PrettySet(record_reprs), known_report, ui);
-}
+const ALL_BUG_CLASSES: &[&str] = &[
+    "Empty",
+    "UnassignedOpcodeFlags",
+    "NonExclusiveOpcodeFlags",
+    "ContinueAfterStop",
+    "OverFlowWord",
+    "TerminateBeforeStop",
+];
 
 fn imm_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
     let x = rng.gen_range(-20..20) * 4;
@@ -327,7 +309,11 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime, args.method == "bb" && !args.no_simplify,
+            &machine,
+            &air,
+            num_col,
+            prime,
+            args.method == "bb" && !args.no_simplify,
         );
     constraint_info
         .refinable_cols
@@ -345,9 +331,11 @@ fn main() -> Result<(), io::Error> {
     //    let program = get_target_program::<BabyBear>();
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
-    let mut global_known_solution = HashSet::new();
+    // Bug classes confirmed across all programs
+    let mut global_found_classes: HashSet<String> = HashSet::new();
 
-    for i in 0..10 {
+    for i in 0..args.num_trial {
+        //0..args.num_trial {
         println!("\n\n===========");
         let program = generate_random_program(&mut rng);
         let program_str = program
@@ -400,10 +388,60 @@ fn main() -> Result<(), io::Error> {
             .insert(1, RangeType::Any(0, program.len() as i128 - 1));
 
         // ######################## Solve ############################################
-        let mut known_solution = global_known_solution.clone();
+        // Per-program bug tracker: bug class -> list of malicious trace representations
+        let bug_class_map: Rc<RefCell<HashMap<String, HashSet<String>>>> =
+            Rc::new(RefCell::new(HashMap::new()));
+        let bug_class_map_ref = Rc::clone(&bug_class_map);
+
         let repr_sets =
             cpu_canonicalizer(&AbstractTrace::new(base_abs_main_trace_data.clone()), prime);
-        known_solution.insert(format!("{}", PrettySet(repr_sets.clone())));
+        let honest_repr = format!("{}", PrettySet(repr_sets.clone()));
+
+        // Seed known_solution with the honest trace so it is not reported as malicious
+        let mut known_solution: HashSet<String> = global_found_classes
+            .iter()
+            .cloned()
+            .collect();
+        known_solution.insert(honest_repr.clone());
+
+        let final_check_fn =
+            move |trace: &AbstractTrace, _num_trial: usize, prime: u32,
+                  known_report: &mut HashSet<String>, ui: &mut UiState, _area: &mut i128| {
+                let mut record_reprs = cpu_canonicalizer(trace, prime);
+                let mut bug_types: HashSet<String> = HashSet::new();
+                check_bug_type(trace, &mut record_reprs, &mut bug_types, prime);
+
+                let trace_repr = format!("{}", PrettySet(record_reprs.clone()));
+                if !known_report.contains(&trace_repr) {
+                    let mut is_new = bug_types.is_empty();
+                    for bt in &bug_types {
+                        if !known_report.contains(bt) {
+                            is_new = true;
+                            known_report.insert(bt.clone());
+                        }
+                    }
+                    if !is_new {
+                        return;
+                    }
+
+                    // Associate this trace with its bug classes
+                    let mut map = bug_class_map_ref.borrow_mut();
+                    if bug_types.is_empty() {
+                        map.entry("Unknown".to_string())
+                            .or_default()
+                            .insert(trace_repr.clone());
+                    } else {
+                        for bt in &bug_types {
+                            map.entry(bt.clone())
+                                .or_default()
+                                .insert(trace_repr.clone());
+                        }
+                    }
+                    drop(map);
+                }
+
+                save_repr_if_unique(&PrettySet(record_reprs), known_report, ui);
+            };
 
         let result = experiment_harness(
             &program_info,
@@ -411,36 +449,86 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             public_vals.clone(),
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             post_process,
-            final_check,
+            final_check_fn,
             &args.method,
             &mut known_solution,
             args.turn_off_ui,
         );
         println!("{:?}", result);
-        if known_solution.len() > 1 {
-            println!("Honest Trace:\n   {}\n", PrettySet(repr_sets));
-            println!("Malicious Traces");
-            for k in &known_solution {
-                println!("  {}\n-------", k);
-            }
 
-            for a in vec![
-                "Empty",
-                "UnassignedOpcodeFlags",
-                "NonExclusiveOpcodeFlags",
-                "ContinueAfterStop",
-                "OverFlowWord",
-                "TerminateBeforeStop",
-            ] {
-                if known_solution.contains(a) {
-                    global_known_solution.insert(a.to_string());
+        // ######################## Per-Program Report ###############################
+        let map = bug_class_map.borrow();
+        if map.is_empty() {
+            println!("No malicious traces found for this program.");
+        } else {
+            println!("\nHonest Trace:\n{}\n", honest_repr);
+            let total_traces: usize = map.values().map(|v| v.len()).sum();
+            println!(
+                "=== Malicious Traces: {} trace(s) across {} bug class(es) ===\n",
+                total_traces,
+                map.len()
+            );
+            let ordered_classes: Vec<&str> = ALL_BUG_CLASSES
+                .iter()
+                .copied()
+                .chain(std::iter::once("Unknown"))
+                .collect();
+            for class in &ordered_classes {
+                if let Some(traces) = map.get(*class) {
+                    println!(
+                        "[{}]  ({} trace{})",
+                        class,
+                        traces.len(),
+                        if traces.len() == 1 { "" } else { "s" }
+                    );
+                    for (j, t) in traces.iter().enumerate() {
+                        println!("  -- Trace {} --\n{}", j + 1, t);
+                    }
+                    println!();
+                    global_found_classes.insert(class.to_string());
                 }
             }
         }
         println!("=============\n\n");
     }
+
+    // ######################## Global Bug Class Summary ##########################
+    println!("{}", "=".repeat(55));
+    println!("Global Bug Class Summary");
+    println!("{}", "=".repeat(55));
+    if global_found_classes.is_empty() {
+        println!("  Found   : none");
+    } else {
+        let mut found: Vec<&str> = ALL_BUG_CLASSES
+            .iter()
+            .copied()
+            .filter(|c| global_found_classes.contains(*c))
+            .collect();
+        if global_found_classes.contains("Unknown") {
+            found.push("Unknown");
+        }
+        println!("  Found   : {}", found.join(", "));
+    }
+    let not_found: Vec<&str> = ALL_BUG_CLASSES
+        .iter()
+        .copied()
+        .filter(|c| !global_found_classes.contains(*c))
+        .collect();
+    println!(
+        "  Missing : {}",
+        if not_found.is_empty() {
+            "none".to_string()
+        } else {
+            not_found.join(", ")
+        }
+    );
+    println!("{}", "=".repeat(55));
 
     Ok(())
 }
