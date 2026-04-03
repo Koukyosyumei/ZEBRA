@@ -184,7 +184,12 @@ fn main() -> Result<(), io::Error> {
             args.turn_off_ui,
         );
         println!("({} {} {} {} {}), {:?}", r1, r2, x, y, z, result);
-        ds.push(result.unwrap());
+        let r = result.unwrap();
+        let verified = r.is_verified();
+        ds.push(r);
+        if args.fail_fast && !verified {
+            break;
+        }
     }
     let report = generate_report(&ds);
     println!("{:?}", report);

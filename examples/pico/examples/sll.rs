@@ -48,7 +48,12 @@ fn main() -> Result<(), io::Error> {
     let _colmap = make_col_map();
 
     let (mut constraint_info, general_lookup_info) =
-        extract_constraints_and_range::<KoalaBear, SLLChip<KoalaBear>>(&air, NUM_SLL_COLS, prime, args.method == "bb" && !args.no_simplify);
+        extract_constraints_and_range::<KoalaBear, SLLChip<KoalaBear>>(
+            &air,
+            NUM_SLL_COLS,
+            prime,
+            args.method == "bb" && !args.no_simplify,
+        );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
         .refinable_cols
@@ -92,24 +97,6 @@ fn main() -> Result<(), io::Error> {
         let program = target_program(4, 4, x, y);
         let base_abs_main_trace_data = generate_abstract_trace(&program, air_name.to_string(), 1);
 
-        use zebra::constraint::eval_constraints;
-        use zebra::interval::AbstractInterval;
-        use zebra::trace::AbstractTrace;
-        let mut bam = base_abs_main_trace_data.clone();
-        let v = vec![
-            0, 64, 173, 148, 181, 82, 166, 64, 142, 215, 253, 78, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0,
-            0, 0, 0, 1, 0, 64, 64, 173, 148, 41, 45, 20, 41, 16, 0, 1, 0, 0, 1,
-        ];
-        for i in 0..search_config.minimum_num_taregt_cols {
-            bam[0][i] = AbstractInterval::from_i128(v[i]);
-        }
-        bam[0][9] = AbstractInterval { lo: 215, hi: 217 };
-        let at = AbstractTrace::new(bam);
-        println!("{}", at);
-        let result = eval_constraints(&at, None, &new_constraint_info.constraints, prime);
-
-        println!("{:?}", result);
-
         // ######################## Set Info ##########################################
         let program_info = ProgramInfo {
             program_str: get_program_str(&program),
@@ -124,7 +111,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             nop_post_process,
             &final_check,
             &args.method,
@@ -132,7 +123,12 @@ fn main() -> Result<(), io::Error> {
             args.turn_off_ui,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap());
+        let r = result.unwrap();
+        let verified = r.is_verified();
+        ds.push(r);
+        if args.fail_fast && !verified {
+            break;
+        }
     }
     let report = generate_report(&ds);
     println!("{:?}", report);

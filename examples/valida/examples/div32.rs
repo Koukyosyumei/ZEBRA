@@ -74,8 +74,8 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    println!("DIV AIR MAP");
-    println!("  {:?}", DIV_COL_MAP);
+    //println!("DIV AIR MAP");
+    //println!("  {:?}", DIV_COL_MAP);
 
     let air = Div32Chip::default();
     let num_col = NUM_DIV_COLS;
@@ -84,7 +84,11 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime, args.method == "bb" && !args.no_simplify,
+            &machine,
+            &air,
+            num_col,
+            prime,
+            args.method == "bb" && !args.no_simplify,
         );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
@@ -141,7 +145,12 @@ fn main() -> Result<(), io::Error> {
             args.turn_off_ui,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap());
+        let r = result.unwrap();
+        let verified = r.is_verified();
+        ds.push(r);
+        if args.fail_fast && !verified {
+            break;
+        }
     }
     let report = generate_report(&ds);
     println!("{:?}", report);

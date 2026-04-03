@@ -99,12 +99,15 @@ fn main() -> Result<(), io::Error> {
     let air: MemoryReadWriteChip<KoalaBear> = MemoryReadWriteChip::default();
     let air_name = "MemoryReadWrite";
     let _colmap = make_col_map();
-    println!("{:?}", _colmap);
+    //println!("{:?}", _colmap);
 
-    let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
-        KoalaBear,
-        MemoryReadWriteChip<KoalaBear>,
-    >(&air, NUM_MEMORY_CHIP_COLS, prime, args.method == "bb" && !args.no_simplify);
+    let (mut constraint_info, general_lookup_info) =
+        extract_constraints_and_range::<KoalaBear, MemoryReadWriteChip<KoalaBear>>(
+            &air,
+            NUM_MEMORY_CHIP_COLS,
+            prime,
+            args.method == "bb" && !args.no_simplify,
+        );
 
     let final_check = generate_memory_op_final_checker(
         1,                    // clk
@@ -176,7 +179,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             &nop_post_process,
             &final_check,
             &args.method,
@@ -184,7 +191,12 @@ fn main() -> Result<(), io::Error> {
             args.turn_off_ui,
         );
         println!("({} {} {} {} {}), {:?}", r1, r2, x, y, z, result);
-        ds.push(result.unwrap());
+        let r = result.unwrap();
+        let verified = r.is_verified();
+        ds.push(r);
+        if args.fail_fast && !verified {
+            break;
+        }
     }
     let report = generate_report(&ds);
     println!("{:?}", report);

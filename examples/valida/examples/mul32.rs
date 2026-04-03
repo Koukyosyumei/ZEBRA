@@ -77,8 +77,8 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    println!("MUL AIR MAP");
-    println!("  {:?}", MUL_COL_MAP);
+    //println!("MUL AIR MAP");
+    //println!("  {:?}", MUL_COL_MAP);
 
     let air = Mul32Chip::default();
     let num_col = NUM_MUL_COLS;
@@ -87,7 +87,11 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, mut general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime, args.method == "bb" && !args.no_simplify,
+            &machine,
+            &air,
+            num_col,
+            prime,
+            args.method == "bb" && !args.no_simplify,
         );
     general_lookup_info.op_a.extend(&[8, 9, 10, 11]);
     general_lookup_info.op_b.extend(&[0, 1, 2, 3]);
@@ -146,7 +150,12 @@ fn main() -> Result<(), io::Error> {
             args.turn_off_ui,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap());
+        let r = result.unwrap();
+        let verified = r.is_verified();
+        ds.push(r);
+        if args.fail_fast && !verified {
+            break;
+        }
     }
     let report = generate_report(&ds);
     println!("{:?}", report);

@@ -592,6 +592,7 @@ pub fn parallel_solve<PostProcessFn, FinalCheckFn>(
     start_time: &std::time::Instant,
     is_balanced: bool,
     is_backward_refine_on: bool,
+    tui_enabled: bool,
 ) -> (VerificationStatus, bool, bool)
 // (Found, Quit)
 where
@@ -815,7 +816,9 @@ where
         "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",
         refinable_cols, 0, 0, 1
     );
-    let _ = terminal.draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
+    if tui_enabled {
+        let _ = terminal.draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
+    }
     // 30 FPR = ~33ms
     let tick_rate = Duration::from_millis(50);
     let mut last_tick = std::time::Instant::now();
@@ -851,7 +854,7 @@ where
                         known_solution_area,
                     );
                     solution_found = true;
-                    if last_tick.elapsed() >= tick_rate {
+                    if tui_enabled && last_tick.elapsed() >= tick_rate {
                         let _ = terminal
                             .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
                         last_tick = std::time::Instant::now();
@@ -898,7 +901,7 @@ where
         // --------------------------------------------------------
         // 3. Update UI
         // --------------------------------------------------------
-        if last_tick.elapsed() >= tick_rate {
+        if tui_enabled && last_tick.elapsed() >= tick_rate {
             let _ = terminal.draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
             last_tick = std::time::Instant::now();
         }
@@ -1074,6 +1077,7 @@ pub fn run_parallel_solver<FinalCheckFn, PostProcessFn>(
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     sleep_time: &mut Duration,
+    tui_enabled: bool,
 ) -> (VerificationStatus, usize)
 where
     FinalCheckFn:
@@ -1141,6 +1145,7 @@ where
                 column_subset.len() == constraint_info.refinable_cols.len(),
                 search_config.enable_interval_refinement
                     && column_subset.len() == constraint_info.refinable_cols.len(),
+                tui_enabled,
             );
             last_verification_status = status;
 

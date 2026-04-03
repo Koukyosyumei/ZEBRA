@@ -128,8 +128,8 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Memory Constraints #######################
-    println!("MEM AIR MAP");
-    println!("  {:?}", MEM_COL_MAP);
+    //println!("MEM AIR MAP");
+    //println!("  {:?}", MEM_COL_MAP);
 
     let air = MemoryChip::default();
     let num_col = NUM_MEM_COLS;
@@ -191,7 +191,12 @@ fn main() -> Result<(), io::Error> {
             args.turn_off_ui,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap());
+        let r = result.unwrap();
+        let verified = r.is_verified();
+        ds.push(r);
+        if args.fail_fast && !verified {
+            break;
+        }
     }
     let report = generate_report(&ds);
     println!("{:?}", report);

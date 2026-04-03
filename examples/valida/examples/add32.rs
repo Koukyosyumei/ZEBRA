@@ -66,8 +66,8 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    println!("ADD AIR MAP");
-    println!("  {:?}", ADD_COL_MAP);
+    //println!("ADD AIR MAP");
+    //println!("  {:?}", ADD_COL_MAP);
 
     let air = Add32Chip::default();
     let num_col = NUM_ADD_COLS;
@@ -76,7 +76,11 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime, args.method == "bb" && !args.no_simplify,
+            &machine,
+            &air,
+            num_col,
+            prime,
+            args.method == "bb" && !args.no_simplify,
         );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     constraint_info
@@ -141,7 +145,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             nop_post_process,
             &final_check,
             &args.method,
@@ -149,7 +157,12 @@ fn main() -> Result<(), io::Error> {
             args.turn_off_ui,
         );
         println!("({} {}), {:?}", x, y, result);
-        ds.push(result.unwrap());
+        let r = result.unwrap();
+        let verified = r.is_verified();
+        ds.push(r);
+        if args.fail_fast && !verified {
+            break;
+        }
     }
     let report = generate_report(&ds);
     println!("{:?}", report);
