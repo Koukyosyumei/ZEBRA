@@ -26,6 +26,7 @@ use zebra::canonicalizer::save_repr_if_unique;
 use zebra::interval::AbstractInterval as AI;
 use zebra::interval::AbstractInterval;
 use zebra::interval::MayBeFlag;
+use zebra::memory::reconstruct_word;
 use zebra::memory::IntervalMemory;
 use zebra::memory::{check_memory_consistency, reconstruct_word as rec_word};
 use zebra::quick::{experiment_harness, load_config, Args, ProgramInfo};
@@ -98,13 +99,14 @@ fn check_bug_type(
                 }
             }
 
-            if MayBeFlag::True != trace.data[i][42].is_zero(prime) {
-                let v = trace.data[i][44].clone()
-                    + trace.data[i][45].clone()
-                    + trace.data[i][46].clone()
-                    + trace.data[i][47].clone();
-                if v.lo > prime as i128 {
-                    bug_types.insert("OverFlowWord".to_string());
+            if (MayBeFlag::True != trace.data[i][20].is_zero(prime))
+                || (MayBeFlag::True != trace.data[i][21].is_zero(prime))
+            {
+                if MayBeFlag::True != trace.data[i][42].is_zero(prime) {
+                    let v = reconstruct_word(&trace.data[i], 44, 4);
+                    if v.lo > prime as i128 {
+                        bug_types.insert("OverFlowWord".to_string());
+                    }
                 }
             }
         }
@@ -291,10 +293,10 @@ fn branch_program<Val: StarkField>(rng: &mut StdRng) -> Vec<IW<i32>> {
 
 pub fn generate_random_program(rng: &mut StdRng) -> Vec<IW<i32>> {
     let fs = vec![
-        imm_program::<BabyBear>,
-        alu_program::<BabyBear>,
+        //imm_program::<BabyBear>,
+        //alu_program::<BabyBear>,
         jal_program::<BabyBear>,
-        branch_program::<BabyBear>,
+        //branch_program::<BabyBear>,
     ];
     let f = fs.choose(rng).unwrap();
     f(rng)
@@ -327,7 +329,11 @@ fn main() -> Result<(), io::Error> {
     let machine = BasicMachine::<BabyBear>::default();
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BasicMachine<BabyBear>, MyConfig, _>(
-            &machine, &air, num_col, prime, args.method == "bb" && !args.no_simplify,
+            &machine,
+            &air,
+            num_col,
+            prime,
+            args.method == "bb" && !args.no_simplify,
         );
     constraint_info
         .refinable_cols
@@ -348,6 +354,7 @@ fn main() -> Result<(), io::Error> {
     let mut global_known_solution = HashSet::new();
 
     for i in 0..10 {
+        //0..args.num_trial {
         println!("\n\n===========");
         let program = generate_random_program(&mut rng);
         let program_str = program
@@ -411,7 +418,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             public_vals.clone(),
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             post_process,
             final_check,
             &args.method,
