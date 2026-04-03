@@ -334,7 +334,7 @@ fn main() -> Result<(), io::Error> {
     // Bug classes confirmed across all programs
     let mut global_found_classes: HashSet<String> = HashSet::new();
 
-    for i in 0..10 {
+    for i in 0..2 {
         //0..args.num_trial {
         println!("\n\n===========");
         let program = generate_random_program(&mut rng);
@@ -389,7 +389,7 @@ fn main() -> Result<(), io::Error> {
 
         // ######################## Solve ############################################
         // Per-program bug tracker: bug class -> list of malicious trace representations
-        let bug_class_map: Rc<RefCell<HashMap<String, Vec<String>>>> =
+        let bug_class_map: Rc<RefCell<HashMap<String, HashSet<String>>>> =
             Rc::new(RefCell::new(HashMap::new()));
         let bug_class_map_ref = Rc::clone(&bug_class_map);
 
@@ -423,22 +423,22 @@ fn main() -> Result<(), io::Error> {
                     if !is_new {
                         return;
                     }
-                }
 
-                // Associate this trace with its bug classes
-                let mut map = bug_class_map_ref.borrow_mut();
-                if bug_types.is_empty() {
-                    map.entry("Unknown".to_string())
-                        .or_default()
-                        .push(trace_repr.clone());
-                } else {
-                    for bt in &bug_types {
-                        map.entry(bt.clone())
+                    // Associate this trace with its bug classes
+                    let mut map = bug_class_map_ref.borrow_mut();
+                    if bug_types.is_empty() {
+                        map.entry("Unknown".to_string())
                             .or_default()
-                            .push(trace_repr.clone());
+                            .insert(trace_repr.clone());
+                    } else {
+                        for bt in &bug_types {
+                            map.entry(bt.clone())
+                                .or_default()
+                                .insert(trace_repr.clone());
+                        }
                     }
+                    drop(map);
                 }
-                drop(map);
 
                 save_repr_if_unique(&PrettySet(record_reprs), known_report, ui);
             };
