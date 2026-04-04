@@ -22,7 +22,7 @@ use zebra::ui::{pad_dummy_rows_with_last_dummy, UiState};
 use zebra::utils::create_or_clear_dir;
 use zebra::utils::PrettySet;
 
-use zebra_sphinx::pv_constraints::get_pv_constraints;
+use zebra_sphinx::pv_constraints::{get_pv_constraints, ShardPosition};
 use zebra_sphinx::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
 
 fn clk(row: &[AI]) -> AI {
@@ -159,7 +159,10 @@ fn main() -> Result<(), io::Error> {
     constraint_info
         .refinable_cols
         .retain(|x| !program_cols.contains(x));
-    let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints();
+    // Model the sphinx single-shard scenario: first (and only) shard has no halt check.
+    let pc_offset = prime - 4;
+    let (pv_pos_constraints, pv_neg_constraints) =
+        get_pv_constraints(ShardPosition::First { pc_start: pc_offset });
     constraint_info.constraints.pv_pos_constraints = pv_pos_constraints;
     constraint_info.constraints.pv_neg_constraints = pv_neg_constraints;
 
@@ -167,7 +170,6 @@ fn main() -> Result<(), io::Error> {
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     for i in 0..args.num_trial {
         search_config.seed = i as u64;
-        let pc_offset = prime - 4;
         let program = get_random_target_program(pc_offset, pc_offset, &mut rng);
 
         let base_abs_main_trace_data =
