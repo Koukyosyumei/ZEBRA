@@ -24,8 +24,8 @@ use crate::shrinker::{
     SelectorAddUConstraint, SelectorWordAssignConstraint,
 };
 use crate::symbolic::{
-    gather_boolean_variables, gather_vars, is_babybear_word_range,
-    is_boolean_constraint, is_iszero_operator, is_koalabear_word_range, ZEBRASymbolicExpr,
+    gather_boolean_variables, gather_vars, is_babybear_word_range, is_boolean_constraint,
+    is_iszero_operator, is_koalabear_word_range, ZEBRASymbolicExpr,
 };
 use crate::{
     constraint::{eval_constraints, ZEBRAConstraints},
@@ -855,8 +855,8 @@ where
                     );
                     solution_found = true;
                     if tui_enabled && last_tick.elapsed() >= tick_rate {
-                        let _ = terminal
-                            .draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
+                        let _ =
+                            terminal.draw(|f| ui.render::<CrosstermBackend<std::io::Stdout>>(f));
                         last_tick = std::time::Instant::now();
                     }
                 }

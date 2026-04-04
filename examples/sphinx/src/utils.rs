@@ -7,7 +7,9 @@ use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
 use sphinx_core::air::MachineAir;
-use sphinx_core::alu::{AddSubChip, BitwiseChip, DivRemChip, LtChip, MulChip, ShiftLeft, ShiftRightChip};
+use sphinx_core::alu::{
+    AddSubChip, BitwiseChip, DivRemChip, LtChip, MulChip, ShiftLeft, ShiftRightChip,
+};
 use sphinx_core::cpu::CpuChip;
 use sphinx_core::lookup::InteractionBuilder;
 use sphinx_core::runtime::{ExecutionRecord, Program, Runtime};
@@ -24,7 +26,11 @@ use crate::lookup::get_symbolic_lookup_constraints;
 use crate::p3_to_tv::convert_p3_expr;
 
 fn trace_to_rows(trace: p3_matrix::dense::RowMajorMatrix<BabyBear>) -> Vec<Vec<AbstractInterval>> {
-    let nrows = if trace.width > 0 { trace.values.len() / trace.width } else { 0 };
+    let nrows = if trace.width > 0 {
+        trace.values.len() / trace.width
+    } else {
+        0
+    };
     (0..nrows)
         .map(|i| {
             let start = i * trace.width;

@@ -23,24 +23,34 @@ use zebra::utils::create_or_clear_dir;
 use zebra::utils::PrettySet;
 
 use zebra_sphinx::pv_constraints::{get_pv_constraints, ShardPosition};
-use zebra_sphinx::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
+use zebra_sphinx::utils::{
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
+};
 
 fn clk(row: &[AI]) -> AI {
-    row[1].clone() + row[2].clone() * AI::from_i128(2_usize.pow(16) as i128)
+    // clk_16bit_limb: 4,  clk_8bit_limb: 5
+    row[4].clone() + row[5].clone() * AI::from_i128(2_usize.pow(16) as i128)
 }
 
 fn get_memory(trace: &AbstractTrace, prime: u32) -> Vec<(AI, AI, AI, bool)> {
     let mut ops = vec![];
     for row in &trace.data {
-        if MayBeFlag::True != row[56].is_zero(prime) {
-            if MayBeFlag::True != row[17].is_non_zero(prime) {
-                ops.push((clk(row), row[8].clone(), rec_word(row, 29, 4), true));
+        // is_real: 140
+        if MayBeFlag::True != row[140].is_zero(prime) {
+            // op_a is always written; register address in instruction.op_a (cols 9-12),
+            // new value in op_a_access.access.value (cols 64-67)
+            ops.push((clk(row), rec_word(row, 9, 4), rec_word(row, 64, 4), true));
+            // op_b read when not immediate (imm_b: 38)
+            // register address in instruction.op_b (cols 13-16),
+            // value in op_b_access.access.value (cols 73-76)
+            if MayBeFlag::True != row[38].is_non_zero(prime) {
+                ops.push((clk(row), rec_word(row, 13, 4), rec_word(row, 73, 4), false));
             }
-            if MayBeFlag::True != row[18].is_non_zero(prime) {
-                ops.push((clk(row), rec_word(row, 9, 4), rec_word(row, 38, 4), false));
-            }
-            if MayBeFlag::True != row[19].is_non_zero(prime) {
-                ops.push((clk(row), rec_word(row, 13, 4), rec_word(row, 47, 4), false));
+            // op_c read when not immediate (imm_c: 39)
+            // register address in instruction.op_c (cols 17-20),
+            // value in op_c_access.access.value (cols 82-85)
+            if MayBeFlag::True != row[39].is_non_zero(prime) {
+                ops.push((clk(row), rec_word(row, 17, 4), rec_word(row, 82, 4), false));
             }
         }
     }
@@ -59,9 +69,10 @@ fn final_check(
 ) {
     let mut record_reprs = HashSet::new();
     for row in &trace.data {
-        if MayBeFlag::True != row[56].is_zero(prime) {
+        // is_real: 140,  pc: 6
+        if MayBeFlag::True != row[140].is_zero(prime) {
             record_reprs
-                .insert(format!("\tins: (clk: {}, pc: {})", clk(row), row[5].clone()).to_string());
+                .insert(format!("\tins: (clk: {}, pc: {})", clk(row), row[6].clone()).to_string());
         }
     }
     for ms in &get_memory(trace, prime) {
@@ -95,14 +106,12 @@ fn opcode_from_u8(value: u8) -> Option<Opcode> {
         11 => Some(Opcode::MULH),
         12 => Some(Opcode::MULHU),
         13 => Some(Opcode::MULHSU),
-        14 => Some(Opcode::DIV),
-        15 => Some(Opcode::DIVU),
         _ => None,
     }
 }
 
 pub fn get_random_target_program(pc_start: u32, pc_base: u32, rng: &mut StdRng) -> Program {
-    let v = vec![0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, 15];
+    let v = vec![0, 1];
     let mut instructions = vec![Instruction::new(
         opcode_from_u8(*v.choose(rng).unwrap()).unwrap(),
         rng.random_range(0..32),
@@ -141,13 +150,19 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Prime and Column Settings ########################
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
-    let program_cols = (8..35).collect::<Vec<_>>();
+    let program_cols = (8..60).collect::<Vec<_>>();
     let num_extracted_rows = 8;
+
+    search_config.max_expansions = 3000;
+    search_config.time_out_ms = 10000;
+    search_config.seed = 41;
+    search_config.min_row_id = 0;
+    search_config.max_row_id = 6;
 
     // ######################## Extract CPU Constraints ##########################
     let air = CpuChip::default();
     let air_name = "CPU";
-    println!("{:?}", CPU_COL_MAP);
+    //println!("{:?}", CPU_COL_MAP);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, CpuChip>(
@@ -156,13 +171,18 @@ fn main() -> Result<(), io::Error> {
             prime,
             args.method == "bb" && !args.no_simplify,
         );
+    println!("{}", constraint_info.constraints.air_constraints[336]);
+    constraint_info.constraints.air_constraints.remove(336);
+
     constraint_info
         .refinable_cols
         .retain(|x| !program_cols.contains(x));
+    constraint_info.refinable_cols.push(140);
     // Model the sphinx single-shard scenario: first (and only) shard has no halt check.
-    let pc_offset = prime - 4;
-    let (pv_pos_constraints, pv_neg_constraints) =
-        get_pv_constraints(ShardPosition::First { pc_start: pc_offset });
+    let pc_offset = 4; //prime - 2;
+    let (pv_pos_constraints, pv_neg_constraints) = get_pv_constraints(ShardPosition::First {
+        pc_start: pc_offset,
+    });
     constraint_info.constraints.pv_pos_constraints = pv_pos_constraints;
     constraint_info.constraints.pv_neg_constraints = pv_neg_constraints;
 

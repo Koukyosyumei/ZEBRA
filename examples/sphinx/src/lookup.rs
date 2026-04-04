@@ -88,30 +88,26 @@ where
             InteractionKind::Program => {
                 general_lookup_info.is_real.push(multiplicities.clone());
             }
-            InteractionKind::Instruction => {
-                let _shard = &s.values[0];
-                let _clk = &s.values[1];
-                let pc = cv(&s.values[2]);
-                let next_pc = cv(&s.values[3]);
-                let opcode = cv(&s.values[5]);
+            InteractionKind::Alu => {
+                let opcode = cv(&s.values[0]);
 
                 let a = [
+                    cv(&s.values[1]),
+                    cv(&s.values[2]),
+                    cv(&s.values[3]),
+                    cv(&s.values[4]),
+                ];
+                let b = [
+                    cv(&s.values[5]),
                     cv(&s.values[6]),
                     cv(&s.values[7]),
                     cv(&s.values[8]),
-                    cv(&s.values[9]),
                 ];
-                let b = [
+                let c = [
+                    cv(&s.values[9]),
                     cv(&s.values[10]),
                     cv(&s.values[11]),
                     cv(&s.values[12]),
-                    cv(&s.values[13]),
-                ];
-                let c = [
-                    cv(&s.values[14]),
-                    cv(&s.values[15]),
-                    cv(&s.values[16]),
-                    cv(&s.values[17]),
                 ];
 
                 // ALU Constraints
@@ -133,7 +129,7 @@ where
                     let impl_constraint =
                         make_impl_constraint(t.0 as i128, &opcode, alu_constraint, prime);
                     if let Some(impl_constraint) = impl_constraint {
-                        for i in 6..18 {
+                        for i in 1..13 {
                             try_add_single_var_col(&s.values[i], u8_cols);
                         }
 
@@ -141,49 +137,6 @@ where
                             Box::new(multiplicities.clone()),
                             Box::new(impl_constraint),
                         ));
-                    }
-
-                    let pc_constraint = LExpr::Sub(
-                        Box::new(next_pc.clone()),
-                        Box::new(LExpr::Add(
-                            Box::new(pc.clone()),
-                            Box::new(LExpr::Constant(AbstractInterval::from_i128(4))),
-                        )),
-                    );
-                    let impl_pc_constraint =
-                        make_impl_constraint(t.0 as i128, &opcode, pc_constraint, prime);
-                    if let Some(impl_pc_constraint) = impl_pc_constraint {
-                        air_constraints.push(LExpr::Mul(
-                            Box::new(multiplicities.clone()),
-                            Box::new(impl_pc_constraint),
-                        ));
-                    }
-                }
-
-                // Branch Constraints
-                let tmps = vec![
-                    (Opcode::BEQ as u8, ControFLowOp::BEQ),
-                    (Opcode::BNE as u8, ControFLowOp::BNE),
-                    (Opcode::BGE as u8, ControFLowOp::BGE),
-                    (Opcode::BLT as u8, ControFLowOp::BLT),
-                    (Opcode::BGEU as u8, ControFLowOp::BGEU),
-                    (Opcode::BLTU as u8, ControFLowOp::BLTU),
-                    (Opcode::JAL as u8, ControFLowOp::JAL),
-                    (Opcode::JALR as u8, ControFLowOp::JALR),
-                ];
-                for t in tmps {
-                    let cf_constraints =
-                        get_control_flow_constraint(&pc, &next_pc, &a, &b, &c, &t.1, 4);
-
-                    for cfc in cf_constraints {
-                        let impl_constraint =
-                            make_impl_constraint(t.0 as i128, &opcode, cfc, prime);
-                        if let Some(impl_constraint) = impl_constraint {
-                            air_constraints.push(LExpr::Mul(
-                                Box::new(multiplicities.clone()),
-                                Box::new(impl_constraint),
-                            ));
-                        }
                     }
                 }
             }
