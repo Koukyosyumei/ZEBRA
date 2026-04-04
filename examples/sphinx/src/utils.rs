@@ -7,6 +7,7 @@ use p3_uni_stark::SymbolicAirBuilder;
 use p3_uni_stark::{get_symbolic_constraints, SymbolicExpression};
 
 use sphinx_core::air::MachineAir;
+use sphinx_core::alu::{AddSubChip, BitwiseChip, DivRemChip, LtChip, MulChip, ShiftLeft, ShiftRightChip};
 use sphinx_core::cpu::CpuChip;
 use sphinx_core::lookup::InteractionBuilder;
 use sphinx_core::runtime::{ExecutionRecord, Program, Runtime};
@@ -22,6 +23,19 @@ use zebra::{
 use crate::lookup::get_symbolic_lookup_constraints;
 use crate::p3_to_tv::convert_p3_expr;
 
+fn trace_to_rows(trace: p3_matrix::dense::RowMajorMatrix<BabyBear>) -> Vec<Vec<AbstractInterval>> {
+    let nrows = if trace.width > 0 { trace.values.len() / trace.width } else { 0 };
+    (0..nrows)
+        .map(|i| {
+            let start = i * trace.width;
+            trace.values[start..start + trace.width]
+                .iter()
+                .map(|v: &BabyBear| AbstractInterval::from_i128(v.as_canonical_u32() as i128))
+                .collect()
+        })
+        .collect()
+}
+
 pub fn run_sphinx_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterval>>)> {
     let mut runtime = Runtime::new(program.clone(), SphinxCoreOpts::default());
     let result = runtime.execute_record();
@@ -29,30 +43,28 @@ pub fn run_sphinx_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInt
         return vec![];
     }
     let (record, _done) = result.unwrap();
-
-    let chip = CpuChip::default();
     let mut output = ExecutionRecord::default();
-    let trace: p3_matrix::dense::RowMajorMatrix<BabyBear> =
-        chip.generate_trace(&record, &mut output);
 
-    let nrows = if trace.width > 0 {
-        trace.values.len() / trace.width
-    } else {
-        0
-    };
-    let mut rows = vec![];
-    for i in 0..nrows {
-        let start = i * trace.width;
-        let end = start + trace.width;
-        rows.push(
-            trace.values[start..end]
-                .iter()
-                .map(|v: &BabyBear| AbstractInterval::from_i128(v.as_canonical_u32() as i128))
-                .collect(),
-        );
+    macro_rules! chip_trace {
+        ($chip:ty) => {{
+            let chip = <$chip>::default();
+            let name = <$chip as MachineAir<BabyBear>>::name(&chip);
+            let trace: p3_matrix::dense::RowMajorMatrix<BabyBear> =
+                chip.generate_trace(&record, &mut output);
+            (name, trace_to_rows(trace))
+        }};
     }
 
-    vec![(<CpuChip as MachineAir<BabyBear>>::name(&chip), rows)]
+    vec![
+        chip_trace!(CpuChip),
+        chip_trace!(AddSubChip),
+        chip_trace!(BitwiseChip),
+        chip_trace!(DivRemChip),
+        chip_trace!(LtChip),
+        chip_trace!(MulChip),
+        chip_trace!(ShiftLeft),
+        chip_trace!(ShiftRightChip),
+    ]
 }
 
 pub fn get_program_str(program: &Program) -> String {
