@@ -58,7 +58,7 @@ where
 
     for r in &receives {
         match r.kind {
-            InteractionKind::Instruction => {
+            InteractionKind::Alu => {
                 general_lookup_info.is_real.push(cv(&r.multiplicity));
                 for rv in &r.values {
                     for c in &rv.column_weights {
@@ -67,13 +67,13 @@ where
                         }
                     }
                 }
-                for i in 6..10 {
+                for i in 1..5 {
                     try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_a);
                 }
-                for i in 10..14 {
+                for i in 5..9 {
                     try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_b);
                 }
-                for i in 14..18 {
+                for i in 9..13 {
                     try_add_single_var_col(&r.values[i], &mut general_lookup_info.op_c);
                 }
             }

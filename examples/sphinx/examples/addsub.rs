@@ -6,7 +6,7 @@ use std::io;
 
 use p3_baby_bear::BabyBear;
 
-use sphinx_core::alu::{AddSubCols, AddSubChip, NUM_ADD_SUB_COLS};
+use sphinx_core::alu::{AddSubChip, AddSubCols, NUM_ADD_SUB_COLS};
 use sphinx_core::runtime::{Instruction, Opcode, Program};
 
 use zebra::canonicalizer::save_repr_if_unique;
@@ -20,17 +20,19 @@ use zebra::ui::UiState;
 use zebra::utils::PrettySet;
 use zebra::utils::{create_or_clear_dir, indices_arr};
 
-use zebra_sphinx::utils::{extract_constraints_and_range, generate_abstract_trace, get_program_str};
+use zebra_sphinx::utils::{
+    extract_constraints_and_range, generate_abstract_trace, get_program_str,
+};
 
 fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
     for i in 0..trace.data.len() {
-        if trace.data[i][17].is_zero(prime) != MayBeFlag::True {
+        if trace.data[i][18].is_zero(prime) != MayBeFlag::True {
             record_reprs.insert(format!(
                 "input0: [{}], input1: [{}], output: [{}]",
-                trace_fmt_with_idxs(trace, 0, &[8, 9, 10, 11]),
-                trace_fmt_with_idxs(trace, 0, &[12, 13, 14, 15]),
-                trace_fmt_with_idxs(trace, 0, &[1, 2, 3, 4]),
+                trace_fmt_with_idxs(trace, 0, &[10, 11, 12, 13]),
+                trace_fmt_with_idxs(trace, 0, &[14, 15, 16, 17]),
+                trace_fmt_with_idxs(trace, 0, &[3, 4, 5, 6]),
             ));
         };
     }
@@ -40,12 +42,12 @@ fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
 fn cr_sub(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
     for i in 0..trace.data.len() {
-        if trace.data[i][18].is_zero(prime) != MayBeFlag::True {
+        if trace.data[i][19].is_zero(prime) != MayBeFlag::True {
             record_reprs.insert(format!(
                 "input0: [{}], input1: [{}], output: [{}]",
-                trace_fmt_with_idxs(trace, 1, &[1, 2, 3, 4]),
-                trace_fmt_with_idxs(trace, 1, &[12, 13, 14, 15]),
-                trace_fmt_with_idxs(trace, 1, &[8, 9, 10, 11]),
+                trace_fmt_with_idxs(trace, 1, &[3, 4, 5, 6]),
+                trace_fmt_with_idxs(trace, 1, &[14, 15, 16, 17]),
+                trace_fmt_with_idxs(trace, 1, &[10, 11, 12, 13]),
             ));
         };
     }
@@ -105,11 +107,16 @@ fn main() -> Result<(), io::Error> {
     let air = AddSubChip::default();
     let air_name = "AddSub";
     let _colmap = make_col_map();
+    println!("{:?}", _colmap.add_operation);
+    println!("{:?}", _colmap.operand_1);
+    println!("{:?}", _colmap.operand_2);
+    println!("{:?}", _colmap.is_add);
+    println!("{:?}", _colmap.is_sub);
 
     let (output_columns, num_extracted_rows, min_row_id, max_row_id) = if opcode_str == "ADD" {
-        (vec![1, 2, 3, 4], 1, 0, 0)
+        (vec![3, 4, 5, 6], 1, 0, 0)
     } else {
-        (vec![8, 9, 10, 11], 2, 1, 1)
+        (vec![10, 11, 12, 13], 2, 1, 1)
     };
 
     let (mut constraint_info, _general_lookup_info) =
@@ -133,11 +140,11 @@ fn main() -> Result<(), io::Error> {
             use zebra::solver::RangeType;
             let mut rng = StdRng::seed_from_u64(search_config.seed);
             let op_b = if opcode_str == "ADD" {
-                vec![8, 9, 10, 11]
+                vec![10, 11, 12, 13]
             } else {
-                vec![1, 2, 3, 4]
+                vec![3, 4, 5, 6]
             };
-            let op_c = vec![12, 13, 14, 15];
+            let op_c = vec![14, 15, 16, 17];
             let b = op_b.choose(&mut rng).unwrap();
             let c = op_c.choose(&mut rng).unwrap();
             let b_lo = rng.random_range(0..(255 - args.range_interval));
