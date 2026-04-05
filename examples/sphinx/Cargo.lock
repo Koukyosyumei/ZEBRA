@@ -676,9 +676,9 @@ dependencies = [
 
 [[package]]
 name = "fastrand"
-version = "2.3.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+checksum = "a043dc74da1e37d6afe657061213aa6f425f855399a11d3463c6ecccc4dfda1f"
 
 [[package]]
 name = "ff"
@@ -2172,7 +2172,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 [[package]]
 name = "sphinx-core"
 version = "1.0.0"
-source = "git+https://github.com/Koukyosyumei/sphinx?branch=latticevm#199fad1a144988fd5f5c2725d062b1c0ebdc11b8"
+source = "git+https://github.com/Koukyosyumei/sphinx?branch=latticevm#1d720dcc0dedd47d85e236a216cc333b524bd325"
 dependencies = [
  "anyhow",
  "arrayref",
@@ -2234,7 +2234,7 @@ dependencies = [
 [[package]]
 name = "sphinx-derive"
 version = "1.0.0"
-source = "git+https://github.com/Koukyosyumei/sphinx?branch=latticevm#199fad1a144988fd5f5c2725d062b1c0ebdc11b8"
+source = "git+https://github.com/Koukyosyumei/sphinx?branch=latticevm#1d720dcc0dedd47d85e236a216cc333b524bd325"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2257,7 +2257,7 @@ dependencies = [
 [[package]]
 name = "sphinx-primitives"
 version = "1.0.0"
-source = "git+https://github.com/Koukyosyumei/sphinx?branch=latticevm#199fad1a144988fd5f5c2725d062b1c0ebdc11b8"
+source = "git+https://github.com/Koukyosyumei/sphinx?branch=latticevm#1d720dcc0dedd47d85e236a216cc333b524bd325"
 dependencies = [
  "itertools 0.12.1",
  "lazy_static",
