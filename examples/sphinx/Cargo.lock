@@ -2172,6 +2172,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 [[package]]
 name = "sphinx-core"
 version = "1.0.0"
+source = "git+https://github.com/Koukyosyumei/sphinx?branch=latticevm#199fad1a144988fd5f5c2725d062b1c0ebdc11b8"
 dependencies = [
  "anyhow",
  "arrayref",
@@ -2233,6 +2234,7 @@ dependencies = [
 [[package]]
 name = "sphinx-derive"
 version = "1.0.0"
+source = "git+https://github.com/Koukyosyumei/sphinx?branch=latticevm#199fad1a144988fd5f5c2725d062b1c0ebdc11b8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2255,6 +2257,7 @@ dependencies = [
 [[package]]
 name = "sphinx-primitives"
 version = "1.0.0"
+source = "git+https://github.com/Koukyosyumei/sphinx?branch=latticevm#199fad1a144988fd5f5c2725d062b1c0ebdc11b8"
 dependencies = [
  "itertools 0.12.1",
  "lazy_static",

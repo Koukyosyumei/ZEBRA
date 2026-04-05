@@ -37,7 +37,7 @@ p3-keccak-air = { git = "https://github.com/argumentcomputer/Plonky3.git", branc
 p3-blake3 = { git = "https://github.com/argumentcomputer/Plonky3.git", branch = "sp1" }
 p3-mds = { git = "https://github.com/argumentcomputer/Plonky3.git", branch = "sp1" }
 p3-maybe-rayon = { git = "https://github.com/argumentcomputer/Plonky3.git", branch = "sp1" }
-sphinx-core = { path = "../../../sphinx/core" }
+sphinx-core = { git = "https://github.com/Koukyosyumei/sphinx", branch="latticevm"}
 bincode = "1.3.3"
 ratatui = "0.29"
 crossterm = "0.29"
