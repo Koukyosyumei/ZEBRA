@@ -56,6 +56,11 @@ VMS = {
         "cmap": "Purples",
         "c_range": (0.45, 0.80),
     },
+    "sphinx": {
+        "chips": ["addsub", "bitwise", "mul", "divrem", "lt", "shiftleft", "sr"],
+        "cmap": "Oranges",
+        "c_range": (0.35, 0.90),
+    },
 }
 
 # Line styles and markers cycle within a chip (one per opcode).

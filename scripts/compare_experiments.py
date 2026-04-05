@@ -136,6 +136,18 @@ VM_REGISTRY: Dict[str, Dict] = {
             "lt32":     ["LT"],     # --opcode-str ignored
         },
     },
+    "sphinx": {
+        "dir": "examples/sphinx",
+        "chips": {
+            "addsub":    ["ADD", "SUB"],
+            "bitwise":   ["AND", "OR", "XOR"],
+            "mul":       ["MUL", "MULH", "MULHU", "MULHSU"],
+            "divrem":    ["DIV", "DIVU", "REM", "REMU"],
+            "lt":        ["SLT", "SLTU"],
+            "shiftleft": ["SLL"],   # --opcode-str ignored
+            "sr":        ["SRL", "SRA"],
+        },
+    },
 }
 
 STANDARD_METHODS = ["bb", "bb_blocking", "z3"]
