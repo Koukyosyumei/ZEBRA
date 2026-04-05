@@ -225,7 +225,7 @@ class VMRow:
 def _write_temp_config(
     timeout_ms: int,
     seed: int,
-    num_workers: int = 12,
+    num_workers: int = 4,
     max_expansions: int = 30_000_000,
 ) -> str:
     cfg = {
@@ -333,7 +333,7 @@ def run_opcode(
     base_seed:       int,
     out_root:        Path,
     verbose:         bool = True,
-    cfg_num_workers: int  = 12,
+    cfg_num_workers: int  = 4,
     tolerance:       int  = 0,
 ) -> OpcodeResult:
     """
