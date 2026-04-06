@@ -70,7 +70,7 @@ CHIP_OPCODES[branch]="BEQ BNE BGEZ BGTZ BLEZ BLTZ"
 CHIPS=(addsub bitwise cloclz movcond mul shiftleft shiftright divrem lt memoryreadwrite jump branch)
 
 # ── experiment parameters ─────────────────────────────────────────────────────
-WORKER_COUNTS=(8 6 4 2 1)
+WORKER_COUNTS=(4 3 2 1)
 RANGE_INTERVALS=(0 1 7 31 127)
 
 # ── parallel job pool ─────────────────────────────────────────────────────────

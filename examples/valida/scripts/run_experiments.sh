@@ -65,7 +65,7 @@ CHIP_OPCODES[sub32]="SUB"
 CHIPS=(add32 sub32 mul32 div32 bitwise32 com32 lt32 memory)
 
 # ── experiment parameters ─────────────────────────────────────────────────────
-WORKER_COUNTS=(8 6 4 2 1)
+WORKER_COUNTS=(4 3 2 1)
 RANGE_INTERVALS=(0 1 7 31 127)
 
 # ── parallel job pool ─────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ZEBRA Pico Experiment Runner
+# ZEBRA Sphinx Experiment Runner
 #
 # Experiment 1 – Worker sweep  : vary num_workers = {8,6,4,2,1} (high → low)
 #                                with --range-interval 0 (single-point)
@@ -15,7 +15,7 @@
 #     worker_sweep/<chip>/workers_<N>/<OPCODE>.yaml
 #     range_sweep/<chip>/range_<R>/<OPCODE>.yaml
 #
-# Usage (run from examples/pico/):
+# Usage (run from examples/sphinx/):
 #   bash scripts/run_experiments.sh [--num-trial N] [--timeout-ms T]
 #                                   [--workers W]
 #                                   [--only-worker-sweep]
@@ -25,7 +25,7 @@ set -euo pipefail
 
 # ── defaults ──────────────────────────────────────────────────────────────────
 NUM_TRIALS=5
-TIMEOUT_MS=10000000
+TIMEOUT_MS=1000000
 MAX_EXPANSIONS=30000000
 FIXED_WORKERS=1      # num_workers inside each range-sweep experiment
 BASE_SEED=41
@@ -52,18 +52,17 @@ RESULTS_DIR="$VM_DIR/report"
 BIN_DIR="$VM_DIR/target/release/examples"
 
 # ── chip → opcode list ────────────────────────────────────────────────────────
-# sll/sr binaries ignore --opcode-str; the label is used only for filenames.
+# shiftleft ignores --opcode-str; "SLL" is used only as a filename label.
 declare -A CHIP_OPCODES
 CHIP_OPCODES[addsub]="ADD SUB"
 CHIP_OPCODES[bitwise]="AND OR XOR"
 CHIP_OPCODES[mul]="MUL MULH MULHU MULHSU"
 CHIP_OPCODES[divrem]="DIV DIVU REM REMU"
-CHIP_OPCODES[lessthan]="SLT SLTU"
-CHIP_OPCODES[sll]="SLL"
-CHIP_OPCODES[sr]="SRL"
-CHIP_OPCODES[memoryreadwrite]="LB LBU LH LHU LW SB SH SW"
+CHIP_OPCODES[lt]="SLT SLTU"
+CHIP_OPCODES[shiftleft]="SLL"
+CHIP_OPCODES[sr]="SRL SRA"
 
-CHIPS=(addsub bitwise mul divrem lessthan sll sr memoryreadwrite)
+CHIPS=(addsub bitwise mul divrem lt shiftleft sr)
 
 # ── experiment parameters ─────────────────────────────────────────────────────
 WORKER_COUNTS=(4 3 2 1)
