@@ -27,7 +27,7 @@ set -euo pipefail
 NUM_TRIALS=5
 TIMEOUT_MS=10000000
 MAX_EXPANSIONS=30000000
-FIXED_WORKERS=1      # num_workers inside each range-sweep experiment
+FIXED_WORKERS=4      # num_workers inside each range-sweep experiment
 BASE_SEED=41
 PARALLEL_JOBS=1      # number of experiments to run simultaneously
 RUN_WORKER_SWEEP=1
