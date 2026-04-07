@@ -235,6 +235,16 @@ def _plot_vm_ax(
                             capsize=3, capthick=1.0, elinewidth=0.9, alpha=0.7)
                 """
 
+    # y = x reference line
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    ref_lo = max(xlim[0], ylim[0])
+    ref_hi = min(xlim[1], ylim[1])
+    if ref_lo < ref_hi:
+        ref_pts = np.linspace(ref_lo, ref_hi, 300)
+        ax.plot(ref_pts, ref_pts, color="black", linestyle="--", linewidth=1.0,
+                alpha=0.45, label="y = x", zorder=0)
+
     ax.set_title(vm_name, fontsize=11, fontweight="bold")
     ax.set_yscale("log")
     ax.yaxis.set_major_formatter(
@@ -319,7 +329,7 @@ def main() -> None:
 
     sweeps = [
         ("worker_sweep", "Number of workers",          f"worker_sweep_{gran}.pdf"),
-        ("range_sweep",  "Search volume  (x+1)²",      f"range_sweep_{gran}.pdf"),
+        ("range_sweep",  "input volume",                 f"range_sweep_{gran}.pdf"),
     ]
 
     for sweep_type, x_label, fname in sweeps:
