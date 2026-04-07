@@ -181,6 +181,7 @@ def _plot_vm_ax(
     granularity: str = "opcode",   # "chip" | "opcode"
     x_transform = None,            # optional callable: raw param → display value
     x_log:       bool = False,     # use log scale on x-axis
+    draw_yx:     bool = False,     # draw y = x reference line
 ) -> None:
     """Draw lines for one VM onto *ax*, at chip or opcode granularity."""
     xfn = x_transform if x_transform is not None else (lambda v: v)
@@ -235,15 +236,16 @@ def _plot_vm_ax(
                             capsize=3, capthick=1.0, elinewidth=0.9, alpha=0.7)
                 """
 
-    # y = x reference line
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
-    ref_lo = max(xlim[0], ylim[0])
-    ref_hi = min(xlim[1], ylim[1])
-    if ref_lo < ref_hi:
-        ref_pts = np.linspace(ref_lo, ref_hi, 300)
-        ax.plot(ref_pts, ref_pts, color="black", linestyle="--", linewidth=1.0,
-                alpha=0.45, label="y = x", zorder=0)
+    # y = x reference line (range sweep only)
+    if draw_yx:
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        ref_lo = max(xlim[0], ylim[0])
+        ref_hi = min(xlim[1], ylim[1])
+        if ref_lo < ref_hi:
+            ref_pts = np.linspace(ref_lo, ref_hi, 300)
+            ax.plot(ref_pts, ref_pts, color="black", linestyle="--", linewidth=1.0,
+                    alpha=0.45, label="y = x", zorder=0)
 
     ax.set_title(vm_name, fontsize=11, fontweight="bold")
     ax.set_yscale("log")
@@ -284,7 +286,8 @@ def plot_sweep(
 
         _plot_vm_ax(ax, vm_name, vm_cfg, sweep_data, granularity=granularity,
                     x_transform=x_transform,
-                    x_log=(sweep_type == "range_sweep"))
+                    x_log=(sweep_type == "range_sweep"),
+                    draw_yx=(sweep_type == "range_sweep"))
         ax.set_xlabel(x_label, fontsize=13)
 
     axes[0].set_ylabel("Mean verification time (s)  [log]", fontsize=13)
