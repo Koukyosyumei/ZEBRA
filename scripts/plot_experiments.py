@@ -245,7 +245,7 @@ def _plot_vm_ax(
         ax.xaxis.set_major_formatter(plt.matplotlib.ticker.ScalarFormatter())
     ax.grid(True, which="both", axis="y", linestyle=":", linewidth=0.5, alpha=0.6)
     ax.tick_params(labelsize=11)
-    ax.legend(fontsize=9, loc="best", bbox_to_anchor=(1.0, 1.0),
+    ax.legend(fontsize=9, loc="best",
               framealpha=0.85, handlelength=2.0)
 
     if not sweep_data:
