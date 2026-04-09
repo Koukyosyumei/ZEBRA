@@ -319,7 +319,7 @@ def main() -> None:
 
     sweeps = [
         ("worker_sweep", "Number of workers",          f"worker_sweep_{gran}.pdf"),
-        ("range_sweep",  "input volume",                 f"range_sweep_{gran}.pdf"),
+        ("range_sweep",  "verified input volume",                 f"range_sweep_{gran}.pdf"),
     ]
 
     for sweep_type, x_label, fname in sweeps:
