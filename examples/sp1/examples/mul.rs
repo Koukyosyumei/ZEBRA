@@ -71,6 +71,9 @@ fn main() -> Result<(), io::Error> {
     for i in &constraint_info.output_columns {
         constraint_info.range_types.insert(*i, RangeType::U8);
     }
+    search_config.priority_cols = [general_lookup_info.op_b.clone(), general_lookup_info.op_c.clone()].concat();
+    search_config.priority_col_weight = 3;
+
     if search_config.minimum_num_taregt_cols == 0 {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }

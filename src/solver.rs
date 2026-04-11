@@ -222,6 +222,13 @@ pub struct SearchConfig {
     pub seed: u64,
     pub enable_heuristic: bool,
     pub enable_interval_refinement: bool,
+    /// Columns that should be split with higher priority during refinement.
+    /// These columns are repeated `priority_col_weight` times in the weighted
+    /// target list, increasing their probability of being selected.
+    pub priority_cols: Vec<usize>,
+    /// Number of times each priority column is repeated in the weighted target
+    /// list. A value of 1 (the default) disables the prioritization.
+    pub priority_col_weight: usize,
 }
 
 impl Default for SearchConfig {
@@ -236,6 +243,8 @@ impl Default for SearchConfig {
             seed: 41,
             enable_heuristic: true,
             enable_interval_refinement: true,
+            priority_cols: vec![],
+            priority_col_weight: 1,
         }
     }
 }
@@ -327,6 +336,8 @@ fn process_single_node(
     is_balanced: bool,
     is_backward_refine_on: bool,
     enable_heuristic: bool,
+    priority_cols: &[usize],
+    priority_col_weight: usize,
 ) -> NodeProcessingResult {
     let mut main_trace = head.main_trace;
 
@@ -383,6 +394,17 @@ fn process_single_node(
     }
 
     // 2. Generate Children
+    let weighted_main_targets = {
+        let mut targets = refinment_target_indicies_main.to_vec();
+        if priority_col_weight > 1 {
+            for &col in priority_cols {
+                for _ in 1..priority_col_weight {
+                    targets.push(col);
+                }
+            }
+        }
+        targets
+    };
     let refined_main_candidates = {
         let (refined_main_candidates, refined_flag) = refine_trace(
             &main_trace,
@@ -398,7 +420,7 @@ fn process_single_node(
         } else {
             refine_trace(
                 &main_trace,
-                &refinment_target_indicies_main.to_vec(),
+                &weighted_main_targets,
                 min_row_id,
                 max_row_id,
                 prime,
@@ -700,6 +722,8 @@ where
         let c_saddu = selector_addu_constraints.clone();
         let c_swa = selector_word_assign_constraints.clone();
         let c_align = post_process.clone();
+        let c_priority_cols = search_config.priority_cols.clone();
+        let c_priority_col_weight = search_config.priority_col_weight;
         thread::spawn(move || {
             let mut rng = StdRng::seed_from_u64(search_config.seed + wid as u64);
             // Time-based throttling to prevent freezing
@@ -770,6 +794,8 @@ where
                     is_balanced,
                     is_backward_refine_on,
                     search_config.enable_heuristic,
+                    &c_priority_cols,
+                    c_priority_col_weight,
                 );
 
                 match result {

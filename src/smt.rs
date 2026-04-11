@@ -274,10 +274,50 @@ pub fn expr_to_smt(
 
     // ranges
     for (j, k) in range_types {
-        if let RangeType::U8 = k {
-            for i in 0..n_rows {
-                smt.push_str(&format!("(assert (<= trace_{}_{} 255))\n", i, j,));
-                smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j,));
+        match k {
+            RangeType::Bool => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!("(assert (<= trace_{}_{} 1))\n", i, j));
+                    smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j));
+                }
+            }
+            RangeType::U4 => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!("(assert (<= trace_{}_{} 15))\n", i, j));
+                    smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j));
+                }
+            }
+            RangeType::U7 => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!("(assert (<= trace_{}_{} 126))\n", i, j));
+                    smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j));
+                }
+            }
+            RangeType::U8 => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!("(assert (<= trace_{}_{} 255))\n", i, j));
+                    smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j));
+                }
+            }
+            RangeType::U16 => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!("(assert (<= trace_{}_{} 65535))\n", i, j));
+                    smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j));
+                }
+            }
+            RangeType::Const(val) => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!("(assert (= trace_{}_{} {}))\n", i, j, val));
+                }
+            }
+            RangeType::Any(lo, hi) => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!("(assert (<= {} trace_{}_{}))\n", lo, i, j));
+                    smt.push_str(&format!("(assert (<= trace_{}_{} {}))\n", i, j, hi));
+                }
+            }
+            RangeType::Top => {
+                // Unbounded — no additional assertion needed
             }
         }
     }
@@ -778,23 +818,125 @@ pub fn expr_to_smt_bv(
     }
 
     for (j, k) in range_types {
-        if let RangeType::U16 = k {
-            for i in 0..n_rows {
-                smt.push_str(&format!("(assert (bvule trace_{}_{} #x0000ffff))\n", i, j,));
+        match k {
+            RangeType::Bool => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!(
+                        "(assert (bvule trace_{}_{} #x00000001))\n",
+                        i, j
+                    ));
+                }
             }
-        }
-        if let RangeType::U8 = k {
-            for i in 0..n_rows {
-                smt.push_str(&format!("(assert (bvule trace_{}_{} #x000000ff))\n", i, j,));
+            RangeType::U4 => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!(
+                        "(assert (bvule trace_{}_{} #x0000000f))\n",
+                        i, j
+                    ));
+                }
             }
-        }
-        if let RangeType::U7 = k {
-            for i in 0..n_rows {
-                smt.push_str(&format!("(assert (bvule trace_{}_{} #x0000007f))\n", i, j,));
+            RangeType::U7 => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!(
+                        "(assert (bvule trace_{}_{} #x0000007f))\n",
+                        i, j
+                    ));
+                }
+            }
+            RangeType::U8 => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!(
+                        "(assert (bvule trace_{}_{} #x000000ff))\n",
+                        i, j
+                    ));
+                }
+            }
+            RangeType::U16 => {
+                for i in 0..n_rows {
+                    smt.push_str(&format!(
+                        "(assert (bvule trace_{}_{} #x0000ffff))\n",
+                        i, j
+                    ));
+                }
+            }
+            RangeType::Const(val) => {
+                let hex = format!("#x{:08x}", (*val as u32));
+                for i in 0..n_rows {
+                    smt.push_str(&format!("(assert (= trace_{}_{} {}))\n", i, j, hex));
+                }
+            }
+            RangeType::Any(lo, hi) => {
+                let lo_hex = format!("#x{:08x}", (*lo as u32));
+                let hi_hex = format!("#x{:08x}", (*hi as u32));
+                for i in 0..n_rows {
+                    smt.push_str(&format!(
+                        "(assert (bvuge trace_{}_{} {}))\n",
+                        i, j, lo_hex
+                    ));
+                    smt.push_str(&format!(
+                        "(assert (bvule trace_{}_{} {}))\n",
+                        i, j, hi_hex
+                    ));
+                }
+            }
+            RangeType::Top => {
+                // Already bounded by the global bvule P assertions above
             }
         }
     }
 
     smt.push_str("(check-sat)\n(get-model)\n");
     smt
+}
+
+/// Parse a Z3 bitvector model and extract the concrete `u32` value assigned to
+/// each requested trace variable `trace_{row}_{col}`.
+///
+/// Z3's `(get-model)` emits lines of the form:
+/// ```text
+/// (define-fun trace_0_5 () (_ BitVec 32) #x00000003)
+/// ```
+/// The hex literal may appear on the same line or the following line.
+/// Only columns actually present in the model are returned.
+pub fn parse_bv_model(stdout: &str, row: usize, cols: &[usize]) -> Vec<(usize, u32)> {
+    let mut result = Vec::with_capacity(cols.len());
+    for &col in cols {
+        let needle = format!("define-fun trace_{}_{} ()", row, col);
+        if let Some(pos) = stdout.find(&needle) {
+            let tail = &stdout[pos..];
+            if let Some(hex_start) = tail.find("#x") {
+                let hex_digits = &tail[hex_start + 2..];
+                let end = hex_digits
+                    .find(|c: char| !c.is_ascii_hexdigit())
+                    .unwrap_or(hex_digits.len())
+                    .min(8);
+                if let Ok(val) = u32::from_str_radix(&hex_digits[..end], 16) {
+                    result.push((col, val));
+                }
+            }
+        }
+    }
+    result
+}
+
+/// Build an SMT-LIB2 blocking clause that rules out the exact bitvector
+/// assignment described by `col_vals` on row `row`.
+///
+/// * Single column  → `(assert (not (= trace_R_C #x...)))`
+/// * Multiple columns → `(assert (not (and (= trace_R_C1 #x...) ...)))`
+///
+/// Returns an empty string when `col_vals` is empty.
+pub fn build_blocking_clause(row: usize, col_vals: &[(usize, u32)]) -> String {
+    if col_vals.is_empty() {
+        return String::new();
+    }
+    let eqs: Vec<String> = col_vals
+        .iter()
+        .map(|(col, val)| format!("(= trace_{}_{} #x{:08x})", row, col, val))
+        .collect();
+    if eqs.len() == 1 {
+        format!("(assert (not {}))\n", eqs[0])
+    } else {
+        format!("(assert (not (and {})))\n", eqs.join(" "))
+    }
 }

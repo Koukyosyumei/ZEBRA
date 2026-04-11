@@ -59,7 +59,12 @@ fn main() -> Result<(), io::Error> {
     // println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
-        extract_constraints_and_range::<BabyBear, MulChip>(&air, NUM_MUL_COLS, prime, args.method == "bb" && !args.no_simplify);
+        extract_constraints_and_range::<BabyBear, MulChip>(
+            &air,
+            NUM_MUL_COLS,
+            prime,
+            args.method == "bb" && !args.no_simplify,
+        );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
     //println!("{:?}", general_lookup_info);
 
@@ -67,7 +72,18 @@ fn main() -> Result<(), io::Error> {
         .refinable_cols
         .extend(&general_lookup_info.op_a.clone());
     constraint_info.refinable_cols.retain(|a| *a < 42);
+    constraint_info.refinable_cols.push(2);
+    constraint_info.refinable_cols.push(3);
+    constraint_info.refinable_cols.push(4);
+    constraint_info.refinable_cols.push(5); //46, 47, 48, 49
+    constraint_info.refinable_cols.push(46);
+    constraint_info.refinable_cols.push(47);
+    constraint_info.refinable_cols.push(48);
+    constraint_info.refinable_cols.push(49);
+
     constraint_info.output_columns = general_lookup_info.op_a.clone();
+    search_config.priority_cols = [general_lookup_info.op_b.clone(), general_lookup_info.op_c.clone()].concat();
+    search_config.priority_col_weight = 6;
     for i in &constraint_info.output_columns {
         constraint_info.range_types.insert(*i, RangeType::U8);
     }
@@ -124,7 +140,11 @@ fn main() -> Result<(), io::Error> {
             &search_config,
             &base_abs_main_trace_data,
             vec![],
-            &if args.blocking_closure && args.range_interval == 0 { vec![0usize] } else { vec![] },
+            &if args.blocking_closure && args.range_interval == 0 {
+                vec![0usize]
+            } else {
+                vec![]
+            },
             nop_post_process,
             &final_check,
             &args.method,
