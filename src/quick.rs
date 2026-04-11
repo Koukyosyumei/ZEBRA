@@ -139,7 +139,28 @@ where
             .iter()
             .map(|&j| (0, j, base_abs_main_trace_data[0][j].clone()))
             .collect();
-        let smt_str = expr_to_smt_bv(
+
+        // Columns to block after each found solution: the free input columns
+        // (those given an Any range by --range-interval) so the solver is
+        // forced to find a *different* input assignment on each iteration.
+        // This replicates what B&B does by continuing its search after each
+        // found trace.
+        use crate::solver::RangeType;
+        let block_cols: Vec<usize> = constraint_info
+            .range_types
+            .iter()
+            .filter_map(|(j, k)| {
+                if matches!(k, RangeType::Any(..)) {
+                    Some(*j)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Generate the base formula once; strip the trailing check-sat/get-model
+        // so we can insert per-iteration blocking clauses before them.
+        let base_smt = expr_to_smt_bv(
             &constraint_info.constraints,
             &constants,
             &neg_constants,
@@ -149,36 +170,101 @@ where
             constraint_info.num_pv_columns,
             constraint_info.prime,
         );
+        const CHECK_SUFFIX: &str = "(check-sat)\n(get-model)\n";
+        let base_without_check = base_smt
+            .strip_suffix(CHECK_SUFFIX)
+            .unwrap_or(&base_smt);
+
         let smt_file_path = "voutput/smt_query.smt2";
-        let mut file = File::create(smt_file_path).expect("Failed to create SMT file");
-        file.write_all(smt_str.as_bytes())
-            .expect("Failed to write SMT string to file");
-
-        // ######################### Query SMT solver ###############################
         let start_time = time::Instant::now();
-        let output = Command::new(verification_method)
-            .arg(format!("-t:{}", search_config.time_out_ms))
-            .arg(smt_file_path)
-            .output()
-            .expect("Failed to execute SMT solver");
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut blocking_clauses = String::new();
+        let mut num_solutions: usize = 0;
 
-        // ######################### Check the solutions ############################
-        let (status, num_solutions) = if stdout.contains("unsat") {
-            (VerificationStatus::Verified, 0)
-        } else if stdout.contains("sat") {
-            (VerificationStatus::Verified, 1)
-        } else {
-            (VerificationStatus::TimedOut, 0)
-        };
+        // ######################### Enumeration loop ###############################
+        // Each iteration queries the solver with all previously found solutions
+        // blocked out.  We stop when the solver returns `unsat` (region exhausted)
+        // or the wall-clock budget runs out, mirroring B&B's exhaustive search
+        // within a bounded input region.
+        loop {
+            let elapsed_ms = start_time.elapsed().as_millis() as u64;
+            if elapsed_ms >= search_config.time_out_ms {
+                return Ok(VerificationResult {
+                    status: VerificationStatus::TimedOut,
+                    num_total_trials: num_solutions,
+                    num_solutions,
+                    execution_time: start_time.elapsed() - sleep_time,
+                    area: 1,
+                });
+            }
+            let remaining_ms = search_config.time_out_ms - elapsed_ms;
 
-        Ok(VerificationResult {
-            status: status,
-            num_total_trials: 0,
-            num_solutions,
-            execution_time: start_time.elapsed() - sleep_time,
-            area: 1,
-        })
+            // Write the formula (base + accumulated blocking clauses) to disk.
+            let full_smt =
+                format!("{}{}{}", base_without_check, blocking_clauses, CHECK_SUFFIX);
+            let mut file = File::create(smt_file_path).expect("Failed to create SMT file");
+            file.write_all(full_smt.as_bytes())
+                .expect("Failed to write SMT string to file");
+
+            let output = Command::new(verification_method)
+                .arg(format!("-t:{}", remaining_ms))
+                .arg(smt_file_path)
+                .output()
+                .expect("Failed to execute SMT solver");
+            let stdout = String::from_utf8_lossy(&output.stdout);
+
+            if stdout.contains("unsat") {
+                // No more solutions exist in the region.
+                return Ok(VerificationResult {
+                    status: VerificationStatus::Verified,
+                    num_total_trials: num_solutions,
+                    num_solutions,
+                    execution_time: start_time.elapsed() - sleep_time,
+                    area: 1,
+                });
+            } else if stdout.contains("sat") {
+                num_solutions += 1;
+
+                // If there are no free input columns to block on (range_interval
+                // was 0), we cannot enumerate further — treat this as a single
+                // counterexample and exit.
+                if block_cols.is_empty() {
+                    return Ok(VerificationResult {
+                        status: VerificationStatus::Verified,
+                        num_total_trials: num_solutions,
+                        num_solutions,
+                        execution_time: start_time.elapsed() - sleep_time,
+                        area: 1,
+                    });
+                }
+
+                // Parse the model to extract concrete values for the free input
+                // columns, then add a blocking clause preventing this exact
+                // input combination from appearing in future iterations.
+                let col_vals =
+                    crate::smt::parse_bv_model(&stdout, 0, &block_cols);
+                let clause = crate::smt::build_blocking_clause(0, &col_vals);
+                if clause.is_empty() {
+                    // Model parse failed — cannot make progress; bail out.
+                    return Ok(VerificationResult {
+                        status: VerificationStatus::TimedOut,
+                        num_total_trials: num_solutions,
+                        num_solutions,
+                        execution_time: start_time.elapsed() - sleep_time,
+                        area: 1,
+                    });
+                }
+                blocking_clauses.push_str(&clause);
+            } else {
+                // Solver returned neither sat nor unsat (timeout / error).
+                return Ok(VerificationResult {
+                    status: VerificationStatus::TimedOut,
+                    num_total_trials: num_solutions,
+                    num_solutions,
+                    execution_time: start_time.elapsed() - sleep_time,
+                    area: 1,
+                });
+            }
+        }
     }
 }
 
