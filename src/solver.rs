@@ -724,7 +724,6 @@ where
         let c_align = post_process.clone();
         let c_priority_cols = search_config.priority_cols.clone();
         let c_priority_col_weight = search_config.priority_col_weight;
-
         thread::spawn(move || {
             let mut rng = StdRng::seed_from_u64(search_config.seed + wid as u64);
             // Time-based throttling to prevent freezing
