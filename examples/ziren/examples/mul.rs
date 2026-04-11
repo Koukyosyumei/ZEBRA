@@ -72,17 +72,24 @@ fn main() -> Result<(), io::Error> {
         .refinable_cols
         .extend(&general_lookup_info.op_a.clone());
     constraint_info.refinable_cols.retain(|a| *a < 42);
-    constraint_info.refinable_cols.push(2);
-    constraint_info.refinable_cols.push(3);
-    constraint_info.refinable_cols.push(4);
-    constraint_info.refinable_cols.push(5); //46, 47, 48, 49
-    constraint_info.refinable_cols.push(46);
-    constraint_info.refinable_cols.push(47);
-    constraint_info.refinable_cols.push(48);
-    constraint_info.refinable_cols.push(49);
+
+    if opcode_str != "MUL" {
+        constraint_info.refinable_cols.push(2);
+        constraint_info.refinable_cols.push(3);
+        constraint_info.refinable_cols.push(4);
+        constraint_info.refinable_cols.push(5); //46, 47, 48, 49
+        constraint_info.refinable_cols.push(46);
+        constraint_info.refinable_cols.push(47);
+        constraint_info.refinable_cols.push(48);
+        constraint_info.refinable_cols.push(49);
+    }
 
     constraint_info.output_columns = general_lookup_info.op_a.clone();
-    search_config.priority_cols = [general_lookup_info.op_b.clone(), general_lookup_info.op_c.clone()].concat();
+    search_config.priority_cols = [
+        general_lookup_info.op_b.clone(),
+        general_lookup_info.op_c.clone(),
+    ]
+    .concat();
     search_config.priority_col_weight = 6;
     for i in &constraint_info.output_columns {
         constraint_info.range_types.insert(*i, RangeType::U8);
