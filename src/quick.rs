@@ -134,7 +134,7 @@ where
             .filter(|j| !constraint_info.refinable_cols.contains(j))
             .map(|j| (0, j, base_abs_main_trace_data[0][j].clone()))
             .collect();
-        let neg_constants: Vec<_> = constraint_info
+        let mut neg_constants: Vec<_> = constraint_info
             .output_columns
             .iter()
             .map(|&j| (0, j, base_abs_main_trace_data[0][j].clone()))
@@ -157,6 +157,9 @@ where
                 }
             })
             .collect();
+        if block_cols.len() > 0 {
+            neg_constants.clear();
+        }
 
         // Generate the base formula once; strip the trailing check-sat/get-model
         // so we can insert per-iteration blocking clauses before them.
@@ -171,9 +174,7 @@ where
             constraint_info.prime,
         );
         const CHECK_SUFFIX: &str = "(check-sat)\n(get-model)\n";
-        let base_without_check = base_smt
-            .strip_suffix(CHECK_SUFFIX)
-            .unwrap_or(&base_smt);
+        let base_without_check = base_smt.strip_suffix(CHECK_SUFFIX).unwrap_or(&base_smt);
 
         let smt_file_path = "voutput/smt_query.smt2";
         let start_time = time::Instant::now();
@@ -199,8 +200,7 @@ where
             let remaining_ms = search_config.time_out_ms - elapsed_ms;
 
             // Write the formula (base + accumulated blocking clauses) to disk.
-            let full_smt =
-                format!("{}{}{}", base_without_check, blocking_clauses, CHECK_SUFFIX);
+            let full_smt = format!("{}{}{}", base_without_check, blocking_clauses, CHECK_SUFFIX);
             let mut file = File::create(smt_file_path).expect("Failed to create SMT file");
             file.write_all(full_smt.as_bytes())
                 .expect("Failed to write SMT string to file");
@@ -240,8 +240,7 @@ where
                 // Parse the model to extract concrete values for the free input
                 // columns, then add a blocking clause preventing this exact
                 // input combination from appearing in future iterations.
-                let col_vals =
-                    crate::smt::parse_bv_model(&stdout, 0, &block_cols);
+                let col_vals = crate::smt::parse_bv_model(&stdout, 0, &block_cols);
                 let clause = crate::smt::build_blocking_clause(0, &col_vals);
                 if clause.is_empty() {
                     // Model parse failed — cannot make progress; bail out.
