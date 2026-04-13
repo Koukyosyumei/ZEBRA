@@ -275,18 +275,6 @@ pub fn expr_to_smt(
     // ranges
     for (j, k) in range_types {
         match k {
-            RangeType::Bool => {
-                for i in 0..n_rows {
-                    smt.push_str(&format!("(assert (<= trace_{}_{} 1))\n", i, j));
-                    smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j));
-                }
-            }
-            RangeType::U4 => {
-                for i in 0..n_rows {
-                    smt.push_str(&format!("(assert (<= trace_{}_{} 15))\n", i, j));
-                    smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j));
-                }
-            }
             RangeType::U7 => {
                 for i in 0..n_rows {
                     smt.push_str(&format!("(assert (<= trace_{}_{} 126))\n", i, j));
@@ -305,18 +293,13 @@ pub fn expr_to_smt(
                     smt.push_str(&format!("(assert (<= 0 trace_{}_{}))\n", i, j));
                 }
             }
-            RangeType::Const(val) => {
-                for i in 0..n_rows {
-                    smt.push_str(&format!("(assert (= trace_{}_{} {}))\n", i, j, val));
-                }
-            }
             RangeType::Any(lo, hi) => {
                 for i in 0..n_rows {
                     smt.push_str(&format!("(assert (<= {} trace_{}_{}))\n", lo, i, j));
                     smt.push_str(&format!("(assert (<= trace_{}_{} {}))\n", i, j, hi));
                 }
             }
-            RangeType::Top => {
+            _ => {
                 // Unbounded — no additional assertion needed
             }
         }
@@ -819,67 +802,30 @@ pub fn expr_to_smt_bv(
 
     for (j, k) in range_types {
         match k {
-            RangeType::Bool => {
-                for i in 0..n_rows {
-                    smt.push_str(&format!(
-                        "(assert (bvule trace_{}_{} #x00000001))\n",
-                        i, j
-                    ));
-                }
-            }
-            RangeType::U4 => {
-                for i in 0..n_rows {
-                    smt.push_str(&format!(
-                        "(assert (bvule trace_{}_{} #x0000000f))\n",
-                        i, j
-                    ));
-                }
-            }
             RangeType::U7 => {
                 for i in 0..n_rows {
-                    smt.push_str(&format!(
-                        "(assert (bvule trace_{}_{} #x0000007f))\n",
-                        i, j
-                    ));
+                    smt.push_str(&format!("(assert (bvule trace_{}_{} #x0000007f))\n", i, j));
                 }
             }
             RangeType::U8 => {
                 for i in 0..n_rows {
-                    smt.push_str(&format!(
-                        "(assert (bvule trace_{}_{} #x000000ff))\n",
-                        i, j
-                    ));
+                    smt.push_str(&format!("(assert (bvule trace_{}_{} #x000000ff))\n", i, j));
                 }
             }
             RangeType::U16 => {
                 for i in 0..n_rows {
-                    smt.push_str(&format!(
-                        "(assert (bvule trace_{}_{} #x0000ffff))\n",
-                        i, j
-                    ));
-                }
-            }
-            RangeType::Const(val) => {
-                let hex = format!("#x{:08x}", (*val as u32));
-                for i in 0..n_rows {
-                    smt.push_str(&format!("(assert (= trace_{}_{} {}))\n", i, j, hex));
+                    smt.push_str(&format!("(assert (bvule trace_{}_{} #x0000ffff))\n", i, j));
                 }
             }
             RangeType::Any(lo, hi) => {
                 let lo_hex = format!("#x{:08x}", (*lo as u32));
                 let hi_hex = format!("#x{:08x}", (*hi as u32));
                 for i in 0..n_rows {
-                    smt.push_str(&format!(
-                        "(assert (bvuge trace_{}_{} {}))\n",
-                        i, j, lo_hex
-                    ));
-                    smt.push_str(&format!(
-                        "(assert (bvule trace_{}_{} {}))\n",
-                        i, j, hi_hex
-                    ));
+                    smt.push_str(&format!("(assert (bvuge trace_{}_{} {}))\n", i, j, lo_hex));
+                    smt.push_str(&format!("(assert (bvule trace_{}_{} {}))\n", i, j, hi_hex));
                 }
             }
-            RangeType::Top => {
+            _ => {
                 // Already bounded by the global bvule P assertions above
             }
         }

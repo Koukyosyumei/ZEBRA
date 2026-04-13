@@ -1,30 +1,22 @@
 config:
   num_workers: 12
   time_out_ms: 1000000
-  minimum_num_taregt_cols: 26
+  minimum_num_taregt_cols: 7
   max_expansions: 1000000000
   min_row_id: 0
   max_row_id: 0
   seed: 41
   enable_heuristic: true
   enable_interval_refinement: true
-  priority_cols:
-  - 10
-  - 11
-  - 12
-  - 13
-  - 14
-  - 15
-  - 16
-  - 17
-  priority_col_weight: 6
+  priority_cols: []
+  priority_col_weight: 1
 args:
   config: ./configs/alu.config
-  num_trial: 50
+  num_trial: 1
   ouptput_path: output.yaml
-  method: bb
-  opcode_str: MUL
-  range_interval: 3
+  method: z3
+  opcode_str: ADD
+  range_interval: 0
   blocking_closure: false
   no_heuristic: false
   no_simplify: false
@@ -32,7 +24,7 @@ args:
   turn_off_ui: false
   fail_fast: true
 report:
-  success_ratio: 0.6666666666666666
+  success_ratio: 1.0
   exe_time_mean: .inf
   exe_time_variance: .inf
-  n_trials_run: 3
+  n_trials_run: 1
