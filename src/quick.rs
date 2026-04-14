@@ -23,6 +23,31 @@ use crate::{
     constraint::add_blocking_constraint, interval::AbstractInterval, trace::AbstractTrace,
 };
 
+/// Print a constraint sparsity report for the given `ConstraintInfo` and
+/// return immediately (to be called in `--sparsity` mode before the solver).
+pub fn print_sparsity_report(constraint_info: &ConstraintInfo, table_name: &str) {
+    let report = constraint_info
+        .constraints
+        .sparsity_report(constraint_info.num_total_columns);
+    println!("=== Sparsity Report: {table_name} ===");
+    println!("{report}");
+}
+
+/// Like [`load_config`], but falls back to [`SearchConfig::default`] when
+/// `args.config` is `None` (allowed only in `--sparsity` mode).
+pub fn load_config_for_args(args: &Args) -> SearchConfig {
+    match args.config.as_deref() {
+        Some(path) => load_config(path).expect("failed to load config"),
+        None => {
+            assert!(
+                args.sparsity,
+                "--config is required when not using --sparsity"
+            );
+            SearchConfig::default()
+        }
+    }
+}
+
 pub struct ProgramInfo {
     pub program_str: String,
     pub program_len: usize,
@@ -36,8 +61,9 @@ pub fn load_config(path: &std::path::Path) -> anyhow::Result<SearchConfig> {
 
 #[derive(Parser, Debug, Serialize)]
 pub struct Args {
+    /// Path to the YAML search config.  Optional when --sparsity is set.
     #[arg(long)]
-    pub config: PathBuf,
+    pub config: Option<PathBuf>,
     #[arg(long, default_value = "30")]
     pub num_trial: usize,
     #[arg(long, default_value = "output.yaml")]
@@ -65,6 +91,10 @@ pub struct Args {
     /// Stop immediately after the first failed trial (useful for batch scripts)
     #[arg(long, default_value = "true")]
     pub fail_fast: bool,
+    /// Print a constraint-sparsity report for every table and exit.
+    /// When set, --config is optional (no solving is performed).
+    #[arg(long, default_value = "false")]
+    pub sparsity: bool,
 }
 
 #[derive(Debug)]

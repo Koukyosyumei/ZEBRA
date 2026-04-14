@@ -826,6 +826,76 @@ pub fn gather_vars(
     }
 }
 
+/// Collects all column indices referenced by `expr` into `cols`.
+///
+/// Unlike [`gather_vars_simple`], this function handles every variant of
+/// [`ZEBRASymbolicExpr`], including `WhenZero`/`WhenNonZero`, `MulLo`,
+/// `MulHiSS`/`MulHiUU`, `KoalaBearRange`/`BabyBearRange`, and all `Word*`
+/// word-operation variants.  It is therefore suitable for accurate sparsity
+/// analysis where missing branches would silently under-count coverage.
+pub fn gather_cols(expr: &ZEBRASymbolicExpr, cols: &mut HashSet<usize>) {
+    match expr {
+        ZEBRASymbolicExpr::Variable(v) => {
+            cols.insert(v.index);
+        }
+        ZEBRASymbolicExpr::Constant(_)
+        | ZEBRASymbolicExpr::IsFirstRow
+        | ZEBRASymbolicExpr::IsTransition
+        | ZEBRASymbolicExpr::IsLastRow => {}
+        ZEBRASymbolicExpr::WhenNonZero(cond, body)
+        | ZEBRASymbolicExpr::WhenZero(cond, body) => {
+            gather_cols(cond, cols);
+            gather_cols(body, cols);
+        }
+        ZEBRASymbolicExpr::Neg(e)
+        | ZEBRASymbolicExpr::Msb(e)
+        | ZEBRASymbolicExpr::Flip(e)
+        | ZEBRASymbolicExpr::KoalaBearRange(e)
+        | ZEBRASymbolicExpr::BabyBearRange(e) => {
+            gather_cols(e, cols);
+        }
+        ZEBRASymbolicExpr::Add(a, b)
+        | ZEBRASymbolicExpr::Sub(a, b)
+        | ZEBRASymbolicExpr::Mul(a, b)
+        | ZEBRASymbolicExpr::MulLo(a, b)
+        | ZEBRASymbolicExpr::MulHiSS(a, b)
+        | ZEBRASymbolicExpr::MulHiUU(a, b)
+        | ZEBRASymbolicExpr::And(a, b)
+        | ZEBRASymbolicExpr::Or(a, b)
+        | ZEBRASymbolicExpr::Xor(a, b)
+        | ZEBRASymbolicExpr::SRL(a, b)
+        | ZEBRASymbolicExpr::SRLCarry(a, b)
+        | ZEBRASymbolicExpr::Lt(a, b) => {
+            gather_cols(a, cols);
+            gather_cols(b, cols);
+        }
+        ZEBRASymbolicExpr::WordAddU(a, b)
+        | ZEBRASymbolicExpr::WordSubU(a, b)
+        | ZEBRASymbolicExpr::WordMul(a, b)
+        | ZEBRASymbolicExpr::WordMulhu(a, b)
+        | ZEBRASymbolicExpr::WordMulhs(a, b)
+        | ZEBRASymbolicExpr::WordMultl(a, b)
+        | ZEBRASymbolicExpr::WordMulth(a, b)
+        | ZEBRASymbolicExpr::WordMultul(a, b)
+        | ZEBRASymbolicExpr::WordMultuh(a, b)
+        | ZEBRASymbolicExpr::WordDiv(a, b)
+        | ZEBRASymbolicExpr::WordSDiv(a, b)
+        | ZEBRASymbolicExpr::WordLt(a, b)
+        | ZEBRASymbolicExpr::WordSLe(a, b)
+        | ZEBRASymbolicExpr::WordSLt(a, b)
+        | ZEBRASymbolicExpr::WordAnd(a, b)
+        | ZEBRASymbolicExpr::WordOr(a, b)
+        | ZEBRASymbolicExpr::WordXOr(a, b)
+        | ZEBRASymbolicExpr::WordEq(a, b)
+        | ZEBRASymbolicExpr::WordNEq(a, b)
+        | ZEBRASymbolicExpr::WordSrl(a, b) => {
+            for e in a.iter().chain(b.iter()) {
+                gather_cols(e, cols);
+            }
+        }
+    }
+}
+
 pub fn get_curr_i(expr: &ZEBRASymbolicExpr) -> Option<usize> {
     if let ZEBRASymbolicExpr::Variable(ZEBRASymbolicVal { entry, index }) = expr {
         if let ZEBRASymbolicEntry::Main { is_curr } = entry {

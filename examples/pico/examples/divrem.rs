@@ -13,7 +13,7 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
 use zebra::canonicalizer::generate_alu_final_checker;
 use zebra::quick::{
-    experiment_harness, generate_report, load_config, write_output, Args, ProgramInfo,
+    experiment_harness, generate_report, load_config, load_config_for_args, print_sparsity_report, write_output, Args, ProgramInfo,
 };
 use zebra::solver::RangeType;
 use zebra::solver::{dummy_program_counter_refine_fn, nop_post_process};
@@ -46,7 +46,7 @@ fn main() -> Result<(), io::Error> {
 
     let args = Args::parse();
     let opcode_str = args.opcode_str.clone();
-    let mut search_config = load_config(&args.config).unwrap();
+    let mut search_config = load_config_for_args(&args);
     search_config.enable_heuristic = !args.no_heuristic;
     search_config.enable_interval_refinement = !args.no_refinement;
 
@@ -74,6 +74,10 @@ fn main() -> Result<(), io::Error> {
         search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
     }
 
+    if args.sparsity {
+        print_sparsity_report(&constraint_info, "DivRem");
+        return Ok(());
+    }
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
     for _ in 0..args.num_trial {

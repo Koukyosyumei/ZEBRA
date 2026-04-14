@@ -31,7 +31,7 @@ use zebra::interval::MayBeFlag;
 use zebra::memory::reconstruct_word;
 use zebra::memory::IntervalMemory;
 use zebra::memory::{check_memory_consistency, reconstruct_word as rec_word};
-use zebra::quick::{experiment_harness, load_config, Args, ProgramInfo};
+use zebra::quick::{experiment_harness, load_config, load_config_for_args, print_sparsity_report, Args, ProgramInfo};
 use zebra::solver::RangeType;
 use zebra::state::AbstractState;
 use zebra::trace::AbstractTrace;
@@ -286,7 +286,7 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    let mut search_config = load_config(&args.config).unwrap();
+    let mut search_config = load_config_for_args(&args);
     search_config.enable_heuristic = !args.no_heuristic;
     search_config.enable_interval_refinement = !args.no_refinement;
 
@@ -330,6 +330,10 @@ fn main() -> Result<(), io::Error> {
     // ######################## Program Initialization ###########################
     //    let program = get_target_program::<BabyBear>();
 
+    if args.sparsity {
+        print_sparsity_report(&constraint_info, "Cpu");
+        return Ok(());
+    }
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     // Bug classes confirmed across all programs
     let mut global_found_classes: HashSet<String> = HashSet::new();
