@@ -335,7 +335,7 @@ where
         status: verification_status,
         num_total_trials: global_count,
         num_solutions: known_solution.len(),
-        execution_time: start_time.elapsed() - sleep_time,
+        execution_time: start_time.elapsed() - *sleep_time,
         area: *known_solution_area,
     })
 }
