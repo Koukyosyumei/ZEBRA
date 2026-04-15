@@ -65,6 +65,9 @@ pub struct Args {
     /// Stop immediately after the first failed trial (useful for batch scripts)
     #[arg(long, default_value = "true")]
     pub fail_fast: bool,
+    /// Run a two-mode benchmark (heuristic vs blind-DFS) and print a comparison table
+    #[arg(long, default_value = "false")]
+    pub benchmark: bool,
 }
 
 #[derive(Debug)]
