@@ -516,7 +516,6 @@ fn process_single_node(
 /// * `final_check` — Callback invoked when a candidate solution is found.
 /// * `known_solution` — Set used to deduplicate previously discovered solutions.
 /// * `global_total_trials` — Global counter shared across subsets.
-/// * `sleep_time` — Accumulates idle sleep time to throttle CPU usage.
 ///
 /// # Returns
 ///
@@ -610,7 +609,6 @@ pub fn parallel_solve<PostProcessFn, FinalCheckFn>(
     known_solution: &mut HashSet<String>,
     known_solution_area: &mut i128,
     global_total_trials: Arc<AtomicUsize>,
-    sleep_time: &mut Duration,
     start_time: &std::time::Instant,
     is_balanced: bool,
     is_backward_refine_on: bool,
@@ -966,7 +964,6 @@ where
         }
 
         // tiny sleep to avoid the over-usage of CPU
-        *sleep_time += Duration::from_millis(10);
         thread::sleep(Duration::from_millis(10));
     }
 
@@ -1046,7 +1043,6 @@ pub fn is_constraint_trivially_true(
 /// * `known_solution` — Set used to deduplicate discovered solutions.
 /// * `ui` — Mutable UI state for progress reporting.
 /// * `terminal` — Terminal backend for rendering.
-/// * `sleep_time` — Accumulates solver idle time for throttling.
 ///
 /// # Search Strategy
 ///
@@ -1101,7 +1097,6 @@ pub fn run_parallel_solver<FinalCheckFn, PostProcessFn>(
     known_solution_area: &mut i128,
     ui: &mut UiState,
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    sleep_time: &mut Duration,
     tui_enabled: bool,
 ) -> (VerificationStatus, usize)
 where
@@ -1165,7 +1160,6 @@ where
                 known_solution,
                 known_solution_area,
                 global_count.clone(),
-                sleep_time,
                 &start_time,
                 column_subset.len() == constraint_info.refinable_cols.len(),
                 search_config.enable_interval_refinement
