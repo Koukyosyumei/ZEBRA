@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{self, Duration};
+use std::time;
 use std::{fs, io};
 
 use clap::Parser;
@@ -100,8 +100,6 @@ where
         Fn(&AbstractTrace, usize, u32, &mut HashSet<String>, &mut UiState, &mut i128) + Clone,
     PostProcessFn: Fn(&mut AbstractTrace, u32) -> MayBeFlag + Clone + Send + Sync + 'static,
 {
-    let mut sleep_time = Duration::from_millis(0);
-
     // ######################## Blocking Closures ################################
     for i in blocked_rows {
         add_blocking_constraint(
@@ -123,7 +121,6 @@ where
             &search_config,
             post_process,
             final_check,
-            &mut sleep_time,
             known_solution,
             &mut known_solution_area,
             turn_off_ui,
@@ -193,7 +190,7 @@ where
                     status: VerificationStatus::TimedOut,
                     num_total_trials: num_solutions,
                     num_solutions,
-                    execution_time: start_time.elapsed() - sleep_time,
+                    execution_time: start_time.elapsed(),
                     area: 1,
                 });
             }
@@ -218,7 +215,7 @@ where
                     status: VerificationStatus::Verified,
                     num_total_trials: num_solutions,
                     num_solutions,
-                    execution_time: start_time.elapsed() - sleep_time,
+                    execution_time: start_time.elapsed(),
                     area: 1,
                 });
             } else if stdout.contains("sat") {
@@ -232,7 +229,7 @@ where
                         status: VerificationStatus::Verified,
                         num_total_trials: num_solutions,
                         num_solutions,
-                        execution_time: start_time.elapsed() - sleep_time,
+                        execution_time: start_time.elapsed(),
                         area: 1,
                     });
                 }
@@ -248,7 +245,7 @@ where
                         status: VerificationStatus::TimedOut,
                         num_total_trials: num_solutions,
                         num_solutions,
-                        execution_time: start_time.elapsed() - sleep_time,
+                        execution_time: start_time.elapsed(),
                         area: 1,
                     });
                 }
@@ -259,7 +256,7 @@ where
                     status: VerificationStatus::TimedOut,
                     num_total_trials: num_solutions,
                     num_solutions,
-                    execution_time: start_time.elapsed() - sleep_time,
+                    execution_time: start_time.elapsed(),
                     area: 1,
                 });
             }
@@ -275,7 +272,6 @@ pub fn quick_api<FinalCheckFn, PostProcessFn>(
     search_config: &SearchConfig,
     align_pc_to_program: PostProcessFn,
     final_check: FinalCheckFn,
-    sleep_time: &mut Duration,
     known_solution: &mut HashSet<String>,
     known_solution_area: &mut i128,
     turn_off_ui: bool,
@@ -317,7 +313,6 @@ where
         known_solution_area,
         &mut ui,
         &mut terminal,
-        sleep_time,
         tui_available,
     );
 
@@ -335,7 +330,7 @@ where
         status: verification_status,
         num_total_trials: global_count,
         num_solutions: known_solution.len(),
-        execution_time: start_time.elapsed() - *sleep_time,
+        execution_time: start_time.elapsed(),
         area: *known_solution_area,
     })
 }
