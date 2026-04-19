@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::interval::{AbstractInterval, MayBeFlag};
 use crate::symbolic::{
-    count_arith_ops, gather_cols, gather_neighbors, gather_vars, ZEBRASymbolicEntry,
+    count_arith_ops_cse, gather_cols, gather_neighbors, gather_vars, ZEBRASymbolicEntry,
     ZEBRASymbolicExpr, ZEBRASymbolicVal,
 };
 use crate::trace::AbstractTrace;
@@ -190,13 +190,14 @@ pub struct ConstraintSparsityReport {
     /// `column_hit_counts[i]` = number of constraints that reference column `i`.
     /// Length equals `num_total_columns`; unconstrained columns have value 0.
     pub column_hit_counts: Vec<usize>,
-    // ---- AIR-sparsity metric (IACR 2018/046, Option B) ----
-    /// |N|: distinct (entry, row-context, column-index) cells across all constraints.
+    // ---- AIR-sparsity metric (IACR 2018/046) ----
+    /// |N|: distinct (entry, row-context, column-index) cells across ALL constraints
+    /// (AIR + lookup + PV + blocking), reflecting the full table width.
     pub neighborhood_size: usize,
-    /// T_arith: total arithmetic operation nodes across all constraints.
+    /// T_arith: total arithmetic operation nodes across AIR constraints.
     pub t_arith: usize,
-    /// T_arith / |N|²  — arithmetic density relative to a fully-coupled quadratic AIR.
-    /// Lower means sparser. 0.0 when the neighborhood is empty.
+    /// T_arith / (s × |N|) — ops per variable slot relative to a fully-dense linear baseline.
+    /// Lower means sparser. 0.0 when s or |N| is zero.
     pub air_sparsity: f64,
 }
 
@@ -237,11 +238,11 @@ impl std::fmt::Display for ConstraintSparsityReport {
         )?;
         writeln!(
             f,
-            "AIR sparsity  : {:.6}  (T_arith={}, |N|={}, |N|²={})",
+            "AIR sparsity  : {:.6}  (T_arith={}, |N|={}, s={})",
             self.air_sparsity,
             self.t_arith,
             self.neighborhood_size,
-            self.neighborhood_size * self.neighborhood_size,
+            self.num_air_constraints,
         )?;
         // Show the top-5 hottest columns (most constraints)
         let mut indexed: Vec<(usize, usize)> = self
@@ -361,9 +362,10 @@ impl ZEBRAConstraints {
             total as f64 / num_pv as f64
         };
 
-        // AIR-sparsity metric: T_arith / |N|²
-        // Lookup constraints are excluded: they describe table membership, not
-        // arithmetic structure, and would inflate both |N| and T_arith.
+        // AIR-sparsity metric: T_arith / (s × |N|)
+        // |N| is gathered from ALL constraints so it reflects the true table width
+        // (lookup columns are part of the neighborhood even though they don't
+        // contribute arithmetic ops).  T_arith and s are AIR-only.
         let air_only: Vec<&ZEBRASymbolicExpr> = self
             .air_constraints
             .iter()
@@ -371,16 +373,23 @@ impl ZEBRAConstraints {
             .chain(self.pv_neg_constraints.iter())
             .chain(self.blocking_constraints.iter().map(|(_, c)| c))
             .collect();
+        let all_constraints: Vec<&ZEBRASymbolicExpr> = air_only
+            .iter()
+            .copied()
+            .chain(self.lookup_constraints.iter())
+            .collect();
         let mut neighbors = HashSet::new();
-        for c in &air_only {
+        for c in &all_constraints {
             gather_neighbors(c, &mut neighbors);
         }
         let neighborhood_size = neighbors.len();
-        let t_arith: usize = air_only.iter().map(|c| count_arith_ops(c)).sum();
-        let air_sparsity = if neighborhood_size == 0 {
+        // s = number of AIR+PV+blocking constraints (arithmetic constraints only).
+        let s = air_only.len();
+        let t_arith = count_arith_ops_cse(&air_only);
+        let air_sparsity = if s == 0 || neighborhood_size == 0 {
             0.0
         } else {
-            t_arith as f64 / (neighborhood_size * neighborhood_size) as f64
+            t_arith as f64 / (s * neighborhood_size) as f64
         };
 
         ConstraintSparsityReport {
@@ -664,10 +673,10 @@ mod tests {
 
     #[test]
     fn test_air_sparsity_basic() {
-        // c0 = Sub(var_curr[0], const)  -> 1 op, neighbors: {curr[0]}
-        // c1 = Add(var_curr[1], var_curr[2]) -> 1 op, neighbors: {curr[1], curr[2]}
+        // c0 = Sub(var_curr[0], const)            -> 1 op, neighbors: {curr[0]}
+        // c1 = Add(var_curr[1], var_curr[2])      -> 1 op, neighbors: {curr[1], curr[2]}
         // c2 = WhenZero(var_curr[0], var_curr[1]) -> 1 op, neighbors: {curr[0], curr[1]}
-        // t_arith = 3, |N| = {curr[0], curr[1], curr[2]} = 3, air_sparsity = 3/9
+        // t_arith=3, s=3, |N|=3, air_sparsity = 3 / (3×3) = 1/3
         let c0 = ZEBRASymbolicExpr::Sub(Box::new(make_var(0)), Box::new(make_const(1)));
         let c1 = ZEBRASymbolicExpr::Add(Box::new(make_var(1)), Box::new(make_var(2)));
         let c2 = ZEBRASymbolicExpr::WhenZero(Box::new(make_var(0)), Box::new(make_var(1)));
@@ -676,20 +685,40 @@ mod tests {
 
         assert_eq!(report.t_arith, 3);
         assert_eq!(report.neighborhood_size, 3);
-        assert!((report.air_sparsity - 3.0 / 9.0).abs() < 1e-9);
+        assert_eq!(report.num_air_constraints, 3);
+        assert!((report.air_sparsity - 3.0 / (3.0 * 3.0)).abs() < 1e-9);
     }
 
     #[test]
     fn test_air_sparsity_curr_next_distinct() {
         // curr[0] and next[0] are different neighbors even though they share column 0.
         // c0 = Mul(curr[0], next[0]) -> 1 op, neighbors: {curr[0], next[0]}
-        // t_arith = 1, |N| = 2, air_sparsity = 1/4
+        // t_arith=1, s=1, |N|=2, air_sparsity = 1 / (1×2) = 0.5
         let c0 = ZEBRASymbolicExpr::Mul(Box::new(make_var(0)), Box::new(make_next_var(0)));
         let constraints = ZEBRAConstraints::new(vec![c0], vec![]);
         let report = constraints.sparsity_report(2);
 
         assert_eq!(report.neighborhood_size, 2);
         assert_eq!(report.t_arith, 1);
-        assert!((report.air_sparsity - 1.0 / 4.0).abs() < 1e-9);
+        assert_eq!(report.num_air_constraints, 1);
+        assert!((report.air_sparsity - 1.0 / (1.0 * 2.0)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_air_sparsity_cse() {
+        // P1 = Mul(Add(var[0], var[1]), var[2])  -> 2 ops: Add + Mul
+        // P2 = Mul(Add(var[0], var[1]), var[3])  -> shared Add counted once: 1 new op (Mul)
+        // Without CSE: t_arith=4; with CSE: t_arith=3
+        // s=2, |N|=4, air_sparsity = 3 / (2×4) = 0.375
+        let shared = ZEBRASymbolicExpr::Add(Box::new(make_var(0)), Box::new(make_var(1)));
+        let c0 = ZEBRASymbolicExpr::Mul(Box::new(shared.clone()), Box::new(make_var(2)));
+        let c1 = ZEBRASymbolicExpr::Mul(Box::new(shared), Box::new(make_var(3)));
+        let constraints = ZEBRAConstraints::new(vec![c0, c1], vec![]);
+        let report = constraints.sparsity_report(4);
+
+        assert_eq!(report.t_arith, 3);
+        assert_eq!(report.neighborhood_size, 4);
+        assert_eq!(report.num_air_constraints, 2);
+        assert!((report.air_sparsity - 3.0 / (2.0 * 4.0)).abs() < 1e-9);
     }
 }

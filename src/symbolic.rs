@@ -189,7 +189,7 @@ impl fmt::Display for ZEBRASymbolicVal {
 ///
 /// * [`ZEBRASymbolicVal`] — Variable leaf nodes
 /// * [`ZEBRASymbolicEntry`] — Trace domain selector
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, Hash)]
 pub enum ZEBRASymbolicExpr {
     IsFirstRow,
     IsTransition,
@@ -896,7 +896,7 @@ pub fn gather_cols(expr: &ZEBRASymbolicExpr, cols: &mut HashSet<usize>) {
     }
 }
 
-/// Count the total number of arithmetic operation nodes in `expr`.
+/// Count the total number of arithmetic operation nodes in `expr` (T_arith).
 /// Every non-leaf node counts as one operation; leaf nodes (Variable, Constant,
 /// row predicates) contribute zero. Word* variants recurse into their limbs.
 pub fn count_arith_ops(expr: &ZEBRASymbolicExpr) -> usize {
@@ -950,6 +950,90 @@ pub fn count_arith_ops(expr: &ZEBRASymbolicExpr) -> usize {
             .map(|e| count_arith_ops(e))
             .sum(),
     }
+}
+
+/// CSE-aware inner helper: count arithmetic ops in `expr`, skipping any
+/// subexpression that has already been counted (recorded in `seen`).
+fn count_arith_ops_with_cse(
+    expr: &ZEBRASymbolicExpr,
+    seen: &mut HashSet<ZEBRASymbolicExpr>,
+) -> usize {
+    // Leaf nodes carry no operation cost and are never deduplicated.
+    match expr {
+        ZEBRASymbolicExpr::Variable(_)
+        | ZEBRASymbolicExpr::Constant(_)
+        | ZEBRASymbolicExpr::IsFirstRow
+        | ZEBRASymbolicExpr::IsTransition
+        | ZEBRASymbolicExpr::IsLastRow => return 0,
+        _ => {}
+    }
+    // insert returns false when already present → already counted, skip.
+    if !seen.insert(expr.clone()) {
+        return 0;
+    }
+    match expr {
+        ZEBRASymbolicExpr::Neg(e)
+        | ZEBRASymbolicExpr::Msb(e)
+        | ZEBRASymbolicExpr::Flip(e)
+        | ZEBRASymbolicExpr::KoalaBearRange(e)
+        | ZEBRASymbolicExpr::BabyBearRange(e) => 1 + count_arith_ops_with_cse(e, seen),
+        ZEBRASymbolicExpr::WhenNonZero(a, b)
+        | ZEBRASymbolicExpr::WhenZero(a, b)
+        | ZEBRASymbolicExpr::Add(a, b)
+        | ZEBRASymbolicExpr::Sub(a, b)
+        | ZEBRASymbolicExpr::Mul(a, b)
+        | ZEBRASymbolicExpr::MulLo(a, b)
+        | ZEBRASymbolicExpr::MulHiSS(a, b)
+        | ZEBRASymbolicExpr::MulHiUU(a, b)
+        | ZEBRASymbolicExpr::And(a, b)
+        | ZEBRASymbolicExpr::Or(a, b)
+        | ZEBRASymbolicExpr::Xor(a, b)
+        | ZEBRASymbolicExpr::SRL(a, b)
+        | ZEBRASymbolicExpr::SRLCarry(a, b)
+        | ZEBRASymbolicExpr::Lt(a, b) => {
+            1 + count_arith_ops_with_cse(a, seen) + count_arith_ops_with_cse(b, seen)
+        }
+        ZEBRASymbolicExpr::WordAddU(a, b)
+        | ZEBRASymbolicExpr::WordSubU(a, b)
+        | ZEBRASymbolicExpr::WordMul(a, b)
+        | ZEBRASymbolicExpr::WordMulhu(a, b)
+        | ZEBRASymbolicExpr::WordMulhs(a, b)
+        | ZEBRASymbolicExpr::WordMultl(a, b)
+        | ZEBRASymbolicExpr::WordMulth(a, b)
+        | ZEBRASymbolicExpr::WordMultul(a, b)
+        | ZEBRASymbolicExpr::WordMultuh(a, b)
+        | ZEBRASymbolicExpr::WordDiv(a, b)
+        | ZEBRASymbolicExpr::WordSDiv(a, b)
+        | ZEBRASymbolicExpr::WordLt(a, b)
+        | ZEBRASymbolicExpr::WordSLe(a, b)
+        | ZEBRASymbolicExpr::WordSLt(a, b)
+        | ZEBRASymbolicExpr::WordAnd(a, b)
+        | ZEBRASymbolicExpr::WordOr(a, b)
+        | ZEBRASymbolicExpr::WordXOr(a, b)
+        | ZEBRASymbolicExpr::WordEq(a, b)
+        | ZEBRASymbolicExpr::WordNEq(a, b)
+        | ZEBRASymbolicExpr::WordSrl(a, b) => a
+            .iter()
+            .chain(b.iter())
+            .map(|e| count_arith_ops_with_cse(e, seen))
+            .sum(),
+        // leaves already handled above
+        ZEBRASymbolicExpr::Variable(_)
+        | ZEBRASymbolicExpr::Constant(_)
+        | ZEBRASymbolicExpr::IsFirstRow
+        | ZEBRASymbolicExpr::IsTransition
+        | ZEBRASymbolicExpr::IsLastRow => unreachable!(),
+    }
+}
+
+/// Count T_arith across all `exprs` with CSE: common subexpressions shared
+/// across multiple constraints are counted only once.
+pub fn count_arith_ops_cse(exprs: &[&ZEBRASymbolicExpr]) -> usize {
+    let mut seen = HashSet::new();
+    exprs
+        .iter()
+        .map(|e| count_arith_ops_with_cse(e, &mut seen))
+        .sum()
 }
 
 /// Collect all distinct `(entry, column-index)` neighbor pairs referenced by `expr`.
