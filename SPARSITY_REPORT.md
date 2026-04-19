@@ -1,7 +1,8 @@
 # ZEBRA Constraint Sparsity Report
 
 > Generated: 2026-04-19 (s×|N| metric; |N| from all constraints; T\_arith with CSE)  
-> Branch: `sparcity`
+> Branch: `sparcity`  
+> VMs covered: ziren, sp1, sphinx, pico, valida (openvm excluded — pure-lookup architecture)
 
 ## Overview
 
@@ -56,16 +57,6 @@ Two complementary sparsity views are reported per table:
 | sphinx | ShiftLeft | 45 | 40 | 88.9% | 41 | 66 | 173 | 0.064 | 66 | 2.50 | 0 | 0.00 |
 | sphinx | ShiftRight | 71 | 66 | 93.0% | 67 | 83 | 204 | 0.037 | 83 | 3.35 | 17 | 5.82 |
 | sphinx | Cpu | 151 | 145 | 96.0% | 204 | 259 | 919 | 0.017 | 259 | 5.22 | 39 | 14.54 |
-| openvm | BaseAlu | 25 | 17 | 68.0% | 17 | 0 | 0 | 0.000 | 0 | 0.00 | 5 | 13.00 |
-| openvm | BitwiseAlu | 25 | 17 | 68.0% | 17 | 0 | 0 | 0.000 | 0 | 0.00 | 5 | 13.00 |
-| openvm | Mul | 21 | 13 | 61.9% | 13 | 0 | 0 | 0.000 | 0 | 0.00 | 1 | 13.00 |
-| openvm | Lt | 26 | 11 | 42.3% | 11 | 0 | 0 | 0.000 | 0 | 0.00 | 2 | 10.00 |
-| openvm | Shift | 42 | 13 | 31.0% | 13 | 0 | 0 | 0.000 | 0 | 0.00 | 1 | 13.00 |
-| openvm | BranchEqual | 24 | 11 | 45.8% | 11 | 0 | 0 | 0.000 | 0 | 0.00 | 2 | 10.00 |
-| openvm | BranchLessThan | 30 | 13 | 43.3% | 13 | 0 | 0 | 0.000 | 0 | 0.00 | 4 | 10.00 |
-| openvm | Jal | 15 | 8 | 53.3% | 8 | 2 | 14 | 0.875 | 2 | 6.00 | 0 | 0.00 |
-| openvm | Lui | 15 | 8 | 53.3% | 8 | 2 | 14 | 0.875 | 2 | 6.00 | 0 | 0.00 |
-| openvm | Jalr | 21 | 10 | 47.6% | 10 | 4 | 22 | 0.550 | 4 | 3.25 | 0 | 0.00 |
 | pico | AddSub | 17 | 17 | 100.0% | 17 | 17 | 52 | 0.180 | 17 | 4.59 | 0 | 0.00 |
 | pico | Bitwise | 15 | 15 | 100.0% | 15 | 4 | 10 | 0.167 | 4 | 1.50 | 28 | 5.71 |
 | pico | Mul | 37 | 37 | 100.0% | 37 | 30 | 137 | 0.123 | 30 | 4.67 | 2 | 2.00 |
@@ -84,6 +75,7 @@ Two complementary sparsity views are reported per table:
 | valida | Com32 | 14 | 14 | 100.0% | 14 | 8 | 29 | 0.259 | 8 | 2.88 | 0 | 0.00 |
 | valida | Memory | 27 | 27 | 100.0% | 38 | 42 | 109 | 0.068 | 42 | 2.67 | 0 | 0.00 |
 | valida | Cpu | 59 | 58 | 98.3% | 65 | 61 | 300 | 0.076 | 61 | 5.02 | 13 | 12.31 |
+| **all** | **average** | | | | | | | **0.140** | | | | |
 
 ---
 
@@ -140,23 +132,6 @@ Two complementary sparsity views are reported per table:
 
 ---
 
-## openvm (BabyBear · RV32IM)
-
-| Table | Cols | Covered | Coverage | \|N\| | s | T\_arith | air\_sparsity | AIR cols/c | Lookup cols/c | Top-5 hot columns |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| BaseAlu | 25 | 17 | 68.0% | 17 | 0 | 0 | 0.000 | 0.00 | 13.00 | `[8]=5  [9]=5  [10]=5  [11]=5  [12]=5` |
-| BitwiseAlu | 25 | 17 | 68.0% | 17 | 0 | 0 | 0.000 | 0.00 | 13.00 | `[8]=5  [9]=5  [10]=5  [11]=5  [12]=5` |
-| Mul | 21 | 13 | 61.9% | 13 | 0 | 0 | 0.000 | 0.00 | 13.00 | `[8]=1  [9]=1  [10]=1  [11]=1  [12]=1` |
-| Lt | 26 | 11 | 42.3% | 11 | 0 | 0 | 0.000 | 0.00 | 10.00 | `[8]=2  [9]=2  [10]=2  [11]=2  [12]=2` |
-| Shift | 42 | 13 | 31.0% | 13 | 0 | 0 | 0.000 | 0.00 | 13.00 | `[8]=1  [9]=1  [10]=1  [11]=1  [12]=1` |
-| BranchEqual | 24 | 11 | 45.8% | 11 | 0 | 0 | 0.000 | 0.00 | 10.00 | `[8]=2  [9]=2  [10]=2  [11]=2  [12]=2` |
-| BranchLessThan | 30 | 13 | 43.3% | 13 | 0 | 0 | 0.000 | 0.00 | 10.00 | `[8]=4  [9]=4  [10]=4  [11]=4  [12]=4` |
-| Jal | 15 | 8 | 53.3% | 8 | 2 | 14 | 0.875 | 6.00 | 0.00 | `[9]=2  [10]=2  [11]=2  [12]=2  [0]=1` |
-| Lui | 15 | 8 | 53.3% | 8 | 2 | 14 | 0.875 | 6.00 | 0.00 | `[9]=2  [10]=2  [11]=2  [12]=2  [0]=1` |
-| Jalr | 21 | 10 | 47.6% | 10 | 4 | 22 | 0.550 | 3.25 | 0.00 | `[16]=2  [17]=2  [20]=2  [8]=1  [9]=1` |
-
----
-
 ## pico (KoalaBear · RISC-V)
 
 | Table | Cols | Covered | Coverage | \|N\| | s | T\_arith | air\_sparsity | AIR cols/c | Lookup cols/c | Top-5 hot columns |
@@ -191,18 +166,17 @@ Two complementary sparsity views are reported per table:
 
 ## Key Observations
 
-- **59 tables** measured across 6 zkVM backends (including CPU tables for ziren, sp1, sphinx, pico, valida).
+- **50 tables** measured across 5 zkVM backends (ziren, sp1, sphinx, pico, valida).
+- **Global average air\_sparsity: 0.140** (mean over all 50 tables).
 - **T\_arith uses CSE**: common subexpressions shared across constraints are counted once. This reduces T\_arith substantially for complex tables (e.g. ziren DivRem: 1522→483, ziren Cpu: 910→316, sphinx Cpu: 1596→919). SP1 tables are unaffected, indicating their constraint expressions share no common subexpressions.
-- **air\_sparsity** (`T_arith / (s × |N|)`) now uses CSE-aware T\_arith. Most tables fall in `[0.02, 0.35]`; all but sp1 Branch and valida Mul32 are below 0.5.
+- **air\_sparsity** (`T_arith / (s × |N|)`) now uses CSE-aware T\_arith. Most tables fall in `[0.02, 0.35]`; only sp1 Branch (0.809) and valida Mul32 (0.623) exceed 0.5.
 - **CPU tables** are consistently sparse (`0.017–0.181`), with sphinx Cpu the sparsest overall (`|N|=204`, `air_sparsity=0.017`).
 - **Bitwise tables** show `|N| ≈ 15–17` (full table width) and `air_sparsity ≈ 0.138–0.200`, reflecting that their tiny AIR portion is moderately dense while the lookup side carries the structural richness.
-- **sp1 Branch** remains the densest non-trivial table (0.809), driven by 78 selector-gated constraints referencing 31 neighborhood cells, with no CSE benefit.
+- **sp1 Branch** is the densest table (0.809), driven by 78 selector-gated constraints referencing 31 neighborhood cells, with no CSE benefit.
 - **valida Mul32** (0.623) is similarly dense: only 7 constraints but 109 arithmetic ops over 25 cells after CSE.
-- **openvm Jal/Lui** (0.875) have deeply nested expressions (7 ops/constraint) over a tiny 8-cell neighborhood; CSE reduced them from 1.250 to 0.875.
-- **openvm pure-lookup tables** correctly show `air_sparsity = 0.000` (zero AIR constraints).
-- **Sparsest by air\_sparsity**: sphinx Cpu (0.017), sphinx DivRem (0.033), pico DivRem (0.028), pico Cpu (0.019).
+- **Sparsest by air\_sparsity**: sphinx Cpu (0.017), pico Cpu (0.019), pico DivRem (0.028), sphinx DivRem (0.033).
 
-### air\_sparsity ranking (excluding pure-lookup tables with s=0)
+### air\_sparsity ranking (all 50 tables, ascending)
 
 | VM | Table | \|N\| | s | T\_arith | air\_sparsity |
 |---|---|---:|---:|---:|---:|
@@ -239,10 +213,10 @@ Two complementary sparsity views are reported per table:
 | ziren | CloClz | 20 | 21 | 57 | 0.136 |
 | sphinx | Bitwise | 17 | 6 | 14 | 0.137 |
 | ziren | Bitwise | 16 | 5 | 11 | 0.138 |
+| sphinx | AddSub | 19 | 19 | 56 | 0.155 |
 | sp1 | Lt | 28 | 29 | 131 | 0.161 |
 | sp1 | Mul | 38 | 31 | 191 | 0.162 |
 | pico | Bitwise | 15 | 4 | 10 | 0.167 |
-| sphinx | AddSub | 19 | 19 | 56 | 0.155 |
 | pico | AddSub | 17 | 17 | 52 | 0.180 |
 | sp1 | Cpu | 64 | 71 | 845 | 0.181 |
 | ziren | AddSub | 17 | 14 | 46 | 0.193 |
@@ -253,8 +227,6 @@ Two complementary sparsity views are reported per table:
 | sp1 | AddSub | 18 | 18 | 91 | 0.281 |
 | ziren | Jump | 19 | 13 | 70 | 0.283 |
 | sp1 | Jump | 23 | 9 | 71 | 0.343 |
-| sp1 | Branch | 31 | 78 | 1956 | 0.809 |
 | valida | Mul32 | 25 | 7 | 109 | 0.623 |
-| openvm | Jalr | 10 | 4 | 22 | 0.550 |
-| openvm | Jal | 8 | 2 | 14 | 0.875 |
-| openvm | Lui | 8 | 2 | 14 | 0.875 |
+| sp1 | Branch | 31 | 78 | 1956 | 0.809 |
+| **—** | **global avg** | | | | **0.140** |
