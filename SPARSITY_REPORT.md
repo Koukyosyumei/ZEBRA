@@ -1,6 +1,6 @@
 # ZEBRA Constraint Sparsity Report
 
-> Generated: 2026-04-19  
+> Generated: 2026-04-19 (CPU tables added)  
 > Branch: `sparcity`
 
 ## Overview
@@ -211,6 +211,7 @@ Lookup constraints are excluded from `|N|` and `T_arith` because they describe t
 | sp1 | ShiftRight | 65 | 395 | 0.093 |
 | pico | ShiftRight | 64 | 389 | 0.095 |
 | valida | Memory | 38 | 139 | 0.096 |
+| valida | Cpu | 64 | 399 | 0.097 |
 | ziren | ShiftRight | 65 | 426 | 0.101 |
 | valida | Sub32 | 16 | 27 | 0.105 |
 | sphinx | Mul | 39 | 185 | 0.122 |
@@ -224,6 +225,7 @@ Lookup constraints are excluded from `|N|` and `T_arith` because they describe t
 | pico | Lt | 30 | 130 | 0.144 |
 | ziren | CloClz | 20 | 59 | 0.148 |
 | sp1 | ShiftLeft | 40 | 238 | 0.149 |
+| ziren | Cpu | 76 | 910 | 0.158 |
 | sp1 | DivRem | 85 | 1158 | 0.160 |
 | valida | Lt32 | 44 | 313 | 0.162 |
 | sp1 | Lt | 28 | 131 | 0.167 |
@@ -231,6 +233,7 @@ Lookup constraints are excluded from `|N|` and `T_arith` because they describe t
 | pico | MemoryReadWrite | 67 | 824 | 0.184 |
 | ziren | DivRem | 88 | 1522 | 0.197 |
 | sp1 | MemoryReadWrite | 46 | 423 | 0.200 |
+| sp1 | Cpu | 64 | 845 | 0.206 |
 | openvm | Jalr | 10 | 22 | 0.220 |
 | ziren | MovCond | 26 | 152 | 0.225 |
 | ziren | Jump | 19 | 84 | 0.233 |
