@@ -12,7 +12,7 @@ use zkm_core_machine::CloClzChip;
 
 use zebra::canonicalizer::save_repr_if_unique;
 use zebra::quick::{
-    experiment_harness, generate_report, load_config, load_config_for_args, print_sparsity_report, write_output, Args, ProgramInfo,
+    experiment_harness, generate_report, load_config, load_config_for_args, print_all_sparsity_reports, write_output, Args, ProgramInfo,
 };
 use zebra::solver::nop_post_process;
 use zebra::trace::trace_fmt_with_idxs;
@@ -93,7 +93,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     if args.sparsity {
-        print_sparsity_report(&constraint_info, "CloClz");
+        print_all_sparsity_reports(&[("CloClz", &constraint_info)]);
         return Ok(());
     }
     let mut rng = StdRng::seed_from_u64(search_config.seed);

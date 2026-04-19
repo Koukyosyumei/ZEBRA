@@ -5,7 +5,8 @@ use std::io;
 
 use zebra::canonicalizer::generate_alu_final_checker;
 use zebra::quick::{
-    experiment_harness, generate_report, load_config, load_config_for_args, print_sparsity_report, write_output, Args, ProgramInfo,
+    experiment_harness, generate_report, load_config, load_config_for_args,
+    print_all_sparsity_reports, write_output, Args, ProgramInfo,
 };
 use zebra::solver::nop_post_process;
 use zebra::utils::create_or_clear_dir;
@@ -24,6 +25,17 @@ fn main() -> Result<(), io::Error> {
     search_config.enable_heuristic = !args.no_heuristic;
     search_config.enable_interval_refinement = !args.no_refinement;
 
+    if args.sparsity {
+        let (ci_jal, _) = extract_jal_constraints(BABY_BEAR_PRIME);
+        let (ci_jalr, _) = extract_jalr_constraints(BABY_BEAR_PRIME);
+        print_all_sparsity_reports(&[
+            ("Jal", &ci_jal),
+            ("Lui", &ci_jal),
+            ("Jalr", &ci_jalr),
+        ]);
+        return Ok(());
+    }
+
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
 
@@ -38,10 +50,6 @@ fn main() -> Result<(), io::Error> {
                 .refinable_cols
                 .extend(&general_lookup_info.op_a.clone());
             constraint_info.output_columns = general_lookup_info.op_a.clone();
-            if args.sparsity {
-                print_sparsity_report(&constraint_info, "Jal");
-                return Ok(());
-            }
             if search_config.minimum_num_taregt_cols == 0 {
                 search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
             }
@@ -87,10 +95,6 @@ fn main() -> Result<(), io::Error> {
                 .refinable_cols
                 .extend(&general_lookup_info.op_a.clone());
             constraint_info.output_columns = general_lookup_info.op_a.clone();
-            if args.sparsity {
-                print_sparsity_report(&constraint_info, "Lui");
-                return Ok(());
-            }
             if search_config.minimum_num_taregt_cols == 0 {
                 search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
             }
@@ -133,10 +137,6 @@ fn main() -> Result<(), io::Error> {
                 .refinable_cols
                 .extend(&general_lookup_info.op_b.clone());
             constraint_info.output_columns = general_lookup_info.op_b.clone();
-            if args.sparsity {
-                print_sparsity_report(&constraint_info, "Jalr");
-                return Ok(());
-            }
             if search_config.minimum_num_taregt_cols == 0 {
                 search_config.minimum_num_taregt_cols = constraint_info.refinable_cols.len();
             }

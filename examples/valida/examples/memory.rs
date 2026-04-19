@@ -17,7 +17,7 @@ use valida_opcodes::BYTES_PER_INSTR;
 use zebra::canonicalizer::save_repr_if_unique;
 use zebra::interval::{AbstractInterval, MayBeFlag};
 use zebra::quick::{
-    experiment_harness, generate_report, load_config, load_config_for_args, print_sparsity_report, write_output, Args, ProgramInfo,
+    experiment_harness, generate_report, load_config, load_config_for_args, print_all_sparsity_reports, write_output, Args, ProgramInfo,
 };
 use zebra::solver::nop_post_process;
 use zebra::trace::AbstractTrace;
@@ -149,7 +149,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     if args.sparsity {
-        print_sparsity_report(&constraint_info, "Memory");
+        print_all_sparsity_reports(&[("Memory", &constraint_info)]);
         return Ok(());
     }
     let mut rng = StdRng::seed_from_u64(search_config.seed);

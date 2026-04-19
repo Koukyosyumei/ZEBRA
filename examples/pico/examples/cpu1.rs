@@ -20,7 +20,7 @@ use zebra::interval::AbstractInterval as AI;
 use zebra::interval::MayBeFlag;
 use zebra::memory::IntervalMemory;
 use zebra::memory::{check_memory_consistency, reconstruct_word as rec_word};
-use zebra::quick::{experiment_harness, load_config, load_config_for_args, print_sparsity_report, Args, ProgramInfo};
+use zebra::quick::{experiment_harness, load_config, load_config_for_args, print_all_sparsity_reports, Args, ProgramInfo};
 use zebra::trace::AbstractTrace;
 use zebra::ui::{pad_dummy_rows_with_last_dummy, UiState};
 use zebra::utils::create_or_clear_dir;
@@ -219,7 +219,7 @@ fn main() -> Result<(), io::Error> {
 
     // ######################## Program Initialization ###########################
     if args.sparsity {
-        print_sparsity_report(&constraint_info, "Cpu");
+        print_all_sparsity_reports(&[("Cpu", &constraint_info)]);
         return Ok(());
     }
     let mut rng = StdRng::seed_from_u64(search_config.seed);

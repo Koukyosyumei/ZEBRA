@@ -896,6 +896,124 @@ pub fn gather_cols(expr: &ZEBRASymbolicExpr, cols: &mut HashSet<usize>) {
     }
 }
 
+/// Count the total number of arithmetic operation nodes in `expr`.
+/// Every non-leaf node counts as one operation; leaf nodes (Variable, Constant,
+/// row predicates) contribute zero. Word* variants recurse into their limbs.
+pub fn count_arith_ops(expr: &ZEBRASymbolicExpr) -> usize {
+    match expr {
+        ZEBRASymbolicExpr::Variable(_)
+        | ZEBRASymbolicExpr::Constant(_)
+        | ZEBRASymbolicExpr::IsFirstRow
+        | ZEBRASymbolicExpr::IsTransition
+        | ZEBRASymbolicExpr::IsLastRow => 0,
+        ZEBRASymbolicExpr::Neg(e)
+        | ZEBRASymbolicExpr::Msb(e)
+        | ZEBRASymbolicExpr::Flip(e)
+        | ZEBRASymbolicExpr::KoalaBearRange(e)
+        | ZEBRASymbolicExpr::BabyBearRange(e) => 1 + count_arith_ops(e),
+        ZEBRASymbolicExpr::WhenNonZero(a, b)
+        | ZEBRASymbolicExpr::WhenZero(a, b)
+        | ZEBRASymbolicExpr::Add(a, b)
+        | ZEBRASymbolicExpr::Sub(a, b)
+        | ZEBRASymbolicExpr::Mul(a, b)
+        | ZEBRASymbolicExpr::MulLo(a, b)
+        | ZEBRASymbolicExpr::MulHiSS(a, b)
+        | ZEBRASymbolicExpr::MulHiUU(a, b)
+        | ZEBRASymbolicExpr::And(a, b)
+        | ZEBRASymbolicExpr::Or(a, b)
+        | ZEBRASymbolicExpr::Xor(a, b)
+        | ZEBRASymbolicExpr::SRL(a, b)
+        | ZEBRASymbolicExpr::SRLCarry(a, b)
+        | ZEBRASymbolicExpr::Lt(a, b) => 1 + count_arith_ops(a) + count_arith_ops(b),
+        ZEBRASymbolicExpr::WordAddU(a, b)
+        | ZEBRASymbolicExpr::WordSubU(a, b)
+        | ZEBRASymbolicExpr::WordMul(a, b)
+        | ZEBRASymbolicExpr::WordMulhu(a, b)
+        | ZEBRASymbolicExpr::WordMulhs(a, b)
+        | ZEBRASymbolicExpr::WordMultl(a, b)
+        | ZEBRASymbolicExpr::WordMulth(a, b)
+        | ZEBRASymbolicExpr::WordMultul(a, b)
+        | ZEBRASymbolicExpr::WordMultuh(a, b)
+        | ZEBRASymbolicExpr::WordDiv(a, b)
+        | ZEBRASymbolicExpr::WordSDiv(a, b)
+        | ZEBRASymbolicExpr::WordLt(a, b)
+        | ZEBRASymbolicExpr::WordSLe(a, b)
+        | ZEBRASymbolicExpr::WordSLt(a, b)
+        | ZEBRASymbolicExpr::WordAnd(a, b)
+        | ZEBRASymbolicExpr::WordOr(a, b)
+        | ZEBRASymbolicExpr::WordXOr(a, b)
+        | ZEBRASymbolicExpr::WordEq(a, b)
+        | ZEBRASymbolicExpr::WordNEq(a, b)
+        | ZEBRASymbolicExpr::WordSrl(a, b) => a
+            .iter()
+            .chain(b.iter())
+            .map(|e| count_arith_ops(e))
+            .sum(),
+    }
+}
+
+/// Collect all distinct `(entry, column-index)` neighbor pairs referenced by `expr`.
+/// This is the AIR neighborhood N: each unique [`ZEBRASymbolicVal`] is one cell.
+pub fn gather_neighbors(expr: &ZEBRASymbolicExpr, neighbors: &mut HashSet<ZEBRASymbolicVal>) {
+    match expr {
+        ZEBRASymbolicExpr::Variable(v) => {
+            neighbors.insert(v.clone());
+        }
+        ZEBRASymbolicExpr::Constant(_)
+        | ZEBRASymbolicExpr::IsFirstRow
+        | ZEBRASymbolicExpr::IsTransition
+        | ZEBRASymbolicExpr::IsLastRow => {}
+        ZEBRASymbolicExpr::WhenNonZero(a, b) | ZEBRASymbolicExpr::WhenZero(a, b) => {
+            gather_neighbors(a, neighbors);
+            gather_neighbors(b, neighbors);
+        }
+        ZEBRASymbolicExpr::Neg(e)
+        | ZEBRASymbolicExpr::Msb(e)
+        | ZEBRASymbolicExpr::Flip(e)
+        | ZEBRASymbolicExpr::KoalaBearRange(e)
+        | ZEBRASymbolicExpr::BabyBearRange(e) => gather_neighbors(e, neighbors),
+        ZEBRASymbolicExpr::Add(a, b)
+        | ZEBRASymbolicExpr::Sub(a, b)
+        | ZEBRASymbolicExpr::Mul(a, b)
+        | ZEBRASymbolicExpr::MulLo(a, b)
+        | ZEBRASymbolicExpr::MulHiSS(a, b)
+        | ZEBRASymbolicExpr::MulHiUU(a, b)
+        | ZEBRASymbolicExpr::And(a, b)
+        | ZEBRASymbolicExpr::Or(a, b)
+        | ZEBRASymbolicExpr::Xor(a, b)
+        | ZEBRASymbolicExpr::SRL(a, b)
+        | ZEBRASymbolicExpr::SRLCarry(a, b)
+        | ZEBRASymbolicExpr::Lt(a, b) => {
+            gather_neighbors(a, neighbors);
+            gather_neighbors(b, neighbors);
+        }
+        ZEBRASymbolicExpr::WordAddU(a, b)
+        | ZEBRASymbolicExpr::WordSubU(a, b)
+        | ZEBRASymbolicExpr::WordMul(a, b)
+        | ZEBRASymbolicExpr::WordMulhu(a, b)
+        | ZEBRASymbolicExpr::WordMulhs(a, b)
+        | ZEBRASymbolicExpr::WordMultl(a, b)
+        | ZEBRASymbolicExpr::WordMulth(a, b)
+        | ZEBRASymbolicExpr::WordMultul(a, b)
+        | ZEBRASymbolicExpr::WordMultuh(a, b)
+        | ZEBRASymbolicExpr::WordDiv(a, b)
+        | ZEBRASymbolicExpr::WordSDiv(a, b)
+        | ZEBRASymbolicExpr::WordLt(a, b)
+        | ZEBRASymbolicExpr::WordSLe(a, b)
+        | ZEBRASymbolicExpr::WordSLt(a, b)
+        | ZEBRASymbolicExpr::WordAnd(a, b)
+        | ZEBRASymbolicExpr::WordOr(a, b)
+        | ZEBRASymbolicExpr::WordXOr(a, b)
+        | ZEBRASymbolicExpr::WordEq(a, b)
+        | ZEBRASymbolicExpr::WordNEq(a, b)
+        | ZEBRASymbolicExpr::WordSrl(a, b) => {
+            for e in a.iter().chain(b.iter()) {
+                gather_neighbors(e, neighbors);
+            }
+        }
+    }
+}
+
 pub fn get_curr_i(expr: &ZEBRASymbolicExpr) -> Option<usize> {
     if let ZEBRASymbolicExpr::Variable(ZEBRASymbolicVal { entry, index }) = expr {
         if let ZEBRASymbolicEntry::Main { is_curr } = entry {

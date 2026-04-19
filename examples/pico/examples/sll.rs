@@ -13,7 +13,7 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
 use zebra::canonicalizer::generate_alu_final_checker;
 use zebra::quick::{
-    experiment_harness, generate_report, load_config, load_config_for_args, print_sparsity_report, write_output, Args, ProgramInfo,
+    experiment_harness, generate_report, load_config, load_config_for_args, print_all_sparsity_reports, write_output, Args, ProgramInfo,
 };
 use zebra::solver::nop_post_process;
 use zebra::utils::{create_or_clear_dir, indices_arr};
@@ -64,7 +64,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     if args.sparsity {
-        print_sparsity_report(&constraint_info, "ShiftLeft");
+        print_all_sparsity_reports(&[("ShiftLeft", &constraint_info)]);
         return Ok(());
     }
     let mut rng = StdRng::seed_from_u64(search_config.seed);

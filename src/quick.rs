@@ -33,6 +33,41 @@ pub fn print_sparsity_report(constraint_info: &ConstraintInfo, table_name: &str)
     println!("{report}");
 }
 
+/// Print sparsity reports for every table, followed by a one-line-per-table
+/// summary that makes cross-table comparison easy.
+///
+/// Call this instead of [`print_sparsity_report`] when multiple tables are
+/// available so the caller can see all metrics in a single pass.
+pub fn print_all_sparsity_reports(tables: &[(&str, &ConstraintInfo)]) {
+    let reports: Vec<(&str, crate::constraint::ConstraintSparsityReport)> = tables
+        .iter()
+        .map(|(name, ci)| (*name, ci.constraints.sparsity_report(ci.num_total_columns)))
+        .collect();
+
+    for (name, report) in &reports {
+        println!("=== Sparsity Report: {name} ===");
+        println!("{report}");
+        println!();
+    }
+
+    println!("=== Summary: AIR Sparsity Across All Tables ===");
+    println!(
+        "{:<30} {:>6} {:>8} {:>12} {:>10}",
+        "Table", "|N|", "T_arith", "sparsity", "coverage%"
+    );
+    println!("{}", "-".repeat(70));
+    for (name, report) in &reports {
+        println!(
+            "{:<30} {:>6} {:>8} {:>12.6} {:>9.1}%",
+            name,
+            report.neighborhood_size,
+            report.t_arith,
+            report.air_sparsity,
+            report.total_column_coverage * 100.0,
+        );
+    }
+}
+
 /// Like [`load_config`], but falls back to [`SearchConfig::default`] when
 /// `args.config` is `None` (allowed only in `--sparsity` mode).
 pub fn load_config_for_args(args: &Args) -> SearchConfig {

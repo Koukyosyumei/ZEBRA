@@ -31,7 +31,7 @@ use zebra::interval::MayBeFlag;
 use zebra::memory::reconstruct_word;
 use zebra::memory::IntervalMemory;
 use zebra::memory::{check_memory_consistency, reconstruct_word as rec_word};
-use zebra::quick::{experiment_harness, load_config, load_config_for_args, print_sparsity_report, Args, ProgramInfo};
+use zebra::quick::{experiment_harness, load_config, load_config_for_args, print_all_sparsity_reports, Args, ProgramInfo};
 use zebra::solver::RangeType;
 use zebra::state::AbstractState;
 use zebra::trace::AbstractTrace;
@@ -331,7 +331,7 @@ fn main() -> Result<(), io::Error> {
     //    let program = get_target_program::<BabyBear>();
 
     if args.sparsity {
-        print_sparsity_report(&constraint_info, "Cpu");
+        print_all_sparsity_reports(&[("Cpu", &constraint_info)]);
         return Ok(());
     }
     let mut rng = StdRng::seed_from_u64(search_config.seed);

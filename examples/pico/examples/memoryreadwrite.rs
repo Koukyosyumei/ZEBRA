@@ -15,7 +15,7 @@ use pico_vm::compiler::riscv::{instruction::Instruction, opcode::Opcode};
 
 use zebra::canonicalizer::{generate_memory_op_final_checker, save_repr_if_unique};
 use zebra::quick::{
-    experiment_harness, generate_report, load_config, load_config_for_args, print_sparsity_report, write_output, Args, ProgramInfo,
+    experiment_harness, generate_report, load_config, load_config_for_args, print_all_sparsity_reports, write_output, Args, ProgramInfo,
 };
 use zebra::solver::{dummy_program_counter_refine_fn, nop_post_process};
 use zebra::ui::UiState;
@@ -141,7 +141,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     if args.sparsity {
-        print_sparsity_report(&constraint_info, "MemoryReadWrite");
+        print_all_sparsity_reports(&[("MemoryReadWrite", &constraint_info)]);
         return Ok(());
     }
     let mut rng = StdRng::seed_from_u64(search_config.seed);

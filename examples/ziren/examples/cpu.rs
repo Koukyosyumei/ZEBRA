@@ -23,7 +23,7 @@ use zebra::interval::MayBeFlag;
 use zebra::memory::IntervalMemory;
 use zebra::memory::{check_memory_consistency, reconstruct_word as rec_word};
 use zebra::quick::{
-    experiment_harness, generate_report, load_config, load_config_for_args, print_sparsity_report, write_output, Args, ProgramInfo,
+    experiment_harness, generate_report, load_config, load_config_for_args, print_all_sparsity_reports, write_output, Args, ProgramInfo,
 };
 use zebra::solver::dummy_program_counter_refine_fn;
 use zebra::state::AbstractState;
@@ -166,7 +166,7 @@ fn main() -> Result<(), io::Error> {
         program_len: program.instructions.len(),
     };
     if args.sparsity {
-        print_sparsity_report(&constraint_info, "Cpu");
+        print_all_sparsity_reports(&[("Cpu", &constraint_info)]);
         return Ok(());
     }
     if search_config.minimum_num_taregt_cols == 0 {

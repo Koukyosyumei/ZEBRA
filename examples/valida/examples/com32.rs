@@ -18,7 +18,7 @@ use valida_opcodes::BYTES_PER_INSTR;
 
 use zebra::canonicalizer::generate_alu_final_checker;
 use zebra::quick::{
-    experiment_harness, generate_report, load_config, load_config_for_args, print_sparsity_report, write_output, Args, ProgramInfo,
+    experiment_harness, generate_report, load_config, load_config_for_args, print_all_sparsity_reports, write_output, Args, ProgramInfo,
 };
 use zebra::solver::nop_post_process;
 use zebra::utils::create_or_clear_dir;
@@ -100,7 +100,7 @@ fn main() -> Result<(), io::Error> {
     }
 
     if args.sparsity {
-        print_sparsity_report(&constraint_info, "Com32");
+        print_all_sparsity_reports(&[("Com32", &constraint_info)]);
         return Ok(());
     }
     let mut rng = StdRng::seed_from_u64(search_config.seed);

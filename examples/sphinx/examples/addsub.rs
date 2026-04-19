@@ -12,7 +12,7 @@ use sphinx_core::runtime::{Instruction, Opcode, Program};
 use zebra::canonicalizer::save_repr_if_unique;
 use zebra::interval::MayBeFlag;
 use zebra::quick::{
-    experiment_harness, generate_report, load_config, load_config_for_args, print_sparsity_report, write_output, Args, ProgramInfo,
+    experiment_harness, generate_report, load_config, load_config_for_args, print_all_sparsity_reports, write_output, Args, ProgramInfo,
 };
 use zebra::solver::nop_post_process;
 use zebra::trace::{trace_fmt_with_idxs, AbstractTrace};
@@ -132,7 +132,7 @@ fn main() -> Result<(), io::Error> {
     constraint_info.output_columns = output_columns.clone();
 
     if args.sparsity {
-        print_sparsity_report(&constraint_info, "AddSub");
+        print_all_sparsity_reports(&[("AddSub", &constraint_info)]);
         return Ok(());
     }
     let mut rng = StdRng::seed_from_u64(search_config.seed);
