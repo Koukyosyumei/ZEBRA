@@ -5,3 +5,5 @@ cargo build --release --example div32
 cargo build --release --example lt32
 cargo build --release --example mul32
 cargo build --release --example sub32
+cargo build --release --example cpu
+cargo build --release --example memory
