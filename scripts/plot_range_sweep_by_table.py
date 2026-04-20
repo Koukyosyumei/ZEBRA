@@ -213,15 +213,16 @@ def _draw_vm_ax(ax, vm: str, series: dict[int, tuple[float, float]]) -> None:
 
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel("Verified input volume  $(r+1)^2$", fontsize=9)
-    ax.set_ylabel("Mean verification time (s)", fontsize=9)
+    ax.set_xlabel("Verified input volume", fontsize=13)
+    ax.set_ylabel("Mean verification time (s)", fontsize=13)
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.yaxis.set_major_formatter(
         ticker.LogFormatterSciNotation(labelOnlyBase=False)
     )
+    ax.tick_params(labelsize=12)
     ax.grid(True, which="both", axis="both",
             linestyle=":", linewidth=0.5, alpha=0.6)
-    ax.legend(fontsize=8, loc="upper left", framealpha=0.85, handlelength=2.2)
+    ax.legend(fontsize=11, loc="upper left", framealpha=0.85, handlelength=2.2)
 
 
 def _draw_vm_ax_inverted(ax, vm: str, series: dict[int, tuple[float, float]]) -> None:
@@ -250,15 +251,16 @@ def _draw_vm_ax_inverted(ax, vm: str, series: dict[int, tuple[float, float]]) ->
 
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel("Mean verification time (s)", fontsize=9)
-    ax.set_ylabel("Verified input volume  $(r+1)^2$", fontsize=9)
+    ax.set_xlabel("Mean verification time (s)", fontsize=13)
+    ax.set_ylabel("Verified input volume", fontsize=13)
     ax.xaxis.set_major_formatter(
         ticker.LogFormatterSciNotation(labelOnlyBase=False)
     )
     ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.tick_params(labelsize=12)
     ax.grid(True, which="both", axis="both",
             linestyle=":", linewidth=0.5, alpha=0.6)
-    ax.legend(fontsize=8, loc="upper left", framealpha=0.85, handlelength=2.2)
+    ax.legend(fontsize=11, loc="upper left", framealpha=0.85, handlelength=2.2)
 
 
 def _save_fig(fig, out_dir: str, stem: str) -> None:
@@ -303,8 +305,8 @@ def plot_by_table_type(base_dir: str, out_dir: str) -> None:
             axes = [axes]
         for ax, vm in zip(axes, vms_present):
             _draw_vm_ax(ax, vm, vm_series[vm])
-            ax.set_title(vm, fontsize=10, fontweight="bold")
-        fig.suptitle(f"{ttype}  —  range sweep", fontsize=12, fontweight="bold")
+            ax.set_title(vm, fontsize=13, fontweight="bold")
+        fig.suptitle(f"{ttype}  —  range sweep", fontsize=14, fontweight="bold")
         fig.tight_layout()
         _save_fig(fig, out_dir, f"range_sweep_{ttype}")
         plt.close(fig)
@@ -315,8 +317,8 @@ def plot_by_table_type(base_dir: str, out_dir: str) -> None:
             axes2 = [axes2]
         for ax, vm in zip(axes2, vms_present):
             _draw_vm_ax_inverted(ax, vm, vm_series[vm])
-            ax.set_title(vm, fontsize=10, fontweight="bold")
-        fig2.suptitle(f"{ttype}  —  range sweep (time vs volume)", fontsize=12, fontweight="bold")
+            ax.set_title(vm, fontsize=13, fontweight="bold")
+        fig2.suptitle(f"{ttype}  —  range sweep (time vs volume)", fontsize=14, fontweight="bold")
         fig2.tight_layout()
         _save_fig(fig2, out_dir, f"range_sweep_{ttype}_inverted")
         plt.close(fig2)
