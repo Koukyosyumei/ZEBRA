@@ -358,11 +358,17 @@ fn main() -> Result<(), io::Error> {
     if args.benchmark {
         println!(
             "\n{:<4}  {:^8} {:^8}  {:^8} {:^8}  {:^8} {:^8}  {:^7} {:^7}  {:^6} {:^6}",
-            "Prog", "H.Found", "D.Found",
-            "H.1stTr", "D.1stTr",
-            "H.Trials", "D.Trials",
-            "H.ms", "D.ms",
-            "H.Bugs", "D.Bugs",
+            "Prog",
+            "H.Found",
+            "D.Found",
+            "H.1stTr",
+            "D.1stTr",
+            "H.Trials",
+            "D.Trials",
+            "H.ms",
+            "D.ms",
+            "H.Bugs",
+            "D.Bugs",
         );
         println!("{}", "-".repeat(90));
     }
@@ -407,7 +413,10 @@ fn main() -> Result<(), io::Error> {
 
         if args.benchmark {
             // -------- Benchmark branch: run both variants and collect metrics --------
-            let mut record = BenchmarkRecord { program_id: i, ..Default::default() };
+            let mut record = BenchmarkRecord {
+                program_id: i,
+                ..Default::default()
+            };
 
             for &use_heuristic in &[true, false] {
                 let mut cfg = search_config.clone();
@@ -424,23 +433,51 @@ fn main() -> Result<(), io::Error> {
                 let first_trial: Rc<RefCell<Option<usize>>> = Rc::new(RefCell::new(None));
                 let ft = Rc::clone(&first_trial);
 
+                let bug_class_map: Rc<RefCell<HashMap<String, HashSet<String>>>> =
+                    Rc::new(RefCell::new(HashMap::new()));
+                let bug_class_map_ref = Rc::clone(&bug_class_map);
+
                 let bench_final_check =
-                    move |trace: &AbstractTrace, num_trial: usize, prime: u32,
-                          known_report: &mut HashSet<String>, _ui: &mut UiState,
+                    move |trace: &AbstractTrace,
+                          num_trial: usize,
+                          prime: u32,
+                          known_report: &mut HashSet<String>,
+                          ui: &mut UiState,
                           _area: &mut i128| {
-                        let mut reprs = cpu_canonicalizer(trace, prime);
-                        let mut types: HashSet<String> = HashSet::new();
-                        check_bug_type(trace, &mut reprs, &mut types, prime);
-                        let repr = format!("{}", PrettySet(reprs));
-                        if !known_report.contains(&repr) {
-                            known_report.insert(repr);
-                            if !types.is_empty() {
-                                let mut g = ft.borrow_mut();
-                                if g.is_none() {
-                                    *g = Some(num_trial);
+                        let mut record_reprs = cpu_canonicalizer(trace, prime);
+                        let mut bug_types: HashSet<String> = HashSet::new();
+                        check_bug_type(trace, &mut record_reprs, &mut bug_types, prime);
+
+                        let trace_repr = format!("{}", PrettySet(record_reprs.clone()));
+                        if !known_report.contains(&trace_repr) {
+                            let mut is_new = bug_types.is_empty();
+                            for bt in &bug_types {
+                                if !known_report.contains(bt) {
+                                    is_new = true;
+                                    known_report.insert(bt.clone());
                                 }
                             }
+                            if !is_new {
+                                return;
+                            }
+
+                            // Associate this trace with its bug classes
+                            let mut map = bug_class_map_ref.borrow_mut();
+                            if bug_types.is_empty() {
+                                map.entry("Unknown".to_string())
+                                    .or_default()
+                                    .insert(trace_repr.clone());
+                            } else {
+                                for bt in &bug_types {
+                                    map.entry(bt.clone())
+                                        .or_default()
+                                        .insert(trace_repr.clone());
+                                }
+                            }
+                            drop(map);
                         }
+
+                        save_repr_if_unique(&PrettySet(record_reprs), known_report, ui);
                     };
 
                 let adj = make_pc_adjuster(&program_table);
@@ -488,8 +525,12 @@ fn main() -> Result<(), io::Error> {
                 record.program_id,
                 if record.heuristic_found { "yes" } else { "no" },
                 if record.dfs_found { "yes" } else { "no" },
-                record.heuristic_first_trial.map_or("-".to_string(), |v| v.to_string()),
-                record.dfs_first_trial.map_or("-".to_string(), |v| v.to_string()),
+                record
+                    .heuristic_first_trial
+                    .map_or("-".to_string(), |v| v.to_string()),
+                record
+                    .dfs_first_trial
+                    .map_or("-".to_string(), |v| v.to_string()),
                 record.heuristic_total_trials,
                 record.dfs_total_trials,
                 record.heuristic_time_ms,
@@ -513,50 +554,51 @@ fn main() -> Result<(), io::Error> {
             let bug_class_map_ref = Rc::clone(&bug_class_map);
 
             // Seed known_solution with the honest trace so it is not reported as malicious
-            let mut known_solution: HashSet<String> = global_found_classes
-                .iter()
-                .cloned()
-                .collect();
+            let mut known_solution: HashSet<String> =
+                global_found_classes.iter().cloned().collect();
             known_solution.insert(honest_repr.clone());
 
-            let final_check_fn =
-                move |trace: &AbstractTrace, _num_trial: usize, prime: u32,
-                      known_report: &mut HashSet<String>, ui: &mut UiState, _area: &mut i128| {
-                    let mut record_reprs = cpu_canonicalizer(trace, prime);
-                    let mut bug_types: HashSet<String> = HashSet::new();
-                    check_bug_type(trace, &mut record_reprs, &mut bug_types, prime);
+            let final_check_fn = move |trace: &AbstractTrace,
+                                       _num_trial: usize,
+                                       prime: u32,
+                                       known_report: &mut HashSet<String>,
+                                       ui: &mut UiState,
+                                       _area: &mut i128| {
+                let mut record_reprs = cpu_canonicalizer(trace, prime);
+                let mut bug_types: HashSet<String> = HashSet::new();
+                check_bug_type(trace, &mut record_reprs, &mut bug_types, prime);
 
-                    let trace_repr = format!("{}", PrettySet(record_reprs.clone()));
-                    if !known_report.contains(&trace_repr) {
-                        let mut is_new = bug_types.is_empty();
-                        for bt in &bug_types {
-                            if !known_report.contains(bt) {
-                                is_new = true;
-                                known_report.insert(bt.clone());
-                            }
+                let trace_repr = format!("{}", PrettySet(record_reprs.clone()));
+                if !known_report.contains(&trace_repr) {
+                    let mut is_new = bug_types.is_empty();
+                    for bt in &bug_types {
+                        if !known_report.contains(bt) {
+                            is_new = true;
+                            known_report.insert(bt.clone());
                         }
-                        if !is_new {
-                            return;
-                        }
-
-                        // Associate this trace with its bug classes
-                        let mut map = bug_class_map_ref.borrow_mut();
-                        if bug_types.is_empty() {
-                            map.entry("Unknown".to_string())
-                                .or_default()
-                                .insert(trace_repr.clone());
-                        } else {
-                            for bt in &bug_types {
-                                map.entry(bt.clone())
-                                    .or_default()
-                                    .insert(trace_repr.clone());
-                            }
-                        }
-                        drop(map);
+                    }
+                    if !is_new {
+                        return;
                     }
 
-                    save_repr_if_unique(&PrettySet(record_reprs), known_report, ui);
-                };
+                    // Associate this trace with its bug classes
+                    let mut map = bug_class_map_ref.borrow_mut();
+                    if bug_types.is_empty() {
+                        map.entry("Unknown".to_string())
+                            .or_default()
+                            .insert(trace_repr.clone());
+                    } else {
+                        for bt in &bug_types {
+                            map.entry(bt.clone())
+                                .or_default()
+                                .insert(trace_repr.clone());
+                        }
+                    }
+                    drop(map);
+                }
+
+                save_repr_if_unique(&PrettySet(record_reprs), known_report, ui);
+            };
 
             let result = experiment_harness(
                 &program_info,
@@ -618,7 +660,10 @@ fn main() -> Result<(), io::Error> {
     if args.benchmark && !benchmark_records.is_empty() {
         let n = benchmark_records.len() as f64;
 
-        let h_success = benchmark_records.iter().filter(|r| r.heuristic_found).count();
+        let h_success = benchmark_records
+            .iter()
+            .filter(|r| r.heuristic_found)
+            .count();
         let d_success = benchmark_records.iter().filter(|r| r.dfs_found).count();
 
         // Mean first-trial over programs where that variant found at least one bug.
@@ -638,20 +683,38 @@ fn main() -> Result<(), io::Error> {
             }
         };
 
-        let h_mean_trials: f64 =
-            benchmark_records.iter().map(|r| r.heuristic_total_trials as f64).sum::<f64>() / n;
-        let d_mean_trials: f64 =
-            benchmark_records.iter().map(|r| r.dfs_total_trials as f64).sum::<f64>() / n;
+        let h_mean_trials: f64 = benchmark_records
+            .iter()
+            .map(|r| r.heuristic_total_trials as f64)
+            .sum::<f64>()
+            / n;
+        let d_mean_trials: f64 = benchmark_records
+            .iter()
+            .map(|r| r.dfs_total_trials as f64)
+            .sum::<f64>()
+            / n;
 
-        let h_mean_ms: f64 =
-            benchmark_records.iter().map(|r| r.heuristic_time_ms as f64).sum::<f64>() / n;
-        let d_mean_ms: f64 =
-            benchmark_records.iter().map(|r| r.dfs_time_ms as f64).sum::<f64>() / n;
+        let h_mean_ms: f64 = benchmark_records
+            .iter()
+            .map(|r| r.heuristic_time_ms as f64)
+            .sum::<f64>()
+            / n;
+        let d_mean_ms: f64 = benchmark_records
+            .iter()
+            .map(|r| r.dfs_time_ms as f64)
+            .sum::<f64>()
+            / n;
 
-        let h_mean_bugs: f64 =
-            benchmark_records.iter().map(|r| r.heuristic_bugs as f64).sum::<f64>() / n;
-        let d_mean_bugs: f64 =
-            benchmark_records.iter().map(|r| r.dfs_bugs as f64).sum::<f64>() / n;
+        let h_mean_bugs: f64 = benchmark_records
+            .iter()
+            .map(|r| r.heuristic_bugs as f64)
+            .sum::<f64>()
+            / n;
+        let d_mean_bugs: f64 = benchmark_records
+            .iter()
+            .map(|r| r.dfs_bugs as f64)
+            .sum::<f64>()
+            / n;
 
         println!("\n{}", "=".repeat(60));
         println!("Benchmark Summary  ({} programs)", benchmark_records.len());
@@ -685,20 +748,22 @@ fn main() -> Result<(), io::Error> {
         println!("{}", "=".repeat(60));
 
         // Win/tie/lose counts
-        let h_wins = benchmark_records.iter().filter(|r| {
-            match (r.heuristic_first_trial, r.dfs_first_trial) {
+        let h_wins = benchmark_records
+            .iter()
+            .filter(|r| match (r.heuristic_first_trial, r.dfs_first_trial) {
                 (Some(h), Some(d)) => h < d,
                 (Some(_), None) => true,
                 _ => false,
-            }
-        }).count();
-        let d_wins = benchmark_records.iter().filter(|r| {
-            match (r.heuristic_first_trial, r.dfs_first_trial) {
+            })
+            .count();
+        let d_wins = benchmark_records
+            .iter()
+            .filter(|r| match (r.heuristic_first_trial, r.dfs_first_trial) {
                 (Some(h), Some(d)) => d < h,
                 (None, Some(_)) => true,
                 _ => false,
-            }
-        }).count();
+            })
+            .count();
         let ties = benchmark_records.len() - h_wins - d_wins;
         println!(
             "First-bug race: Heuristic wins {}, Blind-DFS wins {}, Ties/N/A {}",
