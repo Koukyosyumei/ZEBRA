@@ -131,6 +131,9 @@ fn main() -> Result<(), io::Error> {
     //println!("MEM AIR MAP");
     //println!("  {:?}", MEM_COL_MAP);
 
+    search_config.max_expansions = 3000;
+    search_config.time_out_ms = 10000;
+
     let air = MemoryChip::default();
     let num_col = NUM_MEM_COLS;
     let chip_idx = 2;
