@@ -501,7 +501,14 @@ fn main() -> Result<(), io::Error> {
                 )
                 .unwrap();
 
-                let bugs_found = known.len().saturating_sub(init_known_size);
+                let mut bug_str_len = 0;
+                for s in ALL_BUG_CLASSES {
+                    if known.contains(*s) {
+                        bug_str_len += 1;
+                    }
+                }
+
+                let bugs_found = known.len().saturating_sub(init_known_size + bug_str_len);
                 let first = *first_trial.borrow();
 
                 if use_heuristic {
