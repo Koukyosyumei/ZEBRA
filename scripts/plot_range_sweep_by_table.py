@@ -188,43 +188,95 @@ def aggregate_opcodes(
 
 # ── plotting ──────────────────────────────────────────────────────────────────
 
-def _plot_single_table_type(ax, ttype: str, vm_series: dict) -> None:
-    """Draw all VM lines (solid) and brute-force lines (dashed) onto *ax*."""
-    for vm, series in sorted(vm_series.items()):
-        color  = VM_COLORS.get(vm, "gray")
-        marker = VM_MARKERS.get(vm, "o")
+def _draw_vm_ax(ax, vm: str, series: dict[int, tuple[float, float]]) -> None:
+    """
+    Draw one VM's actual line + brute-force reference onto *ax*.
+    x = verified volume (r+1)^2, y = mean verification time (s).
+    """
+    color  = VM_COLORS.get(vm, "gray")
+    marker = VM_MARKERS.get(vm, "o")
 
-        xs      = sorted(series.keys())
-        volumes = [(r + 1) ** 2 for r in xs]
-        ys      = [series[r][0] for r in xs]
+    xs      = sorted(series.keys())
+    volumes = [(r + 1) ** 2 for r in xs]
+    ys      = [series[r][0] for r in xs]
 
-        ax.plot(volumes, ys,
-                color=color, marker=marker, markersize=5,
-                linewidth=2.0, linestyle="-", label=vm)
+    ax.plot(volumes, ys,
+            color=color, marker=marker, markersize=5,
+            linewidth=2.0, linestyle="-", label="actual")
 
-        singleton_time = series.get(0, (None, None))[0]
-        if singleton_time is not None:
-            bf_ys = [singleton_time * v for v in volumes]
-            ax.plot(volumes, bf_ys,
-                    color=color, linestyle="--", linewidth=1.2,
-                    alpha=0.55, marker="", label=f"{vm} (brute-force)")
+    singleton_time = series.get(0, (None, None))[0]
+    if singleton_time is not None:
+        bf_ys = [singleton_time * v for v in volumes]
+        ax.plot(volumes, bf_ys,
+                color=color, linestyle="--", linewidth=1.2,
+                alpha=0.55, marker="", label="brute-force")
 
-    ax.set_title(ttype, fontsize=11, fontweight="bold")
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel("Verified input volume  $(r+1)^2$", fontsize=10)
-    ax.set_ylabel("Mean verification time (s)", fontsize=10)
+    ax.set_xlabel("Verified input volume  $(r+1)^2$", fontsize=9)
+    ax.set_ylabel("Mean verification time (s)", fontsize=9)
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
     ax.yaxis.set_major_formatter(
         ticker.LogFormatterSciNotation(labelOnlyBase=False)
     )
     ax.grid(True, which="both", axis="both",
             linestyle=":", linewidth=0.5, alpha=0.6)
-    ax.legend(fontsize=8, loc="upper left",
-              framealpha=0.85, handlelength=2.2, ncol=1)
+    ax.legend(fontsize=8, loc="upper left", framealpha=0.85, handlelength=2.2)
+
+
+def _draw_vm_ax_inverted(ax, vm: str, series: dict[int, tuple[float, float]]) -> None:
+    """
+    Draw one VM's actual line + brute-force reference onto *ax*.
+    x = mean verification time (s), y = verified volume (r+1)^2.
+    """
+    color  = VM_COLORS.get(vm, "gray")
+    marker = VM_MARKERS.get(vm, "o")
+
+    xs      = sorted(series.keys())
+    volumes = [(r + 1) ** 2 for r in xs]
+    times   = [series[r][0] for r in xs]
+
+    ax.plot(times, volumes,
+            color=color, marker=marker, markersize=5,
+            linewidth=2.0, linestyle="-", label="actual")
+
+    singleton_time = series.get(0, (None, None))[0]
+    if singleton_time is not None and singleton_time > 0:
+        # brute-force: time = singleton_time × volume  →  volume = time / singleton_time
+        bf_vols = [t / singleton_time for t in times]
+        ax.plot(times, bf_vols,
+                color=color, linestyle="--", linewidth=1.2,
+                alpha=0.55, marker="", label="brute-force")
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Mean verification time (s)", fontsize=9)
+    ax.set_ylabel("Verified input volume  $(r+1)^2$", fontsize=9)
+    ax.xaxis.set_major_formatter(
+        ticker.LogFormatterSciNotation(labelOnlyBase=False)
+    )
+    ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.grid(True, which="both", axis="both",
+            linestyle=":", linewidth=0.5, alpha=0.6)
+    ax.legend(fontsize=8, loc="upper left", framealpha=0.85, handlelength=2.2)
+
+
+def _save_fig(fig, out_dir: str, stem: str) -> None:
+    for ext in ("pdf", "png"):
+        path = os.path.join(out_dir, f"{stem}.{ext}")
+        fig.savefig(path,
+                    format=ext,
+                    dpi=(150 if ext == "png" else None),
+                    bbox_inches="tight")
+        print(f"Saved: {path}")
 
 
 def plot_by_table_type(base_dir: str, out_dir: str) -> None:
+    """
+    For each table type: one figure with one subfigure per zkVM.
+    Each subfigure: x = volume, y = verification time (log-log).
+    A second set of figures swaps the axes (x = time, y = volume).
+    """
     os.makedirs(out_dir, exist_ok=True)
 
     any_data = False
@@ -242,18 +294,32 @@ def plot_by_table_type(base_dir: str, out_dir: str) -> None:
             continue
 
         any_data = True
-        fig, ax = plt.subplots(figsize=(5, 4.5))
-        _plot_single_table_type(ax, ttype, vm_series)
-        fig.tight_layout()
+        vms_present = sorted(vm_series.keys())
+        n = len(vms_present)
 
-        for ext in ("pdf", "png"):
-            out_path = os.path.join(out_dir, f"range_sweep_{ttype}.{ext}")
-            fig.savefig(out_path,
-                        format=ext,
-                        dpi=(150 if ext == "png" else None),
-                        bbox_inches="tight")
-            print(f"Saved: {out_path}")
+        # ── figure 1: volume (x) vs time (y) ─────────────────────────────────
+        fig, axes = plt.subplots(1, n, figsize=(4 * n, 4), sharey=False)
+        if n == 1:
+            axes = [axes]
+        for ax, vm in zip(axes, vms_present):
+            _draw_vm_ax(ax, vm, vm_series[vm])
+            ax.set_title(vm, fontsize=10, fontweight="bold")
+        fig.suptitle(f"{ttype}  —  range sweep", fontsize=12, fontweight="bold")
+        fig.tight_layout()
+        _save_fig(fig, out_dir, f"range_sweep_{ttype}")
         plt.close(fig)
+
+        # ── figure 2: time (x) vs volume (y) ─────────────────────────────────
+        fig2, axes2 = plt.subplots(1, n, figsize=(4 * n, 4), sharey=False)
+        if n == 1:
+            axes2 = [axes2]
+        for ax, vm in zip(axes2, vms_present):
+            _draw_vm_ax_inverted(ax, vm, vm_series[vm])
+            ax.set_title(vm, fontsize=10, fontweight="bold")
+        fig2.suptitle(f"{ttype}  —  range sweep (time vs volume)", fontsize=12, fontweight="bold")
+        fig2.tight_layout()
+        _save_fig(fig2, out_dir, f"range_sweep_{ttype}_inverted")
+        plt.close(fig2)
 
     if not any_data:
         print("No range_sweep data found.  Run the range-sweep experiments first.",
