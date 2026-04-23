@@ -203,14 +203,14 @@ def _draw_vm_ax(ax, vm: str, series: dict[int, tuple[float, float]]) -> None:
 
     ax.plot(volumes, ys,
             color=color, marker=marker, markersize=5,
-            linewidth=2.0, linestyle="-", label="actual")
+            linewidth=2.0, linestyle="-", label="ZEBRA")
 
     singleton_time = series.get(0, (None, None))[0]
     if singleton_time is not None:
         bf_ys = [singleton_time * v for v in volumes]
         ax.plot(volumes, bf_ys,
                 color=color, linestyle="--", linewidth=1.2,
-                alpha=0.55, marker="", label="brute-force")
+                alpha=0.55, marker="", label="iterative point-wise verification")
 
     ax.set_xscale("log")
     ax.set_yscale("log")
@@ -240,7 +240,7 @@ def _draw_vm_ax_inverted(ax, vm: str, series: dict[int, tuple[float, float]]) ->
 
     ax.plot(times, volumes,
             color=color, marker=marker, markersize=5,
-            linewidth=2.0, linestyle="-", label="actual")
+            linewidth=2.0, linestyle="-", label="ZEBRA")
 
     singleton_time = series.get(0, (None, None))[0]
     if singleton_time is not None and singleton_time > 0:
@@ -248,7 +248,7 @@ def _draw_vm_ax_inverted(ax, vm: str, series: dict[int, tuple[float, float]]) ->
         bf_vols = [t / singleton_time for t in times]
         ax.plot(times, bf_vols,
                 color=color, linestyle="--", linewidth=1.2,
-                alpha=0.55, marker="", label="brute-force")
+                alpha=0.55, marker="", label="iterative point-wise verification")
 
     ax.set_xscale("log")
     ax.set_yscale("log")
