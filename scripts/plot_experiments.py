@@ -36,21 +36,6 @@ plt.style.use("ggplot")
 # cmap   : matplotlib colormap used to shade chips within this VM
 # c_range: (lo, hi) – portion of the colormap to use (avoids near-white ends)
 VMS = {
-    "ziren": {
-        "chips": ["addsub", "bitwise", "cloclz", "movcond", "mul", "shiftleft", "jump"],
-        "cmap": "Reds",
-        "c_range": (0.35, 0.90),
-    },
-    "sp1": {
-        "chips": ["addsub", "bitwise", "mul", "jump", "shiftleft"],
-        "cmap": "Blues",
-        "c_range": (0.35, 0.90),
-    },
-    "pico": {
-        "chips": ["addsub", "bitwise", "mul", "sll"],
-        "cmap": "Greens",
-        "c_range": (0.35, 0.90),
-    },
     "valida": {
         "chips": ["add32", "sub32"],
         "cmap": "Purples",
@@ -59,6 +44,21 @@ VMS = {
     "sphinx": {
         "chips": ["addsub", "bitwise", "mul", "divrem", "lt", "shiftleft", "sr"],
         "cmap": "Oranges",
+        "c_range": (0.35, 0.90),
+    },
+    "pico": {
+        "chips": ["addsub", "bitwise", "mul", "sll"],
+        "cmap": "Greens",
+        "c_range": (0.35, 0.90),
+    },
+    "sp1": {
+        "chips": ["addsub", "bitwise", "mul", "jump", "shiftleft"],
+        "cmap": "Blues",
+        "c_range": (0.35, 0.90),
+    },
+    "ziren": {
+        "chips": ["addsub", "bitwise", "cloclz", "movcond", "mul", "shiftleft", "jump"],
+        "cmap": "Reds",
         "c_range": (0.35, 0.90),
     },
 }
@@ -235,7 +235,7 @@ def _plot_vm_ax(
                             capsize=3, capthick=1.0, elinewidth=0.9, alpha=0.7)
                 """
 
-    ax.set_title(vm_name, fontsize=11, fontweight="bold")
+    ax.set_title(vm_name, fontsize=15, fontweight="bold")
     ax.set_yscale("log")
     ax.yaxis.set_major_formatter(
         plt.matplotlib.ticker.LogFormatterSciNotation(labelOnlyBase=False)
