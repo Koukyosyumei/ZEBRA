@@ -210,7 +210,7 @@ def _draw_vm_ax(ax, vm: str, series: dict[int, tuple[float, float]]) -> None:
         bf_ys = [singleton_time * v for v in volumes]
         ax.plot(volumes, bf_ys,
                 color=color, linestyle="--", linewidth=1.2,
-                alpha=0.55, marker="", label="iterative point-wise verification")
+                alpha=0.55, marker="", label="iterative point-wise\n verification")
 
     ax.set_xscale("log")
     ax.set_yscale("log")
@@ -248,7 +248,7 @@ def _draw_vm_ax_inverted(ax, vm: str, series: dict[int, tuple[float, float]]) ->
         bf_vols = [t / singleton_time for t in times]
         ax.plot(times, bf_vols,
                 color=color, linestyle="--", linewidth=1.2,
-                alpha=0.55, marker="", label="iterative point-wise verification")
+                alpha=0.55, marker="", label="iterative point-wise\n verification")
 
     ax.set_xscale("log")
     ax.set_yscale("log")
