@@ -510,6 +510,24 @@ def _std(xs: List[float]) -> float:
     return math.sqrt(sum((x - m) ** 2 for x in xs) / (len(xs) - 1))
 
 
+def _median(xs: List[float]) -> float:
+    if not xs:
+        return float("nan")
+    s = sorted(xs)
+    n = len(s)
+    if n % 2 == 1:
+        return s[n // 2]
+    return 0.5 * (s[n // 2 - 1] + s[n // 2])
+
+
+def _geomean(xs: List[float]) -> float:
+    """Geometric mean. Skips non-positive values defensively."""
+    pos = [x for x in xs if x > 0]
+    if not pos:
+        return float("nan")
+    return math.exp(sum(math.log(x) for x in pos) / len(pos))
+
+
 def aggregate(
     results: List[OpcodeResult],
     vms: List[str],
@@ -679,6 +697,207 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
     _println()
 
 
+# ── Pairwise speedup analysis ─────────────────────────────────────────────────
+
+@dataclass
+class PairStats:
+    n_common_ops:    int = 0
+    n_total_ops:     int = 0
+    n_common_chips:  int = 0
+    n_total_chips:   int = 0
+    op_speedups:     List[float] = field(default_factory=list)
+    chip_speedups:   List[float] = field(default_factory=list)
+
+
+def compute_pair_stats(
+    results: List[OpcodeResult],
+    vms:     List[str],
+    fast:    str,
+    slow:    str,
+) -> Tuple[Dict[str, PairStats], PairStats]:
+    """
+    For each VM, count opcodes and chips verified by BOTH `fast` and `slow`,
+    and collect per-op / per-chip speedup ratios (slow_time / fast_time).
+
+    Op-level speedup: slow_mean / fast_mean for every commonly-verified opcode.
+    Chip-level speedup: a chip counts as common only when every opcode in the
+    chip is verified by both methods; speedup is mean(slow times) / mean(fast
+    times) across the chip's opcodes.
+    """
+    by_key: Dict[Tuple[str, str, str, str], OpcodeResult] = {
+        (r.vm, r.chip, r.opcode, r.method): r for r in results
+    }
+
+    per_vm: Dict[str, PairStats] = {}
+    totals = PairStats()
+
+    for vm in vms:
+        chips = VM_REGISTRY[vm]["chips"]
+        ps = PairStats(
+            n_total_ops   = sum(len(o) for o in chips.values()),
+            n_total_chips = len(chips),
+        )
+
+        for chip, opcodes in chips.items():
+            chip_fast: List[float] = []
+            chip_slow: List[float] = []
+            chip_fully_common = bool(opcodes)
+            for op in opcodes:
+                rf = by_key.get((vm, chip, op, fast))
+                rs = by_key.get((vm, chip, op, slow))
+                if (rf and rs and rf.verified and rs.verified
+                        and rf.times_s and rs.times_s):
+                    tf = sum(rf.times_s) / len(rf.times_s)
+                    ts = sum(rs.times_s) / len(rs.times_s)
+                    if tf > 0:
+                        ps.op_speedups.append(ts / tf)
+                        ps.n_common_ops += 1
+                        chip_fast.append(tf)
+                        chip_slow.append(ts)
+                    else:
+                        chip_fully_common = False
+                else:
+                    chip_fully_common = False
+
+            if chip_fully_common and chip_fast:
+                mf = sum(chip_fast) / len(chip_fast)
+                ms = sum(chip_slow) / len(chip_slow)
+                if mf > 0:
+                    ps.chip_speedups.append(ms / mf)
+                    ps.n_common_chips += 1
+
+        per_vm[vm] = ps
+        totals.n_common_ops   += ps.n_common_ops
+        totals.n_total_ops    += ps.n_total_ops
+        totals.n_common_chips += ps.n_common_chips
+        totals.n_total_chips  += ps.n_total_chips
+        totals.op_speedups.extend(ps.op_speedups)
+        totals.chip_speedups.extend(ps.chip_speedups)
+
+    return per_vm, totals
+
+
+def _select_pairs(methods: List[str]) -> List[Tuple[str, str]]:
+    """Choose (fast, slow) pairs to analyse.
+
+    Default: every non-z3 method paired against z3 (the baseline solver).
+    If z3 is absent but bb is present, fall back to (m, bb) pairs.
+    """
+    if "z3" in methods:
+        return [(m, "z3") for m in methods if m != "z3"]
+    if "bb" in methods:
+        return [(m, "bb") for m in methods if m != "bb"]
+    return []
+
+
+def _fmt_speedup(x: float) -> str:
+    if math.isnan(x):
+        return "  N/A "
+    return f"{x:5.2f}x"
+
+
+def _fmt_ratio(num: int, denom: int) -> str:
+    return f"{num:>3} / {denom:<3}"
+
+
+def print_pairwise_comparison(
+    results: List[OpcodeResult],
+    vms:     List[str],
+    methods: List[str],
+) -> None:
+    """Print per-pair common-ops / common-chips counts and speedup summaries."""
+    pairs = _select_pairs(methods)
+    if not pairs:
+        return
+
+    w_vm = max([len(v) for v in vms] + [len("TOTAL"), 6])
+
+    for fast, slow in pairs:
+        per_vm, totals = compute_pair_stats(results, vms, fast, slow)
+
+        title = (f"Speedup of {METHOD_LABELS.get(fast, fast)} "
+                 f"vs {METHOD_LABELS.get(slow, slow)}  "
+                 f"(slow / fast; higher = {fast} faster)")
+
+        # Column widths
+        w_co  = 11   # "999 / 999  "
+        w_cc  = 11
+        w_sp  = 7    # "99.99x"
+        # Each speedup block: 3 numbers + 2 separators
+        blk_w = w_sp * 3 + 2 * 2
+
+        outer = (w_vm + 2) + 1 + (w_co + 2) + 1 + (w_cc + 2) + 1 + (blk_w + 2) + 1 + (blk_w + 2)
+        outer = max(outer, len(title) + 4)
+
+        _println()
+        _println("┌" + "─" * outer + "┐")
+        _println("│" + f" {title} ".center(outer) + "│")
+        _println("├" + "─" * outer + "┤")
+
+        hdr = (
+            f" {'zkVM':<{w_vm}} "
+            f"│ {'Common-Ops':<{w_co}} "
+            f"│ {'Common-Chips':<{w_cc}} "
+            f"│ {'Op-level speedup':^{blk_w}} "
+            f"│ {'Chip-level speedup':^{blk_w}} "
+        )
+        _println("│" + hdr + "│")
+
+        sub_block = f"{'mean':>{w_sp}}  {'median':>{w_sp}}  {'geomean':>{w_sp}}"
+        sub = (
+            f" {'':<{w_vm}} "
+            f"│ {'(both ok)':<{w_co}} "
+            f"│ {'(both ok)':<{w_cc}} "
+            f"│ {sub_block:^{blk_w}} "
+            f"│ {sub_block:^{blk_w}} "
+        )
+        _println("│" + sub + "│")
+
+        sep = ("├"
+               + "─" * (w_vm + 2) + "┼"
+               + "─" * (w_co + 2) + "┼"
+               + "─" * (w_cc + 2) + "┼"
+               + "─" * (blk_w + 2) + "┼"
+               + "─" * (blk_w + 2)
+               + "┤")
+        _println(sep)
+
+        def fmt_row(label: str, ps: PairStats) -> str:
+            op_block = (
+                f"{_fmt_speedup(sum(ps.op_speedups)/len(ps.op_speedups)) if ps.op_speedups else _fmt_speedup(float('nan')):>{w_sp}}  "
+                f"{_fmt_speedup(_median(ps.op_speedups)):>{w_sp}}  "
+                f"{_fmt_speedup(_geomean(ps.op_speedups)):>{w_sp}}"
+            )
+            chip_block = (
+                f"{_fmt_speedup(sum(ps.chip_speedups)/len(ps.chip_speedups)) if ps.chip_speedups else _fmt_speedup(float('nan')):>{w_sp}}  "
+                f"{_fmt_speedup(_median(ps.chip_speedups)):>{w_sp}}  "
+                f"{_fmt_speedup(_geomean(ps.chip_speedups)):>{w_sp}}"
+            )
+            return ("│"
+                    + f" {label:<{w_vm}} "
+                    + f"│ {_fmt_ratio(ps.n_common_ops, ps.n_total_ops):<{w_co}} "
+                    + f"│ {_fmt_ratio(ps.n_common_chips, ps.n_total_chips):<{w_cc}} "
+                    + f"│ {op_block:^{blk_w}} "
+                    + f"│ {chip_block:^{blk_w}} "
+                    + "│")
+
+        for vm in vms:
+            _println(fmt_row(vm, per_vm[vm]))
+
+        # Totals separator + row
+        sep_tot = ("╞"
+                   + "═" * (w_vm + 2) + "╪"
+                   + "═" * (w_co + 2) + "╪"
+                   + "═" * (w_cc + 2) + "╪"
+                   + "═" * (blk_w + 2) + "╪"
+                   + "═" * (blk_w + 2)
+                   + "╡")
+        _println(sep_tot)
+        _println(fmt_row("TOTAL", totals))
+        _println("└" + "─" * outer + "┘")
+        _println()
+
+
 # ── Per-opcode detail table ───────────────────────────────────────────────────
 
 def print_detail_table(results: List[OpcodeResult], methods: List[str]) -> None:
@@ -726,6 +945,7 @@ def write_csv(
     results: List[OpcodeResult],
     methods: List[str],
     csv_path: Path,
+    vms:     Optional[List[str]] = None,
 ) -> None:
     totals = compute_totals(rows, methods)
 
@@ -787,6 +1007,47 @@ def write_csv(
 
     _println(f"CSV summary  saved to:  {summary_path}")
     _println(f"CSV detail   saved to:  {detail_path}")
+
+    # ── Pairwise CSV (common-ops / common-chips / speedups) ──────────────────
+    pairs = _select_pairs(methods)
+    vm_list = vms if vms is not None else [r.vm for r in rows]
+    if pairs and vm_list:
+        pairwise_path = csv_path.parent / (csv_path.stem + "_pairwise.csv")
+        pairwise_fields = [
+            "fast_method", "slow_method", "zkvm",
+            "common_ops", "total_ops",
+            "common_chips", "total_chips",
+            "op_speedup_mean", "op_speedup_median", "op_speedup_geomean",
+            "chip_speedup_mean", "chip_speedup_median", "chip_speedup_geomean",
+        ]
+        with open(pairwise_path, "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=pairwise_fields)
+            w.writeheader()
+            for fast, slow in pairs:
+                per_vm, totals = compute_pair_stats(results, vm_list, fast, slow)
+                for label, ps in [(vm, per_vm[vm]) for vm in vm_list] + [("TOTAL", totals)]:
+                    op_mean  = (sum(ps.op_speedups)/len(ps.op_speedups)) if ps.op_speedups else ""
+                    op_med   = _median(ps.op_speedups) if ps.op_speedups else ""
+                    op_gm    = _geomean(ps.op_speedups) if ps.op_speedups else ""
+                    ch_mean  = (sum(ps.chip_speedups)/len(ps.chip_speedups)) if ps.chip_speedups else ""
+                    ch_med   = _median(ps.chip_speedups) if ps.chip_speedups else ""
+                    ch_gm    = _geomean(ps.chip_speedups) if ps.chip_speedups else ""
+                    w.writerow({
+                        "fast_method":          fast,
+                        "slow_method":          slow,
+                        "zkvm":                 label,
+                        "common_ops":           ps.n_common_ops,
+                        "total_ops":            ps.n_total_ops,
+                        "common_chips":         ps.n_common_chips,
+                        "total_chips":          ps.n_total_chips,
+                        "op_speedup_mean":      round(op_mean, 6) if isinstance(op_mean, float) else "",
+                        "op_speedup_median":    round(op_med,  6) if isinstance(op_med,  float) else "",
+                        "op_speedup_geomean":   round(op_gm,   6) if isinstance(op_gm,   float) else "",
+                        "chip_speedup_mean":    round(ch_mean, 6) if isinstance(ch_mean, float) else "",
+                        "chip_speedup_median":  round(ch_med,  6) if isinstance(ch_med,  float) else "",
+                        "chip_speedup_geomean": round(ch_gm,   6) if isinstance(ch_gm,   float) else "",
+                    })
+        _println(f"CSV pairwise saved to:  {pairwise_path}")
 
 
 # ── Load saved results (--skip-run) ──────────────────────────────────────────
@@ -891,6 +1152,8 @@ def main() -> None:
                              "(scales only when workers actually exceeds available cores).")
     parser.add_argument("--no-detail",   action="store_true",
                         help="Suppress per-opcode detail table")
+    parser.add_argument("--no-pairwise", action="store_true",
+                        help="Suppress pairwise common-ops / common-chips / speedup table")
     parser.add_argument("--quiet",       action="store_true",
                         help="Suppress per-trial progress output")
     parser.add_argument("--tolerance",   type=int, default=0,
@@ -996,11 +1259,14 @@ def main() -> None:
     # ── Print tables ──────────────────────────────────────────────────────────
     print_table(rows, methods)
 
+    if not args.no_pairwise:
+        print_pairwise_comparison(results, vms, methods)
+
     if not args.no_detail:
         print_detail_table(results, methods)
 
     # ── Write CSV ─────────────────────────────────────────────────────────────
-    write_csv(rows, results, methods, csv_path)
+    write_csv(rows, results, methods, csv_path, vms=vms)
 
 
 if __name__ == "__main__":
