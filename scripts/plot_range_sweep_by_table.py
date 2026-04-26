@@ -4,17 +4,21 @@ ZEBRA Range-Sweep Plot by Table Type
 ======================================
 For each canonical table type (addsub, bitwise, mul, …), produces one subplot
 showing verification time vs. verified input volume across all zkVMs that have
-that table.  Each VM gets a solid line; a matching dashed line shows the
-hypothetical brute-force cost (singleton_time × volume).
+that table.  Each VM gets a solid line for ZEBRA (bb) and — when the
+smt_range_sweep/ data is available — a dash-dot line with hollow markers for
+the SMT range-verification mode.  A thin dashed line shows the hypothetical
+brute-force cost (singleton_time × volume).
 
 Also produces a companion gain table (LaTeX / Markdown / CSV / plain) where
   gain = volume × singleton_time / range_verification_time
-averaged over all chips/opcodes per (zkVM, volume) cell.
+averaged over all chips/opcodes per (zkVM, method, volume) cell.  The "smt"
+method rows appear only when smt_range_sweep data is present.
 
 Usage (from repo root):
   python3 scripts/plot_range_sweep_by_table.py
   python3 scripts/plot_range_sweep_by_table.py --format latex
   python3 scripts/plot_range_sweep_by_table.py --out-dir figures/
+  python3 scripts/plot_range_sweep_by_table.py --no-smt       # bb only
 """
 
 import argparse
@@ -102,15 +106,44 @@ VM_MARKERS = {
 }
 VM_ORDER = ["valida", "sphinx", "pico", "sp1", "ziren"]
 
+# ── methods (one per sweep directory) ────────────────────────────────────────
+# Each method corresponds to one report subdir written by the per-zkVM
+# run_experiments.sh script: range_sweep/ for bb, smt_range_sweep/ for z3.
+METHODS = ["bb", "smt"]
+
+METHOD_SWEEP_DIR = {
+    "bb":  "range_sweep",
+    "smt": "smt_range_sweep",
+}
+
+METHOD_LABEL = {
+    "bb":  "ZEBRA (bb)",
+    "smt": "SMT (z3)",
+}
+
+# Plot style per method: bb is the existing solid filled marker; smt uses
+# dash-dot with hollow markers in the same VM colour so each method is
+# recognisable at a glance without doubling the colour palette.
+METHOD_STYLE = {
+    "bb":  {"linestyle": "-",   "alpha": 1.0,  "fill": True},
+    "smt": {"linestyle": "-.",  "alpha": 0.85, "fill": False},
+}
+
 # ── data loading ──────────────────────────────────────────────────────────────
 
-def load_range_sweep_chip(vm_report_dir: str, chip: str) -> dict[str, dict[int, tuple[float, float]]]:
+def load_range_sweep_chip(
+    vm_report_dir: str,
+    chip: str,
+    sweep_dir: str = "range_sweep",
+) -> dict[str, dict[int, tuple[float, float]]]:
     """
-    Load range_sweep data for one chip directory.
+    Load sweep data for one chip directory.
     Returns { opcode: { range_val: (mean_s, std_s) } }.
     Only entries with success_ratio == 1.0 are kept.
+    sweep_dir selects which sweep to read ("range_sweep" for bb,
+    "smt_range_sweep" for the z3 SMT range-verification sweep).
     """
-    base = os.path.join(vm_report_dir, "range_sweep", chip)
+    base = os.path.join(vm_report_dir, sweep_dir, chip)
     if not os.path.isdir(base):
         return {}
 
@@ -145,19 +178,22 @@ def load_table_type_vm(
     vm: str,
     canonical_chip: str,
     actual_chip: str,
+    sweep_dir: str = "range_sweep",
 ) -> dict[str, dict[int, tuple[float, float]]]:
-    """Load range_sweep data for one (vm, canonical_chip) pair."""
+    """Load sweep data for one (vm, canonical_chip) pair from sweep_dir."""
     vm_report_dir = os.path.join(base_dir, "examples", vm, "report")
 
     if vm == "valida" and canonical_chip == "addsub":
         # Merge add32 and sub32
         merged: dict[str, dict[int, tuple[float, float]]] = {}
         for chip_name in VALIDA_ADDSUB_CHIPS:
-            for op, series in load_range_sweep_chip(vm_report_dir, chip_name).items():
+            for op, series in load_range_sweep_chip(
+                vm_report_dir, chip_name, sweep_dir
+            ).items():
                 merged[op] = series
         return merged
 
-    return load_range_sweep_chip(vm_report_dir, actual_chip)
+    return load_range_sweep_chip(vm_report_dir, actual_chip, sweep_dir)
 
 
 def aggregate_opcodes(
@@ -189,26 +225,45 @@ def aggregate_opcodes(
 
 # ── plotting ──────────────────────────────────────────────────────────────────
 
-def _draw_vm_ax(ax, vm: str, series: dict[int, tuple[float, float]]) -> None:
+def _draw_vm_ax(
+    ax,
+    vm: str,
+    series_by_method: dict[str, dict[int, tuple[float, float]]],
+) -> None:
     """
-    Draw one VM's actual line + brute-force reference onto *ax*.
+    Draw one VM's actual line(s) + brute-force reference onto *ax*.
     x = verified volume (r+1)^2, y = mean verification time (s).
+    series_by_method maps method name → {range_val: (mean, std)}.
+    Brute-force reference is anchored on bb's singleton time when present.
     """
     color  = VM_COLORS.get(vm, "gray")
     marker = VM_MARKERS.get(vm, "o")
 
-    xs      = sorted(series.keys())
-    volumes = [(r + 1) ** 2 for r in xs]
-    ys      = [series[r][0] for r in xs]
+    for method in METHODS:
+        series = series_by_method.get(method) or {}
+        if not series:
+            continue
+        style   = METHOD_STYLE[method]
+        xs      = sorted(series.keys())
+        volumes = [(r + 1) ** 2 for r in xs]
+        ys      = [series[r][0] for r in xs]
+        ax.plot(volumes, ys,
+                color=color, marker=marker, markersize=5,
+                markerfacecolor=color if style["fill"] else "white",
+                markeredgecolor=color,
+                linewidth=2.0, linestyle=style["linestyle"],
+                alpha=style["alpha"], label=METHOD_LABEL[method])
 
-    ax.plot(volumes, ys,
-            color=color, marker=marker, markersize=5,
-            linewidth=2.0, linestyle="-", label="ZEBRA")
-
-    singleton_time = series.get(0, (None, None))[0]
+    # Brute-force reference: prefer bb's singleton time; fall back to smt.
+    bb_series  = series_by_method.get("bb")  or {}
+    smt_series = series_by_method.get("smt") or {}
+    ref_series = bb_series if bb_series else smt_series
+    singleton_time = ref_series.get(0, (None, None))[0]
     if singleton_time is not None:
-        bf_ys = [singleton_time * v for v in volumes]
-        ax.plot(volumes, bf_ys,
+        ref_xs      = sorted(ref_series.keys())
+        ref_volumes = [(r + 1) ** 2 for r in ref_xs]
+        bf_ys       = [singleton_time * v for v in ref_volumes]
+        ax.plot(ref_volumes, bf_ys,
                 color=color, linestyle="--", linewidth=1.2,
                 alpha=0.55, marker="", label="iterative\npoint-wise\nverification")
 
@@ -226,27 +281,44 @@ def _draw_vm_ax(ax, vm: str, series: dict[int, tuple[float, float]]) -> None:
     ax.legend(fontsize=11, loc="upper left", framealpha=0.85, handlelength=2.2)
 
 
-def _draw_vm_ax_inverted(ax, vm: str, series: dict[int, tuple[float, float]]) -> None:
+def _draw_vm_ax_inverted(
+    ax,
+    vm: str,
+    series_by_method: dict[str, dict[int, tuple[float, float]]],
+) -> None:
     """
-    Draw one VM's actual line + brute-force reference onto *ax*.
+    Draw one VM's actual line(s) + brute-force reference onto *ax*.
     x = mean verification time (s), y = verified volume (r+1)^2.
     """
     color  = VM_COLORS.get(vm, "gray")
     marker = VM_MARKERS.get(vm, "o")
 
-    xs      = sorted(series.keys())
-    volumes = [(r + 1) ** 2 for r in xs]
-    times   = [series[r][0] for r in xs]
+    for method in METHODS:
+        series = series_by_method.get(method) or {}
+        if not series:
+            continue
+        style   = METHOD_STYLE[method]
+        xs      = sorted(series.keys())
+        volumes = [(r + 1) ** 2 for r in xs]
+        times   = [series[r][0] for r in xs]
+        ax.plot(times, volumes,
+                color=color, marker=marker, markersize=5,
+                markerfacecolor=color if style["fill"] else "white",
+                markeredgecolor=color,
+                linewidth=2.0, linestyle=style["linestyle"],
+                alpha=style["alpha"], label=METHOD_LABEL[method])
 
-    ax.plot(times, volumes,
-            color=color, marker=marker, markersize=5,
-            linewidth=2.0, linestyle="-", label="ZEBRA")
-
-    singleton_time = series.get(0, (None, None))[0]
+    # Brute-force reference: prefer bb's singleton time; fall back to smt.
+    bb_series  = series_by_method.get("bb")  or {}
+    smt_series = series_by_method.get("smt") or {}
+    ref_series = bb_series if bb_series else smt_series
+    singleton_time = ref_series.get(0, (None, None))[0]
     if singleton_time is not None and singleton_time > 0:
-        # brute-force: time = singleton_time × volume  →  volume = time / singleton_time
-        bf_vols = [t / singleton_time for t in times]
-        ax.plot(times, bf_vols,
+        ref_xs      = sorted(ref_series.keys())
+        ref_volumes = [(r + 1) ** 2 for r in ref_xs]
+        ref_times   = [ref_series[r][0] for r in ref_xs]
+        bf_vols     = [t / singleton_time for t in ref_times]
+        ax.plot(ref_times, bf_vols,
                 color=color, linestyle="--", linewidth=1.2,
                 alpha=0.55, marker="", label="iterative\npoint-wise\nverification")
 
@@ -274,24 +346,39 @@ def _save_fig(fig, out_dir: str, stem: str) -> None:
         print(f"Saved: {path}")
 
 
-def plot_by_table_type(base_dir: str, out_dir: str) -> None:
+def plot_by_table_type(
+    base_dir: str,
+    out_dir: str,
+    methods: list[str] | None = None,
+) -> None:
     """
     For each table type: one figure with one subfigure per zkVM.
     Each subfigure: x = volume, y = verification time (log-log).
     A second set of figures swaps the axes (x = time, y = volume).
+    methods selects which sweep dirs to load; defaults to all in METHODS.
     """
+    if methods is None:
+        methods = list(METHODS)
     os.makedirs(out_dir, exist_ok=True)
 
     any_data = False
     for ttype, vm_map in TABLE_TYPES.items():
-        vm_series: dict[str, dict[int, tuple[float, float]]] = {}
+        # vm_series[vm][method] = aggregated {range_val: (mean, std)}
+        vm_series: dict[str, dict[str, dict[int, tuple[float, float]]]] = {}
         for vm, chip in vm_map.items():
-            opdata = load_table_type_vm(base_dir, vm, ttype, chip)
-            if not opdata:
-                continue
-            agg = aggregate_opcodes(opdata)
-            if agg:
-                vm_series[vm] = agg
+            method_aggs: dict[str, dict[int, tuple[float, float]]] = {}
+            for method in methods:
+                opdata = load_table_type_vm(
+                    base_dir, vm, ttype, chip,
+                    sweep_dir=METHOD_SWEEP_DIR[method],
+                )
+                if not opdata:
+                    continue
+                agg = aggregate_opcodes(opdata)
+                if agg:
+                    method_aggs[method] = agg
+            if method_aggs:
+                vm_series[vm] = method_aggs
 
         if not vm_series:
             continue
@@ -332,91 +419,126 @@ def plot_by_table_type(base_dir: str, out_dir: str) -> None:
 def build_gain_table(
     base_dir: str,
     vms: list[str] | None = None,
-) -> tuple[list[str], list[int], dict[str, dict[int, float]]]:
+    methods: list[str] | None = None,
+) -> tuple[list[str], list[int], list[str], dict[str, dict[str, dict[int, float]]]]:
     """
-    Returns (vm_names, sorted_volumes, gain_table)
-    where gain_table[vm][volume] = mean gain across all table types & opcodes.
+    Returns (vm_names, sorted_volume_labels, methods_present, gain_table)
+    where gain_table[method][vm][volume] = mean gain across all table types &
+    opcodes for that method.
 
     gain = volume × singleton_time / verification_time   (per opcode per range)
+
+    methods_present is the subset of *methods* that produced any data.  When
+    smt_range_sweep is missing, "smt" is dropped automatically.
     """
     if vms is None:
         vms = list(VM_COLORS.keys())
+    if methods is None:
+        methods = list(METHODS)
 
     all_volumes: set[int] = set()
-    # gains_raw[vm][(range_val)] = list of per-opcode gains
-    gains_raw: dict[str, dict[int, list[float]]] = {vm: defaultdict(list) for vm in vms}
+    # gains_raw[method][vm][range_val] = list of per-opcode gains
+    gains_raw: dict[str, dict[str, dict[int, list[float]]]] = {
+        m: {vm: defaultdict(list) for vm in vms} for m in methods
+    }
+    method_has_data: dict[str, bool] = {m: False for m in methods}
 
-    for ttype, vm_map in TABLE_TYPES.items():
-        for vm, chip in vm_map.items():
-            if vm not in vms:
-                continue
-            opdata = load_table_type_vm(base_dir, vm, ttype, chip)
-            for opcode, series in opdata.items():
-                singleton_time = series.get(0, (None, None))[0]
-                if singleton_time is None or singleton_time == 0:
+    for method in methods:
+        for ttype, vm_map in TABLE_TYPES.items():
+            for vm, chip in vm_map.items():
+                if vm not in vms:
                     continue
-                for rv, (mean, _) in series.items():
-                    if rv == 0 or mean == 0:
+                opdata = load_table_type_vm(
+                    base_dir, vm, ttype, chip,
+                    sweep_dir=METHOD_SWEEP_DIR[method],
+                )
+                if opdata:
+                    method_has_data[method] = True
+                for opcode, series in opdata.items():
+                    singleton_time = series.get(0, (None, None))[0]
+                    if singleton_time is None or singleton_time == 0:
                         continue
-                    volume = (rv + 1) ** 2
-                    gain = volume * singleton_time / mean
-                    gains_raw[vm][rv].append(gain)
-                    all_volumes.add(rv)
+                    for rv, (mean, _) in series.items():
+                        if rv == 0 or mean == 0:
+                            continue
+                        volume = (rv + 1) ** 2
+                        gain = volume * singleton_time / mean
+                        gains_raw[method][vm][rv].append(gain)
+                        all_volumes.add(rv)
 
     volumes_sorted = sorted(all_volumes)
-    gain_table: dict[str, dict[int, float]] = {}
-    for vm in vms:
-        gain_table[vm] = {}
-        for rv in volumes_sorted:
-            vals = gains_raw[vm].get(rv, [])
-            if vals:
-                gain_table[vm][(rv + 1) ** 2] = sum(vals) / len(vals)
+    gain_table: dict[str, dict[str, dict[int, float]]] = {}
+    for method in methods:
+        gain_table[method] = {}
+        for vm in vms:
+            gain_table[method][vm] = {}
+            for rv in volumes_sorted:
+                vals = gains_raw[method][vm].get(rv, [])
+                if vals:
+                    gain_table[method][vm][(rv + 1) ** 2] = sum(vals) / len(vals)
 
-    volume_labels = sorted({(rv + 1) ** 2 for rv in volumes_sorted})
-    return vms, volume_labels, gain_table
+    methods_present = [m for m in methods if method_has_data[m]]
+    volume_labels   = sorted({(rv + 1) ** 2 for rv in volumes_sorted})
+    return vms, volume_labels, methods_present, gain_table
 
 
 # ── table formatters ──────────────────────────────────────────────────────────
 
-def _gcell(table: dict, vm: str, vol: int, decimals: int = 1) -> str:
-    v = table[vm].get(vol)
+def _gcell(method_table: dict, vm: str, vol: int, decimals: int = 1) -> str:
+    """Look up gain for one (vm, vol) within a single method's sub-table."""
+    v = method_table.get(vm, {}).get(vol)
     return f"{v:.{decimals}f}×" if v is not None else "—"
 
 
-def fmt_plain(vms, volumes, table) -> str:
-    vol_w = max(len(str(v)) + 1 for v in volumes)
-    vol_w = max(vol_w, 8)
-    vm_w  = max(len(v) for v in vms)
-    header = f"{'zkVM':<{vm_w}}" + "".join(f"  {v:>{vol_w}}" for v in volumes)
+def _row_label(vm: str, method: str, single_method: bool) -> str:
+    """When only one method is present, drop the method suffix to keep the
+    table compact (preserves the original look)."""
+    return vm if single_method else f"{vm}-{method}"
+
+
+def fmt_plain(vms, volumes, methods, table) -> str:
+    single = len(methods) == 1
+    vol_w  = max(len(str(v)) + 1 for v in volumes)
+    vol_w  = max(vol_w, 8)
+    label_w = max(len(_row_label(vm, m, single))
+                  for vm in vms for m in methods)
+    label_w = max(label_w, len("zkVM"))
+    header = f"{'zkVM':<{label_w}}" + "".join(f"  {v:>{vol_w}}" for v in volumes)
     sep    = "-" * len(header)
     rows   = [header, sep]
     for vm in vms:
-        row = f"{vm:<{vm_w}}" + "".join(
-            f"  {_gcell(table, vm, vol):>{vol_w}}" for vol in volumes
-        )
-        rows.append(row)
+        for m in methods:
+            row = f"{_row_label(vm, m, single):<{label_w}}" + "".join(
+                f"  {_gcell(table[m], vm, vol):>{vol_w}}" for vol in volumes
+            )
+            rows.append(row)
     return "\n".join(rows)
 
 
-def fmt_csv(vms, volumes, table) -> str:
+def fmt_csv(vms, volumes, methods, table) -> str:
+    single = len(methods) == 1
     lines = ["zkVM," + ",".join(str(v) for v in volumes)]
     for vm in vms:
-        vals = ",".join(_gcell(table, vm, vol) for vol in volumes)
-        lines.append(f"{vm},{vals}")
+        for m in methods:
+            vals = ",".join(_gcell(table[m], vm, vol) for vol in volumes)
+            lines.append(f"{_row_label(vm, m, single)},{vals}")
     return "\n".join(lines)
 
 
-def fmt_markdown(vms, volumes, table) -> str:
+def fmt_markdown(vms, volumes, methods, table) -> str:
+    single = len(methods) == 1
     header = "| zkVM | " + " | ".join(str(v) for v in volumes) + " |"
     sep    = "|:-----|" + "|".join("---:" for _ in volumes) + "|"
     rows   = [header, sep]
     for vm in vms:
-        vals = " | ".join(_gcell(table, vm, vol) for vol in volumes)
-        rows.append(f"| {vm} | {vals} |")
+        for m in methods:
+            vals = " | ".join(_gcell(table[m], vm, vol) for vol in volumes)
+            rows.append(f"| {_row_label(vm, m, single)} | {vals} |")
     return "\n".join(rows)
 
 
-def fmt_latex(vms, volumes, table) -> str:
+def fmt_latex(vms, volumes, methods, table) -> str:
+    single = len(methods) == 1
     cols = "l" + "r" * len(volumes)
     vol_hdrs = " & ".join(f"vol={v}" for v in volumes)
     lines = [
@@ -426,8 +548,9 @@ def fmt_latex(vms, volumes, table) -> str:
         r"\midrule",
     ]
     for vm in vms:
-        vals = " & ".join(_gcell(table, vm, vol) for vol in volumes)
-        lines.append(f"{vm} & {vals} \\\\")
+        for m in methods:
+            vals = " & ".join(_gcell(table[m], vm, vol) for vol in volumes)
+            lines.append(f"{_row_label(vm, m, single)} & {vals} \\\\")
     lines += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(lines)
 
@@ -470,6 +593,9 @@ def main() -> None:
                         help="Skip the figure; only produce the gain table")
     parser.add_argument("--no-table", action="store_true",
                         help="Skip the gain table; only produce the figure")
+    parser.add_argument("--no-smt", action="store_true",
+                        help="Ignore smt_range_sweep/ data even if present "
+                             "(restores the original bb-only output)")
     args = parser.parse_args()
 
     base_dir = args.base_dir or find_repo_root(
@@ -477,18 +603,24 @@ def main() -> None:
     )
     out_dir = args.out_dir or os.path.join(base_dir, "figures")
 
+    methods = ["bb"] if args.no_smt else list(METHODS)
+
     # ── plot ──────────────────────────────────────────────────────────────────
     if not args.no_plot:
-        plot_by_table_type(base_dir, out_dir)
+        plot_by_table_type(base_dir, out_dir, methods=methods)
 
     # ── gain table ────────────────────────────────────────────────────────────
     if not args.no_table:
-        vms, volumes, gain_table = build_gain_table(base_dir)
+        vms, volumes, methods_present, gain_table = build_gain_table(
+            base_dir, methods=methods
+        )
 
-        if not volumes:
+        if not volumes or not methods_present:
             print("No range_sweep data found for gain table.", file=sys.stderr)
         else:
-            output = FORMATTERS[args.format](vms, volumes, gain_table)
+            output = FORMATTERS[args.format](
+                vms, volumes, methods_present, gain_table
+            )
             if args.table_out:
                 os.makedirs(os.path.dirname(os.path.abspath(args.table_out)), exist_ok=True)
                 with open(args.table_out, "w") as fh:
