@@ -206,10 +206,19 @@ class OpcodeResult:
 class MethodStats:
     n_verified_chips:  int   = 0
     n_verified_ops:    int   = 0
+    # Op-wise aggregation: every opcode contributes equally.
     success_rate:      float = 0.0   # n_verified_ops / n_total_ops * 100
     mean_time_s:       float = float("nan")
     std_time_s:        float = float("nan")
     all_times:         List[float] = field(default_factory=list)
+    # Table-wise (chip-wise) aggregation: every chip contributes equally.
+    # chip_success_rate = mean over chips of (verified_ops_in_chip / ops_in_chip * 100)
+    # chip_mean_time_s  = mean over chips of (mean trial time of verified opcodes in chip)
+    chip_success_rate: float = 0.0
+    chip_mean_time_s:  float = float("nan")
+    chip_std_time_s:   float = float("nan")
+    chip_succ_rates:   List[float] = field(default_factory=list)  # per-chip succ%
+    chip_mean_times:   List[float] = field(default_factory=list)  # per-chip mean time
 
 
 @dataclass
@@ -568,13 +577,41 @@ def aggregate(
             std_t  = _std(all_times) if len(all_times) >= 2 else 0.0
             succ   = n_vops / n_ops * 100.0 if n_ops else 0.0
 
+            # Table-wise (chip-wise) aggregation: each chip contributes equally.
+            chip_succ_rates: List[float] = []
+            chip_mean_times: List[float] = []
+            for chip, opcodes in chips.items():
+                chip_res = [r for r in m_res
+                            if r.chip == chip and not r.skipped]
+                if not chip_res:
+                    continue
+                n_ops_chip = len(chip_res)
+                chip_v_ops = [r for r in chip_res if r.verified]
+                chip_succ_rates.append(len(chip_v_ops) / n_ops_chip * 100.0)
+                chip_times: List[float] = []
+                for r in chip_v_ops:
+                    chip_times.extend(r.times_s)
+                if chip_times:
+                    chip_mean_times.append(sum(chip_times) / len(chip_times))
+
+            chip_succ_mean = (sum(chip_succ_rates) / len(chip_succ_rates)
+                              if chip_succ_rates else 0.0)
+            chip_time_mean = (sum(chip_mean_times) / len(chip_mean_times)
+                              if chip_mean_times else float("nan"))
+            chip_time_std  = _std(chip_mean_times) if len(chip_mean_times) >= 2 else 0.0
+
             stats_map[method] = MethodStats(
-                n_verified_chips = len(v_chip_set),
-                n_verified_ops   = n_vops,
-                success_rate     = succ,
-                mean_time_s      = mean_t,
-                std_time_s       = std_t,
-                all_times        = all_times,
+                n_verified_chips  = len(v_chip_set),
+                n_verified_ops    = n_vops,
+                success_rate      = succ,
+                mean_time_s       = mean_t,
+                std_time_s        = std_t,
+                all_times         = all_times,
+                chip_success_rate = chip_succ_mean,
+                chip_mean_time_s  = chip_time_mean,
+                chip_std_time_s   = chip_time_std,
+                chip_succ_rates   = chip_succ_rates,
+                chip_mean_times   = chip_mean_times,
             )
 
         rows.append(VMRow(vm=vm, n_chips=n_chips, n_ops=n_ops, stats=stats_map))
@@ -591,22 +628,36 @@ def compute_totals(rows: List[VMRow], methods: List[str]) -> VMRow:
 
     for method in methods:
         all_times: List[float] = []
+        chip_succ_rates: List[float] = []
+        chip_mean_times: List[float] = []
         n_vc = n_vo = 0
         for row in rows:
             s = row.stats.get(method, MethodStats())
             n_vc      += s.n_verified_chips
             n_vo      += s.n_verified_ops
             all_times.extend(s.all_times)
+            chip_succ_rates.extend(s.chip_succ_rates)
+            chip_mean_times.extend(s.chip_mean_times)
         mean_t = sum(all_times) / len(all_times) if all_times else float("nan")
         std_t  = _std(all_times) if len(all_times) >= 2 else 0.0
         succ   = n_vo / total_ops * 100.0 if total_ops else 0.0
+        chip_succ_mean = (sum(chip_succ_rates) / len(chip_succ_rates)
+                          if chip_succ_rates else 0.0)
+        chip_time_mean = (sum(chip_mean_times) / len(chip_mean_times)
+                          if chip_mean_times else float("nan"))
+        chip_time_std  = _std(chip_mean_times) if len(chip_mean_times) >= 2 else 0.0
         total_stats[method] = MethodStats(
-            n_verified_chips = n_vc,
-            n_verified_ops   = n_vo,
-            success_rate     = succ,
-            mean_time_s      = mean_t,
-            std_time_s       = std_t,
-            all_times        = all_times,
+            n_verified_chips  = n_vc,
+            n_verified_ops    = n_vo,
+            success_rate      = succ,
+            mean_time_s       = mean_t,
+            std_time_s        = std_t,
+            all_times         = all_times,
+            chip_success_rate = chip_succ_mean,
+            chip_mean_time_s  = chip_time_mean,
+            chip_std_time_s   = chip_time_std,
+            chip_succ_rates   = chip_succ_rates,
+            chip_mean_times   = chip_mean_times,
         )
 
     return VMRow(vm="TOTAL", n_chips=total_chips, n_ops=total_ops, stats=total_stats)
@@ -693,6 +744,76 @@ def print_table(rows: List[VMRow], methods: List[str]) -> None:
     # Totals
     _println(sep("═", "╪", "╞", "╡"))
     _println(row_line(totals.vm, totals.n_chips, totals.n_ops, totals.stats))
+    _println("└" + "─" * outer_w + "┘")
+    _println()
+
+
+def print_chip_table(rows: List[VMRow], methods: List[str]) -> None:
+    """Print the table-wise (chip-wise) aggregation table.
+
+    Each chip contributes equally:
+      - Succ% is the mean across chips of (verified_ops_in_chip / ops_in_chip * 100).
+      - Time  is the mean across chips of (per-chip mean trial time of verified ops);
+              the std is taken across per-chip mean times.
+    Compare with print_table(), where every opcode contributes equally.
+    """
+    totals = compute_totals(rows, methods)
+    all_rows = rows + [totals]
+
+    w_vm = max(len(r.vm) for r in all_rows) + 2
+    w_vm = max(w_vm, 8)
+
+    # Per-method block:  Succ% | Time (mean ± std)
+    blk_w = 7 + 1 + 14
+    blk_w = max(blk_w, 24)
+
+    def sep(c="─", mid="┼", left="├", right="┤") -> str:
+        parts = [c * (w_vm + 2), c * 6]
+        for _ in methods:
+            parts.append(c * (blk_w + 2))
+        return left + mid.join(parts) + right
+
+    def row_line(vm, chips, stats_map: Dict[str, MethodStats]) -> str:
+        cells = [f" {vm:<{w_vm}} ", f" {chips:>4} "]
+        for method in methods:
+            s = stats_map.get(method, MethodStats())
+            pct = _fmt_pct(s.chip_success_rate)
+            t   = _fmt_time(s.chip_mean_time_s, s.chip_std_time_s)
+            cells.append(f"  {pct}   {t}  ")
+        return "│" + "│".join(cells) + "│"
+
+    methods_str = " vs ".join(METHOD_LABELS.get(m, m) for m in methods)
+    title = (f"ZEBRA Verification — Per-Table (Chip) Aggregation  "
+             f"(each chip weighted equally, {methods_str})")
+    outer_w = (w_vm + 2) + 1 + 6 + len(methods) * (blk_w + 3)
+    outer_w = max(outer_w, len(title) + 4)
+
+    _println()
+    _println("┌" + "─" * outer_w + "┐")
+    _println("│" + f" {title} ".center(outer_w) + "│")
+    _println("├" + "─" * outer_w + "┤")
+
+    meth_headers = "│".join(
+        f"  {METHOD_LABELS.get(m, m):^{blk_w}}  "
+        for m in methods
+    )
+    base_hdr = f" {'zkVM':<{w_vm}} │ {'#Chips':>4}  "
+    _println("│" + base_hdr + "│" + meth_headers + "│")
+
+    def method_subhdr(_m: str) -> str:
+        return f"  {'Succ%':>6}   {'Time (s) mean ± std':^14}  "
+
+    sub_base = f" {'':>{w_vm}} │ {'':>4}   "
+    sub_meths = "│".join(method_subhdr(m) for m in methods)
+    _println("│" + sub_base + "│" + sub_meths + "│")
+
+    _println(sep("─", "┼", "├", "┤"))
+
+    for r in rows:
+        _println(row_line(r.vm, r.n_chips, r.stats))
+
+    _println(sep("═", "╪", "╞", "╡"))
+    _println(row_line(totals.vm, totals.n_chips, totals.stats))
     _println("└" + "─" * outer_w + "┘")
     _println()
 
@@ -959,6 +1080,9 @@ def write_csv(
             f"{m}_success_rate_pct",
             f"{m}_mean_time_s",
             f"{m}_std_time_s",
+            f"{m}_chip_success_rate_pct",
+            f"{m}_chip_mean_time_s",
+            f"{m}_chip_std_time_s",
         ]
 
     with open(summary_path, "w", newline="") as fh:
@@ -976,6 +1100,13 @@ def write_csv(
                 )
                 record[f"{m}_std_time_s"]        = (
                     round(s.std_time_s, 6) if not math.isnan(s.std_time_s) else ""
+                )
+                record[f"{m}_chip_success_rate_pct"] = round(s.chip_success_rate, 2)
+                record[f"{m}_chip_mean_time_s"]      = (
+                    round(s.chip_mean_time_s, 6) if not math.isnan(s.chip_mean_time_s) else ""
+                )
+                record[f"{m}_chip_std_time_s"]       = (
+                    round(s.chip_std_time_s, 6) if not math.isnan(s.chip_std_time_s) else ""
                 )
             w.writerow(record)
 
@@ -1154,6 +1285,9 @@ def main() -> None:
                         help="Suppress per-opcode detail table")
     parser.add_argument("--no-pairwise", action="store_true",
                         help="Suppress pairwise common-ops / common-chips / speedup table")
+    parser.add_argument("--no-chip-table", action="store_true",
+                        help="Suppress the table-wise (chip-wise) aggregation table "
+                             "(each chip weighted equally)")
     parser.add_argument("--quiet",       action="store_true",
                         help="Suppress per-trial progress output")
     parser.add_argument("--tolerance",   type=int, default=0,
@@ -1258,6 +1392,9 @@ def main() -> None:
 
     # ── Print tables ──────────────────────────────────────────────────────────
     print_table(rows, methods)
+
+    if not args.no_chip_table:
+        print_chip_table(rows, methods)
 
     if not args.no_pairwise:
         print_pairwise_comparison(results, vms, methods)
