@@ -8,19 +8,20 @@ form is the deduplicated *set* of those projections (matching the Rust
 `HashSet<…>` semantics).
 
 The canonicalized representation is a `Finset Tuple` (a SET, not a string).
+The semantic VM events are modeled separately as concrete execution events.
+They may contain arbitrary metadata and do not contain abstract intervals. The
+canonicalizer is proved faithful to an explicit projection from events to
+canonical tuples.
+
 The string output is a separate printer over this set — trivially deterministic
 in the forward direction; injectivity at the string level is a separate
 "printer correctness" concern (see `stringRepr_consistent`).
-
-The main result is stated at the semantic-event layer: if a table generator
-faithfully turns an `EventSet` into a table, then Zebra canonicalization
-recovers exactly that `EventSet`, and equal canonical representations are
-equivalent to equal original event sets.
 
 Build: `lake build` (uses mathlib via local symlinks under `.lake/packages/`).
 -/
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Dedup
+import Mathlib.Data.Finset.Image
 import Mathlib.Data.Finset.Lattice.Lemmas
 
 namespace Zebra.ALU
@@ -53,9 +54,26 @@ structure Tuple where
   a : List Interval
 deriving DecidableEq, Repr
 
-/-- The semantic events we want the canonicalizer to recover from a generated
-    VM table: a set of input/output tuples. -/
-abbrev EventSet := Finset Tuple
+/-- A concrete semantic ALU event. `Value` is the VM's concrete value type
+    (for example words or byte limbs), and `Aux` can be any execution metadata
+    recorded with the event. -/
+structure Event (Value Aux : Type) where
+  input0 : Value
+  input1 : Value
+  output : Value
+  aux : Aux
+deriving DecidableEq, Repr
+
+/-- The semantic events recorded by VM execution. This is intentionally
+    separate from the canonicalized representation. -/
+abbrev EventSet (Value Aux : Type) := Finset (Event Value Aux)
+
+/-- The tuple-level image of a semantic event set. This is the representation
+    Zebra's canonicalizer is expected to recover from a generated table. -/
+def canonicalEventSet {Value Aux : Type}
+    (eventToTuple : Event Value Aux → Tuple)
+    (events : EventSet Value Aux) : Finset Tuple :=
+  Finset.image eventToTuple events
 
 /-- Configuration: column indices for the three operand groups, plus the
     `is_real` predicate over a row. -/
@@ -81,21 +99,27 @@ def canonicalize (cfg : Config) (t : Trace) : Finset Tuple :=
   ((t.filter cfg.isReal).map cfg.projectRow).toFinset
 
 /-- A table encodes an event set when its real rows, after projection, are
-    exactly the semantic events. This deliberately ignores helper columns,
-    row order, padding rows, and duplicated events. -/
-def TableEncodesEvents (cfg : Config) (events : EventSet) (table : Trace) : Prop :=
-  ∀ tup, tup ∈ events ↔
+    exactly the tuple projection of the semantic events. This deliberately
+    ignores helper columns, row order, padding rows, duplicated events, and
+    any event fields outside `eventToTuple`. -/
+def TableEncodesEvents {Value Aux : Type} (cfg : Config)
+    (eventToTuple : Event Value Aux → Tuple)
+    (events : EventSet Value Aux) (table : Trace) : Prop :=
+  ∀ tup, tup ∈ canonicalEventSet eventToTuple events ↔
     ∃ row ∈ table, cfg.isReal row ∧ cfg.projectRow row = tup
 
 /-- A table generator is faithful when, for every semantic event set, the
     generated table encodes exactly that event set. -/
-def TableGeneratorFaithful (cfg : Config) (generateTable : EventSet → Trace) : Prop :=
-  ∀ events, TableEncodesEvents cfg events (generateTable events)
+def TableGeneratorFaithful {Value Aux : Type} (cfg : Config)
+    (eventToTuple : Event Value Aux → Tuple)
+    (generateTable : EventSet Value Aux → Trace) : Prop :=
+  ∀ events, TableEncodesEvents cfg eventToTuple events (generateTable events)
 
 /-- A VM execution is canonicalized by first extracting its semantic event set,
     then generating the corresponding table. -/
-def generatedTableOfExecution {VMExecution : Type}
-    (execEvents : VMExecution → EventSet) (generateTable : EventSet → Trace)
+def generatedTableOfExecution {VMExecution Value Aux : Type}
+    (execEvents : VMExecution → EventSet Value Aux)
+    (generateTable : EventSet Value Aux → Trace)
     (exec : VMExecution) : Trace :=
   generateTable (execEvents exec)
 
@@ -116,74 +140,113 @@ lemma mem_canonicalize_iff (cfg : Config) (t : Trace) (tup : Tuple) :
 /-! ## (iii) Semantic event-set layer -/
 
 /-- If a table encodes an event set, Zebra's canonicalizer returns exactly that
-    event set. -/
-lemma canonicalize_eq_events_of_encodes (cfg : Config)
-    {events : EventSet} {table : Trace}
-    (h : TableEncodesEvents cfg events table) :
-    canonicalize cfg table = events := by
+    event set's tuple projection. -/
+lemma canonicalize_eq_canonicalEventSet_of_encodes {Value Aux : Type} (cfg : Config)
+    (eventToTuple : Event Value Aux → Tuple)
+    {events : EventSet Value Aux} {table : Trace}
+    (h : TableEncodesEvents cfg eventToTuple events table) :
+    canonicalize cfg table = canonicalEventSet eventToTuple events := by
   ext tup
   rw [mem_canonicalize_iff]
   exact (h tup).symm
 
-/-- The canonicalizer returns an event set exactly when the table encodes that
-    event set. This is the table-level specification of the canonicalizer. -/
-lemma canonicalize_eq_events_iff (cfg : Config)
-    (events : EventSet) (table : Trace) :
-    canonicalize cfg table = events ↔ TableEncodesEvents cfg events table := by
+/-- The canonicalizer returns a canonical event projection exactly when the
+    table encodes that event set. This is the table-level specification of the
+    canonicalizer. -/
+lemma canonicalize_eq_canonicalEventSet_iff {Value Aux : Type} (cfg : Config)
+    (eventToTuple : Event Value Aux → Tuple)
+    (events : EventSet Value Aux) (table : Trace) :
+    canonicalize cfg table = canonicalEventSet eventToTuple events ↔
+      TableEncodesEvents cfg eventToTuple events table := by
   constructor
   · intro h tup
     rw [← h]
     exact mem_canonicalize_iff cfg table tup
-  · exact canonicalize_eq_events_of_encodes cfg
+  · exact canonicalize_eq_canonicalEventSet_of_encodes cfg eventToTuple
 
 /-! ## (iv) Abstract table-generator bridge -/
 
 /-- **Main correctness theorem.** If the table generator is faithful, Zebra
-    recovers exactly the semantic event set used to generate the table. -/
-theorem canonicalize_generated_table_eq_events (cfg : Config)
-    (generateTable : EventSet → Trace)
-    (hgen : TableGeneratorFaithful cfg generateTable)
-    (events : EventSet) :
-    canonicalize cfg (generateTable events) = events :=
-  canonicalize_eq_events_of_encodes cfg (hgen events)
+    recovers exactly the canonical tuple projection of the semantic event set
+    used to generate the table. -/
+theorem canonicalize_generated_table_eq_canonicalEventSet {Value Aux : Type}
+    (cfg : Config)
+    (eventToTuple : Event Value Aux → Tuple)
+    (generateTable : EventSet Value Aux → Trace)
+    (hgen : TableGeneratorFaithful cfg eventToTuple generateTable)
+    (events : EventSet Value Aux) :
+    canonicalize cfg (generateTable events) = canonicalEventSet eventToTuple events :=
+  canonicalize_eq_canonicalEventSet_of_encodes cfg eventToTuple (hgen events)
 
-/-- **Main one-to-one theorem.** For faithful generated tables, equality of Zebra canonicalized
-    representations is exactly equality of the original semantic event sets. -/
-theorem canonicalize_generated_eq_iff_events_eq (cfg : Config)
-    (generateTable : EventSet → Trace)
-    (hgen : TableGeneratorFaithful cfg generateTable)
-    (events₁ events₂ : EventSet) :
+/-- **Main one-to-one theorem.** For faithful generated tables, equality of
+    Zebra canonicalized representations is exactly equality of the canonical
+    tuple projections of the original semantic event sets. -/
+theorem canonicalize_generated_eq_iff_canonicalEventSet_eq {Value Aux : Type}
+    (cfg : Config)
+    (eventToTuple : Event Value Aux → Tuple)
+    (generateTable : EventSet Value Aux → Trace)
+    (hgen : TableGeneratorFaithful cfg eventToTuple generateTable)
+    (events₁ events₂ : EventSet Value Aux) :
+    canonicalize cfg (generateTable events₁) =
+      canonicalize cfg (generateTable events₂) ↔
+    canonicalEventSet eventToTuple events₁ = canonicalEventSet eventToTuple events₂ :=
+  by
+    rw [canonicalize_generated_table_eq_canonicalEventSet cfg eventToTuple generateTable hgen events₁,
+        canonicalize_generated_table_eq_canonicalEventSet cfg eventToTuple generateTable hgen events₂]
+
+/-- If `eventToTuple` is injective for the chosen event model, then the main
+    one-to-one theorem strengthens from canonical tuple projections to full
+    event sets. Without this assumption, extra event fields are intentionally
+    invisible to canonicalization. -/
+theorem canonicalize_generated_eq_iff_events_eq_of_eventToTuple_injective {Value Aux : Type}
+    (cfg : Config)
+    (eventToTuple : Event Value Aux → Tuple)
+    (generateTable : EventSet Value Aux → Trace)
+    (hgen : TableGeneratorFaithful cfg eventToTuple generateTable)
+    (hinj : Function.Injective eventToTuple)
+    (events₁ events₂ : EventSet Value Aux) :
     canonicalize cfg (generateTable events₁) =
       canonicalize cfg (generateTable events₂) ↔
     events₁ = events₂ :=
   by
-    rw [canonicalize_generated_table_eq_events cfg generateTable hgen events₁,
-        canonicalize_generated_table_eq_events cfg generateTable hgen events₂]
+    rw [canonicalize_generated_table_eq_canonicalEventSet cfg eventToTuple generateTable hgen events₁,
+        canonicalize_generated_table_eq_canonicalEventSet cfg eventToTuple generateTable hgen events₂]
+    constructor
+    · intro h
+      exact Finset.image_injective hinj h
+    · intro h
+      rw [h]
 
 /-! ## (v) Optional VM execution bridge -/
 
-/-- With a faithful event-set-to-table generator, Zebra recovers the event set
-    recorded by a VM execution. -/
-lemma canonicalize_execution_table_eq_events {VMExecution : Type}
-    (cfg : Config) (execEvents : VMExecution → EventSet)
-    (generateTable : EventSet → Trace)
-    (hgen : TableGeneratorFaithful cfg generateTable)
+/-- With a faithful event-set-to-table generator, Zebra recovers the canonical
+    tuple projection of the event set recorded by a VM execution. -/
+lemma canonicalize_execution_table_eq_canonicalEventSet {VMExecution Value Aux : Type}
+    (cfg : Config)
+    (eventToTuple : Event Value Aux → Tuple)
+    (execEvents : VMExecution → EventSet Value Aux)
+    (generateTable : EventSet Value Aux → Trace)
+    (hgen : TableGeneratorFaithful cfg eventToTuple generateTable)
     (exec : VMExecution) :
     canonicalize cfg (generatedTableOfExecution execEvents generateTable exec) =
-      execEvents exec :=
-  canonicalize_generated_table_eq_events cfg generateTable hgen (execEvents exec)
+      canonicalEventSet eventToTuple (execEvents exec) :=
+  canonicalize_generated_table_eq_canonicalEventSet cfg eventToTuple generateTable hgen
+    (execEvents exec)
 
 /-- With a faithful event-set-to-table generator, equality of canonicalized VM
-    tables is exactly equality of the executions' semantic event sets. -/
-lemma canonicalize_execution_tables_eq_iff_events_eq {VMExecution : Type}
-    (cfg : Config) (execEvents : VMExecution → EventSet)
-    (generateTable : EventSet → Trace)
-    (hgen : TableGeneratorFaithful cfg generateTable)
+    tables is exactly equality of the executions' canonical event projections. -/
+lemma canonicalize_execution_tables_eq_iff_canonicalEventSet_eq {VMExecution Value Aux : Type}
+    (cfg : Config)
+    (eventToTuple : Event Value Aux → Tuple)
+    (execEvents : VMExecution → EventSet Value Aux)
+    (generateTable : EventSet Value Aux → Trace)
+    (hgen : TableGeneratorFaithful cfg eventToTuple generateTable)
     (exec₁ exec₂ : VMExecution) :
     canonicalize cfg (generatedTableOfExecution execEvents generateTable exec₁) =
       canonicalize cfg (generatedTableOfExecution execEvents generateTable exec₂) ↔
-    execEvents exec₁ = execEvents exec₂ :=
-  canonicalize_generated_eq_iff_events_eq cfg generateTable hgen
+    canonicalEventSet eventToTuple (execEvents exec₁) =
+      canonicalEventSet eventToTuple (execEvents exec₂) :=
+  canonicalize_generated_eq_iff_canonicalEventSet_eq cfg eventToTuple generateTable hgen
     (execEvents exec₁) (execEvents exec₂)
 
 /-! ## (vi) Helper lemmas -/
