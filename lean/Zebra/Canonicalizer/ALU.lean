@@ -7,14 +7,6 @@ project the configured operand columns to a `(b, c, a)` tuple; the canonical
 form is the deduplicated *set* of those projections (matching the Rust
 `HashSet<…>` semantics).
 
-Note on AddSub: the Rust code's `cr_add` (`examples/sp1/examples/addsub.rs:26`)
-and `generate_alu_final_checker` (`src/canonicalizer.rs:72`) both hardcode row
-0 for the projection regardless of which row triggered `is_real`. That is the
-documented "currently only support one-row table" simplification. The semantic
-model below uses per-row projection (matching the memory-op canonicalizer at
-`src/canonicalizer.rs:111` and what the ALU canonicalizer should do once
-generalized). Under "at most one real row," the two coincide.
-
 The canonicalized representation is a `Finset Tuple` (a SET, not a string).
 The string output is a separate printer over this set — trivially deterministic
 in the forward direction; injectivity at the string level is a separate
