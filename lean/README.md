@@ -80,11 +80,10 @@ Expected: no matches.
 | Name | Type | What it is |
 |---|---|---|
 | `canonicalize` | `Config → Trace → Finset Tuple` | Per-row projection of real rows, deduped (the canonical form). |
-| `Event` | `Type → Type → Type` | Concrete semantic VM event with concrete values plus arbitrary auxiliary data. |
-| `EventSet` | `Type → Type → Type` | Semantic VM events, distinct from the canonicalized tuple set. |
-| `canonicalEventSet` | `(Event Value Aux → Tuple) → EventSet Value Aux → Finset Tuple` | Tuple-level image of a semantic event set under a supplied projection. |
-| `TableEncodesEvents` | `Config → (Event Value Aux → Tuple) → EventSet Value Aux → Trace → Prop` | A generated table's real projected rows are exactly `canonicalEventSet eventToTuple events`. |
-| `TableGeneratorFaithful` | `Prop` | Abstract contract: `generateTable events` encodes `canonicalEventSet events`. |
+| `ALUEvent` | `Type → Type` | Concrete ALU event with concrete input/output values. |
+| `EventSet` | `Type → Type` | Semantic ALU events, distinct from the canonicalized tuple set. |
+| `TableEncodesEvents` | `Config → (ALUEvent Value → Tuple) → EventSet Value → Trace → Prop` | A generated table's real projected rows are exactly `Finset.image eventToTuple events`. |
+| `TableGeneratorFaithful` | `Prop` | Abstract contract: `generateTable events` encodes `Finset.image eventToTuple events`. |
 | `generatedTableOfExecution` | `VMExecution → Trace` | Optional wrapper: generate a table from `execEvents exec`. |
 | `stringRepr` | `Config → Trace → String` | Printer faithful to `cr_add` / `PrettySet::fmt` (`noncomputable`). |
 
@@ -92,8 +91,8 @@ Expected: no matches.
 
 | Name | Statement |
 |---|---|
-| `canonicalize_generated_table_eq_canonicalEventSet` | Faithful `EventSet → Trace` generator ⇒ canonicalized generated table equals `canonicalEventSet eventToTuple events`. |
-| `canonicalize_generated_eq_iff_canonicalEventSet_eq` | Faithful `EventSet → Trace` generator ⇒ equal canonical forms iff canonical event projections are equal. |
+| `canonicalize_generated_table_eq_eventTupleSet` | Faithful `EventSet → Trace` generator ⇒ canonicalized generated table equals `Finset.image eventToTuple events`. |
+| `canonicalize_generated_eq_iff_eventTupleSet_eq` | Faithful `EventSet → Trace` generator ⇒ equal canonical forms iff tuple images of event sets are equal. |
 | `canonicalize_generated_eq_iff_events_eq_of_eventToTuple_injective` | If `eventToTuple` is injective, the previous theorem strengthens to equality of full event sets. |
 
 **Support lemmas**
@@ -101,10 +100,10 @@ Expected: no matches.
 | Name | Statement |
 |---|---|
 | `mem_canonicalize_iff` | `tup ∈ canonicalize cfg t ↔ ∃ row ∈ t, isReal row ∧ projectRow row = tup` |
-| `canonicalize_eq_canonicalEventSet_of_encodes` | If a table encodes VM events, canonicalization returns their canonical tuple projection. |
-| `canonicalize_eq_canonicalEventSet_iff` | `canonicalize cfg table = canonicalEventSet events ↔ TableEncodesEvents cfg events table` |
-| `canonicalize_execution_table_eq_canonicalEventSet` | Optional execution wrapper: faithful generator ⇒ canonicalized execution table equals `canonicalEventSet (execEvents exec)`. |
-| `canonicalize_execution_tables_eq_iff_canonicalEventSet_eq` | Optional execution wrapper: equal canonical forms iff execution canonical projections are equal. |
+| `canonicalize_eq_eventTupleSet_of_encodes` | If a table encodes VM events, canonicalization returns `Finset.image eventToTuple events`. |
+| `canonicalize_eq_eventTupleSet_iff` | `canonicalize cfg table = Finset.image eventToTuple events ↔ TableEncodesEvents cfg eventToTuple events table` |
+| `canonicalize_execution_table_eq_eventTupleSet` | Optional execution wrapper: faithful generator ⇒ canonicalized execution table equals `Finset.image eventToTuple (execEvents exec)`. |
+| `canonicalize_execution_tables_eq_iff_eventTupleSet_eq` | Optional execution wrapper: equal canonical forms iff execution tuple images are equal. |
 
 **Lemmas (helpers / consequences)**
 
