@@ -11,9 +11,14 @@ lean/
 ├── lakefile.lean             — Lake config; depends on mathlib
 ├── lean-toolchain            — pins leanprover/lean4:v4.24.0
 ├── lake-manifest.json        — locked dependency revisions
+├── Zebra.lean                — import aggregator for `lake build`
 └── Zebra/
     └── Canonicalizer/
-        └── ALU.lean          — multi-row canonicalizer faithfulness
+        ├── Generic.lean      — reusable theorem layer
+        ├── ALU.lean          — ALU tuple/event wrappers + string rendering
+        ├── Memory.lean       — memory-op canonical representation shape
+        ├── ControlFlow.lean  — control-flow and misc representation shapes
+        └── Examples.lean     — concrete zkVM example layouts
 ```
 
 ## Prerequisites
@@ -39,7 +44,7 @@ lake build               # compiles Zebra/
 Or to type-check a single file:
 
 ```bash
-lake env lean Zebra/Canonicalizer/ALU.lean
+lake env lean Zebra/Canonicalizer/Examples.lean
 ```
 
 Exit code 0 with no output = clean build.
@@ -64,11 +69,11 @@ rev `3bde4584...`). If your local mathlib is at a different revision, run
 
 ## Verifying the proofs
 
-`lake env lean Zebra/Canonicalizer/ALU.lean` should exit 0 with no output. To
-confirm there are no admitted gaps:
+`lake build` should complete successfully. To confirm there are no admitted
+gaps:
 
 ```bash
-grep -nE "sorry|admit|axiom" Zebra/Canonicalizer/ALU.lean
+grep -R -nE "sorry|admit|axiom" Zebra/
 ```
 
 Expected: no matches.
@@ -102,12 +107,21 @@ the appropriate `Repr` type.
 | `ALUEvent` | `Type → Type` | Concrete ALU event with concrete input/output values. |
 | `EventSet` | `Type → Type` | Semantic ALU events, distinct from the canonicalized tuple set. |
 | `ALUEventEncoding` | `Type → Type` | Injective representation of concrete ALU events as canonical tuples. |
-| `MemoryOpTuple` | `Type` | Example canonical representation shape for memory read/write rows. |
-| `ControlFlowTuple` | `Type` | Example canonical representation shape for branch/jump rows. |
 | `TableEncodesEvents` | `Config → ALUEventEncoding Value → EventSet Value → Trace → Prop` | A generated table's real projected rows are exactly the encoded event set. |
 | `TableGeneratorFaithful` | `Prop` | Abstract contract: `generateTable events` encodes exactly `events`. |
 | `generatedTableOfExecution` | `VMExecution → Trace` | Optional wrapper: generate a table from `execEvents exec`. |
 | `stringRepr` | `Config → Trace → String` | Printer faithful to `cr_add` / `PrettySet::fmt` (`noncomputable`). |
+
+### `Zebra.Memory` / `Zebra.ControlFlow`
+
+| Name | Type | What it is |
+|---|---|---|
+| `MemoryOpTuple` | `Type` | Canonical representation shape for memory read/write rows. |
+| `mkMemoryOpConfig` | constructor | Build a generic config from memory-op column groups. |
+| `ControlFlowTuple` | `Type` | Canonical representation shape for branch/jump rows. |
+| `UnaryTuple` | `Type` | Canonical representation shape for unary ALU-like rows such as CLO/CLZ. |
+| `MovCondTuple` | `Type` | Canonical representation shape for Ziren movcond rows. |
+| `ValidaLtTuple` | `Type` | Canonical representation shape for Valida LT32. |
 
 **Main theorems**
 
