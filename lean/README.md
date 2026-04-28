@@ -57,7 +57,10 @@ assumptions.
 
 ## Covered Layouts
 
-`Examples.lean` instantiates the theorem for supported example layouts:
+`Examples.lean` instantiates the theorem for supported example layouts. Static
+layouts have concrete column-index configs. Lookup-driven ALU layouts use
+`ExtractedALULayout`, modeling the `GeneralLookupInfo` columns extracted by the
+Rust pipeline (`is_real`, `op_b`, `op_c`, `op_a`).
 
 - SP1: add/sub, branch/jump, memory instructions, lookup-driven ALU tables
 - Pico: add/sub, memory read/write, lookup-driven ALU tables
