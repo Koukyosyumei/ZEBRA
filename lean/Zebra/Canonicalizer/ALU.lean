@@ -85,10 +85,11 @@ def canonicalize (cfg : Config) (t : Trace) : Finset Tuple := realTuples cfg t
 
 /-! ## (ii) The bidirectional faithfulness theorem -/
 
-/-- **Canonicalizer faithfulness (definitional).** Two traces yield equal
-    canonical forms iff they project to the same set of real-row tuples.
-    The substantive content is `mem_realTuples_iff` below. -/
-theorem faithful (cfg : Config) (t₁ t₂ : Trace) :
+/-- **Naming alias** (definitional, `Iff.rfl`). `canonicalize` is by definition
+    `realTuples`; this lemma exposes the equivalence under the user-facing name.
+    The substantive bidirectional content lives in `mem_realTuples_iff` and
+    `realTuples_eq_iff` below. -/
+@[simp] lemma faithful (cfg : Config) (t₁ t₂ : Trace) :
     canonicalize cfg t₁ = canonicalize cfg t₂ ↔
     realTuples cfg t₁ = realTuples cfg t₂ :=
   Iff.rfl
