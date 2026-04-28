@@ -217,26 +217,4 @@ lemma stringRepr_consistent (cfg : Config) (t₁ t₂ : Trace) :
      = renderSet ((canonicalize cfg t₂).toList.map renderTuple)
   rw [h]
 
-/-! ## Sanity checks -/
-
-/-- The sp1 ADD column layout (`examples/sp1/examples/addsub.rs:32-34`). -/
-def sp1AddConfig : Config where
-  idxB   := [8, 9, 10, 11]
-  idxC   := [12, 13, 14, 15]
-  idxA   := [1, 2, 3, 4]
-  isReal := fun _ => true
-
-example (t : Trace) (pad : Row) (h : sp1AddConfig.isReal pad = false) :
-    canonicalize sp1AddConfig (t ++ [pad]) = canonicalize sp1AddConfig t :=
-  canonicalize_append_padding sp1AddConfig t pad h
-
-example (t₁ t₂ : Trace) :
-    canonicalize sp1AddConfig (t₁ ++ t₂)
-      = canonicalize sp1AddConfig t₁ ∪ canonicalize sp1AddConfig t₂ :=
-  canonicalize_append sp1AddConfig t₁ t₂
-
-example (t : Trace) (tup : Tuple) (h : tup ∈ canonicalize sp1AddConfig t) :
-    ∃ row ∈ t, sp1AddConfig.isReal row ∧ sp1AddConfig.projectRow row = tup :=
-  (mem_canonicalize_iff sp1AddConfig t tup).mp h
-
 end Zebra.ALU

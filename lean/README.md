@@ -18,7 +18,7 @@ lean/
         ├── ALU.lean          — ALU tuple/event wrappers + string rendering
         ├── Memory.lean       — memory-op canonical representation shape
         ├── ControlFlow.lean  — control-flow and misc representation shapes
-        └── Examples.lean     — concrete zkVM example layouts
+        └── Examples.lean     — concrete zkVM layouts + theorem instantiations
 ```
 
 ## Prerequisites
@@ -166,6 +166,11 @@ Concrete example configs are collected under `Zebra.ALU.Examples`:
 
 CPU tables and Valida memory are intentionally not modeled here because their
 canonicalizers are not currently supported by Zebra.
+
+Each static example config also has a corresponding `*_one_to_one` theorem
+instantiating `Zebra.Generic.canonicalize_generated_eq_iff_events_eq`. Lookup-
+driven ALU tables share `Zebra.Examples.lookup_driven_alu_one_to_one`, because
+their operand columns are supplied dynamically by `GeneralLookupInfo`.
 
 ## What the proofs do *not* cover
 
