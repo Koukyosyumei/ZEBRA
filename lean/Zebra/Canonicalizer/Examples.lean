@@ -19,6 +19,18 @@ def mkALUConfig (idxB idxC idxA : List Nat) (isReal : Row → Bool) :
   projectRow := fun row =>
     { b := row.project idxB, c := row.project idxC, a := row.project idxA }
 
+/-- Lookup-driven ALU examples obtain these columns from `GeneralLookupInfo`
+    (`is_real`, `op_b`, `op_c`, `op_a`) rather than hard-coding them in the
+    Rust example file. -/
+structure ExtractedALULayout where
+  isReal : Row → Bool
+  opB : List Nat
+  opC : List Nat
+  opA : List Nat
+
+def ExtractedALULayout.toConfig (layout : ExtractedALULayout) : Generic.Config ALU.Tuple :=
+  mkALUConfig layout.opB layout.opC layout.opA layout.isReal
+
 /-- Shared guarantee for every example config below: if a table generator is
     faithful to the stated config and an injective event encoding, then the
     canonical representation is one-to-one with the original event set. -/
@@ -33,19 +45,18 @@ theorem one_to_one_for_config {Event Repr : Type} [DecidableEq Repr]
     events₁ = events₂ :=
   Generic.canonicalize_generated_eq_iff_events_eq cfg enc generateTable hgen events₁ events₂
 
-/-- Guarantee for lookup-driven ALU tables whose concrete operand columns are
-    provided by `GeneralLookupInfo` at extraction time rather than hard-coded in
-    the example file. -/
+/-- Guarantee for lookup-driven ALU tables after `GeneralLookupInfo` has been
+    extracted into an `ExtractedALULayout`. -/
 theorem lookup_driven_alu_one_to_one {Event : Type}
-    (cfg : Generic.Config ALU.Tuple)
+    (layout : ExtractedALULayout)
     (enc : Generic.EventEncoding Event ALU.Tuple)
     (generateTable : Generic.EventSet Event → Trace)
-    (hgen : Generic.TableGeneratorFaithful cfg enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful layout.toConfig enc generateTable)
     (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize cfg (generateTable events₁) =
-      Generic.canonicalize cfg (generateTable events₂) ↔
+    Generic.canonicalize layout.toConfig (generateTable events₁) =
+      Generic.canonicalize layout.toConfig (generateTable events₂) ↔
     events₁ = events₂ :=
-  one_to_one_for_config cfg enc generateTable hgen events₁ events₂
+  one_to_one_for_config layout.toConfig enc generateTable hgen events₁ events₂
 
 /-! ### SP1 -/
 
@@ -65,11 +76,6 @@ def controlFlowConfig (isReal : Row → Bool) : Generic.Config ControlFlow.Contr
 def memoryInstrsConfig (isReal : Row → Bool) : Generic.Config Memory.MemoryOpTuple :=
   Memory.mkMemoryOpConfig 2 [3, 4, 5, 6] [7, 8, 9, 10] [11, 12, 13, 14]
     [38, 39, 40, 41] isReal
-
-/-- Tables using `generate_alu_final_checker`, whose columns are supplied by
-    `GeneralLookupInfo` at extraction time. -/
-def lookupDrivenALUTables : List String :=
-  ["lt", "bitwise", "divrem", "shiftleft", "mul", "sr"]
 
 /-- SP1 ADD canonicalizer one-to-one guarantee. -/
 theorem add_one_to_one {Event : Type} (isReal : Row → Bool)
@@ -115,6 +121,20 @@ theorem memoryInstrs_one_to_one {Event : Type} (isReal : Row → Bool)
     events₁ = events₂ :=
   one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen events₁ events₂
 
+/-- SP1 lookup-driven ALU canonicalizer one-to-one guarantee after column
+    extraction from `GeneralLookupInfo`. Covers `lt`, `bitwise`, `divrem`,
+    `shiftleft`, `mul`, and `sr`. -/
+theorem lookupDrivenALU_one_to_one {Event : Type}
+    (layout : ExtractedALULayout)
+    (enc : Generic.EventEncoding Event ALU.Tuple)
+    (generateTable : Generic.EventSet Event → Trace)
+    (hgen : Generic.TableGeneratorFaithful layout.toConfig enc generateTable)
+    (events₁ events₂ : Generic.EventSet Event) :
+    Generic.canonicalize layout.toConfig (generateTable events₁) =
+      Generic.canonicalize layout.toConfig (generateTable events₂) ↔
+    events₁ = events₂ :=
+  lookup_driven_alu_one_to_one layout enc generateTable hgen events₁ events₂
+
 end SP1
 
 /-! ### Pico -/
@@ -130,9 +150,6 @@ def subConfig (isReal : Row → Bool) : Generic.Config ALU.Tuple :=
 def memoryReadWriteConfig (isReal : Row → Bool) : Generic.Config Memory.MemoryOpTuple :=
   Memory.mkMemoryOpConfig 1 [68, 69, 70, 71] [77, 78, 79, 80] [86, 87, 88, 89]
     [28, 29, 30, 31] isReal
-
-def lookupDrivenALUTables : List String :=
-  ["sr", "sll", "lessthan", "mul", "bitwise", "divrem"]
 
 /-- Pico ADD canonicalizer one-to-one guarantee. -/
 theorem add_one_to_one {Event : Type} (isReal : Row → Bool)
@@ -167,6 +184,20 @@ theorem memoryReadWrite_one_to_one {Event : Type} (isReal : Row → Bool)
     events₁ = events₂ :=
   one_to_one_for_config (memoryReadWriteConfig isReal) enc generateTable hgen events₁ events₂
 
+/-- Pico lookup-driven ALU canonicalizer one-to-one guarantee after column
+    extraction from `GeneralLookupInfo`. Covers `sr`, `sll`, `lessthan`, `mul`,
+    `bitwise`, and `divrem`. -/
+theorem lookupDrivenALU_one_to_one {Event : Type}
+    (layout : ExtractedALULayout)
+    (enc : Generic.EventEncoding Event ALU.Tuple)
+    (generateTable : Generic.EventSet Event → Trace)
+    (hgen : Generic.TableGeneratorFaithful layout.toConfig enc generateTable)
+    (events₁ events₂ : Generic.EventSet Event) :
+    Generic.canonicalize layout.toConfig (generateTable events₁) =
+      Generic.canonicalize layout.toConfig (generateTable events₂) ↔
+    events₁ = events₂ :=
+  lookup_driven_alu_one_to_one layout enc generateTable hgen events₁ events₂
+
 end Pico
 
 /-! ### Sphinx -/
@@ -178,9 +209,6 @@ def addConfig (isReal : Row → Bool) : Generic.Config ALU.Tuple :=
 
 def subConfig (isReal : Row → Bool) : Generic.Config ALU.Tuple :=
   mkALUConfig [3, 4, 5, 6] [14, 15, 16, 17] [10, 11, 12, 13] isReal
-
-def lookupDrivenALUTables : List String :=
-  ["sr", "shiftleft", "mul", "lt", "bitwise", "divrem"]
 
 /-- Sphinx ADD canonicalizer one-to-one guarantee. -/
 theorem add_one_to_one {Event : Type} (isReal : Row → Bool)
@@ -203,6 +231,20 @@ theorem sub_one_to_one {Event : Type} (isReal : Row → Bool)
       Generic.canonicalize (subConfig isReal) (generateTable events₂) ↔
     events₁ = events₂ :=
   one_to_one_for_config (subConfig isReal) enc generateTable hgen events₁ events₂
+
+/-- Sphinx lookup-driven ALU canonicalizer one-to-one guarantee after column
+    extraction from `GeneralLookupInfo`. Covers `sr`, `shiftleft`, `mul`, `lt`,
+    `bitwise`, and `divrem`. -/
+theorem lookupDrivenALU_one_to_one {Event : Type}
+    (layout : ExtractedALULayout)
+    (enc : Generic.EventEncoding Event ALU.Tuple)
+    (generateTable : Generic.EventSet Event → Trace)
+    (hgen : Generic.TableGeneratorFaithful layout.toConfig enc generateTable)
+    (events₁ events₂ : Generic.EventSet Event) :
+    Generic.canonicalize layout.toConfig (generateTable events₁) =
+      Generic.canonicalize layout.toConfig (generateTable events₂) ↔
+    events₁ = events₂ :=
+  lookup_driven_alu_one_to_one layout enc generateTable hgen events₁ events₂
 
 end Sphinx
 
@@ -240,9 +282,6 @@ def jumpConfig (isReal : Row → Bool) : Generic.Config ControlFlow.ControlFlowT
 def memoryInstrsConfig (isReal : Row → Bool) : Generic.Config Memory.MemoryOpTuple :=
   Memory.mkMemoryOpConfig 3 [4, 5, 6, 7] [8, 9, 10, 11] [12, 13, 14, 15]
     [57, 58, 59, 60] isReal
-
-def lookupDrivenALUTables : List String :=
-  ["mul", "shiftleft", "shiftright", "lt", "bitwise"]
 
 /-- Ziren ADD canonicalizer one-to-one guarantee. -/
 theorem add_one_to_one {Event : Type} (isReal : Row → Bool)
@@ -343,6 +382,20 @@ theorem memoryInstrs_one_to_one {Event : Type} (isReal : Row → Bool)
     events₁ = events₂ :=
   one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen events₁ events₂
 
+/-- Ziren lookup-driven ALU canonicalizer one-to-one guarantee after column
+    extraction from `GeneralLookupInfo`. Covers `mul`, `shiftleft`,
+    `shiftright`, `lt`, and `bitwise`. -/
+theorem lookupDrivenALU_one_to_one {Event : Type}
+    (layout : ExtractedALULayout)
+    (enc : Generic.EventEncoding Event ALU.Tuple)
+    (generateTable : Generic.EventSet Event → Trace)
+    (hgen : Generic.TableGeneratorFaithful layout.toConfig enc generateTable)
+    (events₁ events₂ : Generic.EventSet Event) :
+    Generic.canonicalize layout.toConfig (generateTable events₁) =
+      Generic.canonicalize layout.toConfig (generateTable events₂) ↔
+    events₁ = events₂ :=
+  lookup_driven_alu_one_to_one layout enc generateTable hgen events₁ events₂
+
 end Ziren
 
 /-! ### Valida -/
@@ -351,11 +404,6 @@ namespace Valida
 
 def lt32Config (isReal : Row → Bool) : Generic.Config ControlFlow.ValidaLtTuple :=
   ControlFlow.mkValidaLtConfig [0, 1, 2, 3] [4, 5, 6, 7] 21 isReal
-
-/-- Valida memory is intentionally skipped: its canonicalizer is not yet
-    supported in Zebra. -/
-def lookupDrivenALUTables : List String :=
-  ["add32", "sub32", "mul32", "div32", "bitwise32", "com32"]
 
 /-- Valida LT32 canonicalizer one-to-one guarantee. -/
 theorem lt32_one_to_one {Event : Type} (isReal : Row → Bool)
@@ -368,16 +416,39 @@ theorem lt32_one_to_one {Event : Type} (isReal : Row → Bool)
     events₁ = events₂ :=
   one_to_one_for_config (lt32Config isReal) enc generateTable hgen events₁ events₂
 
+/-- Valida lookup-driven ALU canonicalizer one-to-one guarantee after column
+    extraction from `GeneralLookupInfo`. Covers `add32`, `sub32`, `mul32`,
+    `div32`, `bitwise32`, and `com32`. Valida memory is intentionally skipped. -/
+theorem lookupDrivenALU_one_to_one {Event : Type}
+    (layout : ExtractedALULayout)
+    (enc : Generic.EventEncoding Event ALU.Tuple)
+    (generateTable : Generic.EventSet Event → Trace)
+    (hgen : Generic.TableGeneratorFaithful layout.toConfig enc generateTable)
+    (events₁ events₂ : Generic.EventSet Event) :
+    Generic.canonicalize layout.toConfig (generateTable events₁) =
+      Generic.canonicalize layout.toConfig (generateTable events₂) ↔
+    events₁ = events₂ :=
+  lookup_driven_alu_one_to_one layout enc generateTable hgen events₁ events₂
+
 end Valida
 
 /-! ### OpenVM -/
 
 namespace OpenVM
 
-/-- OpenVM examples currently use the lookup-driven ALU final checker. CPU
-    tables are intentionally skipped. -/
-def lookupDrivenALUTables : List String :=
-  ["alu", "bitwise", "branch", "jump", "lt", "mul", "shift"]
+/-- OpenVM lookup-driven ALU canonicalizer one-to-one guarantee after column
+    extraction from `GeneralLookupInfo`. Covers `alu`, `bitwise`, `branch`,
+    `jump`, `lt`, `mul`, and `shift`. CPU tables are intentionally skipped. -/
+theorem lookupDrivenALU_one_to_one {Event : Type}
+    (layout : ExtractedALULayout)
+    (enc : Generic.EventEncoding Event ALU.Tuple)
+    (generateTable : Generic.EventSet Event → Trace)
+    (hgen : Generic.TableGeneratorFaithful layout.toConfig enc generateTable)
+    (events₁ events₂ : Generic.EventSet Event) :
+    Generic.canonicalize layout.toConfig (generateTable events₁) =
+      Generic.canonicalize layout.toConfig (generateTable events₂) ↔
+    events₁ = events₂ :=
+  lookup_driven_alu_one_to_one layout enc generateTable hgen events₁ events₂
 
 end OpenVM
 
