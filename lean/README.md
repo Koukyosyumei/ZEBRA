@@ -79,8 +79,7 @@ Expected: no matches.
 
 | Name | Type | What it is |
 |---|---|---|
-| `realTuples` | `Config → Trace → Finset Tuple` | Per-row projection of real rows, deduped (the canonical form). |
-| `canonicalize` | `Config → Trace → Finset Tuple` | Naming alias — `:= realTuples`. |
+| `canonicalize` | `Config → Trace → Finset Tuple` | Per-row projection of real rows, deduped (the canonical form). |
 | `TraceEquiv` | `Config → Trace → Trace → Prop` | Equivalence relation: same set of real-row projections. |
 | `stringRepr` | `Config → Trace → String` | Printer faithful to `cr_add` / `PrettySet::fmt` (`noncomputable`). |
 
@@ -88,21 +87,20 @@ Expected: no matches.
 
 | Name | Statement |
 |---|---|
-| `mem_realTuples_iff` | `tup ∈ realTuples cfg t ↔ ∃ row ∈ t, isReal row ∧ projectRow row = tup` |
-| `realTuples_eq_iff` | `realTuples cfg t₁ = realTuples cfg t₂ ↔ TraceEquiv cfg t₁ t₂` |
-| `realTuples_eq_of_equiv` | *same → same*: `TraceEquiv ⇒ realTuples cfg t₁ = realTuples cfg t₂` |
-| `realTuples_ne_of_not_equiv` | *different → different*: `¬ TraceEquiv ⇒ realTuples cfg t₁ ≠ realTuples cfg t₂` |
+| `mem_canonicalize_iff` | `tup ∈ canonicalize cfg t ↔ ∃ row ∈ t, isReal row ∧ projectRow row = tup` |
+| `canonicalize_eq_iff` | `canonicalize cfg t₁ = canonicalize cfg t₂ ↔ TraceEquiv cfg t₁ t₂` |
+| `canonicalize_eq_of_equiv` | *same → same*: `TraceEquiv ⇒ canonicalize cfg t₁ = canonicalize cfg t₂` |
+| `canonicalize_ne_of_not_equiv` | *different → different*: `¬ TraceEquiv ⇒ canonicalize cfg t₁ ≠ canonicalize cfg t₂` |
 
 **Lemmas (helpers / consequences)**
 
 | Name | Statement |
 |---|---|
-| `faithful` | `@[simp]` alias: `canonicalize ↔ realTuples` (`Iff.rfl`) |
-| `realTuples_nil` | `realTuples cfg [] = ∅` |
-| `realTuples_no_real` | no real rows ⇒ `realTuples cfg t = ∅` |
-| `realTuples_append` | distributivity over `++`: `= realTuples t₁ ∪ realTuples t₂` |
-| `realTuples_append_padding` | non-real row appended ⇒ canonical form unchanged |
-| `realTuples_perm` | row permutation ⇒ canonical form unchanged |
+| `canonicalize_nil` | `canonicalize cfg [] = ∅` |
+| `canonicalize_no_real` | no real rows ⇒ `canonicalize cfg t = ∅` |
+| `canonicalize_append` | distributivity over `++`: `= canonicalize t₁ ∪ canonicalize t₂` |
+| `canonicalize_append_padding` | non-real row appended ⇒ canonical form unchanged |
+| `canonicalize_perm` | row permutation ⇒ canonical form unchanged |
 | `stringRepr_consistent` | equal canonical forms ⇒ equal strings (printer's forward direction) |
 
 ## What the proofs do *not* cover

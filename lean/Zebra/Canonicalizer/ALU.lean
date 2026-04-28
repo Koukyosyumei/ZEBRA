@@ -70,38 +70,23 @@ def Config.projectRow (cfg : Config) (row : Row) : Tuple :=
     c := row.project cfg.idxC,
     a := row.project cfg.idxA }
 
-/-! ## (i) `realTuples` — multi-row projection to a deduplicated set -/
+/-! ## (i) `canonicalize` — multi-row projection to a deduplicated set -/
 
 /-- The canonical form of a trace: the deduplicated set of (b, c, a) tuples
     over its real rows. Faithfully models the multi-row pattern at
     `src/canonicalizer.rs:111` (memory-op) — each real row contributes its
     own projection, with `HashSet` deduplication. -/
-def realTuples (cfg : Config) (t : Trace) : Finset Tuple :=
+def canonicalize (cfg : Config) (t : Trace) : Finset Tuple :=
   ((t.filter cfg.isReal).map cfg.projectRow).toFinset
 
-/-- The canonical form is the structured `Finset Tuple` — exactly the
-    information the canonicalizer extracts. -/
-def canonicalize (cfg : Config) (t : Trace) : Finset Tuple := realTuples cfg t
-
-/-! ## (ii) The bidirectional faithfulness theorem -/
-
-/-- **Naming alias** (definitional, `Iff.rfl`). `canonicalize` is by definition
-    `realTuples`; this lemma exposes the equivalence under the user-facing name.
-    The substantive bidirectional content lives in `mem_realTuples_iff` and
-    `realTuples_eq_iff` below. -/
-@[simp] lemma faithful (cfg : Config) (t₁ t₂ : Trace) :
-    canonicalize cfg t₁ = canonicalize cfg t₂ ↔
-    realTuples cfg t₁ = realTuples cfg t₂ :=
-  Iff.rfl
-
-/-! ## (iii) Substantive lemmas -/
+/-! ## (ii) Substantive theorems -/
 
 /-- **Membership characterization.** A tuple is in the canonical form of `t`
     iff it is the projection of some real row of `t`. This is the substantive
     "what the canonicalizer extracts" theorem — both directions. -/
-theorem mem_realTuples_iff (cfg : Config) (t : Trace) (tup : Tuple) :
-    tup ∈ realTuples cfg t ↔ ∃ row ∈ t, cfg.isReal row ∧ cfg.projectRow row = tup := by
-  unfold realTuples
+theorem mem_canonicalize_iff (cfg : Config) (t : Trace) (tup : Tuple) :
+    tup ∈ canonicalize cfg t ↔ ∃ row ∈ t, cfg.isReal row ∧ cfg.projectRow row = tup := by
+  unfold canonicalize
   simp [List.mem_toFinset, List.mem_map, List.mem_filter]
   constructor
   · rintro ⟨row, ⟨hin, hreal⟩, heq⟩
@@ -112,50 +97,52 @@ theorem mem_realTuples_iff (cfg : Config) (t : Trace) (tup : Tuple) :
 /-- Two traces are *canonically equivalent* iff their real-row projections
     coincide as a set. This is the equivalence relation under which the
     canonicalizer is one-to-one — designed to be insensitive to padding rows
-    and to row permutations (see `realTuples_append_padding`, `realTuples_perm`). -/
+    and to row permutations (see `canonicalize_append_padding`, `canonicalize_perm`). -/
 def TraceEquiv (cfg : Config) (t₁ t₂ : Trace) : Prop :=
   ∀ tup, (∃ row ∈ t₁, cfg.isReal row ∧ cfg.projectRow row = tup) ↔
          (∃ row ∈ t₂, cfg.isReal row ∧ cfg.projectRow row = tup)
 
-/-- **Reverse direction (set extensionality).** Two traces have equal
-    canonical forms iff they are canonically equivalent. -/
-theorem realTuples_eq_iff (cfg : Config) (t₁ t₂ : Trace) :
-    realTuples cfg t₁ = realTuples cfg t₂ ↔ TraceEquiv cfg t₁ t₂ := by
+/-- **Bijection statement.** Two traces have equal canonical forms iff they
+    are canonically equivalent. -/
+theorem canonicalize_eq_iff (cfg : Config) (t₁ t₂ : Trace) :
+    canonicalize cfg t₁ = canonicalize cfg t₂ ↔ TraceEquiv cfg t₁ t₂ := by
   rw [Finset.ext_iff]
-  exact ⟨fun h tup => by simpa [mem_realTuples_iff] using h tup,
-         fun h tup => by simpa [mem_realTuples_iff] using h tup⟩
+  exact ⟨fun h tup => by simpa [mem_canonicalize_iff] using h tup,
+         fun h tup => by simpa [mem_canonicalize_iff] using h tup⟩
 
 /-- **Same → same.** Canonically equivalent traces yield equal canonical forms.
     (The "soundness" half of one-to-one: traces that ought to be considered the
     same — same set of real-row projections — produce the same output.) -/
-theorem realTuples_eq_of_equiv (cfg : Config) {t₁ t₂ : Trace}
+theorem canonicalize_eq_of_equiv (cfg : Config) {t₁ t₂ : Trace}
     (h : TraceEquiv cfg t₁ t₂) :
-    realTuples cfg t₁ = realTuples cfg t₂ :=
-  (realTuples_eq_iff cfg t₁ t₂).mpr h
+    canonicalize cfg t₁ = canonicalize cfg t₂ :=
+  (canonicalize_eq_iff cfg t₁ t₂).mpr h
 
 /-- **Different → different.** Canonically *inequivalent* traces yield distinct
     canonical forms. (The "completeness" half of one-to-one: traces that
     genuinely differ in their real-row projections produce different outputs.
 
     NOTE: this is stated on `TraceEquiv`, not raw trace equality. The naive
-    claim "`t₁ ≠ t₂ → realTuples cfg t₁ ≠ realTuples cfg t₂`" is *false* by
+    claim "`t₁ ≠ t₂ → canonicalize cfg t₁ ≠ canonicalize cfg t₂`" is *false* by
     design — appending a non-real padding row to a trace yields a different
     list but the same canonical form, and that's exactly the intended
     behaviour.) -/
-theorem realTuples_ne_of_not_equiv (cfg : Config) {t₁ t₂ : Trace}
+theorem canonicalize_ne_of_not_equiv (cfg : Config) {t₁ t₂ : Trace}
     (h : ¬ TraceEquiv cfg t₁ t₂) :
-    realTuples cfg t₁ ≠ realTuples cfg t₂ :=
-  fun heq => h ((realTuples_eq_iff cfg t₁ t₂).mp heq)
+    canonicalize cfg t₁ ≠ canonicalize cfg t₂ :=
+  fun heq => h ((canonicalize_eq_iff cfg t₁ t₂).mp heq)
+
+/-! ## (iii) Helper lemmas -/
 
 /-- Empty traces canonicalize to the empty set. -/
-lemma realTuples_nil (cfg : Config) :
-    realTuples cfg [] = ∅ := by simp [realTuples]
+lemma canonicalize_nil (cfg : Config) :
+    canonicalize cfg [] = ∅ := by simp [canonicalize]
 
 /-- A trace with no real rows canonicalizes to the empty set. -/
-lemma realTuples_no_real (cfg : Config) (t : Trace)
+lemma canonicalize_no_real (cfg : Config) (t : Trace)
     (h : ∀ row ∈ t, cfg.isReal row = false) :
-    realTuples cfg t = ∅ := by
-  unfold realTuples
+    canonicalize cfg t = ∅ := by
+  unfold canonicalize
   have hfilt : t.filter cfg.isReal = [] := by
     apply List.filter_eq_nil_iff.mpr
     intro row hrow
@@ -166,28 +153,28 @@ lemma realTuples_no_real (cfg : Config) (t : Trace)
 
 /-- **Distributivity over append.** The canonicalizer treats traces as sets:
     appending two traces unions their canonical forms. -/
-lemma realTuples_append (cfg : Config) (t₁ t₂ : Trace) :
-    realTuples cfg (t₁ ++ t₂) = realTuples cfg t₁ ∪ realTuples cfg t₂ := by
-  unfold realTuples
+lemma canonicalize_append (cfg : Config) (t₁ t₂ : Trace) :
+    canonicalize cfg (t₁ ++ t₂) = canonicalize cfg t₁ ∪ canonicalize cfg t₂ := by
+  unfold canonicalize
   rw [List.filter_append, List.map_append, List.toFinset_append]
 
 /-- **Padding invariance.** Appending a non-real row leaves the canonical form
     unchanged. -/
-lemma realTuples_append_padding (cfg : Config) (t : Trace) (pad : Row)
+lemma canonicalize_append_padding (cfg : Config) (t : Trace) (pad : Row)
     (h : cfg.isReal pad = false) :
-    realTuples cfg (t ++ [pad]) = realTuples cfg t := by
-  rw [realTuples_append]
-  have : realTuples cfg [pad] = ∅ :=
-    realTuples_no_real cfg [pad] (fun row hrow => by
+    canonicalize cfg (t ++ [pad]) = canonicalize cfg t := by
+  rw [canonicalize_append]
+  have : canonicalize cfg [pad] = ∅ :=
+    canonicalize_no_real cfg [pad] (fun row hrow => by
       rw [List.mem_singleton] at hrow
       rw [hrow]; exact h)
   rw [this, Finset.union_empty]
 
 /-- **Permutation invariance.** Permuting trace rows leaves the canonical form
     unchanged (the canonicalizer is order-blind). -/
-lemma realTuples_perm (cfg : Config) {t₁ t₂ : Trace} (h : t₁.Perm t₂) :
-    realTuples cfg t₁ = realTuples cfg t₂ := by
-  unfold realTuples
+lemma canonicalize_perm (cfg : Config) {t₁ t₂ : Trace} (h : t₁.Perm t₂) :
+    canonicalize cfg t₁ = canonicalize cfg t₂ := by
+  unfold canonicalize
   exact List.toFinset_eq_of_perm _ _ ((h.filter _).map _)
 
 /-! ## (iv) String presentation (separate concern: printer correctness) -/
@@ -231,26 +218,21 @@ def sp1AddConfig : Config where
   idxA   := [1, 2, 3, 4]
   isReal := fun _ => true  -- stub; real predicate: col 17 nonzero mod prime
 
-/-- Reflexivity check via `faithful`. -/
-example (t : Trace) :
-    canonicalize sp1AddConfig t = canonicalize sp1AddConfig t :=
-  (faithful sp1AddConfig t t).mpr rfl
-
 /-- Padding-invariance check on a concrete trace. -/
 example (t : Trace) (pad : Row) (h : sp1AddConfig.isReal pad = false) :
-    realTuples sp1AddConfig (t ++ [pad]) = realTuples sp1AddConfig t :=
-  realTuples_append_padding sp1AddConfig t pad h
+    canonicalize sp1AddConfig (t ++ [pad]) = canonicalize sp1AddConfig t :=
+  canonicalize_append_padding sp1AddConfig t pad h
 
 /-- Distributivity check. -/
 example (t₁ t₂ : Trace) :
-    realTuples sp1AddConfig (t₁ ++ t₂)
-      = realTuples sp1AddConfig t₁ ∪ realTuples sp1AddConfig t₂ :=
-  realTuples_append sp1AddConfig t₁ t₂
+    canonicalize sp1AddConfig (t₁ ++ t₂)
+      = canonicalize sp1AddConfig t₁ ∪ canonicalize sp1AddConfig t₂ :=
+  canonicalize_append sp1AddConfig t₁ t₂
 
 /-- Reverse-direction (membership) check: any tuple in the canonical form
     must originate from a specific real row. -/
-example (t : Trace) (tup : Tuple) (h : tup ∈ realTuples sp1AddConfig t) :
+example (t : Trace) (tup : Tuple) (h : tup ∈ canonicalize sp1AddConfig t) :
     ∃ row ∈ t, sp1AddConfig.isReal row ∧ sp1AddConfig.projectRow row = tup :=
-  (mem_realTuples_iff sp1AddConfig t tup).mp h
+  (mem_canonicalize_iff sp1AddConfig t tup).mp h
 
 end Zebra.ALU
