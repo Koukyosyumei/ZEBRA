@@ -1,9 +1,11 @@
 # Zebra Lean Proofs
 
-Lean 4 proofs for Zebra canonicalizer correctness. The core result is generic:
-for any table whose canonical form is a finite set of projected real rows,
-canonicalization is one-to-one with the original event set, assuming a faithful
-table generator and an injective event encoding.
+Lean 4 proofs for Zebra canonicalizer correctness. The proofs formalize:
+
+1. Raw trace tables modulo canonicalizer equality are bijective with the image
+   of the canonicalizer.
+2. If a table generator faithfully encodes semantic events and the event
+   encoding is injective, canonicalization is one-to-one with the event set.
 
 ## Layout
 
@@ -29,15 +31,33 @@ grep -R -nE "sorry|admit|axiom" Zebra/
 
 Expected: build succeeds and grep returns no matches.
 
-## Main Theorem
+## Main Theorems
 
 In `Zebra.Generic`:
 
 ```lean
+canonicalTraceSpace_equiv_image
+canonicalize_generator_independent
 canonicalize_generated_eq_iff_events_eq
 ```
 
-states that if:
+The first theorem proves the quotient-space statement:
+
+```lean
+Function.Bijective (quotientToImage cfg)
+```
+
+where the quotient identifies raw tables with equal canonical forms.
+
+The second theorem states that if:
+
+- `gen₁` and `gen₂` are both faithful generators,
+- both receive the same event set,
+
+then their generated raw tables canonicalize to the same value. This formalizes
+the collapse of different raw representations of the same computation.
+
+The third theorem states that if:
 
 - `cfg` defines real rows and row projection,
 - `enc` injectively maps semantic events to canonical row representations,
