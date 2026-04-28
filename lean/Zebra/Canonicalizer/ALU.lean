@@ -109,16 +109,43 @@ theorem mem_realTuples_iff (cfg : Config) (t : Trace) (tup : Tuple) :
   · rintro ⟨row, hin, hreal, heq⟩
     exact ⟨row, ⟨hin, hreal⟩, heq⟩
 
+/-- Two traces are *canonically equivalent* iff their real-row projections
+    coincide as a set. This is the equivalence relation under which the
+    canonicalizer is one-to-one — designed to be insensitive to padding rows
+    and to row permutations (see `realTuples_append_padding`, `realTuples_perm`). -/
+def TraceEquiv (cfg : Config) (t₁ t₂ : Trace) : Prop :=
+  ∀ tup, (∃ row ∈ t₁, cfg.isReal row ∧ cfg.projectRow row = tup) ↔
+         (∃ row ∈ t₂, cfg.isReal row ∧ cfg.projectRow row = tup)
+
 /-- **Reverse direction (set extensionality).** Two traces have equal
-    canonical forms iff for every tuple, it is the projection of a real row
-    of one trace iff it is the projection of a real row of the other. -/
+    canonical forms iff they are canonically equivalent. -/
 theorem realTuples_eq_iff (cfg : Config) (t₁ t₂ : Trace) :
-    realTuples cfg t₁ = realTuples cfg t₂ ↔
-    ∀ tup, (∃ row ∈ t₁, cfg.isReal row ∧ cfg.projectRow row = tup) ↔
-           (∃ row ∈ t₂, cfg.isReal row ∧ cfg.projectRow row = tup) := by
+    realTuples cfg t₁ = realTuples cfg t₂ ↔ TraceEquiv cfg t₁ t₂ := by
   rw [Finset.ext_iff]
   exact ⟨fun h tup => by simpa [mem_realTuples_iff] using h tup,
          fun h tup => by simpa [mem_realTuples_iff] using h tup⟩
+
+/-- **Same → same.** Canonically equivalent traces yield equal canonical forms.
+    (The "soundness" half of one-to-one: traces that ought to be considered the
+    same — same set of real-row projections — produce the same output.) -/
+theorem realTuples_eq_of_equiv (cfg : Config) {t₁ t₂ : Trace}
+    (h : TraceEquiv cfg t₁ t₂) :
+    realTuples cfg t₁ = realTuples cfg t₂ :=
+  (realTuples_eq_iff cfg t₁ t₂).mpr h
+
+/-- **Different → different.** Canonically *inequivalent* traces yield distinct
+    canonical forms. (The "completeness" half of one-to-one: traces that
+    genuinely differ in their real-row projections produce different outputs.
+
+    NOTE: this is stated on `TraceEquiv`, not raw trace equality. The naive
+    claim "`t₁ ≠ t₂ → realTuples cfg t₁ ≠ realTuples cfg t₂`" is *false* by
+    design — appending a non-real padding row to a trace yields a different
+    list but the same canonical form, and that's exactly the intended
+    behaviour.) -/
+theorem realTuples_ne_of_not_equiv (cfg : Config) {t₁ t₂ : Trace}
+    (h : ¬ TraceEquiv cfg t₁ t₂) :
+    realTuples cfg t₁ ≠ realTuples cfg t₂ :=
+  fun heq => h ((realTuples_eq_iff cfg t₁ t₂).mp heq)
 
 /-- Empty traces canonicalize to the empty set. -/
 lemma realTuples_nil (cfg : Config) :
