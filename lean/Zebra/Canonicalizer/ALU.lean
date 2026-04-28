@@ -23,7 +23,7 @@ import Mathlib.Data.Finset.Dedup
 import Mathlib.Data.Finset.Image
 import Mathlib.Data.Finset.Lattice.Lemmas
 
-namespace Zebra.ALU
+namespace Zebra
 
 /-! ## Trace, Tuple, Config -/
 
@@ -46,11 +46,129 @@ abbrev Trace := List Row
 def Row.project (r : Row) (idxs : List Nat) : List Interval :=
   idxs.filterMap (fun j => r[j]?)
 
+/-! ## Generic table canonicalizer -/
+
+namespace Generic
+
+/-- Generic table layout: decide which rows are real and project each real row
+    to the table-specific canonical representation. -/
+structure Config (Repr : Type) where
+  isReal : Row → Bool
+  projectRow : Row → Repr
+
+/-- Generic canonicalizer: project all real rows and deduplicate them as a
+    finite set. Different table families choose different `Repr` types. -/
+def canonicalize {Repr : Type} [DecidableEq Repr]
+    (cfg : Config Repr) (t : Trace) : Finset Repr :=
+  ((t.filter cfg.isReal).map cfg.projectRow).toFinset
+
+/-- Injective representation of semantic events as the canonical table
+    representation. This is the condition needed for one-to-one recovery of
+    event sets from canonicalized tables. -/
+structure EventEncoding (Event Repr : Type) where
+  toRepr : Event → Repr
+  injective : Function.Injective toRepr
+
+abbrev EventSet (Event : Type) := Finset Event
+
+/-- A table encodes an event set when its real projected rows are exactly the
+    encoded event set. -/
+def TableEncodesEvents {Event Repr : Type} [DecidableEq Repr]
+    (cfg : Config Repr) (enc : EventEncoding Event Repr)
+    (events : EventSet Event) (table : Trace) : Prop :=
+  ∀ repr, repr ∈ Finset.image enc.toRepr events ↔
+    ∃ row ∈ table, cfg.isReal row ∧ cfg.projectRow row = repr
+
+/-- A table generator is faithful when every generated table encodes exactly
+    the event set it was generated from. -/
+def TableGeneratorFaithful {Event Repr : Type} [DecidableEq Repr]
+    (cfg : Config Repr) (enc : EventEncoding Event Repr)
+    (generateTable : EventSet Event → Trace) : Prop :=
+  ∀ events, TableEncodesEvents cfg enc events (generateTable events)
+
+lemma mem_canonicalize_iff {Repr : Type} [DecidableEq Repr]
+    (cfg : Config Repr) (t : Trace) (repr : Repr) :
+    repr ∈ canonicalize cfg t ↔
+      ∃ row ∈ t, cfg.isReal row ∧ cfg.projectRow row = repr := by
+  unfold canonicalize
+  simp [List.mem_toFinset, List.mem_map, List.mem_filter]
+  constructor
+  · rintro ⟨row, ⟨hin, hreal⟩, heq⟩
+    exact ⟨row, hin, hreal, heq⟩
+  · rintro ⟨row, hin, hreal, heq⟩
+    exact ⟨row, ⟨hin, hreal⟩, heq⟩
+
+lemma canonicalize_eq_eventReprSet_of_encodes {Event Repr : Type} [DecidableEq Repr]
+    (cfg : Config Repr) (enc : EventEncoding Event Repr)
+    {events : EventSet Event} {table : Trace}
+    (h : TableEncodesEvents cfg enc events table) :
+    canonicalize cfg table = Finset.image enc.toRepr events := by
+  ext repr
+  rw [mem_canonicalize_iff]
+  exact (h repr).symm
+
+/-- Generic correctness theorem: faithful table generation followed by
+    canonicalization returns the encoded event set. -/
+theorem canonicalize_generated_table_eq_eventReprSet {Event Repr : Type}
+    [DecidableEq Repr]
+    (cfg : Config Repr) (enc : EventEncoding Event Repr)
+    (generateTable : EventSet Event → Trace)
+    (hgen : TableGeneratorFaithful cfg enc generateTable)
+    (events : EventSet Event) :
+    canonicalize cfg (generateTable events) = Finset.image enc.toRepr events :=
+  canonicalize_eq_eventReprSet_of_encodes cfg enc (hgen events)
+
+/-- Generic one-to-one theorem: if the table generator is faithful and event
+    encoding is injective, then equal canonical representations are exactly
+    equal original event sets. -/
+theorem canonicalize_generated_eq_iff_events_eq {Event Repr : Type}
+    [DecidableEq Repr]
+    (cfg : Config Repr) (enc : EventEncoding Event Repr)
+    (generateTable : EventSet Event → Trace)
+    (hgen : TableGeneratorFaithful cfg enc generateTable)
+    (events₁ events₂ : EventSet Event) :
+    canonicalize cfg (generateTable events₁) =
+      canonicalize cfg (generateTable events₂) ↔
+    events₁ = events₂ := by
+  rw [canonicalize_generated_table_eq_eventReprSet cfg enc generateTable hgen events₁,
+      canonicalize_generated_table_eq_eventReprSet cfg enc generateTable hgen events₂]
+  constructor
+  · intro h
+    exact Finset.image_injective enc.injective h
+  · intro h
+    rw [h]
+
+end Generic
+
+namespace ALU
+
 /-- The canonical operand tuple: byte-limb groups for inputs and result. -/
 structure Tuple where
   b : List Interval
   c : List Interval
   a : List Interval
+deriving DecidableEq, Repr
+
+/-- Example canonical representation shape for memory read/write tables, matching
+    the rows emitted by `generate_memory_op_final_checker`: clock plus operand
+    accesses and the memory access. -/
+structure MemoryOpTuple where
+  clk : Interval
+  opA : List Interval
+  opB : List Interval
+  opC : List Interval
+  mem : List Interval
+deriving DecidableEq, Repr
+
+/-- Example canonical representation shape for control-flow tables: current
+    program counter, next program counter, and operand groups used by branch or
+    jump logic. Specific VMs can choose a richer representation if needed. -/
+structure ControlFlowTuple where
+  pc : List Interval
+  nextPc : List Interval
+  opA : List Interval
+  opB : List Interval
+  opC : List Interval
 deriving DecidableEq, Repr
 
 /-- A concrete semantic ALU event. `Value` is the VM's concrete value type
@@ -330,4 +448,5 @@ example (t : Trace) (tup : Tuple) (h : tup ∈ canonicalize sp1AddConfig t) :
     ∃ row ∈ t, sp1AddConfig.isReal row ∧ sp1AddConfig.projectRow row = tup :=
   (mem_canonicalize_iff sp1AddConfig t tup).mp h
 
-end Zebra.ALU
+end ALU
+end Zebra
