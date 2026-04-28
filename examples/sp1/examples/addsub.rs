@@ -25,6 +25,7 @@ use zebra_sp1::utils::{extract_constraints_and_range, generate_abstract_trace, g
 
 fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
+    // currently only support one-row table
     for i in 0..trace.data.len() {
         if trace.data[i][17].is_zero(prime) != MayBeFlag::True {
             record_reprs.insert(format!(
@@ -40,6 +41,7 @@ fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
 
 fn cr_sub(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
+    // currently only support two-rows table, where the first row corresponds to ADD.
     for i in 0..trace.data.len() {
         if trace.data[i][18].is_zero(prime) != MayBeFlag::True {
             record_reprs.insert(format!(
