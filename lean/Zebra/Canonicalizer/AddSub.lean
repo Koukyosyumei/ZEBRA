@@ -105,7 +105,17 @@ theorem faithful (cfg : Config) (t₁ t₂ : Trace) :
     realTuples cfg t₁ = realTuples cfg t₂ :=
   Iff.rfl
 
-/-! ## (iii) Substantive consistency lemmas -/
+/-! ## (iii) Substantive lemmas -/
+
+/-- Computational unfolding for non-empty traces. -/
+@[simp] theorem realTuples_cons (cfg : Config) (row₀ : Row) (rest : List Row) :
+    realTuples cfg (row₀ :: rest) =
+      (if (row₀ :: rest).any cfg.isReal then
+         ({ b := row₀.project cfg.idxB,
+            c := row₀.project cfg.idxC,
+            a := row₀.project cfg.idxA } : Tuple) ::ₘ 0
+       else 0) := rfl
+
 
 /-- The canonical form is preserved when a non-real row is appended to a
     non-empty trace. (Padding rows do not affect the canonicalizer's output.) -/
@@ -134,6 +144,45 @@ theorem realTuples_no_real (cfg : Config) (t : Trace)
       show (if (row₀ :: rest).any cfg.isReal then _ else _) = 0
       rw [h]
       rfl
+
+/-- **Structural reverse direction of one-to-one.**
+
+    If two traces both have at least one real row and produce the same canonical
+    form, then their row-0 projections onto the operand columns are equal.
+
+    Combined with the forward direction (the canonicalizer is a function — same
+    trace yields same canonical form), this establishes the canonicalizer as a
+    bijection between traces *modulo padding equivalence* and canonical forms,
+    on the subdomain of traces that contain at least one real row. (Traces with
+    no real rows all collapse to `0` regardless of content; that's the intended
+    behaviour, captured by `realTuples_no_real`.) -/
+theorem realTuples_inj_on_real
+    (cfg : Config) (row₀₁ row₀₂ : Row) (rest₁ rest₂ : List Row)
+    (h₁ : (row₀₁ :: rest₁).any cfg.isReal = true)
+    (h₂ : (row₀₂ :: rest₂).any cfg.isReal = true)
+    (heq : realTuples cfg (row₀₁ :: rest₁) = realTuples cfg (row₀₂ :: rest₂)) :
+    row₀₁.project cfg.idxB = row₀₂.project cfg.idxB ∧
+    row₀₁.project cfg.idxC = row₀₂.project cfg.idxC ∧
+    row₀₁.project cfg.idxA = row₀₂.project cfg.idxA := by
+  rw [realTuples_cons, realTuples_cons, if_pos h₁, if_pos h₂] at heq
+  -- `heq` is now singleton-multiset equality; extract elementwise.
+  have htup :
+      ({ b := row₀₁.project cfg.idxB,
+         c := row₀₁.project cfg.idxC,
+         a := row₀₁.project cfg.idxA } : Tuple)
+      = { b := row₀₂.project cfg.idxB,
+          c := row₀₂.project cfg.idxC,
+          a := row₀₂.project cfg.idxA } := by
+    have hmem :
+        ({ b := row₀₁.project cfg.idxB,
+           c := row₀₁.project cfg.idxC,
+           a := row₀₁.project cfg.idxA } : Tuple)
+        ∈ (({ b := row₀₂.project cfg.idxB,
+              c := row₀₂.project cfg.idxC,
+              a := row₀₂.project cfg.idxA } : Tuple) ::ₘ 0) := by
+      rw [← heq]; exact Multiset.mem_cons_self _ _
+    simpa using hmem
+  exact ⟨congrArg Tuple.b htup, congrArg Tuple.c htup, congrArg Tuple.a htup⟩
 
 /-- Canonical-form cardinality is bounded by 1 (single-row invariant). -/
 theorem realTuples_card_le_one (cfg : Config) (t : Trace) :
@@ -233,5 +282,14 @@ example (row₀ pad : Row) (rest : List Row) (h : sp1AddConfig.isReal pad = fals
 /-- Cardinality-bound check. -/
 example (t : Trace) : Multiset.card (realTuples sp1AddConfig t) ≤ 1 :=
   realTuples_card_le_one sp1AddConfig t
+
+/-- Reverse-direction (structural one-to-one) check on a concrete trace shape. -/
+example (row₀₁ row₀₂ : Row) (rest₁ rest₂ : List Row)
+    (h₁ : (row₀₁ :: rest₁).any sp1AddConfig.isReal = true)
+    (h₂ : (row₀₂ :: rest₂).any sp1AddConfig.isReal = true)
+    (heq : realTuples sp1AddConfig (row₀₁ :: rest₁)
+         = realTuples sp1AddConfig (row₀₂ :: rest₂)) :
+    row₀₁.project sp1AddConfig.idxB = row₀₂.project sp1AddConfig.idxB :=
+  (realTuples_inj_on_real sp1AddConfig row₀₁ row₀₂ rest₁ rest₂ h₁ h₂ heq).1
 
 end Zebra.AddSub
