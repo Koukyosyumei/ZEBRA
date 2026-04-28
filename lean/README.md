@@ -13,7 +13,9 @@ Lean 4 proofs for Zebra canonicalizer correctness. The proofs formalize:
 lean/
 ├── Zebra.lean
 └── Zebra/Canonicalizer/
-    ├── Generic.lean      # reusable theorem layer
+    ├── Generic.lean      # core table canonicalizer
+    ├── Quotient.lean     # D / ~R ≃ Im(R)
+    ├── Generator.lean    # faithful-generator/event-set theorems
     ├── ALU.lean          # ALU tuple canonicalizer
     ├── Memory.lean       # memory-op tuple shape
     ├── ControlFlow.lean  # control-flow and misc tuple shapes
@@ -41,7 +43,8 @@ canonicalize_generator_independent
 canonicalize_generated_eq_iff_events_eq
 ```
 
-The first theorem proves the quotient-space statement:
+`canonicalTraceSpace_equiv_image` is in `Quotient.lean` and proves the
+quotient-space statement:
 
 ```lean
 Function.Bijective (quotientToImage cfg)
@@ -49,7 +52,7 @@ Function.Bijective (quotientToImage cfg)
 
 where the quotient identifies raw tables with equal canonical forms.
 
-The second theorem states that if:
+`canonicalize_generator_independent` is in `Generator.lean` and states that if:
 
 - `gen₁` and `gen₂` are both faithful generators,
 - both receive the same event set,
@@ -57,7 +60,8 @@ The second theorem states that if:
 then their generated raw tables canonicalize to the same value. This formalizes
 the collapse of different raw representations of the same computation.
 
-The third theorem states that if:
+`canonicalize_generated_eq_iff_events_eq` is in `Generator.lean` and states
+that if:
 
 - `cfg` defines real rows and row projection,
 - `enc` injectively maps semantic events to canonical row representations,

@@ -6,6 +6,7 @@ canonicalizers are not currently supported by Zebra.
 -/
 import Zebra.Canonicalizer.ALU
 import Zebra.Canonicalizer.ControlFlow
+import Zebra.Canonicalizer.Generator
 import Zebra.Canonicalizer.Memory
 
 namespace Zebra.Examples
