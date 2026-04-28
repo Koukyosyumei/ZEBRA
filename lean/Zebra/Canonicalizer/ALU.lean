@@ -120,11 +120,11 @@ theorem realTuples_eq_iff (cfg : Config) (t₁ t₂ : Trace) :
          fun h tup => by simpa [mem_realTuples_iff] using h tup⟩
 
 /-- Empty traces canonicalize to the empty set. -/
-theorem realTuples_nil (cfg : Config) :
+lemma realTuples_nil (cfg : Config) :
     realTuples cfg [] = ∅ := by simp [realTuples]
 
 /-- A trace with no real rows canonicalizes to the empty set. -/
-theorem realTuples_no_real (cfg : Config) (t : Trace)
+lemma realTuples_no_real (cfg : Config) (t : Trace)
     (h : ∀ row ∈ t, cfg.isReal row = false) :
     realTuples cfg t = ∅ := by
   unfold realTuples
@@ -138,14 +138,14 @@ theorem realTuples_no_real (cfg : Config) (t : Trace)
 
 /-- **Distributivity over append.** The canonicalizer treats traces as sets:
     appending two traces unions their canonical forms. -/
-theorem realTuples_append (cfg : Config) (t₁ t₂ : Trace) :
+lemma realTuples_append (cfg : Config) (t₁ t₂ : Trace) :
     realTuples cfg (t₁ ++ t₂) = realTuples cfg t₁ ∪ realTuples cfg t₂ := by
   unfold realTuples
   rw [List.filter_append, List.map_append, List.toFinset_append]
 
 /-- **Padding invariance.** Appending a non-real row leaves the canonical form
     unchanged. -/
-theorem realTuples_append_padding (cfg : Config) (t : Trace) (pad : Row)
+lemma realTuples_append_padding (cfg : Config) (t : Trace) (pad : Row)
     (h : cfg.isReal pad = false) :
     realTuples cfg (t ++ [pad]) = realTuples cfg t := by
   rw [realTuples_append]
@@ -157,7 +157,7 @@ theorem realTuples_append_padding (cfg : Config) (t : Trace) (pad : Row)
 
 /-- **Permutation invariance.** Permuting trace rows leaves the canonical form
     unchanged (the canonicalizer is order-blind). -/
-theorem realTuples_perm (cfg : Config) {t₁ t₂ : Trace} (h : t₁.Perm t₂) :
+lemma realTuples_perm (cfg : Config) {t₁ t₂ : Trace} (h : t₁.Perm t₂) :
     realTuples cfg t₁ = realTuples cfg t₂ := by
   unfold realTuples
   exact List.toFinset_eq_of_perm _ _ ((h.filter _).map _)
@@ -186,7 +186,7 @@ noncomputable def stringRepr (cfg : Config) (t : Trace) : String :=
 
 /-- **Printer consistency** (forward at the string level): equal canonical
     forms produce equal canonical strings. -/
-theorem stringRepr_consistent (cfg : Config) (t₁ t₂ : Trace) :
+lemma stringRepr_consistent (cfg : Config) (t₁ t₂ : Trace) :
     canonicalize cfg t₁ = canonicalize cfg t₂ →
     stringRepr cfg t₁ = stringRepr cfg t₂ := by
   intro h
