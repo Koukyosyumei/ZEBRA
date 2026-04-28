@@ -137,6 +137,22 @@ the appropriate `Repr` type.
 | `canonicalize_perm` | row permutation ⇒ canonical form unchanged |
 | `stringRepr_consistent` | equal canonical forms ⇒ equal strings (printer's forward direction) |
 
+**Example table layouts**
+
+Concrete example configs are collected under `Zebra.ALU.Examples`:
+
+| VM | Examples |
+|---|---|
+| `SP1` | add/sub, branch/jump control-flow, memory instructions, lookup-driven ALU tables (`lt`, `bitwise`, `divrem`, `shiftleft`, `mul`, `sr`) |
+| `Pico` | add/sub, memory read/write, lookup-driven ALU tables (`sr`, `sll`, `lessthan`, `mul`, `bitwise`, `divrem`) |
+| `Sphinx` | add/sub, lookup-driven ALU tables (`sr`, `shiftleft`, `mul`, `lt`, `bitwise`, `divrem`) |
+| `Ziren` | add/sub, div/rem, CLO/CLZ, movcond, branch/jump control-flow, memory instructions, lookup-driven ALU tables (`mul`, `shiftleft`, `shiftright`, `lt`, `bitwise`) |
+| `Valida` | LT32 and lookup-driven ALU tables (`add32`, `sub32`, `mul32`, `div32`, `bitwise32`, `com32`) |
+| `OpenVM` | lookup-driven ALU tables (`alu`, `bitwise`, `branch`, `jump`, `lt`, `mul`, `shift`) |
+
+CPU tables and Valida memory are intentionally not modeled here because their
+canonicalizers are not currently supported by Zebra.
+
 ## What the proofs do *not* cover
 
 - **String-level injectivity** (`stringRepr cfg t₁ = stringRepr cfg t₂ ⇒
