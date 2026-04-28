@@ -3,14 +3,15 @@ Zebra — Canonicalizer faithfulness for AddSub.
 
 Models the AddSub canonicalizer in `examples/{sp1,ziren,pico,sphinx}/examples/addsub.rs`
 (specifically `cr_add` / `cr_sub`) and proves that it is faithful: two traces
-project to equal canonical forms iff they project to the same set of real
+project to equal canonical forms iff they project to the same multiset of real
 `(b, c, a)` tuples.
 
 The Rust canonicalizer is structurally a composition
 
     Trace ─realTuples─▶ HashSet Tuple ─renderTuple─▶ HashSet String ─PrettySet─▶ String
 
-We prove faithfulness at the *structural* level (the `HashSet Tuple` view).
+We prove faithfulness at the *structural* level (the `Multiset Tuple` view —
+the closest mathlib analogue to the Rust `HashSet<Tuple>` before stringification).
 The Rust code's `String` is then a printer applied to this structured form,
 whose injectivity is a separate "printer correctness" question (sketched
 below as `stringRepr_consistent`, the forward direction, and discussed but
@@ -22,10 +23,11 @@ that the canonicalizer extracts is the structured tuple, not its rendering.
 
 Single-row invariant: `cr_add` (`examples/sp1/examples/addsub.rs:28`) is
 documented as "currently only support one-row table", so `realTuples` returns
-a `List Tuple` of length ≤ 1.
+a multiset of cardinality ≤ 1.
 
-Self-contained: no Mathlib import. Compile with `lean AddSub.lean`.
+Build: `lake build` (uses mathlib via local symlinks under `.lake/packages/`).
 -/
+import Mathlib.Data.Multiset.Basic
 
 namespace Zebra.AddSub
 
@@ -66,37 +68,38 @@ structure Config where
   idxA   : List Nat
   isReal : Row → Bool
 
-/-- The set of real tuples extracted from a trace.
+/-- The multiset of real tuples extracted from a trace.
 
     Faithfully models `cr_add`/`cr_sub` (`examples/sp1/examples/addsub.rs:26-54`):
     the loop iterates over all rows to gate via `isReal`, but the projected
     tuple is always taken from row 0 (single-row invariant). The result is
-    therefore either empty or a singleton — a `List Tuple` of length ≤ 1
-    suffices, and equality on this list coincides with set equality. -/
-def realTuples (cfg : Config) (t : Trace) : List Tuple :=
+    therefore either empty or a singleton — a `Multiset Tuple` of cardinality
+    ≤ 1. -/
+def realTuples (cfg : Config) (t : Trace) : Multiset Tuple :=
   match t with
-  | []        => []
+  | []        => 0
   | row₀ :: _ =>
       if t.any cfg.isReal then
-        [{ b := row₀.project cfg.idxB,
+        ({ b := row₀.project cfg.idxB,
            c := row₀.project cfg.idxC,
-           a := row₀.project cfg.idxA }]
+           a := row₀.project cfg.idxA } : Tuple) ::ₘ 0
       else
-        []
+        0
 
-/-- The canonical form is the structured `List Tuple` — exactly the
+/-- The canonical form is the structured `Multiset Tuple` — exactly the
     information the canonicalizer in fact extracts. -/
-def canonicalize (cfg : Config) (t : Trace) : List Tuple := realTuples cfg t
+def canonicalize (cfg : Config) (t : Trace) : Multiset Tuple := realTuples cfg t
 
 /-! ## (ii) The bidirectional faithfulness theorem -/
 
 /-- **Canonicalizer faithfulness.** Two traces yield equal canonical forms iff
     they project to the same multiset of real `(b, c, a)` tuples.
 
-    Stated on `List Tuple` rather than `Finset Tuple`: justified for AddSub
-    because `realTuples` returns at most one element under the single-row
-    invariant (`cr_add` projects from row 0 only). Multi-row generalization
-    should upgrade to `Multiset` / `Finset` and dedupe explicitly. -/
+    Stated on `Multiset Tuple`: matches the Rust `HashSet<Tuple>` semantics
+    (set equality, order-independent, dedup-aware). For AddSub's single-row
+    invariant the multiset has cardinality ≤ 1, so this collapses to set
+    equality; multi-row generalizations (future work) get the proper
+    multiset semantics for free. -/
 theorem faithful (cfg : Config) (t₁ t₂ : Trace) :
     canonicalize cfg t₁ = canonicalize cfg t₂ ↔
     realTuples cfg t₁ = realTuples cfg t₂ :=
@@ -117,26 +120,31 @@ theorem realTuples_invariant_under_padding
     simp [List.any_cons, List.any_append, h]
   rw [hany]
 
-/-- Empty traces canonicalize to the empty list. -/
+/-- Empty traces canonicalize to the empty multiset. -/
 theorem realTuples_nil (cfg : Config) :
-    realTuples cfg [] = [] := rfl
+    realTuples cfg [] = 0 := rfl
 
-/-- A trace with no real rows canonicalizes to the empty list. -/
+/-- A trace with no real rows canonicalizes to the empty multiset. -/
 theorem realTuples_no_real (cfg : Config) (t : Trace)
     (h : t.any cfg.isReal = false) :
-    realTuples cfg t = [] := by
+    realTuples cfg t = 0 := by
   match t with
   | []        => rfl
   | row₀ :: rest =>
-      show (if (row₀ :: rest).any cfg.isReal then _ else _) = []
+      show (if (row₀ :: rest).any cfg.isReal then _ else _) = 0
       rw [h]
       rfl
 
-/-- Faithfulness as decidable equality (since `Tuple` and `List Tuple` are
-    `DecidableEq`). -/
-instance (cfg : Config) (t₁ t₂ : Trace) :
-    Decidable (realTuples cfg t₁ = realTuples cfg t₂) :=
-  inferInstanceAs (Decidable (_ = _))
+/-- Canonical-form cardinality is bounded by 1 (single-row invariant). -/
+theorem realTuples_card_le_one (cfg : Config) (t : Trace) :
+    Multiset.card (realTuples cfg t) ≤ 1 := by
+  match t with
+  | []        => simp [realTuples]
+  | row₀ :: rest =>
+      show Multiset.card (if (row₀ :: rest).any cfg.isReal then _ else _) ≤ 1
+      by_cases h : (row₀ :: rest).any cfg.isReal
+      · rw [if_pos h]; simp
+      · rw [if_neg h]; simp
 
 /-! ## (iv) String presentation (separate concern: printer correctness) -/
 
@@ -150,13 +158,18 @@ def renderTuple (tup : Tuple) : String :=
   "], input1: [" ++ renderLimbs tup.c ++
   "], output: [" ++ renderLimbs tup.a ++ "]"
 
-/-- Mirrors `PrettySet::fmt` (`src/utils.rs:66`). -/
+/-- Mirrors `PrettySet::fmt` (`src/utils.rs:66`). The actual Rust impl sorts
+    before joining; we model the multiset → list → join chain abstractly. -/
 def renderSet (strs : List String) : String :=
   "{\n" ++ String.join (strs.map (fun s => s ++ ",\n")) ++ "}"
 
-/-- The full Rust-faithful canonicalizer: trace → string. -/
-def stringRepr (cfg : Config) (t : Trace) : String :=
-  renderSet ((canonicalize cfg t).map renderTuple)
+/-- The full Rust-faithful canonicalizer: trace → string. We pick a `toList`
+    representative of the multiset for rendering; the choice is order-dependent,
+    matching the `HashSet → Vec → sort → join` chain in `PrettySet::fmt`.
+    Marked `noncomputable` since `Multiset.toList` is — this is a model
+    function for proofs, not for execution. -/
+noncomputable def stringRepr (cfg : Config) (t : Trace) : String :=
+  renderSet ((canonicalize cfg t).toList.map renderTuple)
 
 /-- **Printer consistency** (forward direction at the string level): equal
     canonical forms produce equal canonical strings. -/
@@ -164,12 +177,12 @@ theorem stringRepr_consistent (cfg : Config) (t₁ t₂ : Trace) :
     canonicalize cfg t₁ = canonicalize cfg t₂ →
     stringRepr cfg t₁ = stringRepr cfg t₂ := by
   intro h
-  show renderSet ((canonicalize cfg t₁).map renderTuple)
-     = renderSet ((canonicalize cfg t₂).map renderTuple)
+  show renderSet ((canonicalize cfg t₁).toList.map renderTuple)
+     = renderSet ((canonicalize cfg t₂).toList.map renderTuple)
   rw [h]
 
 /-- And, transitively from `faithful` and `stringRepr_consistent`, equal real
-    tuple sets imply equal canonical strings. -/
+    tuple multisets imply equal canonical strings. -/
 theorem stringRepr_from_realTuples (cfg : Config) (t₁ t₂ : Trace) :
     realTuples cfg t₁ = realTuples cfg t₂ →
     stringRepr cfg t₁ = stringRepr cfg t₂ := fun h =>
@@ -178,24 +191,20 @@ theorem stringRepr_from_realTuples (cfg : Config) (t₁ t₂ : Trace) :
 /-
 The reverse direction at the string level — `stringRepr cfg t₁ = stringRepr cfg t₂
 → canonicalize cfg t₁ = canonicalize cfg t₂` — is a printer-injectivity property
-about `renderTuple` / `renderSet`, *not* about the canonicalizer. Sketch:
+about `renderTuple` / `renderSet`, *not* about the canonicalizer. It reduces to:
 
-  • Punch list:
-      ⊢ Interval.repr_injective : Interval.repr i = Interval.repr j → i = j
-      ⊢ renderLimbs_injective   : (no "input"/"output" letters in output)
-      ⊢ renderTuple_injective   : reduces to renderLimbs_injective
-      ⊢ renderSet_injective_on_⩽1
-                                 : trivial by length argument
+  • `Interval.repr_injective`     (singleton vs bracketed disambiguation)
+  • `renderLimbs_injective`       (bracket-matching for nested `[lo, hi]` items)
+  • `renderTuple_injective`       (delimiter cancellation; "input0:" / "input1:"
+                                   / "output:" never appear in renderLimbs)
+  • `renderSet_injective_on_⩽1`   (trivial by length / structure)
 
-  • The non-trivial step is bracket-matching inside `renderLimbs` (since
-    `Interval.repr` of a non-singleton produces "[lo, hi]" containing the
-    same ", " separator). For AddSub recovered states this is moot: tuples
-    of interest are singletons (concrete recovered values), so
-    `Interval.repr` collapses to `Int.toString` which doesn't contain ", ".
-
-In the spirit of "verify the canonicalizer, not the printer", we leave the
-string-injectivity proof as future work and treat the structured `faithful`
-above as the substantive theorem. -/
+Mathlib does not provide nested-delimiter parser correctness off-the-shelf;
+under a singleton hypothesis (`∀ i ∈ tup, i.lo = i.hi` — realistic for AddSub
+recovered states) bracket-matching disappears and the proof becomes tractable.
+We treat that as a future increment; the structured `faithful` above is the
+substantive theorem.
+-/
 
 /-! ## Sanity check — concrete instance for sp1 ADD -/
 
@@ -220,5 +229,9 @@ example (row₀ pad : Row) (rest : List Row) (h : sp1AddConfig.isReal pad = fals
     realTuples sp1AddConfig ((row₀ :: rest) ++ [pad])
       = realTuples sp1AddConfig (row₀ :: rest) :=
   realTuples_invariant_under_padding sp1AddConfig row₀ rest pad h
+
+/-- Cardinality-bound check. -/
+example (t : Trace) : Multiset.card (realTuples sp1AddConfig t) ≤ 1 :=
+  realTuples_card_le_one sp1AddConfig t
 
 end Zebra.AddSub
