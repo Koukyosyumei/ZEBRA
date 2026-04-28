@@ -15,23 +15,6 @@ structure Tuple where
   a : List Interval
 deriving DecidableEq, Repr
 
-/-- A concrete semantic ALU event. `Value` is the VM's concrete value type
-    (for example words or byte limbs). -/
-structure ALUEvent (Value : Type) where
-  input0 : Value
-  input1 : Value
-  output : Value
-deriving DecidableEq, Repr
-
-/-- The semantic ALU events recorded by VM execution. -/
-abbrev EventSet (Value : Type) := Finset (ALUEvent Value)
-
-/-- How concrete ALU events are represented by the canonicalizer's tuple
-    format. Injectivity is the condition needed for a one-to-one theorem on
-    full event sets. -/
-abbrev ALUEventEncoding (Value : Type) :=
-  Generic.EventEncoding (ALUEvent Value) Tuple
-
 /-- Configuration: column indices for the three operand groups, plus the
     `is_real` predicate over a row. -/
 structure Config where
@@ -55,99 +38,11 @@ def Config.toGeneric (cfg : Config) : Generic.Config Tuple where
 def canonicalize (cfg : Config) (t : Trace) : Finset Tuple :=
   Generic.canonicalize cfg.toGeneric t
 
-/-- A table encodes an ALU event set when its real rows, after projection, are
-    exactly the canonical tuple representation of those events. -/
-def TableEncodesEvents {Value : Type} (cfg : Config)
-    (enc : ALUEventEncoding Value)
-    (events : EventSet Value) (table : Trace) : Prop :=
-  Generic.TableEncodesEvents cfg.toGeneric enc events table
-
-/-- A table generator is faithful when every generated ALU table encodes exactly
-    the event set it was generated from. -/
-def TableGeneratorFaithful {Value : Type} (cfg : Config)
-    (enc : ALUEventEncoding Value)
-    (generateTable : EventSet Value → Trace) : Prop :=
-  Generic.TableGeneratorFaithful cfg.toGeneric enc generateTable
-
-/-- A VM execution is canonicalized by first extracting its semantic event set,
-    then generating the corresponding ALU table. -/
-def generatedTableOfExecution {VMExecution Value : Type}
-    (execEvents : VMExecution → EventSet Value)
-    (generateTable : EventSet Value → Trace)
-    (exec : VMExecution) : Trace :=
-  generateTable (execEvents exec)
-
 /-- A tuple is in the ALU canonical form iff it is the projection of some real
     row of the table. -/
 lemma mem_canonicalize_iff (cfg : Config) (t : Trace) (tup : Tuple) :
     tup ∈ canonicalize cfg t ↔ ∃ row ∈ t, cfg.isReal row ∧ cfg.projectRow row = tup :=
   Generic.mem_canonicalize_iff cfg.toGeneric t tup
-
-lemma canonicalize_eq_eventTupleSet_of_encodes {Value : Type} (cfg : Config)
-    (enc : ALUEventEncoding Value)
-    {events : EventSet Value} {table : Trace}
-    (h : TableEncodesEvents cfg enc events table) :
-    canonicalize cfg table = Finset.image enc.toRepr events :=
-  Generic.canonicalize_eq_eventReprSet_of_encodes cfg.toGeneric enc h
-
-lemma canonicalize_eq_eventTupleSet_iff {Value : Type} (cfg : Config)
-    (enc : ALUEventEncoding Value)
-    (events : EventSet Value) (table : Trace) :
-    canonicalize cfg table = Finset.image enc.toRepr events ↔
-      TableEncodesEvents cfg enc events table := by
-  constructor
-  · intro h tup
-    rw [← h]
-    exact mem_canonicalize_iff cfg table tup
-  · exact canonicalize_eq_eventTupleSet_of_encodes cfg enc
-
-/-- Main correctness theorem for ALU tables. -/
-theorem canonicalize_generated_table_eq_eventTupleSet {Value : Type}
-    (cfg : Config)
-    (enc : ALUEventEncoding Value)
-    (generateTable : EventSet Value → Trace)
-    (hgen : TableGeneratorFaithful cfg enc generateTable)
-    (events : EventSet Value) :
-    canonicalize cfg (generateTable events) = Finset.image enc.toRepr events :=
-  Generic.canonicalize_generated_table_eq_eventReprSet cfg.toGeneric enc generateTable hgen events
-
-/-- Main one-to-one theorem for ALU tables. -/
-theorem canonicalize_generated_eq_iff_events_eq {Value : Type}
-    (cfg : Config)
-    (enc : ALUEventEncoding Value)
-    (generateTable : EventSet Value → Trace)
-    (hgen : TableGeneratorFaithful cfg enc generateTable)
-    (events₁ events₂ : EventSet Value) :
-    canonicalize cfg (generateTable events₁) =
-      canonicalize cfg (generateTable events₂) ↔
-    events₁ = events₂ :=
-  Generic.canonicalize_generated_eq_iff_events_eq cfg.toGeneric enc generateTable hgen
-    events₁ events₂
-
-lemma canonicalize_execution_table_eq_eventTupleSet {VMExecution Value : Type}
-    (cfg : Config)
-    (enc : ALUEventEncoding Value)
-    (execEvents : VMExecution → EventSet Value)
-    (generateTable : EventSet Value → Trace)
-    (hgen : TableGeneratorFaithful cfg enc generateTable)
-    (exec : VMExecution) :
-    canonicalize cfg (generatedTableOfExecution execEvents generateTable exec) =
-      Finset.image enc.toRepr (execEvents exec) :=
-  canonicalize_generated_table_eq_eventTupleSet cfg enc generateTable hgen
-    (execEvents exec)
-
-lemma canonicalize_execution_tables_eq_iff_events_eq {VMExecution Value : Type}
-    (cfg : Config)
-    (enc : ALUEventEncoding Value)
-    (execEvents : VMExecution → EventSet Value)
-    (generateTable : EventSet Value → Trace)
-    (hgen : TableGeneratorFaithful cfg enc generateTable)
-    (exec₁ exec₂ : VMExecution) :
-    canonicalize cfg (generatedTableOfExecution execEvents generateTable exec₁) =
-      canonicalize cfg (generatedTableOfExecution execEvents generateTable exec₂) ↔
-    execEvents exec₁ = execEvents exec₂ :=
-  canonicalize_generated_eq_iff_events_eq cfg enc generateTable hgen
-    (execEvents exec₁) (execEvents exec₂)
 
 /-! ## Helper lemmas -/
 

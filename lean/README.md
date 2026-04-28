@@ -103,13 +103,9 @@ the appropriate `Repr` type.
 
 | Name | Type | What it is |
 |---|---|---|
+| `Tuple` | `Type` | ALU canonical representation: byte-limb groups for input0, input1, output. |
+| `Config` | `Type` | ALU column layout: input0/input1/output indices plus real-row predicate. |
 | `canonicalize` | `Config → Trace → Finset Tuple` | Per-row projection of real rows, deduped (the canonical form). |
-| `ALUEvent` | `Type → Type` | Concrete ALU event with concrete input/output values. |
-| `EventSet` | `Type → Type` | Semantic ALU events, distinct from the canonicalized tuple set. |
-| `ALUEventEncoding` | `Type → Type` | Injective representation of concrete ALU events as canonical tuples. |
-| `TableEncodesEvents` | `Config → ALUEventEncoding Value → EventSet Value → Trace → Prop` | A generated table's real projected rows are exactly the encoded event set. |
-| `TableGeneratorFaithful` | `Prop` | Abstract contract: `generateTable events` encodes exactly `events`. |
-| `generatedTableOfExecution` | `VMExecution → Trace` | Optional wrapper: generate a table from `execEvents exec`. |
 | `stringRepr` | `Config → Trace → String` | Printer faithful to `cr_add` / `PrettySet::fmt` (`noncomputable`). |
 
 ### `Zebra.Memory` / `Zebra.ControlFlow`
@@ -123,27 +119,11 @@ the appropriate `Repr` type.
 | `MovCondTuple` | `Type` | Canonical representation shape for Ziren movcond rows. |
 | `ValidaLtTuple` | `Type` | Canonical representation shape for Valida LT32. |
 
-**Main theorems**
-
-| Name | Statement |
-|---|---|
-| `canonicalize_generated_table_eq_eventTupleSet` | Faithful `EventSet → Trace` generator ⇒ canonicalized generated table equals the encoded event set. |
-| `canonicalize_generated_eq_iff_events_eq` | Faithful `EventSet → Trace` generator ⇒ equal canonical forms iff original event sets are equal. |
-
-**Support lemmas**
+### ALU support lemmas
 
 | Name | Statement |
 |---|---|
 | `mem_canonicalize_iff` | `tup ∈ canonicalize cfg t ↔ ∃ row ∈ t, isReal row ∧ projectRow row = tup` |
-| `canonicalize_eq_eventTupleSet_of_encodes` | If a table encodes VM events, canonicalization returns their encoded tuple set. |
-| `canonicalize_eq_eventTupleSet_iff` | `canonicalize cfg table = Finset.image enc.toTuple events ↔ TableEncodesEvents cfg enc events table` |
-| `canonicalize_execution_table_eq_eventTupleSet` | Optional execution wrapper: faithful generator ⇒ canonicalized execution table equals the encoded execution event set. |
-| `canonicalize_execution_tables_eq_iff_events_eq` | Optional execution wrapper: equal canonical forms iff execution event sets are equal. |
-
-**Lemmas (helpers / consequences)**
-
-| Name | Statement |
-|---|---|
 | `canonicalize_nil` | `canonicalize cfg [] = ∅` |
 | `canonicalize_no_real` | no real rows ⇒ `canonicalize cfg t = ∅` |
 | `canonicalize_append` | distributivity over `++`: `= canonicalize t₁ ∪ canonicalize t₂` |
