@@ -70,13 +70,3 @@ Rust pipeline (`is_real`, `op_b`, `op_c`, `op_a`).
 - OpenVM: lookup-driven ALU tables
 
 CPU tables and Valida memory are intentionally skipped.
-
-## Non-Claims
-
-These proofs do not prove:
-
-- Rust table generators are faithful.
-- Event encodings used by a real VM are injective.
-- AIR constraints are sound.
-- ALU arithmetic semantics are correct.
-- String rendering is injective.
