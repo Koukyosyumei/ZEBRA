@@ -12,11 +12,19 @@ The string output is a separate printer over this set — trivially deterministi
 in the forward direction; injectivity at the string level is a separate
 "printer correctness" concern (see `stringRepr_consistent`).
 
+The strongest true "one-to-one" statement is not between raw `Trace` values
+and canonical forms: row order, duplicate projected rows, and non-real padding
+are intentionally erased. The proof below therefore states injectivity on the
+quotient of traces by canonical equivalence, i.e. one canonical form for one
+original multi-row table *up to exactly the information the canonicalizer is
+designed to forget*.
+
 Build: `lake build` (uses mathlib via local symlinks under `.lake/packages/`).
 -/
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Dedup
 import Mathlib.Data.Finset.Lattice.Lemmas
+import Mathlib.Data.Quot
 
 namespace Zebra.ALU
 
@@ -48,6 +56,10 @@ structure Tuple where
   a : List Interval
 deriving DecidableEq, Repr
 
+/-- The semantic events we want the canonicalizer to recover from a generated
+    VM table: a set of input/output tuples. -/
+abbrev EventSet := Finset Tuple
+
 /-- Configuration: column indices for the three operand groups, plus the
     `is_real` predicate over a row. -/
 structure Config where
@@ -71,7 +83,14 @@ def Config.projectRow (cfg : Config) (row : Row) : Tuple :=
 def canonicalize (cfg : Config) (t : Trace) : Finset Tuple :=
   ((t.filter cfg.isReal).map cfg.projectRow).toFinset
 
-/-! ## (ii) Substantive theorems -/
+/-- A table encodes an event set when its real rows, after projection, are
+    exactly the semantic events. This deliberately ignores helper columns,
+    row order, padding rows, and duplicated events. -/
+def TableEncodesEvents (cfg : Config) (events : EventSet) (table : Trace) : Prop :=
+  ∀ tup, tup ∈ events ↔
+    ∃ row ∈ table, cfg.isReal row ∧ cfg.projectRow row = tup
+
+/-! ## (ii) Canonicalizer membership -/
 
 /-- **Membership characterization.** A tuple is in the canonical form of `t`
     iff it is the projection of some real row of `t`. This is the substantive
@@ -85,6 +104,114 @@ theorem mem_canonicalize_iff (cfg : Config) (t : Trace) (tup : Tuple) :
     exact ⟨row, hin, hreal, heq⟩
   · rintro ⟨row, hin, hreal, heq⟩
     exact ⟨row, ⟨hin, hreal⟩, heq⟩
+
+/-! ## (iii) Semantic event-set layer -/
+
+/-- **Canonicalizer correctness for encoded event sets.** If a VM-generated
+    table encodes an event set, Zebra's canonicalizer returns exactly that set. -/
+theorem canonicalize_eq_events_of_encodes (cfg : Config)
+    {events : EventSet} {table : Trace}
+    (h : TableEncodesEvents cfg events table) :
+    canonicalize cfg table = events := by
+  ext tup
+  rw [mem_canonicalize_iff]
+  exact (h tup).symm
+
+/-- The canonicalizer returns an event set exactly when the table encodes that
+    event set. This is the table-level specification of the canonicalizer. -/
+theorem canonicalize_eq_events_iff (cfg : Config)
+    (events : EventSet) (table : Trace) :
+    canonicalize cfg table = events ↔ TableEncodesEvents cfg events table := by
+  constructor
+  · intro h tup
+    rw [← h]
+    exact mem_canonicalize_iff cfg table tup
+  · exact canonicalize_eq_events_of_encodes cfg
+
+/-- If two event sets are both encoded by the same table, they are equal. -/
+theorem encoded_events_unique (cfg : Config)
+    {events₁ events₂ : EventSet} {table : Trace}
+    (h₁ : TableEncodesEvents cfg events₁ table)
+    (h₂ : TableEncodesEvents cfg events₂ table) :
+    events₁ = events₂ := by
+  rw [← canonicalize_eq_events_of_encodes cfg h₁,
+      ← canonicalize_eq_events_of_encodes cfg h₂]
+
+/-- If two tables encode the same VM event set, they have the same canonicalized
+    representation even if their padding rows, helper columns, order, or
+    duplicated rows differ. -/
+theorem canonicalize_eq_of_same_events (cfg : Config)
+    {events : EventSet} {table₁ table₂ : Trace}
+    (h₁ : TableEncodesEvents cfg events table₁)
+    (h₂ : TableEncodesEvents cfg events table₂) :
+    canonicalize cfg table₁ = canonicalize cfg table₂ := by
+  rw [canonicalize_eq_events_of_encodes cfg h₁,
+      canonicalize_eq_events_of_encodes cfg h₂]
+
+/-- If two encoded tables have the same canonicalized representation, then the
+    original semantic event sets they encode are equal. -/
+theorem events_eq_of_canonicalize_eq (cfg : Config)
+    {events₁ events₂ : EventSet} {table₁ table₂ : Trace}
+    (h₁ : TableEncodesEvents cfg events₁ table₁)
+    (h₂ : TableEncodesEvents cfg events₂ table₂)
+    (hcanon : canonicalize cfg table₁ = canonicalize cfg table₂) :
+    events₁ = events₂ := by
+  rw [← canonicalize_eq_events_of_encodes cfg h₁,
+      ← canonicalize_eq_events_of_encodes cfg h₂]
+  exact hcanon
+
+/-- For tables known to encode event sets, equality of canonicalized
+    representations is exactly equality of the original semantic event sets.
+    This is the VM/table/canonical-representation one-to-one statement, with
+    table-generator correctness supplied as the two `TableEncodesEvents`
+    hypotheses. -/
+theorem canonicalize_eq_iff_events_eq_of_encodes (cfg : Config)
+    {events₁ events₂ : EventSet} {table₁ table₂ : Trace}
+    (h₁ : TableEncodesEvents cfg events₁ table₁)
+    (h₂ : TableEncodesEvents cfg events₂ table₂) :
+    canonicalize cfg table₁ = canonicalize cfg table₂ ↔ events₁ = events₂ := by
+  constructor
+  · exact events_eq_of_canonicalize_eq cfg h₁ h₂
+  · intro hevents
+    rw [canonicalize_eq_events_of_encodes cfg h₁,
+        canonicalize_eq_events_of_encodes cfg h₂,
+        hevents]
+
+/-! ## (iv) Abstract VM/table-generator bridge -/
+
+section VMGenerator
+
+variable {VMExecution : Type}
+variable (cfg : Config)
+variable (vmEvents : VMExecution → EventSet)
+variable (generateTable : VMExecution → Trace)
+
+/-- A table generator is faithful when, for every VM execution, the generated
+    table encodes exactly the semantic events recorded by that execution. -/
+def TableGeneratorFaithful : Prop :=
+  ∀ exec, TableEncodesEvents cfg (vmEvents exec) (generateTable exec)
+
+/-- If the table generator is faithful, Zebra recovers the VM execution's
+    semantic event set from the generated table. -/
+theorem canonicalize_generated_table_eq_vmEvents
+    (hgen : TableGeneratorFaithful cfg vmEvents generateTable)
+    (exec : VMExecution) :
+    canonicalize cfg (generateTable exec) = vmEvents exec :=
+  canonicalize_eq_events_of_encodes cfg (hgen exec)
+
+/-- For faithful generated tables, equality of Zebra canonicalized
+    representations is exactly equality of the original VM event sets. -/
+theorem canonicalize_generated_eq_iff_vmEvents_eq
+    (hgen : TableGeneratorFaithful cfg vmEvents generateTable)
+    (exec₁ exec₂ : VMExecution) :
+    canonicalize cfg (generateTable exec₁) =
+      canonicalize cfg (generateTable exec₂) ↔
+    vmEvents exec₁ = vmEvents exec₂ :=
+  canonicalize_eq_iff_events_eq_of_encodes cfg (hgen exec₁) (hgen exec₂)
+
+end VMGenerator
+
+/-! ## (v) One-to-one statement for original multi-row tables -/
 
 /-- Two traces are *canonically equivalent* iff their real-row projections
     coincide as a set. This is the equivalence relation under which the
@@ -124,7 +251,63 @@ theorem canonicalize_ne_of_not_equiv (cfg : Config) {t₁ t₂ : Trace}
     canonicalize cfg t₁ ≠ canonicalize cfg t₂ :=
   fun heq => h ((canonicalize_eq_iff cfg t₁ t₂).mp heq)
 
-/-! ## (iii) Helper lemmas -/
+/-- `TraceEquiv` is an equivalence relation: it is exactly equality of the
+    canonicalized real-row projection set, phrased before calling
+    `canonicalize`. -/
+theorem TraceEquiv.refl (cfg : Config) (t : Trace) :
+    TraceEquiv cfg t t := by
+  intro tup
+  exact Iff.rfl
+
+theorem TraceEquiv.symm (cfg : Config) {t₁ t₂ : Trace}
+    (h : TraceEquiv cfg t₁ t₂) :
+    TraceEquiv cfg t₂ t₁ := by
+  intro tup
+  exact (h tup).symm
+
+theorem TraceEquiv.trans (cfg : Config) {t₁ t₂ t₃ : Trace}
+    (h₁₂ : TraceEquiv cfg t₁ t₂) (h₂₃ : TraceEquiv cfg t₂ t₃) :
+    TraceEquiv cfg t₁ t₃ := by
+  intro tup
+  exact (h₁₂ tup).trans (h₂₃ tup)
+
+/-- Raw traces modulo the information erased by canonicalization: padding rows,
+    row order, and duplicate rows with the same projected tuple. -/
+def traceSetoid (cfg : Config) : Setoid Trace where
+  r := TraceEquiv cfg
+  iseqv := ⟨TraceEquiv.refl cfg, TraceEquiv.symm cfg, TraceEquiv.trans cfg⟩
+
+/-- The mathematically meaningful "original trace" for this canonicalizer:
+    an equivalence class of raw traces with the same real-row projected tuples. -/
+abbrev TraceClass (cfg : Config) := Quotient (traceSetoid cfg)
+
+/-- Canonicalization descends from raw traces to trace classes. -/
+noncomputable def canonicalizeClass (cfg : Config) :
+    TraceClass cfg → Finset Tuple :=
+  Quotient.lift (canonicalize cfg) (by
+    intro t₁ t₂ h
+    exact canonicalize_eq_of_equiv cfg h)
+
+/-- **One-to-one theorem.** Canonicalized representations are injective for
+    original multi-row tables once raw traces are quotiented by the exact
+    observational equivalence of the canonicalizer. -/
+theorem canonicalizeClass_injective (cfg : Config) :
+    Function.Injective (canonicalizeClass cfg) := by
+  intro q₁ q₂ h
+  refine Quotient.inductionOn₂ q₁ q₂ ?_ h
+  intro t₁ t₂ hcanon
+  apply Quotient.sound
+  exact (canonicalize_eq_iff cfg t₁ t₂).mp hcanon
+
+/-- Equal canonical forms are the same as equal trace classes. This is the
+    compact bijection-style statement: canonicalization is a lossless
+    representation of traces after quotienting away order, padding, and
+    duplicate projected rows. -/
+theorem canonicalizeClass_eq_iff (cfg : Config) (q₁ q₂ : TraceClass cfg) :
+    canonicalizeClass cfg q₁ = canonicalizeClass cfg q₂ ↔ q₁ = q₂ :=
+  ⟨fun h => canonicalizeClass_injective cfg h, fun h => by rw [h]⟩
+
+/-! ## (vi) Helper lemmas -/
 
 /-- Empty traces canonicalize to the empty set. -/
 lemma canonicalize_nil (cfg : Config) :
@@ -169,7 +352,7 @@ lemma canonicalize_perm (cfg : Config) {t₁ t₂ : Trace} (h : t₁.Perm t₂) 
   unfold canonicalize
   exact List.toFinset_eq_of_perm _ _ ((h.filter _).map _)
 
-/-! ## (iv) String presentation (separate concern: printer correctness) -/
+/-! ## (vii) String presentation (separate concern: printer correctness) -/
 
 /-- Mirrors `trace_fmt_with_idxs` (`src/trace.rs:123`). -/
 def renderLimbs (xs : List Interval) : String :=
