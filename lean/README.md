@@ -1,164 +1,79 @@
-# Zebra — Lean 4 proofs
+# Zebra Lean Proofs
 
-Formal-verification companion for the Rust crates above. Currently scopes the
-canonicalizer faithfulness theorems for the multi-row ALU/memory-op pattern
-(`src/canonicalizer.rs:56`, `:90`).
+Lean 4 proofs for Zebra canonicalizer correctness. The core result is generic:
+for any table whose canonical form is a finite set of projected real rows,
+canonicalization is one-to-one with the original event set, assuming a faithful
+table generator and an injective event encoding.
 
 ## Layout
 
-```
+```text
 lean/
-├── lakefile.lean             — Lake config; depends on mathlib
-├── lean-toolchain            — pins leanprover/lean4:v4.24.0
-├── lake-manifest.json        — locked dependency revisions
-├── Zebra.lean                — import aggregator for `lake build`
-└── Zebra/
-    └── Canonicalizer/
-        ├── Generic.lean      — reusable theorem layer
-        ├── ALU.lean          — ALU tuple/event wrappers + string rendering
-        ├── Memory.lean       — memory-op canonical representation shape
-        ├── ControlFlow.lean  — control-flow and misc representation shapes
-        └── Examples.lean     — concrete zkVM layouts + theorem instantiations
+├── Zebra.lean
+└── Zebra/Canonicalizer/
+    ├── Generic.lean      # reusable theorem layer
+    ├── ALU.lean          # ALU tuple canonicalizer
+    ├── Memory.lean       # memory-op tuple shape
+    ├── ControlFlow.lean  # control-flow and misc tuple shapes
+    └── Examples.lean     # zkVM layouts and theorem instantiations
 ```
 
-## Prerequisites
-
-- [`elan`](https://github.com/leanprover/elan) (Lean's toolchain manager).
-  Installs `lean` and `lake` automatically.
-- The toolchain pinned in `lean-toolchain` (`leanprover/lean4:v4.24.0`) will be
-  fetched on first invocation if not already installed.
-
-## Build
-
-### Option A — fresh build (downloads mathlib)
+## Verify
 
 From `lean/`:
 
 ```bash
-lake update              # fetches mathlib + transitive deps (~5 min, multi-GB)
-lake exe cache get       # downloads precompiled mathlib .olean files (recommended;
-                         # avoids ~30 min of mathlib compilation)
-lake build               # compiles Zebra/
-```
-
-Or to type-check a single file:
-
-```bash
-lake env lean Zebra/Canonicalizer/Examples.lean
-```
-
-Exit code 0 with no output = clean build.
-
-### Option B — share an existing mathlib build (faster)
-
-If you already have a Lean 4.24.0 project with mathlib built locally (e.g.
-under `~/Dev/SomeProject/.lake/packages/mathlib`), symlink its packages
-directory into ours to skip download/compile:
-
-```bash
-mkdir -p .lake/packages
-for pkg in /path/to/other/project/.lake/packages/*; do
-  ln -sf "$pkg" .lake/packages/
-done
-lake env lean Zebra/Canonicalizer/ALU.lean
-```
-
-The current checked-in `lake-manifest.json` was bootstrapped this way (mathlib
-rev `3bde4584...`). If your local mathlib is at a different revision, run
-`lake update` to refresh the manifest.
-
-## Verifying the proofs
-
-`lake build` should complete successfully. To confirm there are no admitted
-gaps:
-
-```bash
+lake build
 grep -R -nE "sorry|admit|axiom" Zebra/
 ```
 
-Expected: no matches.
+Expected: build succeeds and grep returns no matches.
 
-## Theorem index
+## Main Theorem
 
-### `Zebra.Generic`
+In `Zebra.Generic`:
 
-Reusable theorem layer for any table whose canonical representation is a
-deduplicated set of projected real rows.
+```lean
+canonicalize_generated_eq_iff_events_eq
+```
 
-| Name | Type | What it is |
-|---|---|---|
-| `Config` | `Type → Type` | Generic table layout: real-row predicate plus row projection. |
-| `canonicalize` | `Config Repr → Trace → Finset Repr` | Project real rows to table-specific canonical representations. |
-| `EventEncoding` | `Type → Type → Type` | Injective representation of semantic events as canonical row representations. |
-| `TableGeneratorFaithful` | `Prop` | Abstract contract: generated tables encode exactly their source event sets. |
-| `canonicalize_generated_table_eq_eventReprSet` | theorem | Faithful generator ⇒ canonicalized table equals encoded event set. |
-| `canonicalize_generated_eq_iff_events_eq` | theorem | Faithful generator ⇒ equal canonical forms iff original event sets are equal. |
+states that if:
 
-This layer can be reused for ALU, control-flow, and memory-op tables by choosing
-the appropriate `Repr` type.
+- `cfg` defines real rows and row projection,
+- `enc` injectively maps semantic events to canonical row representations,
+- `generateTable` faithfully encodes each event set,
 
-### `Zebra.ALU`
+then:
 
-**Definitions**
+```lean
+canonicalize cfg (generateTable events₁) =
+canonicalize cfg (generateTable events₂)
+↔
+events₁ = events₂
+```
 
-| Name | Type | What it is |
-|---|---|---|
-| `Tuple` | `Type` | ALU canonical representation: byte-limb groups for input0, input1, output. |
-| `Config` | `Type` | ALU column layout: input0/input1/output indices plus real-row predicate. |
-| `canonicalize` | `Config → Trace → Finset Tuple` | Per-row projection of real rows, deduped (the canonical form). |
-| `stringRepr` | `Config → Trace → String` | Printer faithful to `cr_add` / `PrettySet::fmt` (`noncomputable`). |
+This proves one-to-one correctness for the canonicalizer relative to those
+assumptions.
 
-### `Zebra.Memory` / `Zebra.ControlFlow`
+## Covered Layouts
 
-| Name | Type | What it is |
-|---|---|---|
-| `MemoryOpTuple` | `Type` | Canonical representation shape for memory read/write rows. |
-| `mkMemoryOpConfig` | constructor | Build a generic config from memory-op column groups. |
-| `ControlFlowTuple` | `Type` | Canonical representation shape for branch/jump rows. |
-| `UnaryTuple` | `Type` | Canonical representation shape for unary ALU-like rows such as CLO/CLZ. |
-| `MovCondTuple` | `Type` | Canonical representation shape for Ziren movcond rows. |
-| `ValidaLtTuple` | `Type` | Canonical representation shape for Valida LT32. |
+`Examples.lean` instantiates the theorem for supported example layouts:
 
-### ALU support lemmas
+- SP1: add/sub, branch/jump, memory instructions, lookup-driven ALU tables
+- Pico: add/sub, memory read/write, lookup-driven ALU tables
+- Sphinx: add/sub, lookup-driven ALU tables
+- Ziren: add/sub, div/rem, CLO/CLZ, movcond, branch/jump, memory instructions, lookup-driven ALU tables
+- Valida: LT32 and lookup-driven ALU tables
+- OpenVM: lookup-driven ALU tables
 
-| Name | Statement |
-|---|---|
-| `mem_canonicalize_iff` | `tup ∈ canonicalize cfg t ↔ ∃ row ∈ t, isReal row ∧ projectRow row = tup` |
-| `canonicalize_nil` | `canonicalize cfg [] = ∅` |
-| `canonicalize_no_real` | no real rows ⇒ `canonicalize cfg t = ∅` |
-| `canonicalize_append` | distributivity over `++`: `= canonicalize t₁ ∪ canonicalize t₂` |
-| `canonicalize_append_padding` | non-real row appended ⇒ canonical form unchanged |
-| `canonicalize_perm` | row permutation ⇒ canonical form unchanged |
-| `stringRepr_consistent` | equal canonical forms ⇒ equal strings (printer's forward direction) |
+CPU tables and Valida memory are intentionally skipped.
 
-**Example table layouts**
+## Non-Claims
 
-Concrete example configs are collected under `Zebra.ALU.Examples`:
+These proofs do not prove:
 
-| VM | Examples |
-|---|---|
-| `SP1` | add/sub, branch/jump control-flow, memory instructions, lookup-driven ALU tables (`lt`, `bitwise`, `divrem`, `shiftleft`, `mul`, `sr`) |
-| `Pico` | add/sub, memory read/write, lookup-driven ALU tables (`sr`, `sll`, `lessthan`, `mul`, `bitwise`, `divrem`) |
-| `Sphinx` | add/sub, lookup-driven ALU tables (`sr`, `shiftleft`, `mul`, `lt`, `bitwise`, `divrem`) |
-| `Ziren` | add/sub, div/rem, CLO/CLZ, movcond, branch/jump control-flow, memory instructions, lookup-driven ALU tables (`mul`, `shiftleft`, `shiftright`, `lt`, `bitwise`) |
-| `Valida` | LT32 and lookup-driven ALU tables (`add32`, `sub32`, `mul32`, `div32`, `bitwise32`, `com32`) |
-| `OpenVM` | lookup-driven ALU tables (`alu`, `bitwise`, `branch`, `jump`, `lt`, `mul`, `shift`) |
-
-CPU tables and Valida memory are intentionally not modeled here because their
-canonicalizers are not currently supported by Zebra.
-
-Each static example config also has a corresponding `*_one_to_one` theorem
-instantiating `Zebra.Generic.canonicalize_generated_eq_iff_events_eq`. Lookup-
-driven ALU tables share `Zebra.Examples.lookup_driven_alu_one_to_one`, because
-their operand columns are supplied dynamically by `GeneralLookupInfo`.
-
-## What the proofs do *not* cover
-
-- **String-level injectivity** (`stringRepr cfg t₁ = stringRepr cfg t₂ ⇒
-  canonicalize cfg t₁ = canonicalize cfg t₂`). This is a printer-correctness
-  property, not a canonicalizer property — would require nested-bracket parser
-  injectivity for `renderLimbs`. Tractable under a singleton-interval
-  hypothesis (realistic for AddSub recovered states); unaddressed at present.
-- **AIR-soundness for AddSub**. The proofs here treat the canonicalizer in
-  isolation; relating the canonical form to the algebraic AIR semantics
-  (i.e., proving `a = b ± c mod 2³²`) is a separate vertical slice.
+- Rust table generators are faithful.
+- Event encodings used by a real VM are injective.
+- AIR constraints are sound.
+- ALU arithmetic semantics are correct.
+- String rendering is injective.
