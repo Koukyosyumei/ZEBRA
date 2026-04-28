@@ -90,6 +90,18 @@ def TableEncodesEvents (cfg : Config) (events : EventSet) (table : Trace) : Prop
   ∀ tup, tup ∈ events ↔
     ∃ row ∈ table, cfg.isReal row ∧ cfg.projectRow row = tup
 
+/-- A table generator is faithful when, for every semantic event set, the
+    generated table encodes exactly that event set. -/
+def TableGeneratorFaithful (cfg : Config) (generateTable : EventSet → Trace) : Prop :=
+  ∀ events, TableEncodesEvents cfg events (generateTable events)
+
+/-- A VM execution is canonicalized by first extracting its semantic event set,
+    then generating the corresponding table. -/
+def generatedTableOfExecution {VMExecution : Type}
+    (execEvents : VMExecution → EventSet) (generateTable : EventSet → Trace)
+    (exec : VMExecution) : Trace :=
+  generateTable (execEvents exec)
+
 /-! ## (ii) Canonicalizer membership -/
 
 /-- **Membership characterization.** A tuple is in the canonical form of `t`
@@ -177,41 +189,55 @@ theorem canonicalize_eq_iff_events_eq_of_encodes (cfg : Config)
         canonicalize_eq_events_of_encodes cfg h₂,
         hevents]
 
-/-! ## (iv) Abstract VM/table-generator bridge -/
+/-! ## (iv) Abstract table-generator bridge -/
 
-section VMGenerator
-
-variable {VMExecution : Type}
-variable (cfg : Config)
-variable (vmEvents : VMExecution → EventSet)
-variable (generateTable : VMExecution → Trace)
-
-/-- A table generator is faithful when, for every VM execution, the generated
-    table encodes exactly the semantic events recorded by that execution. -/
-def TableGeneratorFaithful : Prop :=
-  ∀ exec, TableEncodesEvents cfg (vmEvents exec) (generateTable exec)
-
-/-- If the table generator is faithful, Zebra recovers the VM execution's
-    semantic event set from the generated table. -/
-theorem canonicalize_generated_table_eq_vmEvents
-    (hgen : TableGeneratorFaithful cfg vmEvents generateTable)
-    (exec : VMExecution) :
-    canonicalize cfg (generateTable exec) = vmEvents exec :=
-  canonicalize_eq_events_of_encodes cfg (hgen exec)
+/-- If the table generator is faithful, Zebra recovers exactly the semantic
+    event set used to generate the table. -/
+theorem canonicalize_generated_table_eq_events (cfg : Config)
+    (generateTable : EventSet → Trace)
+    (hgen : TableGeneratorFaithful cfg generateTable)
+    (events : EventSet) :
+    canonicalize cfg (generateTable events) = events :=
+  canonicalize_eq_events_of_encodes cfg (hgen events)
 
 /-- For faithful generated tables, equality of Zebra canonicalized
-    representations is exactly equality of the original VM event sets. -/
-theorem canonicalize_generated_eq_iff_vmEvents_eq
-    (hgen : TableGeneratorFaithful cfg vmEvents generateTable)
+    representations is exactly equality of the original semantic event sets. -/
+theorem canonicalize_generated_eq_iff_events_eq (cfg : Config)
+    (generateTable : EventSet → Trace)
+    (hgen : TableGeneratorFaithful cfg generateTable)
+    (events₁ events₂ : EventSet) :
+    canonicalize cfg (generateTable events₁) =
+      canonicalize cfg (generateTable events₂) ↔
+    events₁ = events₂ :=
+  canonicalize_eq_iff_events_eq_of_encodes cfg (hgen events₁) (hgen events₂)
+
+/-! ## (v) Optional VM execution bridge -/
+
+/-- With a faithful event-set-to-table generator, Zebra recovers the event set
+    recorded by a VM execution. -/
+theorem canonicalize_execution_table_eq_events {VMExecution : Type}
+    (cfg : Config) (execEvents : VMExecution → EventSet)
+    (generateTable : EventSet → Trace)
+    (hgen : TableGeneratorFaithful cfg generateTable)
+    (exec : VMExecution) :
+    canonicalize cfg (generatedTableOfExecution execEvents generateTable exec) =
+      execEvents exec :=
+  canonicalize_generated_table_eq_events cfg generateTable hgen (execEvents exec)
+
+/-- With a faithful event-set-to-table generator, equality of canonicalized VM
+    tables is exactly equality of the executions' semantic event sets. -/
+theorem canonicalize_execution_tables_eq_iff_events_eq {VMExecution : Type}
+    (cfg : Config) (execEvents : VMExecution → EventSet)
+    (generateTable : EventSet → Trace)
+    (hgen : TableGeneratorFaithful cfg generateTable)
     (exec₁ exec₂ : VMExecution) :
-    canonicalize cfg (generateTable exec₁) =
-      canonicalize cfg (generateTable exec₂) ↔
-    vmEvents exec₁ = vmEvents exec₂ :=
-  canonicalize_eq_iff_events_eq_of_encodes cfg (hgen exec₁) (hgen exec₂)
+    canonicalize cfg (generatedTableOfExecution execEvents generateTable exec₁) =
+      canonicalize cfg (generatedTableOfExecution execEvents generateTable exec₂) ↔
+    execEvents exec₁ = execEvents exec₂ :=
+  canonicalize_generated_eq_iff_events_eq cfg generateTable hgen
+    (execEvents exec₁) (execEvents exec₂)
 
-end VMGenerator
-
-/-! ## (v) One-to-one statement for original multi-row tables -/
+/-! ## (vi) One-to-one statement for original multi-row tables -/
 
 /-- Two traces are *canonically equivalent* iff their real-row projections
     coincide as a set. This is the equivalence relation under which the
@@ -307,7 +333,7 @@ theorem canonicalizeClass_eq_iff (cfg : Config) (q₁ q₂ : TraceClass cfg) :
     canonicalizeClass cfg q₁ = canonicalizeClass cfg q₂ ↔ q₁ = q₂ :=
   ⟨fun h => canonicalizeClass_injective cfg h, fun h => by rw [h]⟩
 
-/-! ## (vi) Helper lemmas -/
+/-! ## (vii) Helper lemmas -/
 
 /-- Empty traces canonicalize to the empty set. -/
 lemma canonicalize_nil (cfg : Config) :
@@ -352,7 +378,7 @@ lemma canonicalize_perm (cfg : Config) {t₁ t₂ : Trace} (h : t₁.Perm t₂) 
   unfold canonicalize
   exact List.toFinset_eq_of_perm _ _ ((h.filter _).map _)
 
-/-! ## (vii) String presentation (separate concern: printer correctness) -/
+/-! ## (viii) String presentation (separate concern: printer correctness) -/
 
 /-- Mirrors `trace_fmt_with_idxs` (`src/trace.rs:123`). -/
 def renderLimbs (xs : List Interval) : String :=

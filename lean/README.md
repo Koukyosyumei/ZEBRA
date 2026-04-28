@@ -82,7 +82,8 @@ Expected: no matches.
 | `canonicalize` | `Config → Trace → Finset Tuple` | Per-row projection of real rows, deduped (the canonical form). |
 | `EventSet` | `Type` | Semantic VM events represented as a set of `(input0, input1, output)` tuples. |
 | `TableEncodesEvents` | `Config → EventSet → Trace → Prop` | A generated table's real projected rows are exactly the VM event set. |
-| `TableGeneratorFaithful` | `Prop` | Abstract contract: `generateTable exec` encodes `vmEvents exec` for every execution. |
+| `TableGeneratorFaithful` | `Prop` | Abstract contract: `generateTable events` encodes exactly `events`. |
+| `generatedTableOfExecution` | `VMExecution → Trace` | Optional wrapper: generate a table from `execEvents exec`. |
 | `TraceEquiv` | `Config → Trace → Trace → Prop` | Equivalence relation: same set of real-row projections. |
 | `TraceClass` | `Config → Type` | Raw traces quotiented by `TraceEquiv`; the original table modulo order, padding, and duplicate projected rows. |
 | `canonicalizeClass` | `TraceClass cfg → Finset Tuple` | Canonicalization lifted to trace equivalence classes. |
@@ -99,8 +100,10 @@ Expected: no matches.
 | `canonicalize_eq_events_of_encodes` | If a table encodes VM events, canonicalization returns exactly those events. |
 | `canonicalize_eq_events_iff` | `canonicalize cfg table = events ↔ TableEncodesEvents cfg events table` |
 | `canonicalize_eq_iff_events_eq_of_encodes` | For encoded tables, equal canonical forms iff original event sets are equal. |
-| `canonicalize_generated_table_eq_vmEvents` | Faithful generator ⇒ canonicalized generated table equals `vmEvents exec`. |
-| `canonicalize_generated_eq_iff_vmEvents_eq` | Faithful generator ⇒ equal canonical forms iff VM event sets are equal. |
+| `canonicalize_generated_table_eq_events` | Faithful `EventSet → Trace` generator ⇒ canonicalized generated table equals the input events. |
+| `canonicalize_generated_eq_iff_events_eq` | Faithful `EventSet → Trace` generator ⇒ equal canonical forms iff input event sets are equal. |
+| `canonicalize_execution_table_eq_events` | Optional execution wrapper: faithful generator ⇒ canonicalized execution table equals `execEvents exec`. |
+| `canonicalize_execution_tables_eq_iff_events_eq` | Optional execution wrapper: equal canonical forms iff execution event sets are equal. |
 | `canonicalizeClass_injective` | *one-to-one*: canonical forms injectively represent `TraceClass cfg` values |
 | `canonicalizeClass_eq_iff` | `canonicalizeClass cfg q₁ = canonicalizeClass cfg q₂ ↔ q₁ = q₂` |
 
