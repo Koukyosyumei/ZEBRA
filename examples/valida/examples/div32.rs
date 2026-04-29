@@ -74,8 +74,6 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    //println!("DIV AIR MAP");
-    //println!("  {:?}", DIV_COL_MAP);
 
     let air = Div32Chip::default();
     let num_col = NUM_DIV_COLS;

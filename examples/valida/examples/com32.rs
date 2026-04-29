@@ -76,8 +76,6 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    //println!("COM AIR MAP");
-    //println!("  {:?}", COM_COL_MAP);
 
     let air = Com32Chip::default();
     let num_col = NUM_COM_COLS;

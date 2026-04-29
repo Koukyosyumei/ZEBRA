@@ -1,22 +1,20 @@
 #[macro_export]
 macro_rules! impl_p3_to_tv_conversion {
     (
-        $SymbolicExpression:path, // SymbolicExpression列挙型へのフルパス
-        $SymbolicVariable:path,   // SymbolicVariable構造体へのフルパス
+        $SymbolicExpression:path,
+        $SymbolicVariable:path,
         $PairCol:path,
         $VirtualPairCol:path,
         $PrimeField32:path,
-        $convert_var_fn:path,     // 変数変換関数のパス
+        $convert_var_fn:path,
         $one_expr:expr
     ) => {
-        // 型をエイリアスとしてインポート（バリアントへのアクセスに使用）
         use $PairCol as GeneralPairCol;
         use $PrimeField32 as GeneralPrimeField32;
         use $SymbolicExpression as GenericSymbolicExpression;
         use $SymbolicVariable as GenericSymbolicVariable;
         use $VirtualPairCol as GeneralVirtualPairCol;
 
-        // PairColの変換（共通部分）
         pub fn convert_p3_paircol(pair_col: &GeneralPairCol) -> ZEBRASymbolicVal {
             match pair_col {
                 PairCol::Main(index) => ZEBRASymbolicVal {
@@ -27,7 +25,6 @@ macro_rules! impl_p3_to_tv_conversion {
             }
         }
 
-        // VirtualPairColの変換
         fn get_weighted_var<F: GeneralPrimeField32>(
             paircol: &GeneralPairCol,
             weight: &F,
@@ -71,7 +68,6 @@ macro_rules! impl_p3_to_tv_conversion {
             }
         }
 
-        // 式の変換ロジック
         pub fn convert_p3_expr<F>(expr: &GenericSymbolicExpression<F>) -> ZEBRASymbolicExpr
         where
             F: GeneralPrimeField32,

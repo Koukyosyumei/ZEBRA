@@ -32,7 +32,7 @@ pub type MyConfig = StarkConfigImpl<Val, Challenge, PackedChallenge, Pcs, Challe
 
 pub fn get_machine_config() -> MyConfig {
     let mds16 = Mds16::default();
-    let perm16 = Perm16::new_from_rng(4, 22, mds16, &mut thread_rng()); // TODO: Use deterministic RNG
+    let perm16 = Perm16::new_from_rng(4, 22, mds16, &mut thread_rng());
     let hash = MyHash::new(Keccak256Hash {});
     let compress = MyCompress::new(hash);
     let val_mmcs = ValMmcs::new(hash, compress);

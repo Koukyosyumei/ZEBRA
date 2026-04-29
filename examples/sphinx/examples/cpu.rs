@@ -162,7 +162,6 @@ fn main() -> Result<(), io::Error> {
     // ######################## Extract CPU Constraints ##########################
     let air = CpuChip::default();
     let air_name = "CPU";
-    //println!("{:?}", CPU_COL_MAP);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, CpuChip>(

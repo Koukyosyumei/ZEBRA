@@ -2,10 +2,8 @@
 name = "zebra"
 version = "0.0.0"
 edition = "2021"
-authors = ["Koukyosyumei <koukyosyumei@hotmail.com>"]
 description = "Abstract-Interpretation-based Verifier for zkVM"
 license = "GPL-3.0"
-repository = "https://github.com/Koukyosyumei/TwinVM"
 keywords = ["formal method", "security", "zero-knowledge-proof", "zkp"]
 
 [dependencies]

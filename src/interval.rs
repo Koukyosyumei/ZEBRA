@@ -394,19 +394,13 @@ impl AbstractInterval {
 
     pub fn shr_carry(self, rhs: Self) -> (Self, Self) {
         if self.lo < 0 || rhs.lo < 0 {
-            //panic!("LTU for negative region is not supported. {}", self);
             return (
                 AbstractInterval::from_i128(123456),
                 AbstractInterval::from_i128(123456),
             );
-            //return AbstractInterval::bool();
         }
-        // assert!(self.lo >= 0 && rhs.lo >= 0);
 
-        // Logical right shift with carry
-        // self = x interval
-        // rhs  = shift amount interval
-        // Assume 0 <= values <= 255
+        // Logical right shift with carry over byte-sized inputs.
         let a = self.lo as u64;
         let b = self.hi as u64;
         let c = rhs.lo as u32;
@@ -464,9 +458,7 @@ impl AbstractInterval {
 
     pub fn ltu(&self, rhs: Self) -> AbstractInterval {
         if self.lo < 0 {
-            //panic!("LTU for negative region is not supported. {}", self);
             return AbstractInterval::from_i128(123456);
-            //return AbstractInterval::bool();
         }
 
         // returns one when self < rhs
@@ -587,7 +579,6 @@ impl AbstractInterval {
             self.clone()
         } else if self.lo == self.hi {
             if m == 0 {}
-            // let v = self.lo.rem_euclid(m);
             let v = self.lo % m;
             Self { lo: v, hi: v }
         } else {
@@ -645,7 +636,6 @@ mod tests {
             x
         }
 
-        // min以上 max以下の値を返す
         fn range(&mut self, min: i128, max: i128) -> i128 {
             let width = (max - min + 1) as u64;
             (min as u64 + (self.next_u64() % width)) as i128
@@ -723,7 +713,7 @@ mod tests {
     fn test_bitwise_and_soundness() {
         let mut rng = SimpleRng::new(12345);
         for _ in 0..100 {
-            let a = rng.gen_positive_interval(1000, 50); // 値は0~1000, 幅は最大50
+            let a = rng.gen_positive_interval(1000, 50);
             let b = rng.gen_positive_interval(1000, 50);
 
             verify_binary_op("BitAnd", a, b, |x, y| x & y, |x, y| x & y);
@@ -758,7 +748,6 @@ mod tests {
 
     #[test]
     fn test_not_soundness() {
-        // 注: 正の数のNOTは負の数になりますが、結果が範囲に含まれているか検証します
         let mut rng = SimpleRng::new(445566);
         for _ in 0..100 {
             let a = rng.gen_positive_interval(1000, 100);
@@ -768,10 +757,9 @@ mod tests {
 
     #[test]
     fn test_negative_input_panics() {
-        // 負の数が入力されたときにパニックすることを確認
         let pos = AbstractInterval { lo: 0, hi: 10 };
         let neg = AbstractInterval { lo: -5, hi: -1 };
-        let cross = AbstractInterval { lo: -2, hi: 2 }; // 負の領域を含む
+        let cross = AbstractInterval { lo: -2, hi: 2 };
 
         // BitAnd
         let result = panic::catch_unwind(|| pos.clone() & neg.clone());
@@ -798,28 +786,20 @@ mod tests {
 
     #[test]
     fn test_specific_edge_cases() {
-        // 手動で設定する特定のコーナーケース
-
-        // ケース1: シングルトン同士 (2 & 3 = 2)
+        // singleton AND singleton: 2 & 3 = 2
         let a = AbstractInterval::from_i128(2);
         let b = AbstractInterval::from_i128(3);
         assert_eq!((a.clone() & b.clone()).lo, 2);
         assert_eq!((a & b).hi, 2);
 
-        // ケース2: 包含関係 ( [4,7] & [4,5] )
-        // [4,7] -> 100, 101, 110, 111 (上位 1xx)
-        // [4,5] -> 100, 101 (上位 10x)
-        // AND結果は 100, 101 -> [4, 5] になるはず
+        // [4, 7] & [4, 5] should subsume [4, 5]
         let c = AbstractInterval { lo: 4, hi: 7 };
         let d = AbstractInterval { lo: 4, hi: 5 };
         let res = c & d;
         assert!(res.lo <= 4);
         assert!(res.hi >= 5);
 
-        // ケース3: 大きな飛び地
-        // [0, 1] | [16, 17]
-        // 00000, 00001 | 10000, 10001
-        // OR結果は 10000(16) ~ 10001(17)
+        // [0, 1] | [16, 17] = [16, 17]
         let e = AbstractInterval { lo: 0, hi: 1 };
         let f = AbstractInterval { lo: 16, hi: 17 };
         let or_res = e | f;

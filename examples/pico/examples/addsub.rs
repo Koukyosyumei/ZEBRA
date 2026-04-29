@@ -94,7 +94,6 @@ fn main() -> Result<(), io::Error> {
     let air: AddSubChip<KoalaBear> = AddSubChip::default();
     let air_name = "AddSub";
     let _colmap = make_col_map();
-    //println!("{:?}", colmap);
 
     let output_columns = if opcode_str == "ADD" {
         vec![0, 1, 2, 3]

@@ -51,7 +51,6 @@ fn main() -> Result<(), io::Error> {
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, BitwiseChip>(&air, NUM_BITWISE_COLS, prime, args.method == "bb" && !args.no_simplify);
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
-    //println!("{:?}", general_lookup_info);
 
     constraint_info
         .refinable_cols

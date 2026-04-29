@@ -243,14 +243,12 @@ pub fn word_sub(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    // 確実に underflow しない
     if a.lo >= b.hi {
         AbstractInterval {
             lo: a.lo - b.hi,
             hi: a.hi - b.lo,
         }
     } else {
-        // 一部でも underflow の可能性がある
         full_word()
     }
 }
@@ -265,7 +263,6 @@ pub fn word_addu(b: &Word, c: &Word) -> AbstractInterval {
         return AbstractInterval { lo: res, hi: res };
     }
 
-    // surely not overflow
     if b.hi + c.hi < WORD_BOUND {
         return AbstractInterval {
             lo: b.lo + c.lo,
@@ -273,7 +270,6 @@ pub fn word_addu(b: &Word, c: &Word) -> AbstractInterval {
         };
     }
 
-    // surely overflow
     if b.lo + c.lo >= WORD_BOUND {
         let lo = b.lo + c.lo - WORD_BOUND;
         let hi = b.hi + c.hi - WORD_BOUND;
@@ -284,7 +280,6 @@ pub fn word_addu(b: &Word, c: &Word) -> AbstractInterval {
         };
     }
 
-    // maybe overflow
     full_word()
 }
 
@@ -298,7 +293,6 @@ pub fn word_subu(b: &Word, c: &Word) -> AbstractInterval {
         return AbstractInterval { lo: res, hi: res };
     }
 
-    // surely not underflow
     if b.lo >= c.hi {
         return AbstractInterval {
             lo: b.lo - c.hi,
@@ -306,7 +300,6 @@ pub fn word_subu(b: &Word, c: &Word) -> AbstractInterval {
         };
     }
 
-    // surely underflow
     if b.hi < c.lo {
         let lo = b.lo + (WORD_BOUND - c.hi);
         let hi = b.hi + (WORD_BOUND - c.lo);
@@ -317,12 +310,10 @@ pub fn word_subu(b: &Word, c: &Word) -> AbstractInterval {
         };
     }
 
-    // maybe underflow
     full_word()
 }
 
 pub fn word_mul(a: &Word, b: &Word) -> AbstractInterval {
-    // mul（low 32 bits）
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
@@ -517,15 +508,11 @@ pub fn word_and(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    // AND with a range [0, hi] can never exceed the minimum of the two hi values.
-    // However, the lower bound is tricky. For a simple interval, we know:
-    // 0 <= (a & b) <= min(a.hi, b.hi)
-    // A tighter bound exists but requires bit-by-bit analysis.
+    // 0 <= (a & b) <= min(a.hi, b.hi).
     if a.is_singleton() && b.is_singleton() {
         let res = a.lo & b.lo;
         AbstractInterval { lo: res, hi: res }
     } else {
-        // Conservative approximation for intervals
         AbstractInterval {
             lo: 0,
             hi: a.hi.min(b.hi),
@@ -541,8 +528,6 @@ pub fn word_or(a: &Word, b: &Word) -> AbstractInterval {
         let res = a.lo | b.lo;
         AbstractInterval { lo: res, hi: res }
     } else {
-        // OR can at most set all bits up to the highest bit present in either operand.
-        // We find the smallest power of 2 minus 1 that covers both.
         let max_possible = (1i128 << (128 - (a.hi | b.hi).leading_zeros())) - 1;
         AbstractInterval {
             lo: a.lo.max(b.lo),
@@ -559,8 +544,6 @@ pub fn word_xor(a: &Word, b: &Word) -> AbstractInterval {
         let res = a.lo ^ b.lo;
         AbstractInterval { lo: res, hi: res }
     } else {
-        // XOR is the most unpredictable for intervals.
-        // The result's highest bit is bounded by the highest bit of a.hi or b.hi.
         let max_val = a.hi | b.hi;
         let hi_bound = if max_val == 0 {
             0
@@ -578,16 +561,11 @@ pub fn word_eq(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    // definitely equal
     if a.is_singleton() && b.is_singleton() && a.lo == b.lo {
         AbstractInterval::one()
-    }
-    // definitely not equal
-    else if a.hi < b.lo || b.hi < a.lo {
+    } else if a.hi < b.lo || b.hi < a.lo {
         AbstractInterval::zero()
-    }
-    // unsure
-    else {
+    } else {
         AbstractInterval::bool()
     }
 }
@@ -605,20 +583,16 @@ pub fn word_srl(a: &Word, b: &Word) -> AbstractInterval {
     let a = word_to_unsigned(a);
     let b = word_to_unsigned(b);
 
-    // シフト量が32ビット以上の場合、結果は常に0
     if b.lo >= WORD_BITS as i128 {
         return AbstractInterval::zero();
     }
 
-    // 最小値: aの最小値を最大のシフト量でシフトしたもの
     let lo = if b.hi >= WORD_BITS as i128 {
         0
     } else {
         a.lo >> b.hi
     };
 
-    // 最大値: aの最大値を最小のシフト量でシフトしたもの
-    // (b.lo < 32 は確定している)
     let hi = a.hi >> b.lo;
 
     AbstractInterval { lo, hi }
@@ -706,7 +680,6 @@ mod tests {
     #[test]
     fn test_sub_definite_underflow() {
         use crate::wordop::{full_word, word_sub};
-        // [5, 10] - [20, 30] → 必ず underflow
         let a = _word_range(5, 10);
         let b = _word_range(20, 30);
 
@@ -912,14 +885,13 @@ mod tests {
         let b = _word_range(10, 20);
         assert_eq!(word_add(&a, &b), _ai(11, 22));
 
-        // 境界付近: [MAX-10, MAX-5] + [1, 4] = [MAX-9, MAX-1] (No wrap)
-        let a_near = [_ai(255, 255), _ai(255, 255), _ai(255, 255), _ai(240, 245)]; // 非常に大きい値
+        // [MAX-10, MAX-5] + [1, 4] = [MAX-9, MAX-1] (no wrap)
+        let a_near = [_ai(255, 255), _ai(255, 255), _ai(255, 255), _ai(240, 245)];
         let b_small = _word_range(1, 4);
         let r = word_add(&a_near, &b_small);
         assert!(r.hi < WORD_BOUND);
         assert_eq!(r.lo, word_to_unsigned(&a_near).lo + 1);
 
-        // 一部でもオーバーフローの可能性がある場合は full_word
         let a_overflow = [_ai(255, 255), _ai(255, 255), _ai(255, 255), _ai(250, 255)];
         let b_overflow = _word_range(10, 20);
         assert_eq!(word_add(&a_overflow, &b_overflow), full_word());
@@ -933,7 +905,6 @@ mod tests {
         let b = _word_range(4, 5);
         assert_eq!(word_mul(&a, &b), _ai(8, 15));
 
-        // 巨大な範囲への拡大
         let a_big = _word_range(100, 200);
         let b_big = [_ai(0, 255), _ai(0, 255), _ai(0, 255), _ai(0, 255)];
         assert_eq!(word_mul(&a_big, &b_big), full_word());
@@ -943,7 +914,6 @@ mod tests {
     #[test]
     fn test_mulhs_signed_intervals() {
         use crate::wordop::word_mulhs;
-        // 正×負のインターバル
         let a = _word_range(10, 20);
         let b = [_ai(254, 255), _ai(255, 255), _ai(255, 255), _ai(255, 255)]; // [-2, -1]
         let r = word_mulhs(&a, &b);
@@ -961,19 +931,15 @@ mod tests {
         let b = _word_range(2, 10);
         assert_eq!(word_div(&a, &b), _ai(10, 100));
 
-        // 除数に0が含まれる可能性 [0, 5] -> full_word
+        // divisor may contain 0: [0, 5] -> full_word
         let b_zero = _word_range(0, 5);
         assert_eq!(word_div(&a, &b_zero), full_word());
     }
 
     #[test]
     fn test_sdiv_complex_ranges() {
-        // 配当が符号を跨ぐ: [-10, 10] / [2, 2] = [-5, 5]
-        // a = 0xFFFFFFF6 (-10) to 0x0000000A (10)
-        // ここではword_to_unsignedの仕様上、大きなインターバルになる可能性があるため
-        // 実装の `to_signed` の境界値テストとして機能させる
+        // [-(1<<10), 1<<10] / [2, 2]: signed division with sign-crossing dividend.
         let a = _ai(-(1 << 10), 1 << 10);
-        // 簡略化のため、直接 AbstractInterval の演算ロジックを確認
         let b = _ai(2, 2);
         let candidates = [a.lo / b.lo, a.lo / b.hi, a.hi / b.lo, a.hi / b.hi];
         let lo = *candidates.iter().min().unwrap();
@@ -985,17 +951,17 @@ mod tests {
     #[test]
     fn test_comparison_uncertainty() {
         use crate::wordop::word_ltu;
-        // 確実な比較: [10, 20] < [30, 40] -> [1, 1] (True)
+        // [10, 20] < [30, 40] -> [1, 1]
         let a = _word_range(10, 20);
         let b = _word_range(30, 40);
         assert_eq!(word_ltu(&a, &b), _ai(1, 1));
 
-        // 確実な比較: [50, 60] < [10, 20] -> [0, 0] (False)
+        // [50, 60] < [10, 20] -> [0, 0]
         let a = _word_range(50, 60);
         let b = _word_range(10, 20);
         assert_eq!(word_ltu(&a, &b), _ai(0, 0));
 
-        // 不確実（重なりあり）: [15, 25] < [20, 30] -> [0, 1] (Unknown)
+        // [15, 25] < [20, 30] -> [0, 1]
         let a = _word_range(15, 25);
         let b = _word_range(20, 30);
         assert_eq!(word_ltu(&a, &b), _ai(0, 1));
@@ -1004,7 +970,7 @@ mod tests {
     #[test]
     fn test_slt_definitely_less() {
         use crate::wordop::word_slt;
-        // ケース1: 正の範囲同士で完全に小さい [1, 5] < [10, 15]
+        // [1, 5] < [10, 15]: positive < positive
         let a = _signed_word(1, 5);
         let b = _signed_word(10, 15);
         assert_eq!(
@@ -1013,17 +979,16 @@ mod tests {
             "Positive range: A < B should be True"
         );
 
-        // ケース2: 負数 < 正数 [-10, -5] < [1, 2]
-        // 注: signed_word の実装上、-10 は下位が 0xF6, 上位が 0xFF になる想定
-        let a_neg = [_ai(240, 250), _byte(255), _byte(255), _byte(255)]; // [-16, -6]
-        let b_pos = [_ai(1, 5), _byte(0), _byte(0), _byte(0)]; // [1, 5]
+        // [-16, -6] < [1, 5]: negative < positive
+        let a_neg = [_ai(240, 250), _byte(255), _byte(255), _byte(255)];
+        let b_pos = [_ai(1, 5), _byte(0), _byte(0), _byte(0)];
         assert_eq!(
             word_slt(&a_neg, &b_pos),
             _ai(1, 1),
             "Negative A < Positive B should be True"
         );
 
-        // ケース3: 負の範囲同士で完全に小さい [-20, -15] < [-10, -5]
+        // [-20, -15] < [-10, -5]: negative < negative
         let a_neg_far = [_ai(200, 210), _byte(255), _byte(255), _byte(255)];
         let b_neg_near = [_ai(240, 250), _byte(255), _byte(255), _byte(255)];
         assert_eq!(word_slt(&a_neg_far, &b_neg_near), _ai(1, 1));
@@ -1032,12 +997,12 @@ mod tests {
     #[test]
     fn test_slt_definitely_greater_or_equal() {
         use crate::wordop::word_slt;
-        // ケース1: 正の範囲同士で完全に大きい [20, 30] < [5, 10] -> False
+        // [20, 30] < [5, 10] -> False
         let a = _signed_word(20, 30);
         let b = _signed_word(5, 10);
         assert_eq!(word_slt(&a, &b), _ai(0, 0));
 
-        // ケース2: 正数 < 負数 [1, 5] < [-10, -5] -> False
+        // [1, 5] < [-10, -5] -> False
         let a_pos = [_ai(1, 5), _byte(0), _byte(0), _byte(0)];
         let b_neg = [_ai(240, 250), _byte(255), _byte(255), _byte(255)];
         assert_eq!(word_slt(&a_pos, &b_neg), _ai(0, 0));
@@ -1046,8 +1011,7 @@ mod tests {
     #[test]
     fn test_slt_overlap_unknown() {
         use crate::wordop::word_slt;
-        // ケース1: 範囲が重なっている [5, 15] < [10, 20]
-        // 5 < 10 (True) の可能性もあれば、15 < 10 (False) の可能性もあるため Unknown
+        // [5, 15] < [10, 20]: overlapping ranges, result is [0, 1]
         let a = _signed_word(5, 15);
         let b = _signed_word(10, 20);
         assert_eq!(
@@ -1056,13 +1020,12 @@ mod tests {
             "Overlapping ranges should return [0, 1]"
         );
 
-        // ケース2: 境界値が一致している [5, 10] < [10, 15]
-        // a.hi(10) < b.lo(10) は False なので、完全には小さくない
+        // [5, 10] < [10, 15]: shared boundary, a.hi == b.lo
         let a_edge = _signed_word(5, 10);
         let b_edge = _signed_word(10, 15);
         assert_eq!(word_slt(&a_edge, &b_edge), _ai(0, 1));
 
-        // ケース3: 片方がもう片方を包含している
+        // one range contains the other
         let a_inner = _signed_word(10, 12);
         let b_outer = _signed_word(5, 20);
         assert_eq!(word_slt(&a_inner, &b_outer), _ai(0, 1));
@@ -1071,14 +1034,13 @@ mod tests {
     #[test]
     fn test_slt_max_min_bounds() {
         use crate::wordop::word_slt;
-        // 32bit符号付きの最小値付近のテスト
         let i32_min = [_byte(0), _byte(0), _byte(0), _byte(128)]; // 0x80000000
         let zero = [_byte(0), _byte(0), _byte(0), _byte(0)];
 
-        // INT_MIN < 0 は確実に True
+        // INT_MIN < 0
         assert_eq!(word_slt(&i32_min, &zero), _ai(1, 1));
 
-        // 0 < INT_MIN は確実に False
+        // 0 < INT_MIN is False
         assert_eq!(word_slt(&zero, &i32_min), _ai(0, 0));
     }
 
@@ -1246,12 +1208,12 @@ mod tests {
     #[test]
     fn test_srl_overflow_shift_amount() {
         use crate::wordop::word_srl;
-        // シフト量が32ビットを超える場合
+        // shift amount exceeds 32 bits
         let a = _word_range(100, 200);
         let b = _word_range(32, 64);
         assert_eq!(word_srl(&a, &b), _ai(0, 0));
 
-        // シフト量の範囲が32を跨ぐ場合: [100, 100] >> [31, 33]
+        // shift amount range crosses 32: [100, 100] >> [31, 33]
         // 100 >> 31 = 0
         // 100 >> 33 = 0
         let b_cross = _word_range(31, 33);

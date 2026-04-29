@@ -96,11 +96,9 @@ fn main() -> Result<(), io::Error> {
     let air = BranchChip::default();
     let air_name = "Branch";
     let _colmap = make_col_map();
-    //println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<BabyBear, BranchChip>(&air, NUM_BRANCH_COLS, prime, args.method == "bb" && !args.no_simplify);
-    //println!("{:?}", general_lookup_info);
     let output_columns = vec![5, 6, 7, 8];
     for i in vec![5, 6, 7, 8] {
         constraint_info.range_types.insert(i, RangeType::U8);

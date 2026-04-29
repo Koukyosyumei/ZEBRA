@@ -9,7 +9,6 @@ use std::rc::Rc;
 
 use p3_baby_bear::BabyBear;
 use p3_field::AbstractField;
-//use p3_uni_stark::symbolic_builder::get_symbolic_constraints;
 
 use valida_alu_u32::add::Add32Instruction;
 use valida_basic_api::BasicMachine;
@@ -345,16 +344,12 @@ fn main() -> Result<(), io::Error> {
     search_config.minimum_num_taregt_cols = 3;
 
     // ######################## Program Initialization ###########################
-    //    let program = get_target_program::<BabyBear>();
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
-    // Bug classes confirmed across all programs
     let mut global_found_classes: HashSet<String> = HashSet::new();
 
-    // Benchmark mode: accumulates one record per program for the final report.
     let mut benchmark_records: Vec<BenchmarkRecord> = Vec::new();
 
-    // Print benchmark table header before the loop so progress is visible immediately.
     if args.benchmark {
         println!(
             "\n{:<4}  {:^8} {:^8}  {:^8} {:^8}  {:^8} {:^8}  {:^7} {:^7}  {:^6} {:^6}",

@@ -454,7 +454,6 @@ fn process_single_node(
     let mut solutions = Vec::new();
     let mut refined = Vec::new();
 
-    //let mut results = Vec::new();
     for mut kid_trace in children {
         let post_res = post_process(&mut kid_trace, prime);
         let (res, pot, _) =
@@ -833,7 +832,6 @@ where
     // --- 4. MAIN UI LOOP (BLOCKING FOR THIS SUBSET) ---
     let mut solution_found = false;
     let mut user_quit = false;
-    // let mut subset_finished = false;
 
     ui.status = format!(
         "Subset: {:?}\n#Trials: {}\n#Unsat: {}\n#Queue: {}",

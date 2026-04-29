@@ -380,10 +380,6 @@ pub fn generate_report(results: &[VerificationResult]) -> ResultReport {
         .iter()
         .map(|d| d.execution_time.as_secs_f64())
         .collect();
-    //let mut ys = xs.clone();
-    //ys.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    //let trim_n = (n as f64 * 0.05) as usize;
-    //let trimmed = &ys[..(xs.len() - trim_n)];
 
     let exe_time_mean = xs.iter().sum::<f64>() / (xs.len() as f64);
     let exe_time_variance =

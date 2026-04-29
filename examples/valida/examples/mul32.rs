@@ -77,8 +77,6 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    //println!("MUL AIR MAP");
-    //println!("  {:?}", MUL_COL_MAP);
 
     let air = Mul32Chip::default();
     let num_col = NUM_MUL_COLS;

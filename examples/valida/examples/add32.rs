@@ -66,8 +66,6 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    //println!("ADD AIR MAP");
-    //println!("  {:?}", ADD_COL_MAP);
 
     let air = Add32Chip::default();
     let num_col = NUM_ADD_COLS;

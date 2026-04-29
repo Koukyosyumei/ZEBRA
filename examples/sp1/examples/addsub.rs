@@ -25,7 +25,6 @@ use zebra_sp1::utils::{extract_constraints_and_range, generate_abstract_trace, g
 
 fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
-    // currently only support one-row table
     for i in 0..trace.data.len() {
         if trace.data[i][17].is_zero(prime) != MayBeFlag::True {
             record_reprs.insert(format!(
@@ -41,7 +40,7 @@ fn cr_add(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
 
 fn cr_sub(trace: &AbstractTrace, prime: u32) -> PrettySet<String> {
     let mut record_reprs = HashSet::new();
-    // currently only support two-rows table, where the first row corresponds to ADD.
+    // The first row corresponds to ADD; this routine reads from the SUB row.
     for i in 0..trace.data.len() {
         if trace.data[i][18].is_zero(prime) != MayBeFlag::True {
             record_reprs.insert(format!(
@@ -108,7 +107,6 @@ fn main() -> Result<(), io::Error> {
     let air = AddSubChip::default();
     let air_name = "AddSub";
     let _colmap = make_col_map();
-    //println!("{:?}", colmap.is_add);
 
     let (output_columns, num_extracted_rows, min_row_id, max_row_id) = if opcode_str == "ADD" {
         (vec![1, 2, 3, 4], 1, 0, 0)

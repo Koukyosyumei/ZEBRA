@@ -426,14 +426,14 @@ pub fn expr_to_smt_bv(
             }
             ZEBRASymbolicExpr::Sub(a, b) => {
                 if not_field_op {
-                    format!("(bvsub {} {})", rec(a), rec(b),) // TODO: fix potential overflow
+                    format!("(bvsub {} {})", rec(a), rec(b),)
                 } else {
                     format!("(ff_sub {} {})", rec(a), rec(b),)
                 }
             }
             ZEBRASymbolicExpr::Mul(a, b) => {
                 if not_field_op {
-                    format!("(bvmul {} {})", rec(a), rec(b),) // TODO: fix potential overflow
+                    format!("(bvmul {} {})", rec(a), rec(b),)
                 } else {
                     format!("(ff_mul {} {})", rec(a), rec(b),)
                 }
@@ -552,13 +552,13 @@ pub fn expr_to_smt_bv(
                     a_val, b_val
                 )
             }
-            // 符号付き乗算の低位32ビット (bvmulは下位ビットに関しては符号の有無を問わない)
+            // Low 32 bits of signed multiplication (bvmul is sign-agnostic for low bits).
             ZEBRASymbolicExpr::WordMultl(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvmul {} {})", a_val, b_val)
             }
-            // 符号付き乗算の高位32ビット (WordMulhs と同じ挙動)
+            // High 32 bits of signed multiplication.
             ZEBRASymbolicExpr::WordMulth(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
@@ -567,13 +567,13 @@ pub fn expr_to_smt_bv(
                     a_val, b_val
                 )
             }
-            // 符号なし乗算の低位32ビット
+            // Low 32 bits of unsigned multiplication.
             ZEBRASymbolicExpr::WordMultul(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 format!("(bvmul {} {})", a_val, b_val)
             }
-            // 符号なし乗算の高位32ビット (WordMulhu と同じ挙動)
+            // High 32 bits of unsigned multiplication.
             ZEBRASymbolicExpr::WordMultuh(a_vec, b_vec) => {
                 let a_val = word_to_bv32(a_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
                 let b_val = word_to_bv32(b_vec, row_id, n_rows, n_pvs, vars, prime, not_field_op);
