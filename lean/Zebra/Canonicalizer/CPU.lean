@@ -74,57 +74,64 @@ lemma mem_canonicalize_iff (cfg : Config) (t : Trace) (repr : RecordRepr) :
   unfold canonicalize
   simp [List.mem_flatMap]
 
-/-- A CPU table encodes a record set when the records emitted by its rows are
-    exactly the canonical identities of that set. -/
-def TableEncodesRecords {Record : Type}
-    (cfg : Config) (recordId : Generic.RecordIdentity Record RecordRepr)
+/-- Record identities reconstructed from a CPU table. `tableId` interprets the
+    CPU table record representation as the abstract identity of an execution
+    record. -/
+def recordIdsOfTable {Identity : Type} [DecidableEq Identity]
+    (cfg : Config) (tableId : RecordRepr → Identity) (table : Trace) : Finset Identity :=
+  Finset.image tableId (canonicalize cfg table)
+
+lemma mem_recordIdsOfTable_iff {Identity : Type} [DecidableEq Identity]
+    (cfg : Config) (tableId : RecordRepr → Identity) (table : Trace) (identity : Identity) :
+    identity ∈ recordIdsOfTable cfg tableId table ↔
+      ∃ row ∈ table, ∃ repr ∈ rowRecords cfg row, tableId repr = identity := by
+  unfold recordIdsOfTable
+  constructor
+  · intro h
+    rcases Finset.mem_image.mp h with ⟨repr, hrepr, hidentity⟩
+    rw [mem_canonicalize_iff] at hrepr
+    rcases hrepr with ⟨row, hrow, hreprInRow⟩
+    exact ⟨row, hrow, repr, hreprInRow, hidentity⟩
+  · rintro ⟨row, hrow, repr, hreprInRow, hidentity⟩
+    apply Finset.mem_image.mpr
+    exact ⟨repr, (mem_canonicalize_iff cfg table repr).mpr ⟨row, hrow, hreprInRow⟩, hidentity⟩
+
+def TableEncodesRecordIds {Record Identity : Type} [DecidableEq Identity]
+    (cfg : Config) (tableId : RecordRepr → Identity)
+    (recordId : Generic.RecordIdentity Record Identity)
     (records : Generic.RecordSet Record) (table : Trace) : Prop :=
-  ∀ repr, repr ∈ Finset.image recordId.toIdentity records ↔
-    ∃ row ∈ table, repr ∈ rowRecords cfg row
+  ∀ identity, identity ∈ Finset.image recordId.toIdentity records ↔
+    ∃ row ∈ table, ∃ repr ∈ rowRecords cfg row, tableId repr = identity
 
-def TableGeneratorFaithful {Record : Type}
-    (cfg : Config) (recordId : Generic.RecordIdentity Record RecordRepr)
+def TableGeneratorFaithfulToIds {Record Identity : Type} [DecidableEq Identity]
+    (cfg : Config) (tableId : RecordRepr → Identity)
+    (recordId : Generic.RecordIdentity Record Identity)
     (generateTable : Generic.RecordSet Record → Trace) : Prop :=
-  ∀ records, TableEncodesRecords cfg recordId records (generateTable records)
+  ∀ records, TableEncodesRecordIds cfg tableId recordId records (generateTable records)
 
-lemma canonicalize_eq_recordIdentitySet_of_encodes {Record : Type}
-    (cfg : Config) (recordId : Generic.RecordIdentity Record RecordRepr)
+lemma recordIdsOfTable_eq_recordIds {Record Identity : Type}
+    [DecidableEq Identity]
+    (cfg : Config) (tableId : RecordRepr → Identity)
+    (recordId : Generic.RecordIdentity Record Identity)
     {records : Generic.RecordSet Record} {table : Trace}
-    (h : TableEncodesRecords cfg recordId records table) :
-    canonicalize cfg table = Finset.image recordId.toIdentity records := by
-  ext repr
-  rw [mem_canonicalize_iff]
-  exact (h repr).symm
+    (h : TableEncodesRecordIds cfg tableId recordId records table) :
+    recordIdsOfTable cfg tableId table = Finset.image recordId.toIdentity records := by
+  ext identity
+  rw [mem_recordIdsOfTable_iff]
+  exact (h identity).symm
 
-theorem canonicalize_generated_table_eq_recordIdentitySet {Record : Type}
-    (cfg : Config) (recordId : Generic.RecordIdentity Record RecordRepr)
+theorem recordIds_generated_eq_iff_records_eq {Record Identity : Type}
+    [DecidableEq Record] [DecidableEq Identity]
+    (cfg : Config) (tableId : RecordRepr → Identity)
+    (recordId : Generic.RecordIdentity Record Identity)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : TableGeneratorFaithful cfg recordId generateTable)
-    (records : Generic.RecordSet Record) :
-    canonicalize cfg (generateTable records) = Finset.image recordId.toIdentity records :=
-  canonicalize_eq_recordIdentitySet_of_encodes cfg recordId (hgen records)
-
-theorem canonicalize_generator_independent {Record : Type}
-    (cfg : Config) (recordId : Generic.RecordIdentity Record RecordRepr)
-    (gen₁ gen₂ : Generic.RecordSet Record → Trace)
-    (h₁ : TableGeneratorFaithful cfg recordId gen₁)
-    (h₂ : TableGeneratorFaithful cfg recordId gen₂)
-    (records : Generic.RecordSet Record) :
-    canonicalize cfg (gen₁ records) = canonicalize cfg (gen₂ records) := by
-  rw [canonicalize_generated_table_eq_recordIdentitySet cfg recordId gen₁ h₁ records,
-      canonicalize_generated_table_eq_recordIdentitySet cfg recordId gen₂ h₂ records]
-
-theorem canonicalize_generated_eq_iff_records_eq {Record : Type}
-    [DecidableEq Record]
-    (cfg : Config) (recordId : Generic.RecordIdentity Record RecordRepr)
-    (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : TableGeneratorFaithful cfg recordId generateTable)
+    (hgen : TableGeneratorFaithfulToIds cfg tableId recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
-    canonicalize cfg (generateTable records₁) =
-      canonicalize cfg (generateTable records₂) ↔
+    recordIdsOfTable cfg tableId (generateTable records₁) =
+      recordIdsOfTable cfg tableId (generateTable records₂) ↔
     records₁ = records₂ := by
-  rw [canonicalize_generated_table_eq_recordIdentitySet cfg recordId generateTable hgen records₁,
-      canonicalize_generated_table_eq_recordIdentitySet cfg recordId generateTable hgen records₂]
+  rw [recordIdsOfTable_eq_recordIds cfg tableId recordId (hgen records₁),
+      recordIdsOfTable_eq_recordIds cfg tableId recordId (hgen records₂)]
   constructor
   · intro h
     exact Finset.image_injective recordId.injective h

@@ -42,6 +42,7 @@ In `Zebra.Generic`:
 canonicalTraceSpace_equiv_image
 canonicalize_generator_independent
 canonicalize_generated_eq_iff_records_eq
+recordIds_generated_eq_iff_records_eq
 ```
 
 `canonicalTraceSpace_equiv_image` is in `Quotient.lean` and proves the
@@ -79,6 +80,11 @@ records₁ = records₂
 
 This proves one-to-one correctness for the canonicalizer relative to those
 assumptions.
+
+`recordIds_generated_eq_iff_records_eq` is the variant used when a
+table canonicalizer extracts a table-specific tuple, such as `ALU.Tuple`, and a
+separate `tableId` function interprets that tuple as the abstract identity of a
+semantic record.
 
 ## Covered Layouts
 
