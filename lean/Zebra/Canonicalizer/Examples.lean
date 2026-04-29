@@ -22,46 +22,46 @@ def mkALUConfig (idxB idxC idxA : List Nat) (isReal : Row → Bool) :
     { b := row.project idxB, c := row.project idxC, a := row.project idxA }
 
 /-- Shared guarantee for every example config below: if a table generator is
-    faithful to the stated config and an injective record encoding, then the
+    faithful to the stated config and an injective record identity, then the
     canonical representation is one-to-one with the original record set. -/
-theorem one_to_one_for_config {Record Repr : Type} [DecidableEq Repr]
-    (cfg : Generic.Config Repr)
-    (enc : Generic.RecordIdentity Record Repr)
+theorem one_to_one_for_config {Record Identity : Type} [DecidableEq Identity]
+    (cfg : Generic.Config Identity)
+    (recordId : Generic.RecordIdentity Record Identity)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful cfg enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful cfg recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize cfg (generateTable records₁) =
       Generic.canonicalize cfg (generateTable records₂) ↔
     records₁ = records₂ :=
-  Generic.canonicalize_generated_eq_iff_records_eq cfg enc generateTable hgen records₁ records₂
+  Generic.canonicalize_generated_eq_iff_records_eq cfg recordId generateTable hgen records₁ records₂
 
 /-- Guarantee for lookup-driven ALU tables whose concrete operand columns are
     provided by `GeneralLookupInfo` at extraction time rather than hard-coded in
     the example file. -/
 theorem lookup_driven_alu_one_to_one {Record : Type}
     (cfg : Generic.Config ALU.Tuple)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful cfg enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful cfg recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize cfg (generateTable records₁) =
       Generic.canonicalize cfg (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config cfg enc generateTable hgen records₁ records₂
+  one_to_one_for_config cfg recordId generateTable hgen records₁ records₂
 
 /-- Shared guarantee for CPU configs. A CPU row can emit multiple canonical
     records, so it uses the CPU-specific canonicalizer rather than
     `Generic.canonicalize`. -/
 theorem cpu_one_to_one_for_config {Record : Type} [DecidableEq Record]
     (cfg : CPU.Config)
-    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (recordId : Generic.RecordIdentity Record CPU.RecordRepr)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : CPU.TableGeneratorFaithful cfg enc generateTable)
+    (hgen : CPU.TableGeneratorFaithful cfg recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     CPU.canonicalize cfg (generateTable records₁) =
       CPU.canonicalize cfg (generateTable records₂) ↔
     records₁ = records₂ :=
-  CPU.canonicalize_generated_eq_iff_records_eq cfg enc generateTable hgen records₁ records₂
+  CPU.canonicalize_generated_eq_iff_records_eq cfg recordId generateTable hgen records₁ records₂
 
 /-! ### SP1 -/
 
@@ -95,59 +95,59 @@ def lookupDrivenALUTables : List String :=
 
 /-- SP1 ADD canonicalizer one-to-one guarantee. -/
 theorem add_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (addConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (addConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (addConfig isReal) (generateTable records₁) =
       Generic.canonicalize (addConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (addConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (addConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- SP1 SUB canonicalizer one-to-one guarantee. -/
 theorem sub_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (subConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (subConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (subConfig isReal) (generateTable records₁) =
       Generic.canonicalize (subConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (subConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (subConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- SP1 branch/jump control-flow canonicalizer one-to-one guarantee. -/
 theorem controlFlow_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ControlFlow.ControlFlowTuple)
+    (recordId : Generic.RecordIdentity Record ControlFlow.ControlFlowTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (controlFlowConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (controlFlowConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (controlFlowConfig isReal) (generateTable records₁) =
       Generic.canonicalize (controlFlowConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (controlFlowConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (controlFlowConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- SP1 memory-instructions canonicalizer one-to-one guarantee. -/
 theorem memoryInstrs_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record Memory.MemoryOpTuple)
+    (recordId : Generic.RecordIdentity Record Memory.MemoryOpTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (memoryInstrsConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (memoryInstrsConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (memoryInstrsConfig isReal) (generateTable records₁) =
       Generic.canonicalize (memoryInstrsConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (memoryInstrsConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- SP1 CPU canonicalizer one-to-one guarantee. -/
 theorem cpu_one_to_one {Record : Type} [DecidableEq Record]
     (isReal isOpAWrite : Row → Bool)
-    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (recordId : Generic.RecordIdentity Record CPU.RecordRepr)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal isOpAWrite) enc generateTable)
+    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal isOpAWrite) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₁) =
       CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₂) ↔
     records₁ = records₂ :=
-  cpu_one_to_one_for_config (cpuConfig isReal isOpAWrite) enc generateTable hgen records₁ records₂
+  cpu_one_to_one_for_config (cpuConfig isReal isOpAWrite) recordId generateTable hgen records₁ records₂
 
 end SP1
 
@@ -176,48 +176,48 @@ def lookupDrivenALUTables : List String :=
 
 /-- Pico ADD canonicalizer one-to-one guarantee. -/
 theorem add_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (addConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (addConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (addConfig isReal) (generateTable records₁) =
       Generic.canonicalize (addConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (addConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (addConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Pico SUB canonicalizer one-to-one guarantee. -/
 theorem sub_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (subConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (subConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (subConfig isReal) (generateTable records₁) =
       Generic.canonicalize (subConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (subConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (subConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Pico memory read/write canonicalizer one-to-one guarantee. -/
 theorem memoryReadWrite_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record Memory.MemoryOpTuple)
+    (recordId : Generic.RecordIdentity Record Memory.MemoryOpTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (memoryReadWriteConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (memoryReadWriteConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (memoryReadWriteConfig isReal) (generateTable records₁) =
       Generic.canonicalize (memoryReadWriteConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (memoryReadWriteConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (memoryReadWriteConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Pico CPU canonicalizer one-to-one guarantee. -/
 theorem cpu_one_to_one {Record : Type} [DecidableEq Record]
     (isReal isOpAWrite : Row → Bool)
-    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (recordId : Generic.RecordIdentity Record CPU.RecordRepr)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal isOpAWrite) enc generateTable)
+    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal isOpAWrite) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₁) =
       CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₂) ↔
     records₁ = records₂ :=
-  cpu_one_to_one_for_config (cpuConfig isReal isOpAWrite) enc generateTable hgen records₁ records₂
+  cpu_one_to_one_for_config (cpuConfig isReal isOpAWrite) recordId generateTable hgen records₁ records₂
 
 end Pico
 
@@ -242,37 +242,37 @@ def lookupDrivenALUTables : List String :=
 
 /-- Sphinx ADD canonicalizer one-to-one guarantee. -/
 theorem add_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (addConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (addConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (addConfig isReal) (generateTable records₁) =
       Generic.canonicalize (addConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (addConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (addConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Sphinx SUB canonicalizer one-to-one guarantee. -/
 theorem sub_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (subConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (subConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (subConfig isReal) (generateTable records₁) =
       Generic.canonicalize (subConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (subConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (subConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Sphinx CPU canonicalizer one-to-one guarantee. -/
 theorem cpu_one_to_one {Record : Type} [DecidableEq Record]
     (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (recordId : Generic.RecordIdentity Record CPU.RecordRepr)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal) enc generateTable)
+    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     CPU.canonicalize (cpuConfig isReal) (generateTable records₁) =
       CPU.canonicalize (cpuConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  cpu_one_to_one_for_config (cpuConfig isReal) enc generateTable hgen records₁ records₂
+  cpu_one_to_one_for_config (cpuConfig isReal) recordId generateTable hgen records₁ records₂
 
 end Sphinx
 
@@ -322,114 +322,114 @@ def lookupDrivenALUTables : List String :=
 
 /-- Ziren ADD canonicalizer one-to-one guarantee. -/
 theorem add_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (addConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (addConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (addConfig isReal) (generateTable records₁) =
       Generic.canonicalize (addConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (addConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (addConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Ziren SUB canonicalizer one-to-one guarantee. -/
 theorem sub_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (subConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (subConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (subConfig isReal) (generateTable records₁) =
       Generic.canonicalize (subConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (subConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (subConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Ziren DIV canonicalizer one-to-one guarantee. -/
 theorem div_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (divConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (divConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (divConfig isReal) (generateTable records₁) =
       Generic.canonicalize (divConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (divConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (divConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Ziren REM canonicalizer one-to-one guarantee. -/
 theorem rem_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (recordId : Generic.RecordIdentity Record ALU.Tuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (remConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (remConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (remConfig isReal) (generateTable records₁) =
       Generic.canonicalize (remConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (remConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (remConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Ziren CLO/CLZ canonicalizer one-to-one guarantee. -/
 theorem cloClz_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ControlFlow.UnaryTuple)
+    (recordId : Generic.RecordIdentity Record ControlFlow.UnaryTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (cloClzConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (cloClzConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (cloClzConfig isReal) (generateTable records₁) =
       Generic.canonicalize (cloClzConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (cloClzConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (cloClzConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Ziren MOVCOND canonicalizer one-to-one guarantee. -/
 theorem movCond_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ControlFlow.MovCondTuple)
+    (recordId : Generic.RecordIdentity Record ControlFlow.MovCondTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (movCondConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (movCondConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (movCondConfig isReal) (generateTable records₁) =
       Generic.canonicalize (movCondConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (movCondConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (movCondConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Ziren branch canonicalizer one-to-one guarantee. -/
 theorem branch_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ControlFlow.ControlFlowTuple)
+    (recordId : Generic.RecordIdentity Record ControlFlow.ControlFlowTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (branchConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (branchConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (branchConfig isReal) (generateTable records₁) =
       Generic.canonicalize (branchConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (branchConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (branchConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Ziren jump canonicalizer one-to-one guarantee. -/
 theorem jump_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ControlFlow.ControlFlowTuple)
+    (recordId : Generic.RecordIdentity Record ControlFlow.ControlFlowTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (jumpConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (jumpConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (jumpConfig isReal) (generateTable records₁) =
       Generic.canonicalize (jumpConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (jumpConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (jumpConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Ziren memory-instructions canonicalizer one-to-one guarantee. -/
 theorem memoryInstrs_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record Memory.MemoryOpTuple)
+    (recordId : Generic.RecordIdentity Record Memory.MemoryOpTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (memoryInstrsConfig isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (memoryInstrsConfig isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (memoryInstrsConfig isReal) (generateTable records₁) =
       Generic.canonicalize (memoryInstrsConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (memoryInstrsConfig isReal) recordId generateTable hgen records₁ records₂
 
 /-- Ziren CPU canonicalizer one-to-one guarantee. -/
 theorem cpu_one_to_one {Record : Type} [DecidableEq Record]
     (isReal isOpAWrite : Row → Bool)
-    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (recordId : Generic.RecordIdentity Record CPU.RecordRepr)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal isOpAWrite) enc generateTable)
+    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal isOpAWrite) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₁) =
       CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₂) ↔
     records₁ = records₂ :=
-  cpu_one_to_one_for_config (cpuConfig isReal isOpAWrite) enc generateTable hgen records₁ records₂
+  cpu_one_to_one_for_config (cpuConfig isReal isOpAWrite) recordId generateTable hgen records₁ records₂
 
 end Ziren
 
@@ -452,29 +452,29 @@ def lookupDrivenALUTables : List String :=
 
 /-- Valida LT32 canonicalizer one-to-one guarantee. -/
 theorem lt32_one_to_one {Record : Type} (isReal : Row → Bool)
-    (enc : Generic.RecordIdentity Record ControlFlow.ValidaLtTuple)
+    (recordId : Generic.RecordIdentity Record ControlFlow.ValidaLtTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Generic.TableGeneratorFaithful (lt32Config isReal) enc generateTable)
+    (hgen : Generic.TableGeneratorFaithful (lt32Config isReal) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Generic.canonicalize (lt32Config isReal) (generateTable records₁) =
       Generic.canonicalize (lt32Config isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
-  one_to_one_for_config (lt32Config isReal) enc generateTable hgen records₁ records₂
+  one_to_one_for_config (lt32Config isReal) recordId generateTable hgen records₁ records₂
 
 /-- Valida memory-table canonicalizer one-to-one guarantee. The canonical record
     is `(clk, addr, value, read_or_write)`, with read/write selection supplied by
     the extracted row predicates. -/
 theorem memory_one_to_one {Record : Type} [DecidableEq Record]
     (isRead isWrite : Row → Bool)
-    (enc : Generic.RecordIdentity Record Memory.AccessTuple)
+    (recordId : Generic.RecordIdentity Record Memory.AccessTuple)
     (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : Memory.AccessTableGeneratorFaithful (memoryConfig isRead isWrite) enc generateTable)
+    (hgen : Memory.AccessTableGeneratorFaithful (memoryConfig isRead isWrite) recordId generateTable)
     (records₁ records₂ : Generic.RecordSet Record) :
     Memory.canonicalizeAccesses (memoryConfig isRead isWrite) (generateTable records₁) =
       Memory.canonicalizeAccesses (memoryConfig isRead isWrite) (generateTable records₂) ↔
     records₁ = records₂ :=
   Memory.canonicalizeAccesses_generated_eq_iff_records_eq
-    (memoryConfig isRead isWrite) enc generateTable hgen records₁ records₂
+    (memoryConfig isRead isWrite) recordId generateTable hgen records₁ records₂
 
 end Valida
 

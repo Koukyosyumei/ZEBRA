@@ -5,7 +5,7 @@ Lean 4 proofs for Zebra canonicalizer correctness. The proofs formalize:
 1. Raw trace tables modulo canonicalizer equality are bijective with the image
    of the canonicalizer.
 2. If a table generator faithfully encodes semantic records and the record
-   encoding is injective, canonicalization is one-to-one with the record set.
+   identity is injective, canonicalization is one-to-one with the record set.
 
 ## Layout
 
@@ -65,7 +65,7 @@ the collapse of different raw representations of the same computation.
 that if:
 
 - `cfg` defines real rows and row projection,
-- `enc` injectively maps semantic records to canonical row representations,
+- `recordId` injectively maps semantic records to canonical row identities,
 - `generateTable` faithfully encodes each record set,
 
 then:
