@@ -21,32 +21,32 @@ def mkALUConfig (idxB idxC idxA : List Nat) (isReal : Row → Bool) :
     { b := row.project idxB, c := row.project idxC, a := row.project idxA }
 
 /-- Shared guarantee for every example config below: if a table generator is
-    faithful to the stated config and an injective event encoding, then the
-    canonical representation is one-to-one with the original event set. -/
-theorem one_to_one_for_config {Event Repr : Type} [DecidableEq Repr]
+    faithful to the stated config and an injective record encoding, then the
+    canonical representation is one-to-one with the original record set. -/
+theorem one_to_one_for_config {Record Repr : Type} [DecidableEq Repr]
     (cfg : Generic.Config Repr)
-    (enc : Generic.EventEncoding Event Repr)
-    (generateTable : Generic.EventSet Event → Trace)
+    (enc : Generic.RecordIdentity Record Repr)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful cfg enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize cfg (generateTable events₁) =
-      Generic.canonicalize cfg (generateTable events₂) ↔
-    events₁ = events₂ :=
-  Generic.canonicalize_generated_eq_iff_events_eq cfg enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize cfg (generateTable records₁) =
+      Generic.canonicalize cfg (generateTable records₂) ↔
+    records₁ = records₂ :=
+  Generic.canonicalize_generated_eq_iff_records_eq cfg enc generateTable hgen records₁ records₂
 
 /-- Guarantee for lookup-driven ALU tables whose concrete operand columns are
     provided by `GeneralLookupInfo` at extraction time rather than hard-coded in
     the example file. -/
-theorem lookup_driven_alu_one_to_one {Event : Type}
+theorem lookup_driven_alu_one_to_one {Record : Type}
     (cfg : Generic.Config ALU.Tuple)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful cfg enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize cfg (generateTable events₁) =
-      Generic.canonicalize cfg (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config cfg enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize cfg (generateTable records₁) =
+      Generic.canonicalize cfg (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config cfg enc generateTable hgen records₁ records₂
 
 /-! ### SP1 -/
 
@@ -73,48 +73,48 @@ def lookupDrivenALUTables : List String :=
   ["lt", "bitwise", "divrem", "shiftleft", "mul", "sr"]
 
 /-- SP1 ADD canonicalizer one-to-one guarantee. -/
-theorem add_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem add_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (addConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (addConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (addConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (addConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (addConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (addConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (addConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- SP1 SUB canonicalizer one-to-one guarantee. -/
-theorem sub_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem sub_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (subConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (subConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (subConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (subConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (subConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (subConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (subConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- SP1 branch/jump control-flow canonicalizer one-to-one guarantee. -/
-theorem controlFlow_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ControlFlow.ControlFlowTuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem controlFlow_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ControlFlow.ControlFlowTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (controlFlowConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (controlFlowConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (controlFlowConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (controlFlowConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (controlFlowConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (controlFlowConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (controlFlowConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- SP1 memory-instructions canonicalizer one-to-one guarantee. -/
-theorem memoryInstrs_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event Memory.MemoryOpTuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem memoryInstrs_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record Memory.MemoryOpTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (memoryInstrsConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (memoryInstrsConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (memoryInstrsConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (memoryInstrsConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (memoryInstrsConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen records₁ records₂
 
 end SP1
 
@@ -136,37 +136,37 @@ def lookupDrivenALUTables : List String :=
   ["sr", "sll", "lessthan", "mul", "bitwise", "divrem"]
 
 /-- Pico ADD canonicalizer one-to-one guarantee. -/
-theorem add_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem add_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (addConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (addConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (addConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (addConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (addConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (addConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (addConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Pico SUB canonicalizer one-to-one guarantee. -/
-theorem sub_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem sub_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (subConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (subConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (subConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (subConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (subConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (subConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (subConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Pico memory read/write canonicalizer one-to-one guarantee. -/
-theorem memoryReadWrite_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event Memory.MemoryOpTuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem memoryReadWrite_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record Memory.MemoryOpTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (memoryReadWriteConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (memoryReadWriteConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (memoryReadWriteConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (memoryReadWriteConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (memoryReadWriteConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (memoryReadWriteConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (memoryReadWriteConfig isReal) enc generateTable hgen records₁ records₂
 
 end Pico
 
@@ -184,26 +184,26 @@ def lookupDrivenALUTables : List String :=
   ["sr", "shiftleft", "mul", "lt", "bitwise", "divrem"]
 
 /-- Sphinx ADD canonicalizer one-to-one guarantee. -/
-theorem add_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem add_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (addConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (addConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (addConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (addConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (addConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (addConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (addConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Sphinx SUB canonicalizer one-to-one guarantee. -/
-theorem sub_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem sub_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (subConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (subConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (subConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (subConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (subConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (subConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (subConfig isReal) enc generateTable hgen records₁ records₂
 
 end Sphinx
 
@@ -246,103 +246,103 @@ def lookupDrivenALUTables : List String :=
   ["mul", "shiftleft", "shiftright", "lt", "bitwise"]
 
 /-- Ziren ADD canonicalizer one-to-one guarantee. -/
-theorem add_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem add_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (addConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (addConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (addConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (addConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (addConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (addConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (addConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Ziren SUB canonicalizer one-to-one guarantee. -/
-theorem sub_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem sub_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (subConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (subConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (subConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (subConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (subConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (subConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (subConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Ziren DIV canonicalizer one-to-one guarantee. -/
-theorem div_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem div_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (divConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (divConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (divConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (divConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (divConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (divConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (divConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Ziren REM canonicalizer one-to-one guarantee. -/
-theorem rem_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ALU.Tuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem rem_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ALU.Tuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (remConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (remConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (remConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (remConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (remConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (remConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (remConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Ziren CLO/CLZ canonicalizer one-to-one guarantee. -/
-theorem cloClz_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ControlFlow.UnaryTuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem cloClz_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ControlFlow.UnaryTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (cloClzConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (cloClzConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (cloClzConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (cloClzConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (cloClzConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (cloClzConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (cloClzConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Ziren MOVCOND canonicalizer one-to-one guarantee. -/
-theorem movCond_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ControlFlow.MovCondTuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem movCond_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ControlFlow.MovCondTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (movCondConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (movCondConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (movCondConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (movCondConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (movCondConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (movCondConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (movCondConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Ziren branch canonicalizer one-to-one guarantee. -/
-theorem branch_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ControlFlow.ControlFlowTuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem branch_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ControlFlow.ControlFlowTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (branchConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (branchConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (branchConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (branchConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (branchConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (branchConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (branchConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Ziren jump canonicalizer one-to-one guarantee. -/
-theorem jump_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ControlFlow.ControlFlowTuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem jump_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ControlFlow.ControlFlowTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (jumpConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (jumpConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (jumpConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (jumpConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (jumpConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (jumpConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (jumpConfig isReal) enc generateTable hgen records₁ records₂
 
 /-- Ziren memory-instructions canonicalizer one-to-one guarantee. -/
-theorem memoryInstrs_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event Memory.MemoryOpTuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem memoryInstrs_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record Memory.MemoryOpTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (memoryInstrsConfig isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (memoryInstrsConfig isReal) (generateTable events₁) =
-      Generic.canonicalize (memoryInstrsConfig isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (memoryInstrsConfig isReal) (generateTable records₁) =
+      Generic.canonicalize (memoryInstrsConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen records₁ records₂
 
 end Ziren
 
@@ -359,15 +359,15 @@ def lookupDrivenALUTables : List String :=
   ["add32", "sub32", "mul32", "div32", "bitwise32", "com32"]
 
 /-- Valida LT32 canonicalizer one-to-one guarantee. -/
-theorem lt32_one_to_one {Event : Type} (isReal : Row → Bool)
-    (enc : Generic.EventEncoding Event ControlFlow.ValidaLtTuple)
-    (generateTable : Generic.EventSet Event → Trace)
+theorem lt32_one_to_one {Record : Type} (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record ControlFlow.ValidaLtTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
     (hgen : Generic.TableGeneratorFaithful (lt32Config isReal) enc generateTable)
-    (events₁ events₂ : Generic.EventSet Event) :
-    Generic.canonicalize (lt32Config isReal) (generateTable events₁) =
-      Generic.canonicalize (lt32Config isReal) (generateTable events₂) ↔
-    events₁ = events₂ :=
-  one_to_one_for_config (lt32Config isReal) enc generateTable hgen events₁ events₂
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Generic.canonicalize (lt32Config isReal) (generateTable records₁) =
+      Generic.canonicalize (lt32Config isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  one_to_one_for_config (lt32Config isReal) enc generateTable hgen records₁ records₂
 
 end Valida
 
