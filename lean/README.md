@@ -17,6 +17,7 @@ lean/
     ├── Quotient.lean     # D / ~R ≃ Im(R)
     ├── Generator.lean    # faithful-generator/record-set theorems
     ├── ALU.lean          # ALU tuple canonicalizer
+    ├── CPU.lean          # CPU multi-record canonicalizer
     ├── Memory.lean       # memory-op tuple shape
     ├── ControlFlow.lean  # control-flow and misc tuple shapes
     └── Examples.lean     # zkVM layouts and theorem instantiations
@@ -83,14 +84,14 @@ assumptions.
 
 `Examples.lean` instantiates the theorem for supported example layouts:
 
-- SP1: add/sub, branch/jump, memory instructions, lookup-driven ALU tables
-- Pico: add/sub, memory read/write, lookup-driven ALU tables
-- Sphinx: add/sub, lookup-driven ALU tables
-- Ziren: add/sub, div/rem, CLO/CLZ, movcond, branch/jump, memory instructions, lookup-driven ALU tables
+- SP1: CPU, add/sub, branch/jump, memory instructions, lookup-driven ALU tables
+- Pico: CPU, add/sub, memory read/write, lookup-driven ALU tables
+- Sphinx: CPU, add/sub, lookup-driven ALU tables
+- Ziren: CPU, add/sub, div/rem, CLO/CLZ, movcond, branch/jump, memory instructions, lookup-driven ALU tables
 - Valida: LT32 and lookup-driven ALU tables
 - OpenVM: lookup-driven ALU tables
 
-CPU tables and Valida memory are intentionally skipped.
+Valida memory is intentionally skipped.
 
 ## Non-Claims
 

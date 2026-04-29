@@ -1,11 +1,12 @@
 /-
 Zebra — concrete example table layouts from the Rust experiments.
 
-CPU tables and Valida memory are intentionally skipped because their
-canonicalizers are not currently supported by Zebra.
+Valida memory is intentionally skipped because its canonicalizer is not
+currently supported by Zebra.
 -/
 import Zebra.Canonicalizer.ALU
 import Zebra.Canonicalizer.ControlFlow
+import Zebra.Canonicalizer.CPU
 import Zebra.Canonicalizer.Generator
 import Zebra.Canonicalizer.Memory
 
@@ -48,6 +49,20 @@ theorem lookup_driven_alu_one_to_one {Record : Type}
     records₁ = records₂ :=
   one_to_one_for_config cfg enc generateTable hgen records₁ records₂
 
+/-- Shared guarantee for CPU configs. A CPU row can emit multiple canonical
+    records, so it uses the CPU-specific canonicalizer rather than
+    `Generic.canonicalize`. -/
+theorem cpu_one_to_one_for_config {Record : Type} [DecidableEq Record]
+    (cfg : CPU.Config)
+    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (generateTable : Generic.RecordSet Record → Trace)
+    (hgen : CPU.TableGeneratorFaithful cfg enc generateTable)
+    (records₁ records₂ : Generic.RecordSet Record) :
+    CPU.canonicalize cfg (generateTable records₁) =
+      CPU.canonicalize cfg (generateTable records₂) ↔
+    records₁ = records₂ :=
+  CPU.canonicalize_generated_eq_iff_records_eq cfg enc generateTable hgen records₁ records₂
+
 /-! ### SP1 -/
 
 namespace SP1
@@ -66,6 +81,12 @@ def controlFlowConfig (isReal : Row → Bool) : Generic.Config ControlFlow.Contr
 def memoryInstrsConfig (isReal : Row → Bool) : Generic.Config Memory.MemoryOpTuple :=
   Memory.mkMemoryOpConfig 2 [3, 4, 5, 6] [7, 8, 9, 10] [11, 12, 13, 14]
     [38, 39, 40, 41] isReal
+
+def cpuConfig (isReal : Row → Bool) (isOpAWrite : Row → Bool) : CPU.Config where
+  isReal := isReal
+  clk := [1, 2]
+  pc := [5]
+  writes := [{ isWrite := isOpAWrite, addr := [8], value := [29, 30, 31, 32] }]
 
 /-- Tables using `generate_alu_final_checker`, whose columns are supplied by
     `GeneralLookupInfo` at extraction time. -/
@@ -116,6 +137,18 @@ theorem memoryInstrs_one_to_one {Record : Type} (isReal : Row → Bool)
     records₁ = records₂ :=
   one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen records₁ records₂
 
+/-- SP1 CPU canonicalizer one-to-one guarantee. -/
+theorem cpu_one_to_one {Record : Type} [DecidableEq Record]
+    (isReal isOpAWrite : Row → Bool)
+    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (generateTable : Generic.RecordSet Record → Trace)
+    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal isOpAWrite) enc generateTable)
+    (records₁ records₂ : Generic.RecordSet Record) :
+    CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₁) =
+      CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  cpu_one_to_one_for_config (cpuConfig isReal isOpAWrite) enc generateTable hgen records₁ records₂
+
 end SP1
 
 /-! ### Pico -/
@@ -131,6 +164,12 @@ def subConfig (isReal : Row → Bool) : Generic.Config ALU.Tuple :=
 def memoryReadWriteConfig (isReal : Row → Bool) : Generic.Config Memory.MemoryOpTuple :=
   Memory.mkMemoryOpConfig 1 [68, 69, 70, 71] [77, 78, 79, 80] [86, 87, 88, 89]
     [28, 29, 30, 31] isReal
+
+def cpuConfig (isReal : Row → Bool) (isOpAWrite : Row → Bool) : CPU.Config where
+  isReal := isReal
+  clk := [2, 3]
+  pc := [4]
+  writes := [{ isWrite := isOpAWrite, addr := [7], value := [46, 47, 48, 49] }]
 
 def lookupDrivenALUTables : List String :=
   ["sr", "sll", "lessthan", "mul", "bitwise", "divrem"]
@@ -168,6 +207,18 @@ theorem memoryReadWrite_one_to_one {Record : Type} (isReal : Row → Bool)
     records₁ = records₂ :=
   one_to_one_for_config (memoryReadWriteConfig isReal) enc generateTable hgen records₁ records₂
 
+/-- Pico CPU canonicalizer one-to-one guarantee. -/
+theorem cpu_one_to_one {Record : Type} [DecidableEq Record]
+    (isReal isOpAWrite : Row → Bool)
+    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (generateTable : Generic.RecordSet Record → Trace)
+    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal isOpAWrite) enc generateTable)
+    (records₁ records₂ : Generic.RecordSet Record) :
+    CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₁) =
+      CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  cpu_one_to_one_for_config (cpuConfig isReal isOpAWrite) enc generateTable hgen records₁ records₂
+
 end Pico
 
 /-! ### Sphinx -/
@@ -179,6 +230,12 @@ def addConfig (isReal : Row → Bool) : Generic.Config ALU.Tuple :=
 
 def subConfig (isReal : Row → Bool) : Generic.Config ALU.Tuple :=
   mkALUConfig [3, 4, 5, 6] [14, 15, 16, 17] [10, 11, 12, 13] isReal
+
+def cpuConfig (isReal : Row → Bool) : CPU.Config where
+  isReal := isReal
+  clk := [4, 5]
+  pc := [6]
+  writes := [{ isWrite := fun _ => true, addr := [9, 10, 11, 12], value := [64, 65, 66, 67] }]
 
 def lookupDrivenALUTables : List String :=
   ["sr", "shiftleft", "mul", "lt", "bitwise", "divrem"]
@@ -204,6 +261,18 @@ theorem sub_one_to_one {Record : Type} (isReal : Row → Bool)
       Generic.canonicalize (subConfig isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
   one_to_one_for_config (subConfig isReal) enc generateTable hgen records₁ records₂
+
+/-- Sphinx CPU canonicalizer one-to-one guarantee. -/
+theorem cpu_one_to_one {Record : Type} [DecidableEq Record]
+    (isReal : Row → Bool)
+    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (generateTable : Generic.RecordSet Record → Trace)
+    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal) enc generateTable)
+    (records₁ records₂ : Generic.RecordSet Record) :
+    CPU.canonicalize (cpuConfig isReal) (generateTable records₁) =
+      CPU.canonicalize (cpuConfig isReal) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  cpu_one_to_one_for_config (cpuConfig isReal) enc generateTable hgen records₁ records₂
 
 end Sphinx
 
@@ -241,6 +310,12 @@ def jumpConfig (isReal : Row → Bool) : Generic.Config ControlFlow.ControlFlowT
 def memoryInstrsConfig (isReal : Row → Bool) : Generic.Config Memory.MemoryOpTuple :=
   Memory.mkMemoryOpConfig 3 [4, 5, 6, 7] [8, 9, 10, 11] [12, 13, 14, 15]
     [57, 58, 59, 60] isReal
+
+def cpuConfig (isReal : Row → Bool) (isOpAWrite : Row → Bool) : CPU.Config where
+  isReal := isReal
+  clk := [1, 2]
+  pc := [5]
+  writes := [{ isWrite := isOpAWrite, addr := [9], value := [26, 27, 28, 29] }]
 
 def lookupDrivenALUTables : List String :=
   ["mul", "shiftleft", "shiftright", "lt", "bitwise"]
@@ -344,6 +419,18 @@ theorem memoryInstrs_one_to_one {Record : Type} (isReal : Row → Bool)
     records₁ = records₂ :=
   one_to_one_for_config (memoryInstrsConfig isReal) enc generateTable hgen records₁ records₂
 
+/-- Ziren CPU canonicalizer one-to-one guarantee. -/
+theorem cpu_one_to_one {Record : Type} [DecidableEq Record]
+    (isReal isOpAWrite : Row → Bool)
+    (enc : Generic.RecordIdentity Record CPU.RecordRepr)
+    (generateTable : Generic.RecordSet Record → Trace)
+    (hgen : CPU.TableGeneratorFaithful (cpuConfig isReal isOpAWrite) enc generateTable)
+    (records₁ records₂ : Generic.RecordSet Record) :
+    CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₁) =
+      CPU.canonicalize (cpuConfig isReal isOpAWrite) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  cpu_one_to_one_for_config (cpuConfig isReal isOpAWrite) enc generateTable hgen records₁ records₂
+
 end Ziren
 
 /-! ### Valida -/
@@ -375,8 +462,7 @@ end Valida
 
 namespace OpenVM
 
-/-- OpenVM examples currently use the lookup-driven ALU final checker. CPU
-    tables are intentionally skipped. -/
+/-- OpenVM examples currently use the lookup-driven ALU final checker. -/
 def lookupDrivenALUTables : List String :=
   ["alu", "bitwise", "branch", "jump", "lt", "mul", "shift"]
 
