@@ -78,7 +78,6 @@ fn main() -> Result<(), io::Error> {
     let air = CloClzChip::default();
     let air_name = "CloClz";
     let _colmap = make_col_map();
-    //println!("{:?}", colmap);
 
     let (mut constraint_info, _general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, CloClzChip>(&air, NUM_CLOCLZ_COLS, prime, args.method == "bb" && !args.no_simplify);

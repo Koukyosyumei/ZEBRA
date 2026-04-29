@@ -29,7 +29,6 @@ pub fn get_control_flow_constraint(
     let a_box = a.clone().map(|f| Box::new(f));
     let b_box = b.clone().map(|f| Box::new(f));
     let c_box = c.clone().map(|f| Box::new(f));
-    //let a_expr = reconstruct_symbolic_word(a, 0);
     let b_expr = reconstruct_symbolic_word(b, 0);
     let c_expr = reconstruct_symbolic_word(c, 0);
 

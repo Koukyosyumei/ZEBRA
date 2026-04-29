@@ -78,8 +78,6 @@ fn main() -> Result<(), io::Error> {
     let prime = 2_u32.pow(31) - 2_u32.pow(27) + 1;
 
     // ######################## Extract Add Constraints ##########################
-    //println!("Bitwise AIR MAP");
-    //println!("  {:?}", COL_MAP);
 
     let air = Bitwise32Chip::default();
     let num_col = NUM_BITWISE_COLS;

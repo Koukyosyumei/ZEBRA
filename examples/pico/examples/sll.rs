@@ -34,7 +34,6 @@ fn main() -> Result<(), io::Error> {
     create_or_clear_dir("voutput")?;
 
     let args = Args::parse();
-    //let _opcode_str = args.opcode_str;
     let mut search_config = load_config(&args.config).unwrap();
     search_config.enable_heuristic = !args.no_heuristic;
     search_config.enable_interval_refinement = !args.no_refinement;

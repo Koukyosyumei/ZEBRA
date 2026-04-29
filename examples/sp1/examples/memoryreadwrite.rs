@@ -99,7 +99,6 @@ fn main() -> Result<(), io::Error> {
     let air = MemoryInstructionsChip::default();
     let air_name = "MemoryInstrs";
     let _colmap = make_col_map();
-    //println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) = extract_constraints_and_range::<
         BabyBear,
@@ -107,7 +106,6 @@ fn main() -> Result<(), io::Error> {
     >(
         &air, NUM_MEMORY_INSTRUCTIONS_COLUMNS, prime, args.method == "bb" && !args.no_simplify
     );
-    //  println!("{:?}", general_lookup_info);
 
     let final_check = generate_memory_op_final_checker(
         2,                    // clk

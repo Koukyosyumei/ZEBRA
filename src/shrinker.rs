@@ -179,7 +179,6 @@ pub fn refine_conditional_constraints_var_sub_const(
                 }
             }
 
-            // TODO: if the interval does not contain the target, the selector must be zero.
         }
     }
 
@@ -224,7 +223,6 @@ pub fn refine_conditional_constraints_addvars_sub_const(
                 }
             }
 
-            // TODO: if the interval does not contain the target, the selector must be zero.
         }
     }
 
@@ -349,7 +347,6 @@ pub fn refine_conditional_constraints_var_sub_var(
                     return MayBeFlag::False;
                 }
             }
-            // TODO: if the intervals of a and b are disjoint, the selector must be zero.
         }
     }
 

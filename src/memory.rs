@@ -19,7 +19,8 @@ struct Segment {
 }
 
 pub struct IntervalMemory {
-    segs: Vec<Segment>, // 常に non-overlapping
+    /// Invariant: segments are pairwise non-overlapping.
+    segs: Vec<Segment>,
 }
 
 impl fmt::Display for IntervalMemory {
@@ -37,7 +38,6 @@ impl fmt::Display for IntervalMemory {
             .max()
             .unwrap_or(0);
 
-        //writeln!(f, "IntervalMemory {{")?;
         writeln!(
             f,
             "  {:<addr_w$} | {}",
@@ -58,7 +58,6 @@ impl IntervalMemory {
         Self { segs: vec![] }
     }
 
-    // ---- WRITE ----
     pub fn write(&mut self, addr: &AbstractInterval, value: &AbstractInterval) {
         let mut new_segs = Vec::new();
 
@@ -66,7 +65,6 @@ impl IntervalMemory {
             if seg.addr.is_disjoint(addr) {
                 new_segs.push(seg.clone());
             } else {
-                // 左側残り
                 if seg.addr.lo < addr.lo {
                     new_segs.push(Segment {
                         addr: AbstractInterval {
@@ -77,7 +75,6 @@ impl IntervalMemory {
                     });
                 }
 
-                // 右側残り
                 if seg.addr.hi > addr.hi {
                     new_segs.push(Segment {
                         addr: AbstractInterval {
@@ -90,7 +87,6 @@ impl IntervalMemory {
             }
         }
 
-        // 新しい書き込み
         new_segs.push(Segment {
             addr: addr.clone(),
             value: value.clone(),
@@ -99,14 +95,12 @@ impl IntervalMemory {
         self.segs = new_segs;
     }
 
-    // ---- READ CHECK ----
     pub fn check_read(&self, addr: &AbstractInterval, val: &AbstractInterval) -> MayBeFlag {
         let zero = AbstractInterval { lo: 0, hi: 0 };
 
         let mut all_contained = true;
         let mut all_disjoint = true;
 
-        // ---- 既存セグメントとの重なり ----
         for seg in &self.segs {
             if seg.addr.is_intersects(addr) {
                 if !val.is_contains(&seg.value) {
@@ -118,7 +112,7 @@ impl IntervalMemory {
             }
         }
 
-        // ---- 未書き込み部分（= 0） ----
+        // Unwritten regions read as 0.
         if !self.covers(addr) {
             if !val.is_contains(&zero) {
                 all_contained = false;
@@ -137,7 +131,6 @@ impl IntervalMemory {
         }
     }
 
-    // addr 全体が write で覆われているか
     fn covers(&self, addr: &AbstractInterval) -> bool {
         let mut covered_lo = addr.lo;
 

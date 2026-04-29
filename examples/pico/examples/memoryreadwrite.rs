@@ -99,7 +99,6 @@ fn main() -> Result<(), io::Error> {
     let air: MemoryReadWriteChip<KoalaBear> = MemoryReadWriteChip::default();
     let air_name = "MemoryReadWrite";
     let _colmap = make_col_map();
-    //println!("{:?}", _colmap);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<KoalaBear, MemoryReadWriteChip<KoalaBear>>(
@@ -142,9 +141,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut rng = StdRng::seed_from_u64(search_config.seed);
     let mut ds = vec![];
-    for i in 0..args.num_trial {
-        //search_config.seed += i;
-
+    for _ in 0..args.num_trial {
         let r1: u32 = rng.random_range(0..32);
         let r2: u32 = rng.random_range(0..32);
         let x: u32 = rng.random();

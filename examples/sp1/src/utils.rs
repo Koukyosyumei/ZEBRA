@@ -43,9 +43,6 @@ pub fn run_sp1_program(program: &Program) -> Vec<(String, Vec<Vec<AbstractInterv
     let machine = RiscvAir::machine(config);
     let prover = CpuProver::new(machine);
 
-    //let mut reader = io::BufReader::new(checkpoint_file);
-    //let execution_state: ExecutionState =
-    //    bincode::deserialize_from(&mut reader).expect("failed to deserialize state");
     let (records, _report) = trace_checkpoint::<SC>(
         program.clone(),
         &checkpoint_file,

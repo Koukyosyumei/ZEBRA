@@ -57,7 +57,6 @@ fn main() -> Result<(), io::Error> {
     let air = MulChip::default();
     let air_name = "Mul";
     let _colmap = make_col_map();
-    //println!("{:?}", colmap);
 
     let (mut constraint_info, general_lookup_info) =
         extract_constraints_and_range::<BabyBear, MulChip>(
@@ -67,7 +66,6 @@ fn main() -> Result<(), io::Error> {
             args.method == "bb" && !args.no_simplify,
         );
     let final_check = generate_alu_final_checker(general_lookup_info.clone());
-    //println!("{:?}", general_lookup_info);
 
     constraint_info
         .refinable_cols

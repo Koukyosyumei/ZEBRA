@@ -27,8 +27,8 @@ pub fn convert_ziren_variable<F>(var: &SymbolicVariable<F>) -> ZEBRASymbolicVal 
 }
 
 impl_p3_to_tv_conversion!(
-    p3_uni_stark::SymbolicExpression, // Expr型
-    p3_uni_stark::SymbolicVariable,   // Var型
+    p3_uni_stark::SymbolicExpression,
+    p3_uni_stark::SymbolicVariable,
     p3_air::PairCol,
     p3_air::VirtualPairCol,
     p3_field::PrimeField32,
