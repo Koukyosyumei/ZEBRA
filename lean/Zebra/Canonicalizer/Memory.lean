@@ -72,58 +72,71 @@ lemma mem_canonicalizeAccesses_iff (cfg : AccessConfig) (t : Trace) (repr : Acce
   unfold canonicalizeAccesses
   simp [List.mem_flatMap]
 
-def TableEncodesAccessRecords {Record : Type}
-    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
-    (records : Generic.RecordSet Record) (table : Trace) : Prop :=
-  ∀ repr, repr ∈ Finset.image enc.toRepr records ↔
-    ∃ row ∈ table, repr ∈ rowAccesses cfg row
+/-- Record identities reconstructed from an access-style memory table. `tableId`
+    interprets the memory access tuple as the abstract identity of an execution
+    record. -/
+def recordIdsOfAccessTable {Identity : Type} [DecidableEq Identity]
+    (cfg : AccessConfig) (tableId : AccessTuple → Identity) (table : Trace) : Finset Identity :=
+  Finset.image tableId (canonicalizeAccesses cfg table)
 
-def AccessTableGeneratorFaithful {Record : Type}
-    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
-    (generateTable : Generic.RecordSet Record → Trace) : Prop :=
-  ∀ records, TableEncodesAccessRecords cfg enc records (generateTable records)
-
-lemma canonicalizeAccesses_eq_recordReprSet_of_encodes {Record : Type}
-    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
-    {records : Generic.RecordSet Record} {table : Trace}
-    (h : TableEncodesAccessRecords cfg enc records table) :
-    canonicalizeAccesses cfg table = Finset.image enc.toRepr records := by
-  ext repr
-  rw [mem_canonicalizeAccesses_iff]
-  exact (h repr).symm
-
-theorem canonicalizeAccesses_generated_table_eq_recordReprSet {Record : Type}
-    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
-    (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : AccessTableGeneratorFaithful cfg enc generateTable)
-    (records : Generic.RecordSet Record) :
-    canonicalizeAccesses cfg (generateTable records) = Finset.image enc.toRepr records :=
-  canonicalizeAccesses_eq_recordReprSet_of_encodes cfg enc (hgen records)
-
-theorem canonicalizeAccesses_generator_independent {Record : Type}
-    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
-    (gen₁ gen₂ : Generic.RecordSet Record → Trace)
-    (h₁ : AccessTableGeneratorFaithful cfg enc gen₁)
-    (h₂ : AccessTableGeneratorFaithful cfg enc gen₂)
-    (records : Generic.RecordSet Record) :
-    canonicalizeAccesses cfg (gen₁ records) = canonicalizeAccesses cfg (gen₂ records) := by
-  rw [canonicalizeAccesses_generated_table_eq_recordReprSet cfg enc gen₁ h₁ records,
-      canonicalizeAccesses_generated_table_eq_recordReprSet cfg enc gen₂ h₂ records]
-
-theorem canonicalizeAccesses_generated_eq_iff_records_eq {Record : Type}
-    [DecidableEq Record]
-    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
-    (generateTable : Generic.RecordSet Record → Trace)
-    (hgen : AccessTableGeneratorFaithful cfg enc generateTable)
-    (records₁ records₂ : Generic.RecordSet Record) :
-    canonicalizeAccesses cfg (generateTable records₁) =
-      canonicalizeAccesses cfg (generateTable records₂) ↔
-    records₁ = records₂ := by
-  rw [canonicalizeAccesses_generated_table_eq_recordReprSet cfg enc generateTable hgen records₁,
-      canonicalizeAccesses_generated_table_eq_recordReprSet cfg enc generateTable hgen records₂]
+lemma mem_recordIdsOfAccessTable_iff {Identity : Type} [DecidableEq Identity]
+    (cfg : AccessConfig) (tableId : AccessTuple → Identity) (table : Trace) (identity : Identity) :
+    identity ∈ recordIdsOfAccessTable cfg tableId table ↔
+      ∃ row ∈ table, ∃ repr ∈ rowAccesses cfg row, tableId repr = identity := by
+  unfold recordIdsOfAccessTable
   constructor
   · intro h
-    exact Finset.image_injective enc.injective h
+    rcases Finset.mem_image.mp h with ⟨repr, hrepr, hidentity⟩
+    rw [mem_canonicalizeAccesses_iff] at hrepr
+    rcases hrepr with ⟨row, hrow, hreprInRow⟩
+    exact ⟨row, hrow, repr, hreprInRow, hidentity⟩
+  · rintro ⟨row, hrow, repr, hreprInRow, hidentity⟩
+    apply Finset.mem_image.mpr
+    exact ⟨repr, (mem_canonicalizeAccesses_iff cfg table repr).mpr
+      ⟨row, hrow, hreprInRow⟩, hidentity⟩
+
+def AccessTableEncodesRecordIds {Record Identity : Type} [DecidableEq Identity]
+    (cfg : AccessConfig) (tableId : AccessTuple → Identity)
+    (recordId : Generic.RecordIdentity Record Identity)
+    (records : Generic.RecordSet Record) (table : Trace) : Prop :=
+  ∀ identity, identity ∈ Finset.image recordId.toIdentity records ↔
+    ∃ row ∈ table, ∃ repr ∈ rowAccesses cfg row, tableId repr = identity
+
+def AccessTableGeneratorFaithfulToIds {Record Identity : Type}
+    [DecidableEq Identity]
+    (cfg : AccessConfig) (tableId : AccessTuple → Identity)
+    (recordId : Generic.RecordIdentity Record Identity)
+    (generateTable : Generic.RecordSet Record → Trace) : Prop :=
+  ∀ records, AccessTableEncodesRecordIds cfg tableId recordId records (generateTable records)
+
+lemma recordIdsOfAccessTable_eq_recordIds {Record Identity : Type}
+    [DecidableEq Identity]
+    (cfg : AccessConfig) (tableId : AccessTuple → Identity)
+    (recordId : Generic.RecordIdentity Record Identity)
+    {records : Generic.RecordSet Record} {table : Trace}
+    (h : AccessTableEncodesRecordIds cfg tableId recordId records table) :
+    recordIdsOfAccessTable cfg tableId table = Finset.image recordId.toIdentity records := by
+  ext identity
+  rw [mem_recordIdsOfAccessTable_iff]
+  exact (h identity).symm
+
+theorem recordIdsOfAccessTable_eq_iff_records_eq {Record Identity : Type}
+    [DecidableEq Record] [DecidableEq Identity]
+    (cfg : AccessConfig) (tableId : AccessTuple → Identity)
+    (recordId : Generic.RecordIdentity Record Identity)
+    (generateTable : Generic.RecordSet Record → Trace)
+    (hgen : AccessTableGeneratorFaithfulToIds cfg tableId recordId generateTable)
+    (records₁ records₂ : Generic.RecordSet Record) :
+    recordIdsOfAccessTable cfg tableId (generateTable records₁) =
+      recordIdsOfAccessTable cfg tableId (generateTable records₂) ↔
+    records₁ = records₂ := by
+  rw [recordIdsOfAccessTable_eq_recordIds cfg tableId recordId
+        (hgen records₁),
+      recordIdsOfAccessTable_eq_recordIds cfg tableId recordId
+        (hgen records₂)]
+  constructor
+  · intro h
+    exact Finset.image_injective recordId.injective h
   · intro h
     rw [h]
 

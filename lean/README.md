@@ -5,7 +5,7 @@ Lean 4 proofs for Zebra canonicalizer correctness. The proofs formalize:
 1. Raw trace tables modulo canonicalizer equality are bijective with the image
    of the canonicalizer.
 2. If a table generator faithfully encodes semantic records and the record
-   encoding is injective, canonicalization is one-to-one with the record set.
+   identity is injective, canonicalization is one-to-one with the record set.
 
 ## Layout
 
@@ -42,6 +42,7 @@ In `Zebra.Generic`:
 canonicalTraceSpace_equiv_image
 canonicalize_generator_independent
 canonicalize_generated_eq_iff_records_eq
+recordIds_generated_eq_iff_records_eq
 ```
 
 `canonicalTraceSpace_equiv_image` is in `Quotient.lean` and proves the
@@ -65,7 +66,7 @@ the collapse of different raw representations of the same computation.
 that if:
 
 - `cfg` defines real rows and row projection,
-- `enc` injectively maps semantic records to canonical row representations,
+- `recordId` injectively maps semantic records to canonical row identities,
 - `generateTable` faithfully encodes each record set,
 
 then:
@@ -79,6 +80,11 @@ records₁ = records₂
 
 This proves one-to-one correctness for the canonicalizer relative to those
 assumptions.
+
+`recordIds_generated_eq_iff_records_eq` is the variant used when a
+table canonicalizer extracts a table-specific tuple, such as `ALU.Tuple`, and a
+separate `tableId` function interprets that tuple as the abstract identity of a
+semantic record.
 
 ## Covered Layouts
 
