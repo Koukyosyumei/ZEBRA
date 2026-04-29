@@ -2,6 +2,7 @@
 Zebra — memory-operation canonical representation shapes.
 -/
 import Zebra.Canonicalizer.Generic
+import Zebra.Canonicalizer.Generator
 
 namespace Zebra.Memory
 
@@ -26,5 +27,104 @@ def mkMemoryOpConfig (clk : Nat) (opA opB opC mem : List Nat) (isReal : Row → 
       opB := row.project opB,
       opC := row.project opC,
       mem := row.project mem }
+
+/-- Direction of a canonical memory-table access. -/
+inductive AccessKind where
+  | read
+  | write
+deriving DecidableEq, Repr
+
+/-- Canonical representation for Valida-style memory rows: clock, address,
+    value, and whether the access is a read or write. -/
+structure AccessTuple where
+  clk : Interval
+  addr : Interval
+  value : List Interval
+  kind : AccessKind
+deriving DecidableEq, Repr
+
+/-- Layout for memory tables whose rows may encode read and/or write accesses. -/
+structure AccessConfig where
+  isRead : Row → Bool
+  isWrite : Row → Bool
+  clk : Nat
+  addr : Nat
+  value : List Nat
+
+def accessOfRow (cfg : AccessConfig) (kind : AccessKind) (row : Row) : AccessTuple :=
+  { clk := row[cfg.clk]?.getD { lo := 0, hi := 0 },
+    addr := row[cfg.addr]?.getD { lo := 0, hi := 0 },
+    value := row.project cfg.value,
+    kind := kind }
+
+def rowAccesses (cfg : AccessConfig) (row : Row) : List AccessTuple :=
+  (if cfg.isRead row then [accessOfRow cfg AccessKind.read row] else []) ++
+    (if cfg.isWrite row then [accessOfRow cfg AccessKind.write row] else [])
+
+/-- Memory-table canonicalizer for layouts such as Valida memory: flatten all
+    read/write accesses and deduplicate them as a finite set. -/
+def canonicalizeAccesses (cfg : AccessConfig) (t : Trace) : Finset AccessTuple :=
+  (t.flatMap (rowAccesses cfg)).toFinset
+
+lemma mem_canonicalizeAccesses_iff (cfg : AccessConfig) (t : Trace) (repr : AccessTuple) :
+    repr ∈ canonicalizeAccesses cfg t ↔
+      ∃ row ∈ t, repr ∈ rowAccesses cfg row := by
+  unfold canonicalizeAccesses
+  simp [List.mem_flatMap]
+
+def TableEncodesAccessRecords {Record : Type}
+    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
+    (records : Generic.RecordSet Record) (table : Trace) : Prop :=
+  ∀ repr, repr ∈ Finset.image enc.toRepr records ↔
+    ∃ row ∈ table, repr ∈ rowAccesses cfg row
+
+def AccessTableGeneratorFaithful {Record : Type}
+    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
+    (generateTable : Generic.RecordSet Record → Trace) : Prop :=
+  ∀ records, TableEncodesAccessRecords cfg enc records (generateTable records)
+
+lemma canonicalizeAccesses_eq_recordReprSet_of_encodes {Record : Type}
+    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
+    {records : Generic.RecordSet Record} {table : Trace}
+    (h : TableEncodesAccessRecords cfg enc records table) :
+    canonicalizeAccesses cfg table = Finset.image enc.toRepr records := by
+  ext repr
+  rw [mem_canonicalizeAccesses_iff]
+  exact (h repr).symm
+
+theorem canonicalizeAccesses_generated_table_eq_recordReprSet {Record : Type}
+    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
+    (hgen : AccessTableGeneratorFaithful cfg enc generateTable)
+    (records : Generic.RecordSet Record) :
+    canonicalizeAccesses cfg (generateTable records) = Finset.image enc.toRepr records :=
+  canonicalizeAccesses_eq_recordReprSet_of_encodes cfg enc (hgen records)
+
+theorem canonicalizeAccesses_generator_independent {Record : Type}
+    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
+    (gen₁ gen₂ : Generic.RecordSet Record → Trace)
+    (h₁ : AccessTableGeneratorFaithful cfg enc gen₁)
+    (h₂ : AccessTableGeneratorFaithful cfg enc gen₂)
+    (records : Generic.RecordSet Record) :
+    canonicalizeAccesses cfg (gen₁ records) = canonicalizeAccesses cfg (gen₂ records) := by
+  rw [canonicalizeAccesses_generated_table_eq_recordReprSet cfg enc gen₁ h₁ records,
+      canonicalizeAccesses_generated_table_eq_recordReprSet cfg enc gen₂ h₂ records]
+
+theorem canonicalizeAccesses_generated_eq_iff_records_eq {Record : Type}
+    [DecidableEq Record]
+    (cfg : AccessConfig) (enc : Generic.RecordIdentity Record AccessTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
+    (hgen : AccessTableGeneratorFaithful cfg enc generateTable)
+    (records₁ records₂ : Generic.RecordSet Record) :
+    canonicalizeAccesses cfg (generateTable records₁) =
+      canonicalizeAccesses cfg (generateTable records₂) ↔
+    records₁ = records₂ := by
+  rw [canonicalizeAccesses_generated_table_eq_recordReprSet cfg enc generateTable hgen records₁,
+      canonicalizeAccesses_generated_table_eq_recordReprSet cfg enc generateTable hgen records₂]
+  constructor
+  · intro h
+    exact Finset.image_injective enc.injective h
+  · intro h
+    rw [h]
 
 end Zebra.Memory
