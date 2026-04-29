@@ -88,10 +88,8 @@ assumptions.
 - Pico: CPU, add/sub, memory read/write, lookup-driven ALU tables
 - Sphinx: CPU, add/sub, lookup-driven ALU tables
 - Ziren: CPU, add/sub, div/rem, CLO/CLZ, movcond, branch/jump, memory instructions, lookup-driven ALU tables
-- Valida: LT32 and lookup-driven ALU tables
+- Valida: LT32, memory, and lookup-driven ALU tables
 - OpenVM: lookup-driven ALU tables
-
-Valida memory is intentionally skipped.
 
 ## Non-Claims
 

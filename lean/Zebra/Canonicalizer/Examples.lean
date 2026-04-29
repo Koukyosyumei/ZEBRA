@@ -1,8 +1,8 @@
 /-
 Zebra — concrete example table layouts from the Rust experiments.
 
-Valida memory is intentionally skipped because its canonicalizer is not
-currently supported by Zebra.
+This file includes only the canonical representation shape and column layout;
+faithfulness of the corresponding Rust table generators remains an assumption.
 -/
 import Zebra.Canonicalizer.ALU
 import Zebra.Canonicalizer.ControlFlow
@@ -440,8 +440,13 @@ namespace Valida
 def lt32Config (isReal : Row → Bool) : Generic.Config ControlFlow.ValidaLtTuple :=
   ControlFlow.mkValidaLtConfig [0, 1, 2, 3] [4, 5, 6, 7] 21 isReal
 
-/-- Valida memory is intentionally skipped: its canonicalizer is not yet
-    supported in Zebra. -/
+def memoryConfig (isRead isWrite : Row → Bool) : Memory.AccessConfig where
+  isRead := isRead
+  isWrite := isWrite
+  clk := 13
+  addr := 12
+  value := [4, 5, 6, 7]
+
 def lookupDrivenALUTables : List String :=
   ["add32", "sub32", "mul32", "div32", "bitwise32", "com32"]
 
@@ -455,6 +460,21 @@ theorem lt32_one_to_one {Record : Type} (isReal : Row → Bool)
       Generic.canonicalize (lt32Config isReal) (generateTable records₂) ↔
     records₁ = records₂ :=
   one_to_one_for_config (lt32Config isReal) enc generateTable hgen records₁ records₂
+
+/-- Valida memory-table canonicalizer one-to-one guarantee. The canonical record
+    is `(clk, addr, value, read_or_write)`, with read/write selection supplied by
+    the extracted row predicates. -/
+theorem memory_one_to_one {Record : Type} [DecidableEq Record]
+    (isRead isWrite : Row → Bool)
+    (enc : Generic.RecordIdentity Record Memory.AccessTuple)
+    (generateTable : Generic.RecordSet Record → Trace)
+    (hgen : Memory.AccessTableGeneratorFaithful (memoryConfig isRead isWrite) enc generateTable)
+    (records₁ records₂ : Generic.RecordSet Record) :
+    Memory.canonicalizeAccesses (memoryConfig isRead isWrite) (generateTable records₁) =
+      Memory.canonicalizeAccesses (memoryConfig isRead isWrite) (generateTable records₂) ↔
+    records₁ = records₂ :=
+  Memory.canonicalizeAccesses_generated_eq_iff_records_eq
+    (memoryConfig isRead isWrite) enc generateTable hgen records₁ records₂
 
 end Valida
 
