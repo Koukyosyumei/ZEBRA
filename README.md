@@ -13,7 +13,7 @@ The artifact contains:
 
 | Path | Contents |
 |---|---|
-| `src/` | Core interval domain, symbolic expressions, traces, refinement, SMT export, and terminal UI |
+| `src/` | Core interval domain, symbolic expressions, traces, refinement, and SMT export |
 | `examples/ziren/` | Ziren/RISC-V integration |
 | `examples/sp1/` | SP1 integration |
 | `examples/pico/` | Pico integration |
