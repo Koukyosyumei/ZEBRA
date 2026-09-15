@@ -20,6 +20,7 @@ The artifact contains:
 | `examples/sphinx/` | Sphinx integration |
 | `examples/valida/` | Valida integration |
 | `lean/` | Lean 4 formalization of canonicalizer correctness |
+| `full-version-paper/` | Extended version containing the appendices  |
 
 ## Rust Build and Tests
 
